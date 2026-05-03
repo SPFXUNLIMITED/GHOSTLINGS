@@ -46,38 +46,22 @@ render_header('Playbook Tasks');
         <th style="width:30%;">
           <button type="button" class="linklike" data-sort-col="title" data-sort-type="text" aria-label="Sort by title">Title</button>
         </th>
-        <th style="width:14%;">
-          <button type="button" class="linklike" data-sort-col="status" data-sort-type="status" aria-label="Sort by status">Status</button>
-        </th>
-        <th style="width:120px;">
-          <button type="button" class="linklike" data-sort-col="due" data-sort-type="text" aria-label="Sort by due date">Due</button>
-        </th>
         <th>Details</th>
         <th style="width:220px;">Actions</th>
       </tr>
     </thead>
     <tbody>
       <?php if (!$tasks): ?>
-        <tr><td colspan="5" class="muted">No tasks yet.</td></tr>
+        <tr><td colspan="3" class="muted">No tasks yet.</td></tr>
       <?php endif; ?>
 
       <?php foreach ($tasks as $t): ?>
         <tr data-title="<?= h(strtolower($t['title'])) ?>"
-            data-status="<?= h($t['status']) ?>"
-            data-due="<?= h($t['due_date'] ?? '') ?>"
             data-created-at="<?= h($t['created_at'] ?? '') ?>">
           <td>
             <strong><?= h($t['title']) ?></strong><br>
             <?php $count = (int)($t['upload_count'] ?? 0); ?>
             <a class="muted" href="task_uploads.php?task_id=<?= (int)$t['id'] ?>">Files (<?= $count ?>)</a>
-          </td>
-          <td><span class="badge <?= h($t['status']) ?>"><?= h($t['status']) ?></span></td>
-          <td>
-            <?php if (!empty($t['due_date'])): ?>
-              <?= h(fmt_date_mdY($t['due_date'])) ?>
-            <?php else: ?>
-              <span class="muted">—</span>
-            <?php endif; ?>
           </td>
           <td><?= $t['details'] ?? '' ?></td>
           <td>
