@@ -14,9 +14,10 @@ $project = $stmt->fetch();
 if (!$project) { http_response_code(404); exit('Project not found'); }
 
 $stmt = $pdo->prepare("
-  SELECT t.*, COUNT(u.id) AS upload_count
+  SELECT t.*, COUNT(u.id) AS upload_count, usr.username AS assigned_username
   FROM tasks t
   LEFT JOIN task_uploads u ON u.task_id = t.id
+  LEFT JOIN users usr ON usr.id = t.assigned_to
   WHERE t.project_id = ?
   GROUP BY t.id
   ORDER BY t.id DESC
@@ -46,13 +47,14 @@ render_header('Playbook Tasks');
         <th style="width:18%;">
           <button type="button" class="linklike" data-sort-col="title" data-sort-type="text" aria-label="Sort by title">Title</button>
         </th>
+        <th>Assigned To</th>
         <th>Details</th>
         <th style="width:160px;">Actions</th>
       </tr>
     </thead>
     <tbody>
       <?php if (!$tasks): ?>
-        <tr><td colspan="3" class="muted">No tasks yet.</td></tr>
+        <tr><td colspan="4" class="muted">No tasks yet.</td></tr>
       <?php endif; ?>
 
       <?php foreach ($tasks as $t): ?>
@@ -62,6 +64,13 @@ render_header('Playbook Tasks');
             <strong><?= h($t['title']) ?></strong><br>
             <?php $count = (int)($t['upload_count'] ?? 0); ?>
             <a class="muted" href="task_uploads.php?task_id=<?= (int)$t['id'] ?>">Files (<?= $count ?>)</a>
+          </td>
+          <td>
+            <?php if (!empty($t['assigned_username'])): ?>
+              <?= h($t['assigned_username']) ?>
+            <?php else: ?>
+              <span class="muted">—</span>
+            <?php endif; ?>
           </td>
           <td><?= $t['details'] ?? '' ?></td>
           <td>
