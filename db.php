@@ -41,3 +41,12 @@ try {
     throw $e;
   }
 }
+
+// Add is_admin column to users if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE users ADD COLUMN is_admin TINYINT(1) NOT NULL DEFAULT 0");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
