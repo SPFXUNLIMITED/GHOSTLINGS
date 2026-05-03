@@ -21,8 +21,10 @@ $stmt = $pdo->query("SELECT id, name FROM projects WHERE playbook = 1 ORDER BY n
 $all_projects = $stmt->fetchAll();
 if (!$all_projects) { http_response_code(500); exit('No playbooks exist'); }
 
+$all_users = $pdo->query("SELECT id, username FROM users ORDER BY username")->fetchAll();
+
 $errors = [];
-$task = ['project_id' => $project_id, 'title' => '', 'details' => '', 'status' => 'todo', 'due_date' => ''];
+$task = ['project_id' => $project_id, 'title' => '', 'details' => '', 'status' => 'todo', 'due_date' => '', 'assigned_to' => null];
 
 if ($id) {
   $stmt = $pdo->prepare("SELECT * FROM tasks WHERE id = ?");
@@ -97,6 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['add_comment']) && !i
   $details = trim($_POST['details'] ?? '');
   $status = $_POST['status'] ?? 'todo';
   $due_date = trim($_POST['due_date'] ?? ''); // must be YYYY-MM-DD for <input type="date">
+  $assigned_to = isset($_POST['assigned_to']) && (int)$_POST['assigned_to'] > 0 ? (int)$_POST['assigned_to'] : null;
 
   if ($title === '') $errors[] = "Title is required.";
   if (!in_array($status, ['todo','doing','done'], true)) $errors[] = "Invalid status.";
@@ -108,11 +111,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['add_comment']) && !i
     $due = ($due_date === '') ? null : $due_date;
 
     if ($id) {
-      $stmt = $pdo->prepare("UPDATE tasks SET project_id=?, title=?, details=?, status=?, due_date=? WHERE id=?");
-      $stmt->execute([$new_project_id, $title, $details ?: null, $status, $due, $id]);
+      $stmt = $pdo->prepare("UPDATE tasks SET project_id=?, title=?, details=?, status=?, due_date=?, assigned_to=? WHERE id=?");
+      $stmt->execute([$new_project_id, $title, $details ?: null, $status, $due, $assigned_to, $id]);
     } else {
-      $stmt = $pdo->prepare("INSERT INTO tasks (project_id, title, details, status, due_date) VALUES (?, ?, ?, ?, ?)");
-      $stmt->execute([$new_project_id, $title, $details ?: null, $status, $due]);
+      $stmt = $pdo->prepare("INSERT INTO tasks (project_id, title, details, status, due_date, assigned_to) VALUES (?, ?, ?, ?, ?, ?)");
+      $stmt->execute([$new_project_id, $title, $details ?: null, $status, $due, $assigned_to]);
     }
 
     header("Location: playbook_tasks.php?project_id={$new_project_id}");
@@ -124,6 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['add_comment']) && !i
   $task['status'] = $status;
   $task['due_date'] = $due_date;
   $task['project_id'] = $new_project_id;
+  $task['assigned_to'] = $assigned_to;
 
   $project_id = $new_project_id;
 
@@ -228,6 +232,19 @@ render_header($id ? 'Edit Task' : 'New Task');
         <div class="muted" style="margin-top:6px;">
           Display format: <?= h(fmt_date_mdY($task['due_date'] ?? '')) ?>
         </div>
+      </div>
+
+      <!-- Assign to user selector -->
+      <div>
+        <label>Assign to</label>
+        <select name="assigned_to">
+          <option value="">— Unassigned —</option>
+          <?php foreach ($all_users as $u): ?>
+            <option value="<?= (int)$u['id'] ?>" <?= ((int)($task['assigned_to'] ?? 0) === (int)$u['id']) ? 'selected' : '' ?>>
+              <?= h($u['username']) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
       </div>
 
       <!-- Details WYSIWYG editor -->

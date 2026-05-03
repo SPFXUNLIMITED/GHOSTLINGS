@@ -32,3 +32,12 @@ try {
     throw $e;
   }
 }
+
+// Add assigned_to column to tasks if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE tasks ADD COLUMN assigned_to INT NULL DEFAULT NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
