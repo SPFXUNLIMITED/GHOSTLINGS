@@ -1,0 +1,160 @@
+<?php
+require __DIR__ . '/db.php';
+require __DIR__ . '/layout.php';
+
+require __DIR__ . '/auth.php';
+require_login();
+
+$projects = $pdo->query("
+  SELECT id, name, description, created_at, priority
+  FROM projects
+  WHERE playbook = 0
+  ORDER BY id DESC
+")->fetchAll();
+
+$recent_tasks = $pdo->query("
+  SELECT
+    t.id, t.project_id, t.title, t.status, t.due_date, t.created_at, t.priority,
+    p.name AS project_name
+  FROM tasks t
+  JOIN projects p ON p.id = t.project_id
+  WHERE p.playbook = 0
+  ORDER BY t.created_at DESC
+  LIMIT 25
+")->fetchAll(PDO::FETCH_ASSOC);
+
+render_header('Projects');
+?>
+<div class="card">
+  <div class="row" style="justify-content:space-between; align-items:center;">
+    <h1 style="margin:0;">Projects</h1>
+    <a class="btn primary" href="project_form.php">+ New Project</a>
+  </div>
+  <p class="muted">Create projects, then manage tasks inside each project.</p>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="table-auto" data-table-key="projects" data-default-sort-col="priority" data-default-sort-dir="desc">
+      <thead>
+        <tr>
+          <th>
+            <button type="button" class="linklike" data-sort-col="name" data-sort-type="text" aria-label="Sort projects by name">
+              Name
+            </button>
+          </th>
+          <th>Description</th>
+          <th class="col-status">
+            <button type="button" class="linklike" data-sort-col="priority" data-sort-type="priority" aria-label="Sort projects by priority">
+              Priority
+            </button>
+          </th>
+          <th class="col-actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php if (!$projects): ?>
+          <tr><td colspan="4" class="muted">No projects yet.</td></tr>
+        <?php endif; ?>
+
+        <?php foreach ($projects as $p): ?>
+          <tr data-name="<?= h(strtolower($p['name'])) ?>"
+              data-priority="<?= h($p['priority'] ?? 'medium') ?>"
+              data-created-at="<?= h($p['created_at']) ?>">
+            <td>
+              <strong><?= h($p['name']) ?></strong><br />
+              <span class="muted">
+                Project #<?= (int)$p['id'] ?> <br>
+				<?php
+				  $dt = new DateTime($p['created_at']); // parsed from DB (often UTC)
+				  $dt->setTimezone(new DateTimeZone('America/Los_Angeles'));
+				  echo nl2br(h($dt->format("m-d-Y\ng:i A")));
+				?>
+              </span>
+            </td>
+            <td class="col-desc"><?= nl2br(h($p['description'] ?? '')) ?></td>
+            <td class="col-status"><span class="badge priority-<?= h($p['priority'] ?? 'medium') ?>"><?= h(ucfirst($p['priority'] ?? 'medium')) ?></span></td>
+            <td class="col-actions">
+              <div class="actions">
+                <a class="btn" href="tasks.php?project_id=<?= (int)$p['id'] ?>">Tasks</a>
+                <a class="btn" href="project_form.php?id=<?= (int)$p['id'] ?>">Edit</a>
+                <a class="btn danger" href="project_delete.php?id=<?= (int)$p['id'] ?>"
+                   onclick="return confirm('Delete this project? This also deletes its tasks.');">
+                  Delete
+                </a>
+              </div>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="row" style="justify-content:space-between; align-items:center;">
+    <h2 style="margin:0;">Recent Tasks</h2>
+    <span class="muted">Latest 25</span>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table-auto" data-table-key="tasks" data-default-sort-col="priority" data-default-sort-dir="desc">
+      <thead>
+        <tr>
+          <th>
+            <button type="button" class="linklike" data-sort-col="title" data-sort-type="text" aria-label="Sort tasks by title">
+              Task
+            </button>
+          </th>
+          <th class="col-project">Project</th>
+          <th class="col-status">
+            <button type="button" class="linklike" data-sort-col="status" data-sort-type="status" aria-label="Sort tasks by status">
+              Status
+            </button>
+          </th>
+          <th class="col-status">
+            <button type="button" class="linklike" data-sort-col="priority" data-sort-type="priority" aria-label="Sort tasks by priority">
+              Priority
+            </button>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($recent_tasks as $t): ?>
+          <?php
+            $created = new DateTime($t['created_at']); // timestamp from DB
+            $created->setTimezone(new DateTimeZone('America/Los_Angeles'));
+
+            $due = '';
+            if (!empty($t['due_date'])) {
+              $dueDt = DateTime::createFromFormat('Y-m-d', $t['due_date'], new DateTimeZone('America/Los_Angeles'));
+              if ($dueDt) $due = $dueDt->format('m-d-Y');
+            }
+          ?>
+          <tr data-title="<?= h(strtolower($t['title'])) ?>"
+              data-status="<?= h($t['status']) ?>"
+              data-priority="<?= h($t['priority'] ?? 'medium') ?>"
+              data-due="<?= h($t['due_date'] ?? '') ?>"
+              data-created-at="<?= h($t['created_at']) ?>">
+			<td class="col-task">
+			  <strong><?= h($t['title']) ?></strong><br>
+			  Due: <?= h($due) ?>
+			</td>
+			<td class="col-project col-project-wrap">
+			  <?= h($t['project_name']) ?> <br>
+			  <a class="muted" href="tasks.php?project_id=<?= (int)$t['project_id'] ?>">View project tasks</a>
+			</td>
+            <td class="col-status"><span class="badge <?= h($t['status']) ?>"><?= h($t['status']) ?></span></td>
+            <td class="col-status"><span class="badge priority-<?= h($t['priority'] ?? 'medium') ?>"><?= h(ucfirst($t['priority'] ?? 'medium')) ?></span></td>
+          </tr>
+        <?php endforeach; ?>
+
+        <?php if (empty($recent_tasks)): ?>
+          <tr><td colspan="4" class="muted">No tasks yet.</td></tr>
+        <?php endif; ?>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<?php render_footer(); ?>

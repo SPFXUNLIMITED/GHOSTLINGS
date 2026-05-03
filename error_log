@@ -1,0 +1,33 @@
+[19-Apr-2026 02:15:27 America/Chicago] PHP Fatal error:  strict_types declaration must be the very first statement in the script in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 6
+[19-Apr-2026 02:15:30 America/Chicago] PHP Fatal error:  strict_types declaration must be the very first statement in the script in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 6
+[19-Apr-2026 02:15:32 America/Chicago] PHP Fatal error:  strict_types declaration must be the very first statement in the script in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 6
+[19-Apr-2026 02:15:51 America/Chicago] PHP Fatal error:  strict_types declaration must be the very first statement in the script in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 6
+[19-Apr-2026 02:15:52 America/Chicago] PHP Fatal error:  strict_types declaration must be the very first statement in the script in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 6
+[19-Apr-2026 02:15:55 America/Chicago] PHP Fatal error:  strict_types declaration must be the very first statement in the script in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 6
+[19-Apr-2026 02:15:56 America/Chicago] PHP Fatal error:  strict_types declaration must be the very first statement in the script in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 6
+[19-Apr-2026 03:07:41 America/Chicago] PHP Parse error:  syntax error, unexpected token ";" in /home3/spfx/public_html/website_a844b2f2/project/task_form.php on line 32
+[19-Apr-2026 03:07:48 America/Chicago] PHP Parse error:  syntax error, unexpected token ";" in /home3/spfx/public_html/website_a844b2f2/project/task_form.php on line 32
+[19-Apr-2026 04:01:34 America/Chicago] PHP Parse error:  syntax error, unexpected token "<", expecting end of file in /home3/spfx/public_html/website_a844b2f2/project/task_form.php on line 53
+[19-Apr-2026 04:01:40 America/Chicago] PHP Parse error:  syntax error, unexpected token "<", expecting end of file in /home3/spfx/public_html/website_a844b2f2/project/task_form.php on line 53
+[19-Apr-2026 04:02:09 America/Chicago] PHP Parse error:  syntax error, unexpected token "<", expecting end of file in /home3/spfx/public_html/website_a844b2f2/project/task_form.php on line 53
+[19-Apr-2026 05:27:32 America/Chicago] PHP Parse error:  syntax error, unexpected token "else", expecting end of file in /home3/spfx/public_html/website_a844b2f2/project/task_form.php on line 244
+[19-Apr-2026 05:27:36 America/Chicago] PHP Parse error:  syntax error, unexpected token "else", expecting end of file in /home3/spfx/public_html/website_a844b2f2/project/task_form.php on line 244
+[19-Apr-2026 16:31:20 America/Chicago] PHP Parse error:  syntax error, unexpected token ";" in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 113
+[19-Apr-2026 16:31:21 America/Chicago] PHP Parse error:  syntax error, unexpected token ";" in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 113
+[19-Apr-2026 16:31:22 America/Chicago] PHP Parse error:  syntax error, unexpected token ";" in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 113
+[01-May-2026 08:44:09 America/Los_Angeles] PHP Warning:  Undefined variable $project_id in /home3/spfx/public_html/website_a844b2f2/project/task_uploads.php on line 26
+[01-May-2026 08:44:09 America/Los_Angeles] PHP Warning:  Undefined variable $task in /home3/spfx/public_html/website_a844b2f2/project/task_uploads.php on line 29
+[01-May-2026 08:44:13 America/Los_Angeles] PHP Warning:  Undefined variable $project_id in /home3/spfx/public_html/website_a844b2f2/project/task_uploads.php on line 26
+[01-May-2026 08:44:13 America/Los_Angeles] PHP Warning:  Undefined variable $task in /home3/spfx/public_html/website_a844b2f2/project/task_uploads.php on line 29
+[01-May-2026 08:44:27 America/Los_Angeles] PHP Warning:  Undefined variable $project_id in /home3/spfx/public_html/website_a844b2f2/project/task_uploads.php on line 26
+[01-May-2026 08:44:27 America/Los_Angeles] PHP Warning:  Undefined variable $task in /home3/spfx/public_html/website_a844b2f2/project/task_uploads.php on line 29
+[03-May-2026 05:46:34 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'spfx_ghostlaser.task_files' doesn't exist in /home3/spfx/public_html/website_a844b2f2/project/playbook_tasks.php:26
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/playbook_tasks.php(26): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/playbook_tasks.php on line 26
+[03-May-2026 05:46:37 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'spfx_ghostlaser.task_files' doesn't exist in /home3/spfx/public_html/website_a844b2f2/project/playbook_tasks.php:26
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/playbook_tasks.php(26): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/playbook_tasks.php on line 26
