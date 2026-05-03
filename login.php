@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if ($username === '' || $password === '') {
     $errors[] = 'Username and password are required.';
   } else {
-    $stmt = $pdo->prepare("SELECT id, username, password_hash FROM users WHERE username = ? LIMIT 1");
+    $stmt = $pdo->prepare("SELECT id, username, password_hash, is_admin FROM users WHERE username = ? LIMIT 1");
     $stmt->execute([$username]);
     $user = $stmt->fetch();
 
@@ -33,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       session_regenerate_id(true);
       $_SESSION['user_id'] = (int)$user['id'];
       $_SESSION['username'] = $user['username'];
+      $_SESSION['is_admin'] = (bool)$user['is_admin'];
 
       // Basic safety: allow only relative redirects
       if (!is_string($next) || $next === '' || str_starts_with($next, 'http')) {

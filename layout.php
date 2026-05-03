@@ -115,6 +115,9 @@ function render_header(string $title): void {
   <div class="menubar-inner">
     <a class="menu-link <?= $current === 'index.php' ? 'active' : '' ?>" href="index.php">Projects</a>
 	<a class="menu-link <?= $current === 'playbooks.php' ? 'active' : '' ?>" href="playbooks.php">Playbooks</a>
+	<?php if (!empty($_SESSION['is_admin'])): ?>
+	<a class="menu-link <?= $current === 'users.php' ? 'active' : '' ?>" href="users.php">Users</a>
+	<?php endif; ?>
   </div>
 </nav>
 
