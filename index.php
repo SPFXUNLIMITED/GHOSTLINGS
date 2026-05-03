@@ -5,23 +5,52 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_login();
 
-$projects = $pdo->query("
-  SELECT id, name, description, created_at, priority
-  FROM projects
-  WHERE playbook = 0
-  ORDER BY id DESC
-")->fetchAll();
+if (is_admin()) {
+  $projects = $pdo->query("
+    SELECT id, name, description, created_at, priority
+    FROM projects
+    WHERE playbook = 0
+    ORDER BY id DESC
+  ")->fetchAll();
 
-$recent_tasks = $pdo->query("
-  SELECT
-    t.id, t.project_id, t.title, t.status, t.due_date, t.created_at, t.priority,
-    p.name AS project_name
-  FROM tasks t
-  JOIN projects p ON p.id = t.project_id
-  WHERE p.playbook = 0
-  ORDER BY t.created_at DESC
-  LIMIT 25
-")->fetchAll(PDO::FETCH_ASSOC);
+  $recent_tasks = $pdo->query("
+    SELECT
+      t.id, t.project_id, t.title, t.status, t.due_date, t.created_at, t.priority,
+      p.name AS project_name
+    FROM tasks t
+    JOIN projects p ON p.id = t.project_id
+    WHERE p.playbook = 0
+    ORDER BY t.created_at DESC
+    LIMIT 25
+  ")->fetchAll(PDO::FETCH_ASSOC);
+} else {
+  $uid = current_user_id();
+
+  $stmt = $pdo->prepare("
+    SELECT DISTINCT pr.id, pr.name, pr.description, pr.created_at, pr.priority
+    FROM projects pr
+    JOIN tasks t ON t.project_id = pr.id
+    WHERE pr.playbook = 0
+      AND t.assigned_to = ?
+    ORDER BY pr.id DESC
+  ");
+  $stmt->execute([$uid]);
+  $projects = $stmt->fetchAll();
+
+  $stmt = $pdo->prepare("
+    SELECT
+      t.id, t.project_id, t.title, t.status, t.due_date, t.created_at, t.priority,
+      p.name AS project_name
+    FROM tasks t
+    JOIN projects p ON p.id = t.project_id
+    WHERE p.playbook = 0
+      AND t.assigned_to = ?
+    ORDER BY t.created_at DESC
+    LIMIT 25
+  ");
+  $stmt->execute([$uid]);
+  $recent_tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
 
 render_header('Projects');
 ?>
