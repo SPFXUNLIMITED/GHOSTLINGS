@@ -43,11 +43,11 @@ render_header('Playbook Tasks');
   <table>
     <thead>
       <tr>
-        <th style="width:30%;">
+        <th style="width:18%;">
           <button type="button" class="linklike" data-sort-col="title" data-sort-type="text" aria-label="Sort by title">Title</button>
         </th>
         <th>Details</th>
-        <th style="width:220px;">Actions</th>
+        <th style="width:160px;">Actions</th>
       </tr>
     </thead>
     <tbody>
