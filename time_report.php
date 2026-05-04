@@ -6,6 +6,77 @@ require_admin();
 
 $tz = new DateTimeZone('America/Los_Angeles');
 
+// ── Delete time entry ─────────────────────────────────────────────────────
+if (isset($_POST['delete_entry'])) {
+  $entry_id = (int)($_POST['entry_id'] ?? 0);
+  if ($entry_id > 0) {
+    $chk = $pdo->prepare("SELECT id FROM time_entries WHERE id = ?");
+    $chk->execute([$entry_id]);
+    if ($chk->fetch()) {
+      $pdo->prepare("DELETE FROM time_entries WHERE id = ?")->execute([$entry_id]);
+    }
+  }
+  $qs = http_build_query(array_filter([
+    'filter_from'    => $_POST['filter_from']    ?? '',
+    'filter_to'      => $_POST['filter_to']      ?? '',
+    'filter_user'    => $_POST['filter_user']    ?? '',
+    'filter_project' => $_POST['filter_project'] ?? '',
+  ], fn($v) => $v !== '' && $v !== '0'));
+  header('Location: time_report.php' . ($qs ? '?' . $qs : ''));
+  exit;
+}
+
+// ── Save edited time entry ────────────────────────────────────────────────
+$save_errors = [];
+if (isset($_POST['save_entry'])) {
+  $entry_id   = (int)($_POST['entry_id'] ?? 0);
+
+  if ($entry_id > 0) {
+    $clock_in_raw     = trim($_POST['clock_in']       ?? '');
+    $clock_out_raw    = trim($_POST['clock_out']      ?? '');
+    $hours_override_raw = trim($_POST['hours_override'] ?? '');
+    $description      = trim($_POST['description']    ?? '');
+    $user_id_save     = (int)($_POST['user_id']       ?? 0);
+    $project_id_save  = (int)($_POST['project_id_entry'] ?? 0) ?: null;
+
+    $ci = $clock_in_raw !== ''
+      ? DateTime::createFromFormat('Y-m-d\TH:i', $clock_in_raw, $tz)
+      : false;
+    $co = $clock_out_raw !== ''
+      ? DateTime::createFromFormat('Y-m-d\TH:i', $clock_out_raw, $tz)
+      : null;
+    $ho = $hours_override_raw !== '' ? (float)$hours_override_raw : null;
+
+    if (!$ci)          $save_errors[] = "Clock-in date/time is required and must be valid.";
+    if ($user_id_save <= 0) $save_errors[] = "Employee is required.";
+
+    if (!$save_errors) {
+      $pdo->prepare("UPDATE time_entries
+                     SET user_id=?, project_id=?, clock_in=?, clock_out=?,
+                         hours_override=?, description=?
+                     WHERE id=?")
+          ->execute([
+            $user_id_save,
+            $project_id_save,
+            $ci->format('Y-m-d H:i:s'),
+            $co ? $co->format('Y-m-d H:i:s') : null,
+            $ho,
+            $description ?: null,
+            $entry_id,
+          ]);
+
+      $qs = http_build_query(array_filter([
+        'filter_from'    => $_POST['filter_from']    ?? '',
+        'filter_to'      => $_POST['filter_to']      ?? '',
+        'filter_user'    => $_POST['filter_user']    ?? '',
+        'filter_project' => $_POST['filter_project'] ?? '',
+      ], fn($v) => $v !== '' && $v !== '0'));
+      header('Location: time_report.php' . ($qs ? '?' . $qs : ''));
+      exit;
+    }
+  }
+}
+
 // ── CSV export (must happen before any output) ────────────────────────────
 if (isset($_POST['export_csv'])) {
   $f_user    = (int)($_POST['filter_user']    ?? 0) ?: null;
@@ -127,6 +198,15 @@ $f_to   = $_GET['filter_to']   ?? $today;
 [$detail_rows, $by_employee, $by_project] = time_report_query(
   $pdo, $tz, $f_user, $f_project, $f_from, $f_to
 );
+
+// ── Load entry being edited (if requested) ────────────────────────────────
+$editing_entry = null;
+if (($_GET['action'] ?? '') === 'edit' && isset($_GET['id'])) {
+  $edit_id = (int)$_GET['id'];
+  $stmt    = $pdo->prepare("SELECT * FROM time_entries WHERE id = ?");
+  $stmt->execute([$edit_id]);
+  $editing_entry = $stmt->fetch() ?: null;
+}
 
 // ── Top-level summary stats ───────────────────────────────────────────────
 $stmt = $pdo->prepare("
@@ -305,6 +385,102 @@ render_header('Time Reports');
   </div>
 </div>
 
+<!-- ── Edit entry form ────────────────────────────────────────────────── -->
+<?php if ($editing_entry): ?>
+  <?php
+    $e_ci_fmt = substr($editing_entry['clock_in'], 0, 16);                  // YYYY-MM-DDTHH:MM (drop seconds)
+    $e_ci_fmt = str_replace(' ', 'T', $e_ci_fmt);
+    $e_co_fmt = $editing_entry['clock_out']
+      ? str_replace(' ', 'T', substr($editing_entry['clock_out'], 0, 16))
+      : '';
+  ?>
+  <div class="card" style="border-color:#93c5fd;">
+    <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <h2 style="margin:0;">Edit Time Entry #<?= (int)$editing_entry['id'] ?></h2>
+      <a class="btn" href="time_report.php?<?= h(http_build_query(array_filter([
+        'filter_from'    => $f_from,
+        'filter_to'      => $f_to,
+        'filter_user'    => (string)($f_user ?? ''),
+        'filter_project' => (string)($f_project ?? ''),
+      ], fn($v) => $v !== '' && $v !== '0'))) ?>">Cancel</a>
+    </div>
+
+    <?php if (!empty($save_errors)): ?>
+      <div class="alert error" style="margin-bottom:10px;">
+        <strong>Fix these:</strong>
+        <ul><?php foreach ($save_errors as $e): ?><li><?= h($e) ?></li><?php endforeach; ?></ul>
+      </div>
+    <?php endif; ?>
+
+    <form method="post">
+      <input type="hidden" name="save_entry"     value="1">
+      <input type="hidden" name="entry_id"       value="<?= (int)$editing_entry['id'] ?>">
+      <input type="hidden" name="filter_from"    value="<?= h($f_from) ?>">
+      <input type="hidden" name="filter_to"      value="<?= h($f_to) ?>">
+      <input type="hidden" name="filter_user"    value="<?= (int)($f_user ?? 0) ?>">
+      <input type="hidden" name="filter_project" value="<?= (int)($f_project ?? 0) ?>">
+
+      <div class="form-grid">
+        <div>
+          <label>Employee</label>
+          <select name="user_id">
+            <?php foreach ($all_users as $u): ?>
+              <option value="<?= (int)$u['id'] ?>"
+                <?= (int)$editing_entry['user_id'] === (int)$u['id'] ? 'selected' : '' ?>>
+                <?= h($u['username']) ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <div>
+          <label>Project</label>
+          <select name="project_id_entry">
+            <option value="">— No project —</option>
+            <?php foreach ($all_projects as $pr): ?>
+              <option value="<?= (int)$pr['id'] ?>"
+                <?= (int)($editing_entry['project_id'] ?? 0) === (int)$pr['id'] ? 'selected' : '' ?>>
+                <?= h($pr['name']) ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <div>
+          <label>Clock In</label>
+          <input type="datetime-local" name="clock_in" value="<?= h($e_ci_fmt) ?>" required>
+        </div>
+
+        <div>
+          <label>Clock Out <span class="muted">(leave blank if still open)</span></label>
+          <input type="datetime-local" name="clock_out" value="<?= h($e_co_fmt) ?>">
+        </div>
+
+        <div>
+          <label>Hours Override <span class="muted">(leave blank to use clock times)</span></label>
+          <input type="number" step="0.01" min="0" name="hours_override"
+                 value="<?= $editing_entry['hours_override'] !== null ? h((string)$editing_entry['hours_override']) : '' ?>">
+        </div>
+
+        <div class="full">
+          <label>Description</label>
+          <textarea name="description" rows="3"><?= h($editing_entry['description'] ?? '') ?></textarea>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:12px;">
+        <button class="btn primary" type="submit">Save Changes</button>
+        <a class="btn" href="time_report.php?<?= h(http_build_query(array_filter([
+          'filter_from'    => $f_from,
+          'filter_to'      => $f_to,
+          'filter_user'    => (string)($f_user ?? ''),
+          'filter_project' => (string)($f_project ?? ''),
+        ], fn($v) => $v !== '' && $v !== '0'))) ?>">Cancel</a>
+      </div>
+    </form>
+  </div>
+<?php endif; ?>
+
 <!-- ── Detailed drill-down ────────────────────────────────────────────── -->
 <div class="card">
   <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
@@ -334,16 +510,25 @@ render_header('Time Reports');
           <th>Clock Out</th>
           <th>Hours</th>
           <th class="col-desc">Description</th>
+          <th class="col-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
         <?php if (!$detail_rows): ?>
-          <tr><td colspan="7" class="muted">No entries match the current filters.</td></tr>
+          <tr><td colspan="8" class="muted">No entries match the current filters.</td></tr>
         <?php endif; ?>
         <?php foreach ($detail_rows as $r): ?>
           <?php
             $ci = new DateTime($r['clock_in'], $tz);
             $co = $r['clock_out'] ? new DateTime($r['clock_out'], $tz) : null;
+            $edit_href = 'time_report.php?' . http_build_query(array_filter([
+              'action'         => 'edit',
+              'id'             => $r['id'],
+              'filter_from'    => $f_from,
+              'filter_to'      => $f_to,
+              'filter_user'    => (string)($f_user ?? ''),
+              'filter_project' => (string)($f_project ?? ''),
+            ], fn($v) => $v !== '' && $v !== '0'));
           ?>
           <tr>
             <td><strong><?= h($r['username']) ?></strong></td>
@@ -363,6 +548,21 @@ render_header('Time Reports');
                 : '<span class="muted">—</span>' ?>
             </td>
             <td class="col-desc"><?= $r['description'] ? h($r['description']) : '<span class="muted">—</span>' ?></td>
+            <td class="col-actions">
+              <div class="actions">
+                <a class="btn" href="<?= h($edit_href) ?>">Edit</a>
+                <form method="post" style="margin:0;"
+                      onsubmit="return confirm('Delete this time entry? This cannot be undone.');">
+                  <input type="hidden" name="delete_entry"    value="1">
+                  <input type="hidden" name="entry_id"        value="<?= (int)$r['id'] ?>">
+                  <input type="hidden" name="filter_from"     value="<?= h($f_from) ?>">
+                  <input type="hidden" name="filter_to"       value="<?= h($f_to) ?>">
+                  <input type="hidden" name="filter_user"     value="<?= (int)($f_user ?? 0) ?>">
+                  <input type="hidden" name="filter_project"  value="<?= (int)($f_project ?? 0) ?>">
+                  <button class="btn danger" type="submit">Delete</button>
+                </form>
+              </div>
+            </td>
           </tr>
         <?php endforeach; ?>
       </tbody>
