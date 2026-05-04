@@ -5,15 +5,35 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_login();
 
+$per_page   = 15;
+$proj_page  = max(1, (int)($_GET['proj_page']  ?? 1));
+$task_page  = max(1, (int)($_GET['task_page']  ?? 1));
+$proj_offset = ($proj_page - 1) * $per_page;
+$task_offset = ($task_page - 1) * $per_page;
+
 if (is_admin()) {
-  $projects = $pdo->query("
+  $proj_total = (int)$pdo->query("SELECT COUNT(*) FROM projects WHERE playbook = 0")->fetchColumn();
+
+  $stmt = $pdo->prepare("
     SELECT id, name, description, created_at, priority
     FROM projects
     WHERE playbook = 0
     ORDER BY id DESC
-  ")->fetchAll();
+    LIMIT :limit OFFSET :offset
+  ");
+  $stmt->bindValue(':limit',  $per_page,    PDO::PARAM_INT);
+  $stmt->bindValue(':offset', $proj_offset, PDO::PARAM_INT);
+  $stmt->execute();
+  $projects = $stmt->fetchAll();
 
-  $recent_tasks = $pdo->query("
+  $task_total = (int)$pdo->query("
+    SELECT COUNT(*)
+    FROM tasks t
+    JOIN projects p ON p.id = t.project_id
+    WHERE p.playbook = 0
+  ")->fetchColumn();
+
+  $stmt = $pdo->prepare("
     SELECT
       t.id, t.project_id, t.title, t.status, t.due_date, t.created_at, t.priority,
       p.name AS project_name
@@ -21,10 +41,24 @@ if (is_admin()) {
     JOIN projects p ON p.id = t.project_id
     WHERE p.playbook = 0
     ORDER BY t.created_at DESC
-    LIMIT 25
-  ")->fetchAll(PDO::FETCH_ASSOC);
+    LIMIT :limit OFFSET :offset
+  ");
+  $stmt->bindValue(':limit',  $per_page,    PDO::PARAM_INT);
+  $stmt->bindValue(':offset', $task_offset, PDO::PARAM_INT);
+  $stmt->execute();
+  $recent_tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } else {
   $uid = current_user_id();
+
+  $stmt = $pdo->prepare("
+    SELECT COUNT(DISTINCT pr.id)
+    FROM projects pr
+    LEFT JOIN tasks t ON t.project_id = pr.id
+    WHERE pr.playbook = 0
+      AND (pr.owner_id = ? OR (t.assigned_to = ? AND t.assigned_to IS NOT NULL))
+  ");
+  $stmt->execute([$uid, $uid]);
+  $proj_total = (int)$stmt->fetchColumn();
 
   $stmt = $pdo->prepare("
     SELECT DISTINCT pr.id, pr.name, pr.description, pr.created_at, pr.priority
@@ -33,9 +67,24 @@ if (is_admin()) {
     WHERE pr.playbook = 0
       AND (pr.owner_id = ? OR (t.assigned_to = ? AND t.assigned_to IS NOT NULL))
     ORDER BY pr.id DESC
+    LIMIT :limit OFFSET :offset
   ");
-  $stmt->execute([$uid, $uid]);
+  $stmt->bindValue(1, $uid,        PDO::PARAM_INT);
+  $stmt->bindValue(2, $uid,        PDO::PARAM_INT);
+  $stmt->bindValue(':limit',  $per_page,    PDO::PARAM_INT);
+  $stmt->bindValue(':offset', $proj_offset, PDO::PARAM_INT);
+  $stmt->execute();
   $projects = $stmt->fetchAll();
+
+  $stmt = $pdo->prepare("
+    SELECT COUNT(*)
+    FROM tasks t
+    JOIN projects p ON p.id = t.project_id
+    WHERE p.playbook = 0
+      AND t.assigned_to = ?
+  ");
+  $stmt->execute([$uid]);
+  $task_total = (int)$stmt->fetchColumn();
 
   $stmt = $pdo->prepare("
     SELECT
@@ -46,9 +95,12 @@ if (is_admin()) {
     WHERE p.playbook = 0
       AND t.assigned_to = ?
     ORDER BY t.created_at DESC
-    LIMIT 25
+    LIMIT :limit OFFSET :offset
   ");
-  $stmt->execute([$uid]);
+  $stmt->bindValue(1, $uid,        PDO::PARAM_INT);
+  $stmt->bindValue(':limit',  $per_page,    PDO::PARAM_INT);
+  $stmt->bindValue(':offset', $task_offset, PDO::PARAM_INT);
+  $stmt->execute();
   $recent_tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
@@ -118,12 +170,13 @@ render_header('Projects');
       </tbody>
     </table>
   </div>
+  <?php render_pagination($proj_page, $proj_total, $per_page, 'proj_page'); ?>
 </div>
 
 <div class="card">
   <div class="row" style="justify-content:space-between; align-items:center;">
     <h2 style="margin:0;">Recent Tasks</h2>
-    <span class="muted">Latest 25</span>
+    <span class="muted">Most recent 15</span>
   </div>
 
   <div class="table-wrap">
@@ -184,6 +237,7 @@ render_header('Projects');
       </tbody>
     </table>
   </div>
+  <?php render_pagination($task_page, $task_total, $per_page, 'task_page'); ?>
 </div>
 
 <?php render_footer(); ?>

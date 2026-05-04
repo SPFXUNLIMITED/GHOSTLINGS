@@ -182,6 +182,14 @@ th, td {
   white-space: nowrap;
 }
 
+.pagination {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 12px;
+}
+
 /* Mobile tweaks */
 @media (max-width: 640px) {
   /* stack action buttons vertically */
