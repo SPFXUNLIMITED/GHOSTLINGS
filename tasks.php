@@ -63,6 +63,7 @@ render_header('Tasks');
       <tr>
 		<th>Title</th>
 		<th>Status</th>
+		<th>Priority</th>
 		<th>Due</th>
 		<th>Assigned To</th>
 		<th>Details</th>
@@ -71,7 +72,7 @@ render_header('Tasks');
     </thead>
     <tbody>
       <?php if (!$tasks): ?>
-        <tr><td colspan="6" class="muted">No tasks yet.</td></tr>
+        <tr><td colspan="7" class="muted">No tasks yet.</td></tr>
       <?php endif; ?>
 
       <?php foreach ($tasks as $t): ?>
@@ -82,6 +83,7 @@ render_header('Tasks');
 			<a class="muted" href="task_uploads.php?task_id=<?= (int)$t['id'] ?>">Files (<?= $count ?>)</a>
           </td>
           <td><span class="badge <?= h($t['status']) ?>"><?= h($t['status']) ?></span></td>
+          <td><span class="badge priority-<?= h($t['priority'] ?? 'medium') ?>"><?= h(ucfirst($t['priority'] ?? 'medium')) ?></span></td>
 
 			<td>
 			  <?php if (!empty($t['due_date'])): ?>
