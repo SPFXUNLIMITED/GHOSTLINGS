@@ -106,7 +106,7 @@ render_header($id ? 'Edit Project' : 'New Project');
     </select>
     <?php endif; ?>
 	
-	<label style="display:flex; gap:10px; align-items:center; margin-top:10px;">
+	<label style="display:flex; gap:10px; align-items:center; margin-top:10px; width:fit-content;">
 	  <span>Playbook project:</span>
 	  <input type="checkbox" name="playbook" value="1" <?= !empty($project['playbook']) ? 'checked' : '' ?>>
 	</label>
