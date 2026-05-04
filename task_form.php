@@ -10,22 +10,6 @@ $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
 
 if (!$project_id) { header('Location: index.php'); exit; }
 
-if (is_admin()) {
-  $stmt = $pdo->query("SELECT id, name FROM projects ORDER BY name");
-  $all_projects = $stmt->fetchAll();
-} else {
-  $uid = current_user_id();
-  $stmt = $pdo->prepare(
-    "SELECT DISTINCT p.id, p.name FROM projects p
-     LEFT JOIN tasks t ON t.project_id = p.id AND t.assigned_to = ?
-     WHERE p.owner_id = ? OR t.id IS NOT NULL
-     ORDER BY p.name"
-  );
-  $stmt->execute([$uid, $uid]);
-  $all_projects = $stmt->fetchAll();
-}
-if (!$all_projects) { http_response_code(500); exit('No projects exist'); }
-
 $all_users = $pdo->query("SELECT id, username FROM users ORDER BY username")->fetchAll();
 
 $errors = [];
@@ -102,8 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment'])) {
 // TASK SAVE: normal create/update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['add_comment']) && !isset($_POST['delete_comment'])) {
 
-  $new_project_id = (int)($_POST['project_id'] ?? $project_id);
-  if ($new_project_id <= 0) $errors[] = "Project is required.";
+  $new_project_id = $project_id;
 
   $title = trim($_POST['title'] ?? '');
   // WYSIWYG HTML will come through here
@@ -184,17 +167,6 @@ render_header($id ? 'Edit Task' : 'New Task');
       </div>
 
       <div>
-        <label>Project</label>
-        <select name="project_id">
-          <?php foreach ($all_projects as $p): ?>
-            <option value="<?= (int)$p['id'] ?>" <?= ((int)$task['project_id'] === (int)$p['id']) ? 'selected' : '' ?>>
-              <?= h($p['name']) ?>
-            </option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-
-      <div>
         <label>Status</label>
         <select name="status">
           <?php foreach (['todo','doing','done'] as $s): ?>
@@ -249,6 +221,7 @@ render_header($id ? 'Edit Task' : 'New Task');
       <a class="btn" href="tasks.php?project_id=<?= (int)$project_id ?>">Cancel</a>
     </div>
 
+    <input type="hidden" name="project_id" value="<?= (int)$project_id ?>">
     <input type="hidden" name="id" value="<?= (int)$id ?>">
   </form>
 
