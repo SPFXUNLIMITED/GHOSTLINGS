@@ -50,3 +50,20 @@ try {
     throw $e;
   }
 }
+
+// Create time_entries table if it does not exist yet
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS time_entries (
+    id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id       INT NOT NULL,
+    project_id    INT NULL DEFAULT NULL,
+    description   TEXT NULL DEFAULT NULL,
+    clock_in      DATETIME NOT NULL,
+    clock_out     DATETIME NULL DEFAULT NULL,
+    hours_override DECIMAL(8,2) NULL DEFAULT NULL,
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_te_user    (user_id),
+    INDEX idx_te_project (project_id),
+    INDEX idx_te_clock_in (clock_in)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
