@@ -8,21 +8,38 @@ require_login();
 $project_id = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
 if (!$project_id) { header('Location: index.php'); exit; }
 
-$stmt = $pdo->prepare("SELECT id, name FROM projects WHERE id = ?");
+$stmt = $pdo->prepare("SELECT id, name, owner_id FROM projects WHERE id = ?");
 $stmt->execute([$project_id]);
 $project = $stmt->fetch();
 if (!$project) { http_response_code(404); exit('Project not found'); }
 
-$stmt = $pdo->prepare("
-  SELECT t.*, COUNT(u.id) AS upload_count, usr.username AS assigned_username
-  FROM tasks t
-  LEFT JOIN task_uploads u ON u.task_id = t.id
-  LEFT JOIN users usr ON usr.id = t.assigned_to
-  WHERE t.project_id = ?
-  GROUP BY t.id
-  ORDER BY t.id DESC
-");
-$stmt->execute([$project_id]);
+$uid = current_user_id();
+
+if (is_admin()) {
+  $stmt = $pdo->prepare("
+    SELECT t.*, COUNT(u.id) AS upload_count, usr.username AS assigned_username
+    FROM tasks t
+    LEFT JOIN task_uploads u ON u.task_id = t.id
+    LEFT JOIN users usr ON usr.id = t.assigned_to
+    WHERE t.project_id = ?
+    GROUP BY t.id
+    ORDER BY t.id DESC
+  ");
+  $stmt->execute([$project_id]);
+} else {
+  $stmt = $pdo->prepare("
+    SELECT t.*, COUNT(u.id) AS upload_count, usr.username AS assigned_username
+    FROM tasks t
+    LEFT JOIN task_uploads u ON u.task_id = t.id
+    LEFT JOIN users usr ON usr.id = t.assigned_to
+    JOIN projects p ON p.id = t.project_id
+    WHERE t.project_id = ?
+      AND (t.assigned_to = ? OR p.owner_id = ?)
+    GROUP BY t.id
+    ORDER BY t.id DESC
+  ");
+  $stmt->execute([$project_id, $uid, $uid]);
+}
 $tasks = $stmt->fetchAll();
 
 render_header('Tasks');
