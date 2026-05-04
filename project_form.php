@@ -1,13 +1,17 @@
 <?php
 require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
+require __DIR__ . '/auth.php';
+require_login();
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $errors = [];
-$project = ['name' => '', 'description' => '', 'playbook' => 0, 'priority' => 'medium'];
+$project = ['name' => '', 'description' => '', 'playbook' => 0, 'priority' => 'medium', 'owner_id' => current_user_id()];
+
+$all_users = $pdo->query("SELECT id, username FROM users ORDER BY username")->fetchAll();
 
 if ($id) {
-  $stmt = $pdo->prepare("SELECT id, name, description, playbook, priority FROM projects WHERE id = ?");
+  $stmt = $pdo->prepare("SELECT id, name, description, playbook, priority, owner_id FROM projects WHERE id = ?");
   $stmt->execute([$id]);
   $project = $stmt->fetch();
   if (!$project) { http_response_code(404); exit('Project not found'); }
@@ -23,16 +27,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $playbook = isset($_POST['playbook']) ? 1 : 0;
   $project['playbook'] = $playbook;
 
+  // Owner: admins may pick any user; others keep their own id (or existing owner)
+  if (is_admin()) {
+    $owner_id = isset($_POST['owner_id']) && (int)$_POST['owner_id'] > 0 ? (int)$_POST['owner_id'] : null;
+  } else {
+    $owner_id = $id ? (int)$project['owner_id'] : current_user_id();
+  }
+
   if ($name === '') $errors[] = "Name is required.";
 
   if (!$errors) {
     $project['priority'] = $priority;
+    $project['owner_id'] = $owner_id;
     if ($id) {
-      $stmt = $pdo->prepare("UPDATE projects SET name = ?, description = ?, playbook = ?, priority = ? WHERE id = ?");
-      $stmt->execute([$name, $description ?: null, $playbook, $priority, $id]);
+      $stmt = $pdo->prepare("UPDATE projects SET name = ?, description = ?, playbook = ?, priority = ?, owner_id = ? WHERE id = ?");
+      $stmt->execute([$name, $description ?: null, $playbook, $priority, $owner_id, $id]);
     } else {
-      $stmt = $pdo->prepare("INSERT INTO projects (name, description, playbook, priority) VALUES (?, ?, ?, ?)");
-      $stmt->execute([$name, $description ?: null, $playbook, $priority]);
+      $stmt = $pdo->prepare("INSERT INTO projects (name, description, playbook, priority, owner_id) VALUES (?, ?, ?, ?, ?)");
+      $stmt->execute([$name, $description ?: null, $playbook, $priority, $owner_id]);
     }
     header('Location: index.php');
     exit;
@@ -41,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $project['name'] = $name;
   $project['description'] = $description;
   $project['priority'] = $priority;
+  $project['owner_id'] = $owner_id;
 }
 
 render_header($id ? 'Edit Project' : 'New Project');
@@ -73,6 +86,18 @@ render_header($id ? 'Edit Project' : 'New Project');
         <option value="<?= h($val) ?>" <?= ($project['priority'] === $val) ? 'selected' : '' ?>><?= h($label) ?></option>
       <?php endforeach; ?>
     </select>
+
+    <?php if (is_admin()): ?>
+    <label style="margin-top:10px;">Owner</label>
+    <select name="owner_id">
+      <option value="">— No owner —</option>
+      <?php foreach ($all_users as $u): ?>
+        <option value="<?= (int)$u['id'] ?>" <?= ((int)($project['owner_id'] ?? 0) === (int)$u['id']) ? 'selected' : '' ?>>
+          <?= h($u['username']) ?>
+        </option>
+      <?php endforeach; ?>
+    </select>
+    <?php endif; ?>
 	
 	<label style="display:flex; gap:10px; align-items:center; margin-top:10px;">
 	  <span>Playbook project:</span>

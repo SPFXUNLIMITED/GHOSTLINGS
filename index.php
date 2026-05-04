@@ -29,12 +29,12 @@ if (is_admin()) {
   $stmt = $pdo->prepare("
     SELECT DISTINCT pr.id, pr.name, pr.description, pr.created_at, pr.priority
     FROM projects pr
-    JOIN tasks t ON t.project_id = pr.id
+    LEFT JOIN tasks t ON t.project_id = pr.id
     WHERE pr.playbook = 0
-      AND t.assigned_to = ?
+      AND (pr.owner_id = ? OR t.assigned_to = ?)
     ORDER BY pr.id DESC
   ");
-  $stmt->execute([$uid]);
+  $stmt->execute([$uid, $uid]);
   $projects = $stmt->fetchAll();
 
   $stmt = $pdo->prepare("
