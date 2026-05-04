@@ -67,12 +67,12 @@ if (is_admin()) {
     WHERE pr.playbook = 0
       AND (pr.owner_id = ? OR (t.assigned_to = ? AND t.assigned_to IS NOT NULL))
     ORDER BY pr.id DESC
-    LIMIT :limit OFFSET :offset
+    LIMIT ? OFFSET ?
   ");
-  $stmt->bindValue(1, $uid,        PDO::PARAM_INT);
-  $stmt->bindValue(2, $uid,        PDO::PARAM_INT);
-  $stmt->bindValue(':limit',  $per_page,    PDO::PARAM_INT);
-  $stmt->bindValue(':offset', $proj_offset, PDO::PARAM_INT);
+  $stmt->bindValue(1, $uid,          PDO::PARAM_INT);
+  $stmt->bindValue(2, $uid,          PDO::PARAM_INT);
+  $stmt->bindValue(3, $per_page,     PDO::PARAM_INT);
+  $stmt->bindValue(4, $proj_offset,  PDO::PARAM_INT);
   $stmt->execute();
   $projects = $stmt->fetchAll();
 
@@ -95,11 +95,11 @@ if (is_admin()) {
     WHERE p.playbook = 0
       AND t.assigned_to = ?
     ORDER BY t.created_at DESC
-    LIMIT :limit OFFSET :offset
+    LIMIT ? OFFSET ?
   ");
-  $stmt->bindValue(1, $uid,        PDO::PARAM_INT);
-  $stmt->bindValue(':limit',  $per_page,    PDO::PARAM_INT);
-  $stmt->bindValue(':offset', $task_offset, PDO::PARAM_INT);
+  $stmt->bindValue(1, $uid,          PDO::PARAM_INT);
+  $stmt->bindValue(2, $per_page,     PDO::PARAM_INT);
+  $stmt->bindValue(3, $task_offset,  PDO::PARAM_INT);
   $stmt->execute();
   $recent_tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
