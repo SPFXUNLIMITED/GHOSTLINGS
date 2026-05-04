@@ -14,6 +14,15 @@ $options = [
 
 $pdo = new PDO($dsn, $db['user'], $db['pass'], $options);
 
+// Add playbook column to projects if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE projects ADD COLUMN playbook TINYINT(1) NOT NULL DEFAULT 0");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
 // Add priority column to projects if it does not exist yet
 try {
   $pdo->exec("ALTER TABLE projects ADD COLUMN priority ENUM('low','medium','high','critical') NOT NULL DEFAULT 'medium'");
