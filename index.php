@@ -31,7 +31,7 @@ if (is_admin()) {
     FROM projects pr
     LEFT JOIN tasks t ON t.project_id = pr.id
     WHERE pr.playbook = 0
-      AND (pr.owner_id = ? OR t.assigned_to = ?)
+      AND (pr.owner_id = ? OR (t.assigned_to = ? AND t.assigned_to IS NOT NULL))
     ORDER BY pr.id DESC
   ");
   $stmt->execute([$uid, $uid]);

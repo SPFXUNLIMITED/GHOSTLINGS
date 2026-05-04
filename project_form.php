@@ -8,7 +8,7 @@ $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $errors = [];
 $project = ['name' => '', 'description' => '', 'playbook' => 0, 'priority' => 'medium', 'owner_id' => current_user_id()];
 
-$all_users = $pdo->query("SELECT id, username FROM users ORDER BY username")->fetchAll();
+$all_users = is_admin() ? $pdo->query("SELECT id, username FROM users ORDER BY username")->fetchAll() : [];
 
 if ($id) {
   $stmt = $pdo->prepare("SELECT id, name, description, playbook, priority, owner_id FROM projects WHERE id = ?");
@@ -30,6 +30,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   // Owner: admins may pick any user; others keep their own id (or existing owner)
   if (is_admin()) {
     $owner_id = isset($_POST['owner_id']) && (int)$_POST['owner_id'] > 0 ? (int)$_POST['owner_id'] : null;
+    // Validate the selected owner exists
+    if ($owner_id !== null) {
+      $valid_ids = array_column($all_users, 'id');
+      if (!in_array($owner_id, $valid_ids, false)) {
+        $owner_id = null;
+      }
+    }
   } else {
     $owner_id = $id ? (int)$project['owner_id'] : current_user_id();
   }
