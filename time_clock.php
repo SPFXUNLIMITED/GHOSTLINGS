@@ -10,7 +10,20 @@ $errors  = [];
 $success = '';
 
 // ── Fetch projects for the manual-entry dropdown ──────────────────────────
-$projects = $pdo->query("SELECT id, name FROM projects WHERE playbook = 0 ORDER BY name ASC")->fetchAll();
+if (is_admin()) {
+  $projects = $pdo->query("SELECT id, name FROM projects WHERE playbook = 0 ORDER BY name ASC")->fetchAll();
+} else {
+  $proj_stmt = $pdo->prepare("
+    SELECT DISTINCT p.id, p.name
+    FROM projects p
+    LEFT JOIN tasks t ON t.project_id = p.id AND t.assigned_to = ?
+    WHERE p.playbook = 0
+      AND (p.owner_id = ? OR t.id IS NOT NULL)
+    ORDER BY p.name ASC
+  ");
+  $proj_stmt->execute([$uid, $uid]);
+  $projects = $proj_stmt->fetchAll();
+}
 
 // ── Check for an open clock-in (clock_out IS NULL) ────────────────────────
 $open_stmt = $pdo->prepare("
