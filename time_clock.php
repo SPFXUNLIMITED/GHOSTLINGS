@@ -117,10 +117,10 @@ $week_start = (new DateTime('monday this week', $tz))->format('Y-m-d');
 $where_date = '';
 $params     = [$uid];
 if ($view === 'today') {
-  $where_date = "AND DATE(CONVERT_TZ(clock_in, '+00:00', '-07:00')) = ?";
+  $where_date = "AND DATE(clock_in) = ?";
   $params[]   = $today;
 } elseif ($view === 'week') {
-  $where_date = "AND DATE(CONVERT_TZ(clock_in, '+00:00', '-07:00')) >= ?";
+  $where_date = "AND DATE(clock_in) >= ?";
   $params[]   = $week_start;
 }
 
@@ -151,11 +151,11 @@ foreach ($entries as $e) {
 }
 
 // Helper to compute hours for a single entry
-function entry_hours(array $e): ?float {
+function entry_hours(array $e, DateTimeZone $tz): ?float {
   if ($e['hours_override'] !== null) return (float)$e['hours_override'];
   if ($e['clock_out']) {
-    $ci = new DateTime($e['clock_in']);
-    $co = new DateTime($e['clock_out']);
+    $ci = new DateTime($e['clock_in'],  $tz);
+    $co = new DateTime($e['clock_out'], $tz);
     return ($co->getTimestamp() - $ci->getTimestamp()) / 3600;
   }
   return null; // still open
@@ -315,7 +315,7 @@ render_header('Time Clock');
           <?php
             $ci  = new DateTime($e['clock_in'], $tz);
             $co  = $e['clock_out'] ? new DateTime($e['clock_out'], $tz) : null;
-            $hrs = entry_hours($e);
+            $hrs = entry_hours($e, $tz);
           ?>
           <tr>
             <td><?= h($ci->format('m-d-Y')) ?></td>

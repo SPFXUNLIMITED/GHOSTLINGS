@@ -49,11 +49,11 @@ function time_report_query(PDO $pdo, DateTimeZone $tz,
     $params[] = $f_project;
   }
   if ($f_from !== '') {
-    $where[]  = 'DATE(CONVERT_TZ(te.clock_in, \'+00:00\', \'-07:00\')) >= ?';
+    $where[]  = 'DATE(te.clock_in) >= ?';
     $params[] = $f_from;
   }
   if ($f_to !== '') {
-    $where[]  = 'DATE(CONVERT_TZ(te.clock_in, \'+00:00\', \'-07:00\')) <= ?';
+    $where[]  = 'DATE(te.clock_in) <= ?';
     $params[] = $f_to;
   }
 
@@ -139,7 +139,7 @@ $stmt = $pdo->prepare("
     END
   ), 0)
   FROM time_entries
-  WHERE DATE(CONVERT_TZ(clock_in, '+00:00', '-07:00')) >= ?
+  WHERE DATE(clock_in) >= ?
 ");
 $stmt->execute([$week_start]);
 $week_hours = (float)$stmt->fetchColumn();
@@ -155,7 +155,7 @@ $stmt2 = $pdo->prepare("
     END
   ), 0)
   FROM time_entries
-  WHERE DATE(CONVERT_TZ(clock_in, '+00:00', '-07:00')) >= ?
+  WHERE DATE(clock_in) >= ?
 ");
 $stmt2->execute([$month_start]);
 $month_hours = (float)$stmt2->fetchColumn();
