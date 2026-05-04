@@ -28,7 +28,14 @@ function parse_date_mdY(?string $mdy): string {
 function render_pagination(int $current_page, int $total, int $per_page, string $page_param): void {
   $total_pages = max(1, (int)ceil($total / $per_page));
   if ($total_pages <= 1) return;
-  $params = $_GET;
+  // Preserve only the known pagination params to prevent parameter pollution.
+  $allowed = ['proj_page', 'task_page'];
+  $params = [];
+  foreach ($allowed as $key) {
+    if (isset($_GET[$key])) {
+      $params[$key] = (int)$_GET[$key];
+    }
+  }
   ?>
   <div class="pagination">
     <?php if ($current_page > 1): ?>

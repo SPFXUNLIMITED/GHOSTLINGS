@@ -14,13 +14,17 @@ $task_offset = ($task_page - 1) * $per_page;
 if (is_admin()) {
   $proj_total = (int)$pdo->query("SELECT COUNT(*) FROM projects WHERE playbook = 0")->fetchColumn();
 
-  $projects = $pdo->query("
+  $stmt = $pdo->prepare("
     SELECT id, name, description, created_at, priority
     FROM projects
     WHERE playbook = 0
     ORDER BY id DESC
-    LIMIT $per_page OFFSET $proj_offset
-  ")->fetchAll();
+    LIMIT :limit OFFSET :offset
+  ");
+  $stmt->bindValue(':limit',  $per_page,    PDO::PARAM_INT);
+  $stmt->bindValue(':offset', $proj_offset, PDO::PARAM_INT);
+  $stmt->execute();
+  $projects = $stmt->fetchAll();
 
   $task_total = (int)$pdo->query("
     SELECT COUNT(*)
@@ -29,7 +33,7 @@ if (is_admin()) {
     WHERE p.playbook = 0
   ")->fetchColumn();
 
-  $recent_tasks = $pdo->query("
+  $stmt = $pdo->prepare("
     SELECT
       t.id, t.project_id, t.title, t.status, t.due_date, t.created_at, t.priority,
       p.name AS project_name
@@ -37,8 +41,12 @@ if (is_admin()) {
     JOIN projects p ON p.id = t.project_id
     WHERE p.playbook = 0
     ORDER BY t.created_at DESC
-    LIMIT $per_page OFFSET $task_offset
-  ")->fetchAll(PDO::FETCH_ASSOC);
+    LIMIT :limit OFFSET :offset
+  ");
+  $stmt->bindValue(':limit',  $per_page,    PDO::PARAM_INT);
+  $stmt->bindValue(':offset', $task_offset, PDO::PARAM_INT);
+  $stmt->execute();
+  $recent_tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } else {
   $uid = current_user_id();
 
@@ -59,9 +67,13 @@ if (is_admin()) {
     WHERE pr.playbook = 0
       AND (pr.owner_id = ? OR (t.assigned_to = ? AND t.assigned_to IS NOT NULL))
     ORDER BY pr.id DESC
-    LIMIT $per_page OFFSET $proj_offset
+    LIMIT :limit OFFSET :offset
   ");
-  $stmt->execute([$uid, $uid]);
+  $stmt->bindValue(1, $uid,        PDO::PARAM_INT);
+  $stmt->bindValue(2, $uid,        PDO::PARAM_INT);
+  $stmt->bindValue(':limit',  $per_page,    PDO::PARAM_INT);
+  $stmt->bindValue(':offset', $proj_offset, PDO::PARAM_INT);
+  $stmt->execute();
   $projects = $stmt->fetchAll();
 
   $stmt = $pdo->prepare("
@@ -83,9 +95,12 @@ if (is_admin()) {
     WHERE p.playbook = 0
       AND t.assigned_to = ?
     ORDER BY t.created_at DESC
-    LIMIT $per_page OFFSET $task_offset
+    LIMIT :limit OFFSET :offset
   ");
-  $stmt->execute([$uid]);
+  $stmt->bindValue(1, $uid,        PDO::PARAM_INT);
+  $stmt->bindValue(':limit',  $per_page,    PDO::PARAM_INT);
+  $stmt->bindValue(':offset', $task_offset, PDO::PARAM_INT);
+  $stmt->execute();
   $recent_tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
