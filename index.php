@@ -40,7 +40,7 @@ if (is_admin()) {
     FROM tasks t
     JOIN projects p ON p.id = t.project_id
     WHERE p.playbook = 0
-    ORDER BY t.created_at DESC
+    ORDER BY FIELD(t.priority, 'critical', 'high', 'medium', 'low'), FIELD(t.status, 'todo', 'doing', 'done')
     LIMIT :limit OFFSET :offset
   ");
   $stmt->bindValue(':limit',  $per_page,    PDO::PARAM_INT);
@@ -94,7 +94,7 @@ if (is_admin()) {
     JOIN projects p ON p.id = t.project_id
     WHERE p.playbook = 0
       AND t.assigned_to = ?
-    ORDER BY t.created_at DESC
+    ORDER BY FIELD(t.priority, 'critical', 'high', 'medium', 'low'), FIELD(t.status, 'todo', 'doing', 'done')
     LIMIT ? OFFSET ?
   ");
   $stmt->bindValue(1, $uid,          PDO::PARAM_INT);
