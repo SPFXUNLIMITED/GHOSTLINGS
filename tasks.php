@@ -23,7 +23,7 @@ if (is_admin()) {
     LEFT JOIN users usr ON usr.id = t.assigned_to
     WHERE t.project_id = ?
     GROUP BY t.id
-    ORDER BY t.id DESC
+    ORDER BY FIELD(t.priority, 'critical', 'high', 'medium', 'low'), FIELD(t.status, 'todo', 'doing', 'done')
   ");
   $stmt->execute([$project_id]);
 } else {
@@ -36,7 +36,7 @@ if (is_admin()) {
     WHERE t.project_id = ?
       AND (t.assigned_to = ? OR p.owner_id = ?)
     GROUP BY t.id
-    ORDER BY t.id DESC
+    ORDER BY FIELD(t.priority, 'critical', 'high', 'medium', 'low'), FIELD(t.status, 'todo', 'doing', 'done')
   ");
   $stmt->execute([$project_id, $uid, $uid]);
 }
