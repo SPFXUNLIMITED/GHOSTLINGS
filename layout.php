@@ -25,6 +25,25 @@ function parse_date_mdY(?string $mdy): string {
   return $dt->format('Y-m-d');
 }
 
+function render_pagination(int $current_page, int $total, int $per_page, string $page_param): void {
+  $total_pages = max(1, (int)ceil($total / $per_page));
+  if ($total_pages <= 1) return;
+  $params = $_GET;
+  ?>
+  <div class="pagination">
+    <?php if ($current_page > 1): ?>
+      <?php $params[$page_param] = $current_page - 1; ?>
+      <a class="btn" href="?<?= http_build_query($params) ?>">← Prev</a>
+    <?php endif; ?>
+    <span class="muted">Page <?= $current_page ?> of <?= $total_pages ?></span>
+    <?php if ($current_page < $total_pages): ?>
+      <?php $params[$page_param] = $current_page + 1; ?>
+      <a class="btn" href="?<?= http_build_query($params) ?>">Next →</a>
+    <?php endif; ?>
+  </div>
+  <?php
+}
+
 function render_header(string $title): void {
   if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
