@@ -10,8 +10,20 @@ $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
 
 if (!$project_id) { header('Location: index.php'); exit; }
 
-$stmt = $pdo->query("SELECT id, name FROM projects ORDER BY name");
-$all_projects = $stmt->fetchAll();
+if (is_admin()) {
+  $stmt = $pdo->query("SELECT id, name FROM projects ORDER BY name");
+  $all_projects = $stmt->fetchAll();
+} else {
+  $uid = current_user_id();
+  $stmt = $pdo->prepare(
+    "SELECT DISTINCT p.id, p.name FROM projects p
+     LEFT JOIN tasks t ON t.project_id = p.id AND t.assigned_to = ?
+     WHERE p.owner_id = ? OR t.id IS NOT NULL
+     ORDER BY p.name"
+  );
+  $stmt->execute([$uid, $uid]);
+  $all_projects = $stmt->fetchAll();
+}
 if (!$all_projects) { http_response_code(500); exit('No projects exist'); }
 
 $all_users = $pdo->query("SELECT id, username FROM users ORDER BY username")->fetchAll();
