@@ -76,11 +76,6 @@ render_header('Playbook Tasks');
           <td>
             <div class="actions">
               <a class="btn" href="playbook_task_form.php?project_id=<?= (int)$project_id ?>&id=<?= (int)$t['id'] ?>">Edit</a>
-              <a class="btn danger"
-                 href="task_delete.php?project_id=<?= (int)$project_id ?>&id=<?= (int)$t['id'] ?>"
-                 onclick="return confirm('Delete this task?');">
-                Delete
-              </a>
             </div>
           </td>
         </tr>
