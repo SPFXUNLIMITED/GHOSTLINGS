@@ -20,9 +20,9 @@ if ($action === 'unarchive') {
   $redirect = 'archives.php';
 } else {
   // Redirect back to the appropriate list based on project type
-  $row = $pdo->prepare("SELECT playbook FROM projects WHERE id = ?");
-  $row->execute([$id]);
-  $proj = $row->fetch();
+  $stmt2 = $pdo->prepare("SELECT playbook FROM projects WHERE id = ?");
+  $stmt2->execute([$id]);
+  $proj = $stmt2->fetch();
   $redirect = ($proj && $proj['playbook']) ? 'playbooks.php' : 'index.php';
 }
 

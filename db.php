@@ -73,6 +73,7 @@ try {
 try {
   $pdo->exec("ALTER TABLE projects ADD COLUMN archived TINYINT(1) NOT NULL DEFAULT 0");
 } catch (PDOException $e) {
+  // SQLSTATE 42S21 = column already exists
   if ($e->getCode() !== '42S21') {
     throw $e;
   }
