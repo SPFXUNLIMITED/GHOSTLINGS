@@ -163,10 +163,7 @@ render_header('Projects');
                    onclick="return confirm('Archive this project?');">
                   Archive
                 </a>
-                <a class="btn danger" href="project_delete.php?id=<?= (int)$p['id'] ?>"
-                   onclick="return confirm('Delete this project? This also deletes its tasks.');">
-                  Delete
-                </a>
+
               </div>
             </td>
           </tr>

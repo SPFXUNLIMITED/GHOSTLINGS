@@ -59,6 +59,10 @@ render_header('Archives');
                  onclick="return confirm('Restore this <?= h(strtolower($type)) ?> to active?');">
                 Unarchive
               </a>
+              <a class="btn danger" href="project_delete.php?id=<?= (int)$p['id'] ?>"
+                 onclick="return confirm('Delete this <?= h(strtolower($type)) ?>? This also deletes its tasks.');">
+                Delete
+              </a>
             </div>
           </td>
         </tr>
