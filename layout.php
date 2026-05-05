@@ -141,6 +141,7 @@ function render_header(string $title): void {
   <div class="menubar-inner">
     <a class="menu-link <?= $current === 'index.php' ? 'active' : '' ?>" href="index.php">Projects</a>
 	<a class="menu-link <?= $current === 'playbooks.php' ? 'active' : '' ?>" href="playbooks.php">Playbooks</a>
+	<a class="menu-link <?= $current === 'archives.php' ? 'active' : '' ?>" href="archives.php">Archives</a>
 	<?php if (!empty($_SESSION['user_id'])): ?>
 	<a class="menu-link <?= $current === 'time_clock.php' ? 'active' : '' ?>" href="time_clock.php">Time Clock</a>
 	<?php endif; ?>
