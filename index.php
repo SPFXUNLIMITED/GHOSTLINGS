@@ -12,12 +12,12 @@ $proj_offset = ($proj_page - 1) * $per_page;
 $task_offset = ($task_page - 1) * $per_page;
 
 if (is_admin()) {
-  $proj_total = (int)$pdo->query("SELECT COUNT(*) FROM projects WHERE playbook = 0")->fetchColumn();
+  $proj_total = (int)$pdo->query("SELECT COUNT(*) FROM projects WHERE playbook = 0 AND archived = 0")->fetchColumn();
 
   $stmt = $pdo->prepare("
     SELECT id, name, description, created_at, priority
     FROM projects
-    WHERE playbook = 0
+    WHERE playbook = 0 AND archived = 0
     ORDER BY id DESC
     LIMIT :limit OFFSET :offset
   ");
@@ -30,7 +30,7 @@ if (is_admin()) {
     SELECT COUNT(*)
     FROM tasks t
     JOIN projects p ON p.id = t.project_id
-    WHERE p.playbook = 0
+    WHERE p.playbook = 0 AND p.archived = 0
   ")->fetchColumn();
 
   $stmt = $pdo->prepare("
@@ -39,7 +39,7 @@ if (is_admin()) {
       p.name AS project_name
     FROM tasks t
     JOIN projects p ON p.id = t.project_id
-    WHERE p.playbook = 0
+    WHERE p.playbook = 0 AND p.archived = 0
     ORDER BY FIELD(t.priority, 'critical', 'high', 'medium', 'low'), FIELD(t.status, 'todo', 'doing', 'done')
     LIMIT :limit OFFSET :offset
   ");
@@ -54,7 +54,7 @@ if (is_admin()) {
     SELECT COUNT(DISTINCT pr.id)
     FROM projects pr
     LEFT JOIN tasks t ON t.project_id = pr.id
-    WHERE pr.playbook = 0
+    WHERE pr.playbook = 0 AND pr.archived = 0
       AND (pr.owner_id = ? OR (t.assigned_to = ? AND t.assigned_to IS NOT NULL))
   ");
   $stmt->execute([$uid, $uid]);
@@ -64,7 +64,7 @@ if (is_admin()) {
     SELECT DISTINCT pr.id, pr.name, pr.description, pr.created_at, pr.priority
     FROM projects pr
     LEFT JOIN tasks t ON t.project_id = pr.id
-    WHERE pr.playbook = 0
+    WHERE pr.playbook = 0 AND pr.archived = 0
       AND (pr.owner_id = ? OR (t.assigned_to = ? AND t.assigned_to IS NOT NULL))
     ORDER BY pr.id DESC
     LIMIT ? OFFSET ?
@@ -80,7 +80,7 @@ if (is_admin()) {
     SELECT COUNT(*)
     FROM tasks t
     JOIN projects p ON p.id = t.project_id
-    WHERE p.playbook = 0
+    WHERE p.playbook = 0 AND p.archived = 0
       AND t.assigned_to = ?
   ");
   $stmt->execute([$uid]);
@@ -92,7 +92,7 @@ if (is_admin()) {
       p.name AS project_name
     FROM tasks t
     JOIN projects p ON p.id = t.project_id
-    WHERE p.playbook = 0
+    WHERE p.playbook = 0 AND p.archived = 0
       AND t.assigned_to = ?
     ORDER BY FIELD(t.priority, 'critical', 'high', 'medium', 'low'), FIELD(t.status, 'todo', 'doing', 'done')
     LIMIT ? OFFSET ?
@@ -159,6 +159,10 @@ render_header('Projects');
               <div class="actions">
                 <a class="btn" href="tasks.php?project_id=<?= (int)$p['id'] ?>">Tasks</a>
                 <a class="btn" href="project_form.php?id=<?= (int)$p['id'] ?>">Edit</a>
+                <a class="btn" href="project_archive.php?id=<?= (int)$p['id'] ?>&action=archive"
+                   onclick="return confirm('Archive this project?');">
+                  Archive
+                </a>
                 <a class="btn danger" href="project_delete.php?id=<?= (int)$p['id'] ?>"
                    onclick="return confirm('Delete this project? This also deletes its tasks.');">
                   Delete

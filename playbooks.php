@@ -8,7 +8,7 @@ require_login();
 $projects = $pdo->query("
   SELECT id, name, description, created_at
   FROM projects
-  WHERE playbook = 1
+  WHERE playbook = 1 AND archived = 0
   ORDER BY id DESC
 ")->fetchAll();
 
@@ -57,6 +57,10 @@ render_header('Playbooks');
             <div class="actions">
               <a class="btn" href="playbook_tasks.php?project_id=<?= (int)$p['id'] ?>">Tasks</a>
               <a class="btn" href="project_form.php?id=<?= (int)$p['id'] ?>">Edit</a>
+              <a class="btn" href="project_archive.php?id=<?= (int)$p['id'] ?>&action=archive"
+                 onclick="return confirm('Archive this playbook?');">
+                Archive
+              </a>
               <a class="btn danger" href="project_delete.php?id=<?= (int)$p['id'] ?>"
                  onclick="return confirm('Delete this project? This also deletes its tasks.');">
                 Delete
