@@ -54,6 +54,10 @@ render_header('Archives');
           <td class="col-desc"><?= nl2br(h($p['description'] ?? '')) ?></td>
           <td class="col-actions">
             <div class="actions">
+              <a class="btn"
+                 href="<?= $p['playbook'] ? 'playbook_tasks.php' : 'tasks.php' ?>?project_id=<?= (int)$p['id'] ?>">
+                Tasks
+              </a>
               <a class="btn primary"
                  href="project_archive.php?id=<?= (int)$p['id'] ?>&action=unarchive"
                  onclick="return confirm('Restore this <?= h(strtolower($type)) ?> to active?');">
