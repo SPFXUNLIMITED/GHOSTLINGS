@@ -36,7 +36,7 @@ th, td { border-bottom:1px solid var(--b); padding: 10px; text-align:left; verti
   justify-content: flex-end;
 }
 
-.btn { display:inline-block; padding: 8px 10px; border:1px solid var(--b); background:#fff; border-radius: 8px; text-decoration:none; color: var(--t); }
+.btn { display:inline-block; padding: 4px 10px; border:1px solid var(--b); background:#fff; border-radius: 8px; text-decoration:none; color: var(--t); }
 .btn.primary { background: var(--p); color:#fff; border-color: var(--p); }
 .btn.danger { background: var(--d); color:#fff; border-color: var(--d); }
 input, textarea, select { width:100%; padding: 10px; border:1px solid var(--b); border-radius: 8px; }
