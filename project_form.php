@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $project['priority'] = $priority;
     $project['owner_id'] = $owner_id;
     if ($id) {
-      $stmt = $pdo->prepare("UPDATE projects SET name = ?, description = ?, priority = ?, owner_id = ? WHERE id = ?");
+      $stmt = $pdo->prepare("UPDATE projects SET name = ?, description = ?, playbook = 0, priority = ?, owner_id = ? WHERE id = ?");
       $stmt->execute([$name, $description ?: null, $priority, $owner_id, $id]);
     } else {
       $stmt = $pdo->prepare("INSERT INTO projects (name, description, playbook, priority, owner_id) VALUES (?, ?, 0, ?, ?)");
