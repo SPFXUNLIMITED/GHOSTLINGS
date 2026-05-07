@@ -17,7 +17,7 @@ render_header('Playbooks');
 <div class="card">
   <div class="row" style="justify-content:space-between; align-items:center;">
     <h1 style="margin:0;">Playbooks</h1>
-    <a class="btn primary" href="project_form.php">+ New Playbook</a>
+    <a class="btn primary" href="playbook_form.php">+ New Playbook</a>
   </div>
   <p class="muted">Create playbooks, then manage tasks inside each playbook.</p>
 </div>
@@ -56,7 +56,7 @@ render_header('Playbooks');
           <td>
             <div class="actions">
               <a class="btn" href="playbook_tasks.php?project_id=<?= (int)$p['id'] ?>">Tasks</a>
-              <a class="btn" href="project_form.php?id=<?= (int)$p['id'] ?>">Edit</a>
+              <a class="btn" href="playbook_form.php?id=<?= (int)$p['id'] ?>">Edit</a>
               <a class="btn" href="project_archive.php?id=<?= (int)$p['id'] ?>&action=archive"
                  onclick="return confirm('Archive this playbook?');">
                 Archive
