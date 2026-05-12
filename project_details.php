@@ -62,7 +62,7 @@ if (!$project) {
 
 if (is_admin()) {
   $task_stmt = $pdo->prepare("
-    SELECT t.id, t.title, t.status, t.priority
+    SELECT t.id, t.title, t.status, t.priority, t.details
     FROM tasks t
     WHERE t.project_id = ?
     ORDER BY FIELD(t.priority, 'critical', 'high', 'medium', 'low'), FIELD(t.status, 'todo', 'doing', 'done')
@@ -71,7 +71,7 @@ if (is_admin()) {
   $task_stmt->execute([$id]);
 } else {
   $task_stmt = $pdo->prepare("
-    SELECT t.id, t.title, t.status, t.priority
+    SELECT t.id, t.title, t.status, t.priority, t.details
     FROM tasks t
     JOIN projects p ON p.id = t.project_id
     WHERE t.project_id = ? AND (p.owner_id = ? OR t.assigned_to = ?)
@@ -134,6 +134,7 @@ render_header('Project Details');
       <thead>
         <tr>
           <th>Title</th>
+          <th>Details</th>
           <th class="col-status">Status</th>
           <th class="col-status">Priority</th>
           <th class="col-actions">Actions</th>
@@ -141,7 +142,7 @@ render_header('Project Details');
       </thead>
       <tbody>
         <?php if (empty($preview_tasks)): ?>
-          <tr><td colspan="4" class="muted">No tasks yet.</td></tr>
+          <tr><td colspan="5" class="muted">No tasks yet.</td></tr>
         <?php endif; ?>
         <?php foreach ($preview_tasks as $t): ?>
           <?php
@@ -149,9 +150,14 @@ render_header('Project Details');
             if (mb_strlen($task_title) > $task_title_max_length) {
               $task_title = mb_substr($task_title, 0, $task_title_max_length) . '...';
             }
+            $task_details = strip_tags((string)($t['details'] ?? ''));
+            if (mb_strlen($task_details) > 50) {
+              $task_details = mb_substr($task_details, 0, 50) . '...';
+            }
           ?>
           <tr>
             <td><?= h($task_title) ?></td>
+            <td><?= h($task_details) ?: '<span class="muted">—</span>' ?></td>
             <td class="col-status"><span class="badge <?= h($t['status']) ?>"><?= h($t['status']) ?></span></td>
             <td class="col-status"><span class="badge priority-<?= h($t['priority'] ?? 'medium') ?>"><?= h(ucfirst($t['priority'] ?? 'medium')) ?></span></td>
             <td class="col-actions">

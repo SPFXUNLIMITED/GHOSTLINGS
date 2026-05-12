@@ -48,6 +48,8 @@ render_header('Task Details');
     <h1 style="margin:0;">Task Details</h1>
     <div class="actions">
       <a class="btn" href="project_details.php?id=<?= (int)$task['project_id'] ?>">Back to Project</a>
+      <a class="btn" href="task_form.php?project_id=<?= (int)$task['project_id'] ?>&id=<?= (int)$task['id'] ?>">Edit</a>
+      <a class="btn danger" href="task_delete.php?project_id=<?= (int)$task['project_id'] ?>&id=<?= (int)$task['id'] ?>" onclick="return confirm('Delete this task?');">Delete</a>
     </div>
   </div>
 </div>
