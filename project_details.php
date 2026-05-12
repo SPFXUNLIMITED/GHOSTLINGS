@@ -94,6 +94,9 @@ render_header('Project Details');
     <h1 style="margin:0;">Project Details</h1>
     <div class="actions">
       <a class="btn" href="projects.php">Back to Projects</a>
+      <a class="btn" href="project_form.php?id=<?= (int)$project['id'] ?>">Edit</a>
+      <a class="btn" href="project_archive.php?id=<?= (int)$project['id'] ?>&action=archive"
+         onclick="return confirm('Archive this project?');">Archive</a>
       <a class="btn primary" href="task_form.php?project_id=<?= (int)$project['id'] ?>">+ New Task</a>
     </div>
   </div>
