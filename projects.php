@@ -117,7 +117,7 @@ $project_desc_max_length = 50;
 
 <div class="card">
   <div class="table-wrap">
-    <table class="table-auto" data-table-key="projects" data-default-sort-col="priority" data-default-sort-dir="desc">
+    <table class="table-auto" data-table-key="projects" data-default-sort-col="createdAt" data-default-sort-dir="desc">
       <thead>
         <tr>
           <th>
@@ -126,6 +126,11 @@ $project_desc_max_length = 50;
             </button>
           </th>
           <th>Description</th>
+          <th class="col-status">
+            <button type="button" class="linklike" data-sort-col="createdAt" data-sort-type="date" aria-label="Sort projects by created date">
+              Created
+            </button>
+          </th>
           <th class="col-status">
             <button type="button" class="linklike" data-sort-col="priority" data-sort-type="priority" aria-label="Sort projects by priority">
               Priority
@@ -136,7 +141,7 @@ $project_desc_max_length = 50;
       </thead>
       <tbody>
         <?php if (!$projects): ?>
-          <tr><td colspan="4" class="muted">No projects yet.</td></tr>
+          <tr><td colspan="5" class="muted">No projects yet.</td></tr>
         <?php endif; ?>
 
         <?php foreach ($projects as $p): ?>
@@ -160,12 +165,10 @@ $project_desc_max_length = 50;
               data-priority="<?= h($p['priority'] ?? 'medium') ?>"
               data-created-at="<?= h($p['created_at']) ?>">
             <td>
-              <strong><?= h($p['name']) ?></strong><br />
-              <span class="muted">
-                Created: <?= h($project_created) ?>
-              </span>
+              <strong><?= h($p['name']) ?></strong>
             </td>
             <td class="col-desc"><?= h($project_description) ?></td>
+            <td class="col-status"><?= h($project_created) ?></td>
             <td class="col-status"><span class="badge priority-<?= h($p['priority'] ?? 'medium') ?>"><?= h(ucfirst($p['priority'] ?? 'medium')) ?></span></td>
             <td class="col-actions">
               <div class="actions project-actions-inline">
