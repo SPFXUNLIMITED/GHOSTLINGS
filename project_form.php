@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $stmt = $pdo->prepare("INSERT INTO projects (name, description, playbook, priority, owner_id) VALUES (?, ?, 0, ?, ?)");
       $stmt->execute([$name, $description ?: null, $priority, $owner_id]);
     }
-    header('Location: index.php');
+    header('Location: projects.php');
     exit;
   }
 
@@ -64,7 +64,7 @@ render_header($id ? 'Edit Project' : 'New Project');
 <div class="card">
   <div class="row" style="justify-content:space-between; align-items:center;">
     <h1 style="margin:0;"><?= $id ? 'Edit Project' : 'New Project' ?></h1>
-    <a class="btn" href="index.php">Back</a>
+    <a class="btn" href="projects.php">Back</a>
   </div>
 
   <?php if ($errors): ?>
@@ -104,7 +104,7 @@ render_header($id ? 'Edit Project' : 'New Project');
 
     <div class="row" style="margin-top:12px;">
       <button class="btn primary" type="submit"><?= $id ? 'Save Changes' : 'Create It' ?></button>
-      <a class="btn" href="index.php">Cancel</a>
+      <a class="btn" href="projects.php">Cancel</a>
     </div>
   </form>
 </div>

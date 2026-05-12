@@ -139,7 +139,8 @@ function render_header(string $title): void {
 
 <nav class="menubar card">
   <div class="menubar-inner">
-    <a class="menu-link <?= $current === 'index.php' ? 'active' : '' ?>" href="index.php">Projects</a>
+    <a class="menu-link <?= $current === 'index.php' ? 'active' : '' ?>" href="index.php">Home</a>
+	<a class="menu-link <?= $current === 'projects.php' ? 'active' : '' ?>" href="projects.php">Projects</a>
 	<a class="menu-link <?= $current === 'documents.php' ? 'active' : '' ?>" href="documents.php">Documents</a>
 	<a class="menu-link <?= $current === 'playbooks.php' ? 'active' : '' ?>" href="playbooks.php">Playbooks</a>
 	<a class="menu-link <?= $current === 'archives.php' ? 'active' : '' ?>" href="archives.php">Archives</a>

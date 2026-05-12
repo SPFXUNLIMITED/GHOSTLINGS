@@ -16,7 +16,7 @@ render_header('Archives');
 <div class="card">
   <div class="row" style="justify-content:space-between; align-items:center;">
     <h1 style="margin:0;">Archives</h1>
-    <a class="btn" href="index.php">← Back to Projects</a>
+    <a class="btn" href="projects.php">← Back to Projects</a>
   </div>
   <p class="muted">Archived projects and playbooks. Use the Unarchive button to restore them.</p>
 </div>

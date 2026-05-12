@@ -12,7 +12,7 @@ $project_id = (int)($_POST['project_id'] ?? 0); // for redirect
 $allowed = ['todo','doing','done'];
 if ($task_id <= 0 || !in_array($status, $allowed, true)) {
   // fall back redirect
-  header('Location: index.php');
+  header('Location: projects.php');
   exit;
 }
 
@@ -24,6 +24,6 @@ $stmt->execute([$status, $task_id]);
 if ($project_id > 0) {
   header('Location: tasks.php?project_id=' . $project_id);
 } else {
-  header('Location: index.php');
+  header('Location: projects.php');
 }
 exit;

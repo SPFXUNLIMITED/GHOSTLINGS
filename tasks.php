@@ -6,7 +6,7 @@ require __DIR__ . '/auth.php';
 require_login();
 
 $project_id = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
-if (!$project_id) { header('Location: index.php'); exit; }
+if (!$project_id) { header('Location: projects.php'); exit; }
 
 $stmt = $pdo->prepare("SELECT id, name, owner_id FROM projects WHERE id = ?");
 $stmt->execute([$project_id]);
@@ -51,7 +51,7 @@ render_header('Tasks');
       <div class="muted">Project: <strong><?= h($project['name']) ?></strong> (ID <?= (int)$project_id ?>)</div>
     </div>
     <div class="actions">
-      <a class="btn" href="index.php">Back to Projects</a>
+      <a class="btn" href="projects.php">Back to Projects</a>
       <a class="btn primary" href="task_form.php?project_id=<?= (int)$project_id ?>">+ New Task</a>
     </div>
   </div>
