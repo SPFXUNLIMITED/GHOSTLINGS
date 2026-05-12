@@ -63,6 +63,15 @@ $stmt = $pdo->prepare("SELECT id, body, created_at FROM task_comments WHERE task
 $stmt->execute([$id]);
 $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+$upload_stmt = $pdo->prepare("
+  SELECT id, original_name, stored_name, mime_type, size_bytes, caption, created_at
+  FROM task_uploads
+  WHERE task_id = ?
+  ORDER BY created_at DESC, id DESC
+");
+$upload_stmt->execute([$id]);
+$task_uploads = $upload_stmt->fetchAll(PDO::FETCH_ASSOC);
+
 render_header('Task Details');
 ?>
 <div class="card">
@@ -72,6 +81,7 @@ render_header('Task Details');
       <a class="btn" href="project_details.php?id=<?= (int)$task['project_id'] ?>">Back to Project</a>
       <a class="btn" href="task_form.php?project_id=<?= (int)$task['project_id'] ?>&id=<?= (int)$task['id'] ?>">Edit</a>
       <a class="btn danger" href="task_delete.php?project_id=<?= (int)$task['project_id'] ?>&id=<?= (int)$task['id'] ?>" onclick="return confirm('Delete this task?');">Delete</a>
+      <a class="btn" href="#task-files">Upload Files</a>
     </div>
   </div>
 </div>
@@ -116,6 +126,81 @@ render_header('Task Details');
     </tbody>
   </table>
 </div>
+
+<div class="card" id="task-files">
+  <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <h2 style="margin:0;">Files</h2>
+    <span class="muted"><?= count($task_uploads) ?> total</span>
+  </div>
+
+  <form action="task_upload_handler.php" method="post" enctype="multipart/form-data" class="row" style="gap:12px; align-items:flex-end; margin-bottom:12px;">
+    <input type="hidden" name="task_id" value="<?= (int)$task['id'] ?>">
+    <div style="min-width:220px;">
+      <label class="muted" for="task_file">Choose file</label>
+      <input id="task_file" type="file" name="file" required>
+    </div>
+    <div style="min-width:220px;">
+      <label class="muted" for="task_caption">Caption (optional)</label>
+      <input id="task_caption" type="text" name="caption" value="" placeholder="Screenshot, spec, etc." style="width:100%;">
+    </div>
+    <div>
+      <button class="btn primary" type="submit">Upload</button>
+    </div>
+  </form>
+
+  <?php if (!$task_uploads): ?>
+    <p class="muted">No files uploaded yet.</p>
+  <?php else: ?>
+    <div class="thumb-grid">
+      <?php foreach ($task_uploads as $u): ?>
+        <?php
+          $isImg = is_string($u['mime_type']) && preg_match('#^image/(png|jpe?g|gif|webp)$#i', $u['mime_type']);
+          $fileUrl = 'uploads/' . $u['stored_name'];
+        ?>
+        <div class="thumb">
+          <div class="preview">
+            <?php if ($isImg): ?>
+              <a href="<?= h($fileUrl) ?>" target="_blank" rel="noopener">
+                <img src="<?= h($fileUrl) ?>" alt="<?= h($u['original_name']) ?>">
+              </a>
+            <?php else: ?>
+              <div class="muted" style="text-align:center; padding:10px;">
+                <div style="font-size:42px; line-height:1;">📄</div>
+                <div style="margin-top:6px;">File</div>
+              </div>
+            <?php endif; ?>
+          </div>
+          <div class="meta">
+            <div class="name" title="<?= h($u['original_name']) ?>"><?= h($u['original_name']) ?></div>
+            <?php if (!empty($u['caption'])): ?>
+              <div class="sub"><?= h($u['caption']) ?></div>
+            <?php endif; ?>
+            <div class="sub">
+              <?= h($u['mime_type'] ?? 'application/octet-stream') ?> •
+              <?= number_format(((int)$u['size_bytes']) / 1024, 1) ?> KB
+            </div>
+            <div class="sub">Uploaded: <?= h($u['created_at']) ?></div>
+          </div>
+          <div class="actions" style="padding:10px;">
+            <a class="btn" href="<?= h($fileUrl) ?>" target="_blank" rel="noopener">Open</a>
+            <a class="btn danger" href="task_upload_delete.php?id=<?= (int)$u['id'] ?>&task_id=<?= (int)$task['id'] ?>"
+               onclick="return confirm('Delete this file?');">Delete</a>
+          </div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
+</div>
+
+<style>
+  .thumb-grid{display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:12px;}
+  .thumb{border:1px solid rgba(0,0,0,.08); border-radius:12px; overflow:hidden; background:#fff;}
+  .thumb .preview{height:150px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.03);}
+  .thumb img{width:100%; height:150px; object-fit:cover; display:block;}
+  .thumb .meta{padding:10px;}
+  .thumb .meta .name{font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .thumb .meta .sub{font-size:12px; color:rgba(0,0,0,.55); margin-top:4px;}
+</style>
 
 <?php if ($comments): ?>
 <div class="card">
