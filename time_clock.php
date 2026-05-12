@@ -35,6 +35,9 @@ $open_stmt = $pdo->prepare("
 ");
 $open_stmt->execute([$uid]);
 $open_entry = $open_stmt->fetch();
+$has_project_or_text = static function (?int $project_id, string $text): bool {
+  return $project_id !== null || $text !== '';
+};
 
 // ── POST handlers ─────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -47,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
       $proj = (int)($_POST['project_id'] ?? 0) ?: null;
       $desc = trim($_POST['description'] ?? '');
-      if (!$proj && $desc === '') {
+      if (!$has_project_or_text($proj, $desc)) {
         $errors[] = 'Please select a project or enter a note before clocking in.';
       } else {
         $now  = (new DateTime('now', $tz))->format('Y-m-d H:i:s');
@@ -92,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$date || !$start || !$end) {
       $errors[] = 'Date, start time, and end time are required.';
-    } elseif (!$proj && $desc === '') {
+    } elseif (!$has_project_or_text($proj, $desc)) {
       $errors[] = 'Please select a project or enter a description for manual entry.';
     } elseif (!$clock_in_obj || !$clock_out_obj) {
       $errors[] = 'Invalid date or time format.';
