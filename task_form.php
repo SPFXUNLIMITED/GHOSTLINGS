@@ -8,7 +8,7 @@ require_login();
 $project_id = (int)($_GET['project_id'] ?? $_POST['project_id'] ?? 0);
 $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
 
-if (!$project_id) { header('Location: index.php'); exit; }
+if (!$project_id) { header('Location: projects.php'); exit; }
 
 $all_users = $pdo->query("SELECT id, username FROM users ORDER BY username")->fetchAll();
 

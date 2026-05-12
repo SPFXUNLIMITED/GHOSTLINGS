@@ -7,7 +7,7 @@ $id     = isset($_GET['id'])     ? (int)$_GET['id']     : 0;
 $action = isset($_GET['action']) ? $_GET['action']       : 'archive';
 
 if (!$id || !in_array($action, ['archive', 'unarchive'], true)) {
-  header('Location: index.php');
+  header('Location: projects.php');
   exit;
 }
 
@@ -23,7 +23,7 @@ if ($action === 'unarchive') {
   $stmt2 = $pdo->prepare("SELECT playbook FROM projects WHERE id = ?");
   $stmt2->execute([$id]);
   $proj = $stmt2->fetch();
-  $redirect = ($proj && $proj['playbook']) ? 'playbooks.php' : 'index.php';
+  $redirect = ($proj && $proj['playbook']) ? 'playbooks.php' : 'projects.php';
 }
 
 header('Location: ' . $redirect);
