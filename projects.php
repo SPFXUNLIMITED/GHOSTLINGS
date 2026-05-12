@@ -169,7 +169,10 @@ $project_desc_max_length = 50;
               <strong><?= h($p['name']) ?></strong>
             </td>
             <td class="col-desc"><?= h($project_description) ?></td>
-            <td class="col-status"><?= h($project_created) ?><?php if ($project_is_new): ?> <span class="badge new">New</span><?php endif; ?></td>
+            <td class="col-status">
+              <div><?= h($project_created) ?></div>
+              <?php if ($project_is_new): ?><div><span class="badge new">New</span></div><?php endif; ?>
+            </td>
             <td class="col-status"><span class="badge priority-<?= h($p['priority'] ?? 'medium') ?>"><?= h(ucfirst($p['priority'] ?? 'medium')) ?></span></td>
             <td class="col-actions">
               <div class="actions project-actions-inline">
@@ -247,7 +250,10 @@ $project_desc_max_length = 50;
               <strong><?= h($t['title']) ?></strong>
             </td>
             <td class="col-desc"><?= h($t['project_name']) ?></td>
-            <td class="col-status"><?= h($task_created) ?><?php if ($task_is_new): ?> <span class="badge new">New</span><?php endif; ?></td>
+            <td class="col-status">
+              <div><?= h($task_created) ?></div>
+              <?php if ($task_is_new): ?><div><span class="badge new">New</span></div><?php endif; ?>
+            </td>
             <td class="col-status"><span class="badge priority-<?= h($t['priority'] ?? 'medium') ?>"><?= h(ucfirst($t['priority'] ?? 'medium')) ?></span></td>
             <td class="col-actions">
               <div class="actions project-actions-inline">
