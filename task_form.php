@@ -68,11 +68,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['add_comment']) && !i
     if ($id) {
       $stmt = $pdo->prepare("UPDATE tasks SET project_id=?, title=?, details=?, status=?, due_date=?, priority=?, assigned_to=? WHERE id=?");
       $stmt->execute([$new_project_id, $title, $details ?: null, $status, $due, $priority, $assigned_to, $id]);
+      $redirect_id = $id;
     } else {
       $stmt = $pdo->prepare("INSERT INTO tasks (project_id, title, details, status, due_date, priority, assigned_to) VALUES (?, ?, ?, ?, ?, ?, ?)");
       $stmt->execute([$new_project_id, $title, $details ?: null, $status, $due, $priority, $assigned_to]);
+      $redirect_id = (int)$pdo->lastInsertId();
     }
-    header("Location: tasks.php?project_id={$new_project_id}");
+    header("Location: task_details.php?id={$redirect_id}");
     exit;
   }
 
@@ -99,7 +101,7 @@ render_header($id ? 'Edit Task' : 'New Task');
       <h1 style="margin:0;"><?= $id ? 'Edit Task' : 'New Task' ?></h1>
       <div class="muted">Project: <?= h($project['name']) ?></div>
     </div>
-    <a class="btn" href="tasks.php?project_id=<?= (int)$project_id ?>">Back</a>
+    <a class="btn" href="<?= $id ? 'task_details.php?id=' . (int)$id : 'project_details.php?id=' . (int)$project_id ?>">Back</a>
   </div>
 
   <?php if ($errors): ?>
@@ -170,7 +172,7 @@ render_header($id ? 'Edit Task' : 'New Task');
 
     <div class="row" style="margin-top:12px;">
       <button class="btn primary" type="submit"><?= $id ? 'Save Changes' : 'Create Task' ?></button>
-      <a class="btn" href="tasks.php?project_id=<?= (int)$project_id ?>">Cancel</a>
+      <a class="btn" href="<?= $id ? 'task_details.php?id=' . (int)$id : 'project_details.php?id=' . (int)$project_id ?>">Cancel</a>
     </div>
 
     <input type="hidden" name="project_id" value="<?= (int)$project_id ?>">

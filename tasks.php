@@ -7,6 +7,8 @@ require_login();
 
 $project_id = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
 if (!$project_id) { header('Location: projects.php'); exit; }
+header("Location: project_details.php?id={$project_id}");
+exit;
 
 $stmt = $pdo->prepare("SELECT id, name, owner_id FROM projects WHERE id = ?");
 $stmt->execute([$project_id]);

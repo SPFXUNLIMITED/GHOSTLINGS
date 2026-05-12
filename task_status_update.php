@@ -22,7 +22,7 @@ $stmt->execute([$status, $task_id]);
 
 // Redirect back to tasks list
 if ($project_id > 0) {
-  header('Location: tasks.php?project_id=' . $project_id);
+  header('Location: task_details.php?id=' . $task_id);
 } else {
   header('Location: projects.php');
 }

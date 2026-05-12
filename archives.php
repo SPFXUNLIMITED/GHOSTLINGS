@@ -55,7 +55,7 @@ render_header('Archives');
           <td class="col-actions">
             <div class="actions">
               <a class="btn"
-                 href="<?= $p['playbook'] ? 'playbook_tasks.php' : 'tasks.php' ?>?project_id=<?= (int)$p['id'] ?>">
+                 href="<?= $p['playbook'] ? 'playbook_tasks.php?project_id=' . (int)$p['id'] : 'project_details.php?id=' . (int)$p['id'] ?>">
                 Tasks
               </a>
               <a class="btn primary"

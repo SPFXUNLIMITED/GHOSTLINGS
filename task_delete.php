@@ -9,5 +9,5 @@ if (!$project_id || !$id) { header('Location: projects.php'); exit; }
 $stmt = $pdo->prepare("DELETE FROM tasks WHERE id = ? AND project_id = ?");
 $stmt->execute([$id, $project_id]);
 
-header("Location: tasks.php?project_id={$project_id}");
+header("Location: project_details.php?id={$project_id}");
 exit;

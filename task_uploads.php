@@ -60,7 +60,7 @@ render_header('Task Files');
       </div>
     </div>
     <div class="actions">
-      <a class="btn" href="tasks.php?project_id=<?= (int)$task['project_id'] ?>">Back to Tasks</a>
+      <a class="btn" href="task_details.php?id=<?= (int)$task_id ?>">Back to Task</a>
     </div>
   </div>
 </div>
