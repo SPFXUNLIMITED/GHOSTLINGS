@@ -166,12 +166,14 @@ $project_desc_max_length = 50;
               data-priority="<?= h($p['priority'] ?? 'medium') ?>"
               data-created-at="<?= h($p['created_at']) ?>">
             <td>
-              <strong><?= h($p['name']) ?></strong>
+              <span class="name-with-badge">
+                <?php if ($project_is_new): ?><span class="badge new">New</span><?php endif; ?>
+                <strong><?= h($p['name']) ?></strong>
+              </span>
             </td>
             <td class="col-desc"><?= h($project_description) ?></td>
             <td class="col-status">
               <div><?= h($project_created) ?></div>
-              <?php if ($project_is_new): ?><div><span class="badge new">New</span></div><?php endif; ?>
             </td>
             <td class="col-status"><span class="badge priority-<?= h($p['priority'] ?? 'medium') ?>"><?= h(ucfirst($p['priority'] ?? 'medium')) ?></span></td>
             <td class="col-actions">
@@ -198,8 +200,8 @@ $project_desc_max_length = 50;
       <thead>
         <tr>
           <th>
-            <button type="button" class="linklike" data-sort-col="title" data-sort-type="text" aria-label="Sort tasks by title">
-              Task
+            <button type="button" class="linklike" data-sort-col="title" data-sort-type="text" aria-label="Sort tasks by name">
+              Name
             </button>
           </th>
           <th class="col-status">
@@ -241,12 +243,14 @@ $project_desc_max_length = 50;
               data-due="<?= h($t['due_date'] ?? '') ?>"
               data-created-at="<?= h($t['created_at']) ?>">
             <td>
-              <strong><?= h($t['title']) ?></strong>
+              <span class="name-with-badge">
+                <?php if ($task_is_new): ?><span class="badge new">New</span><?php endif; ?>
+                <strong><?= h($t['title']) ?></strong>
+              </span>
             </td>
             <td class="col-desc"><?= h($t['project_name']) ?></td>
             <td class="col-status">
               <div><?= h($task_created) ?></div>
-              <?php if ($task_is_new): ?><div><span class="badge new">New</span></div><?php endif; ?>
             </td>
             <td class="col-status"><span class="badge priority-<?= h($t['priority'] ?? 'medium') ?>"><?= h(ucfirst($t['priority'] ?? 'medium')) ?></span></td>
             <td class="col-actions">
