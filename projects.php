@@ -105,6 +105,7 @@ if (is_admin()) {
 }
 
 render_header('Projects');
+$project_desc_max_length = 50;
 ?>
 <div class="card">
   <div class="row" style="justify-content:space-between; align-items:center;">
@@ -139,21 +140,23 @@ render_header('Projects');
         <?php endif; ?>
 
         <?php foreach ($projects as $p): ?>
+          <?php
+            $project_description = preg_replace('/\s+/', ' ', (string)($p['description'] ?? ''));
+            $project_description = trim($project_description);
+            if (mb_strlen($project_description) > $project_desc_max_length) {
+              $project_description = mb_substr($project_description, 0, $project_desc_max_length) . '...';
+            }
+          ?>
           <tr data-name="<?= h(strtolower($p['name'])) ?>"
               data-priority="<?= h($p['priority'] ?? 'medium') ?>"
               data-created-at="<?= h($p['created_at']) ?>">
             <td>
               <strong><?= h($p['name']) ?></strong><br />
               <span class="muted">
-                Project #<?= (int)$p['id'] ?> <br>
-                <?php
-                  $dt = new DateTime($p['created_at']); // parsed from DB (often UTC)
-                  $dt->setTimezone(new DateTimeZone('America/Los_Angeles'));
-                  echo nl2br(h($dt->format("m-d-Y\ng:i A")));
-                ?>
+                Project #<?= (int)$p['id'] ?>
               </span>
             </td>
-            <td class="col-desc"><?= nl2br(h($p['description'] ?? '')) ?></td>
+            <td class="col-desc"><?= h($project_description) ?></td>
             <td class="col-status"><span class="badge priority-<?= h($p['priority'] ?? 'medium') ?>"><?= h(ucfirst($p['priority'] ?? 'medium')) ?></span></td>
             <td class="col-actions">
               <div class="actions">
@@ -204,24 +207,13 @@ render_header('Projects');
       </thead>
       <tbody>
         <?php foreach ($recent_tasks as $t): ?>
-          <?php
-            $created = new DateTime($t['created_at']); // timestamp from DB
-            $created->setTimezone(new DateTimeZone('America/Los_Angeles'));
-
-            $due = '';
-            if (!empty($t['due_date'])) {
-              $dueDt = DateTime::createFromFormat('Y-m-d', $t['due_date'], new DateTimeZone('America/Los_Angeles'));
-              if ($dueDt) $due = $dueDt->format('m-d-Y');
-            }
-          ?>
           <tr data-title="<?= h(strtolower($t['title'])) ?>"
               data-status="<?= h($t['status']) ?>"
               data-priority="<?= h($t['priority'] ?? 'medium') ?>"
               data-due="<?= h($t['due_date'] ?? '') ?>"
               data-created-at="<?= h($t['created_at']) ?>">
             <td class="col-task">
-              <strong><?= h($t['title']) ?></strong><br>
-              Due: <?= h($due) ?>
+              <strong><?= h($t['title']) ?></strong>
             </td>
             <td class="col-project col-project-wrap">
               <?= h($t['project_name']) ?> <br>
