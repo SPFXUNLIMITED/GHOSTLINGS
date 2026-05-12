@@ -128,6 +128,22 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Create project_uploads table if it does not exist yet
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS project_uploads (
+    id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    project_id    INT UNSIGNED NOT NULL,
+    original_name VARCHAR(255) NOT NULL,
+    stored_name   VARCHAR(255) NOT NULL,
+    mime_type     VARCHAR(191) NULL,
+    size_bytes    BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    caption       VARCHAR(255) NULL,
+    created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_project_uploads_project_id (project_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 // Create time_entries table if it does not exist yet
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS time_entries (
