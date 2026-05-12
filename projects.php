@@ -146,11 +146,11 @@ render_header('Projects');
               <strong><?= h($p['name']) ?></strong><br />
               <span class="muted">
                 Project #<?= (int)$p['id'] ?> <br>
-				<?php
-				  $dt = new DateTime($p['created_at']); // parsed from DB (often UTC)
-				  $dt->setTimezone(new DateTimeZone('America/Los_Angeles'));
-				  echo nl2br(h($dt->format("m-d-Y\ng:i A")));
-				?>
+                <?php
+                  $dt = new DateTime($p['created_at']); // parsed from DB (often UTC)
+                  $dt->setTimezone(new DateTimeZone('America/Los_Angeles'));
+                  echo nl2br(h($dt->format("m-d-Y\ng:i A")));
+                ?>
               </span>
             </td>
             <td class="col-desc"><?= nl2br(h($p['description'] ?? '')) ?></td>
@@ -219,14 +219,14 @@ render_header('Projects');
               data-priority="<?= h($t['priority'] ?? 'medium') ?>"
               data-due="<?= h($t['due_date'] ?? '') ?>"
               data-created-at="<?= h($t['created_at']) ?>">
-			<td class="col-task">
-			  <strong><?= h($t['title']) ?></strong><br>
-			  Due: <?= h($due) ?>
-			</td>
-			<td class="col-project col-project-wrap">
-			  <?= h($t['project_name']) ?> <br>
-			  <a class="muted" href="tasks.php?project_id=<?= (int)$t['project_id'] ?>">View project tasks</a>
-			</td>
+            <td class="col-task">
+              <strong><?= h($t['title']) ?></strong><br>
+              Due: <?= h($due) ?>
+            </td>
+            <td class="col-project col-project-wrap">
+              <?= h($t['project_name']) ?> <br>
+              <a class="muted" href="tasks.php?project_id=<?= (int)$t['project_id'] ?>">View project tasks</a>
+            </td>
             <td class="col-status"><span class="badge <?= h($t['status']) ?>"><?= h($t['status']) ?></span></td>
             <td class="col-status"><span class="badge priority-<?= h($t['priority'] ?? 'medium') ?>"><?= h(ucfirst($t['priority'] ?? 'medium')) ?></span></td>
           </tr>
