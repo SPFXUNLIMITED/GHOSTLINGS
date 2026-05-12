@@ -91,7 +91,10 @@ render_header('Project Details');
 ?>
 <div class="card">
   <div class="row" style="justify-content:space-between; align-items:center;">
-    <h1 style="margin:0;">Project Details</h1>
+    <div class="row" style="align-items:center; gap:8px;">
+      <h1 style="margin:0;">Project Details</h1>
+      <a class="btn primary" href="task_form.php?project_id=<?= (int)$project['id'] ?>">+ New Task</a>
+    </div>
     <div class="actions">
       <a class="btn" href="projects.php">Back to Projects</a>
     </div>
