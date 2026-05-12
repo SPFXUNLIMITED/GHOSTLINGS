@@ -104,6 +104,30 @@ try {
   }
 }
 
+// Create task_comments table if it does not exist yet
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS task_comments (
+    id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    task_id    INT UNSIGNED NOT NULL,
+    body       TEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_task_comments_task_id (task_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// Create project_comments table if it does not exist yet
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS project_comments (
+    id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    project_id INT UNSIGNED NOT NULL,
+    body       TEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_project_comments_project_id (project_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 // Create time_entries table if it does not exist yet
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS time_entries (
