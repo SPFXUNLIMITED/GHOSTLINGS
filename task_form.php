@@ -13,11 +13,12 @@ if (!$project_id) { header('Location: projects.php'); exit; }
 $all_users = $pdo->query("SELECT id, username FROM users ORDER BY username")->fetchAll();
 
 $errors = [];
-$task = ['project_id' => $project_id, 'title' => '', 'details' => '', 'status' => 'todo', 'due_date' => '', 'priority' => 'medium', 'assigned_to' => current_user_id()];
+$task = ['project_id' => $project_id, 'title' => '', 'details' => '', 'status' => 'todo', 'due_date' => '', 'priority' => 'medium', 'assigned_to' => null];
 
 if (!$id) {
   // Set default selected project for new task
   $task['project_id'] = $project_id;
+  $task['assigned_to'] = current_user_id();
 
   // Load the project for the header/back link
   $stmt = $pdo->prepare("SELECT id, name FROM projects WHERE id = ?");
