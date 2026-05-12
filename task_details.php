@@ -154,8 +154,12 @@ render_header('Task Details');
     <div class="thumb-grid">
       <?php foreach ($task_uploads as $u): ?>
         <?php
+          $storedName = (string)($u['stored_name'] ?? '');
+          if (!preg_match('/^[a-zA-Z0-9._-]+$/', $storedName)) {
+            continue;
+          }
           $isImg = is_string($u['mime_type']) && preg_match('#^image/(png|jpe?g|gif|webp)$#i', $u['mime_type']);
-          $fileUrl = 'uploads/' . $u['stored_name'];
+          $fileUrl = 'uploads/' . $storedName;
         ?>
         <div class="thumb">
           <div class="preview">
