@@ -119,7 +119,6 @@ render_header('Project Details');
   <div class="row" style="justify-content:space-between; align-items:center;">
     <h1 style="margin:0;">Project Details</h1>
     <div class="actions">
-      <a class="btn" href="projects.php">Back to Projects</a>
       <a class="btn" href="project_form.php?id=<?= (int)$project['id'] ?>">Edit</a>
       <a class="btn" href="project_archive.php?id=<?= (int)$project['id'] ?>&action=archive"
          onclick="return confirm('Archive this project?');">Archive</a>
