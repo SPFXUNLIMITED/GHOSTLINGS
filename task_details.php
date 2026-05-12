@@ -148,7 +148,7 @@ render_header('Task Details');
     </div>
   </form>
 
-  <?php if (!$task_uploads): ?>
+  <?php if (empty($task_uploads)): ?>
     <p class="muted">No files uploaded yet.</p>
   <?php else: ?>
     <div class="thumb-grid">
