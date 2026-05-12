@@ -152,10 +152,11 @@ $project_desc_max_length = 50;
               $project_description = mb_substr($project_description, 0, $project_desc_max_length) . '...';
             }
             $project_created = '';
+            $project_is_new = false;
             if (!empty($p['created_at'])) {
-              $project_created_dt = new DateTime($p['created_at']);
-              $project_created_dt->setTimezone(new DateTimeZone('America/Los_Angeles'));
+              $project_created_dt = new DateTime($p['created_at'], new DateTimeZone('America/Los_Angeles'));
               $project_created = $project_created_dt->format('m-d-Y g:i A');
+              $project_is_new = (time() - $project_created_dt->getTimestamp()) < 86400;
             }
             if ($project_created === '') {
               $project_created = '—';
@@ -168,7 +169,7 @@ $project_desc_max_length = 50;
               <strong><?= h($p['name']) ?></strong>
             </td>
             <td class="col-desc"><?= h($project_description) ?></td>
-            <td class="col-status"><?= h($project_created) ?></td>
+            <td class="col-status"><?= h($project_created) ?><?php if ($project_is_new): ?> <span class="badge new">New</span><?php endif; ?></td>
             <td class="col-status"><span class="badge priority-<?= h($p['priority'] ?? 'medium') ?>"><?= h(ucfirst($p['priority'] ?? 'medium')) ?></span></td>
             <td class="col-actions">
               <div class="actions project-actions-inline">
@@ -226,10 +227,11 @@ $project_desc_max_length = 50;
         <?php foreach ($recent_tasks as $t): ?>
           <?php
             $task_created = '';
+            $task_is_new = false;
             if (!empty($t['created_at'])) {
-              $task_created_dt = new DateTime($t['created_at']);
-              $task_created_dt->setTimezone(new DateTimeZone('America/Los_Angeles'));
+              $task_created_dt = new DateTime($t['created_at'], new DateTimeZone('America/Los_Angeles'));
               $task_created = $task_created_dt->format('m-d-Y g:i A');
+              $task_is_new = (time() - $task_created_dt->getTimestamp()) < 86400;
             }
             if ($task_created === '') {
               $task_created = '—';
@@ -245,7 +247,7 @@ $project_desc_max_length = 50;
               <strong><?= h($t['title']) ?></strong>
             </td>
             <td class="col-desc"><?= h($t['project_name']) ?></td>
-            <td class="col-status"><?= h($task_created) ?></td>
+            <td class="col-status"><?= h($task_created) ?><?php if ($task_is_new): ?> <span class="badge new">New</span><?php endif; ?></td>
             <td class="col-status"><span class="badge priority-<?= h($t['priority'] ?? 'medium') ?>"><?= h(ucfirst($t['priority'] ?? 'medium')) ?></span></td>
             <td class="col-actions">
               <div class="actions project-actions-inline">
