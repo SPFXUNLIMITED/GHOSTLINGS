@@ -24,6 +24,10 @@ th, td { border-bottom:1px solid var(--b); padding: 10px; text-align:left; verti
   flex-wrap: wrap; 
 }
 
+.project-actions-inline {
+  flex-wrap: nowrap;
+}
+
 /* ONLY the topbar actions should stack (login/logout then clock) */
 .topbar .actions {
   flex-direction: column;
@@ -198,6 +202,11 @@ th, td {
     flex-direction: column;
     gap: 8px;
     align-items: stretch;
+  }
+
+  .project-actions-inline {
+    flex-direction: row;
+    align-items: center;
   }
 
   /* avoid forcing nowrap columns too wide on very small screens */
