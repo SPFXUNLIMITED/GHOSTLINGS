@@ -35,6 +35,9 @@ $open_stmt = $pdo->prepare("
 ");
 $open_stmt->execute([$uid]);
 $open_entry = $open_stmt->fetch();
+$has_project_or_text = static function (?int $project_id, string $text): bool {
+  return $project_id !== null || $text !== '';
+};
 
 // ── POST handlers ─────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -47,16 +50,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
       $proj = (int)($_POST['project_id'] ?? 0) ?: null;
       $desc = trim($_POST['description'] ?? '');
-      $now  = (new DateTime('now', $tz))->format('Y-m-d H:i:s');
-      $stmt = $pdo->prepare("
-        INSERT INTO time_entries (user_id, project_id, description, clock_in)
-        VALUES (?, ?, ?, ?)
-      ");
-      $stmt->execute([$uid, $proj, $desc ?: null, $now]);
-      $success = 'Clocked in at ' . (new DateTime('now', $tz))->format('g:i A');
-      // Refresh open entry
-      $open_stmt->execute([$uid]);
-      $open_entry = $open_stmt->fetch();
+      if (!$has_project_or_text($proj, $desc)) {
+        $errors[] = 'Please select a project or enter a note before clocking in.';
+      } else {
+        $now  = (new DateTime('now', $tz))->format('Y-m-d H:i:s');
+        $stmt = $pdo->prepare("
+          INSERT INTO time_entries (user_id, project_id, description, clock_in)
+          VALUES (?, ?, ?, ?)
+        ");
+        $stmt->execute([$uid, $proj, $desc ?: null, $now]);
+        $success = 'Clocked in at ' . (new DateTime('now', $tz))->format('g:i A');
+        // Refresh open entry
+        $open_stmt->execute([$uid]);
+        $open_entry = $open_stmt->fetch();
+      }
     }
   }
 
@@ -88,6 +95,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$date || !$start || !$end) {
       $errors[] = 'Date, start time, and end time are required.';
+    } elseif (!$has_project_or_text($proj, $desc)) {
+      $errors[] = 'Please select a project or enter a description for manual entry.';
     } elseif (!$clock_in_obj || !$clock_out_obj) {
       $errors[] = 'Invalid date or time format.';
     } elseif ($clock_out_obj <= $clock_in_obj) {
@@ -234,7 +243,7 @@ render_header('Time Clock');
     <form method="post" style="max-width:480px;">
       <input type="hidden" name="action" value="clock_in">
 
-      <label>Project (optional)</label>
+      <label>Project (or add a note)</label>
       <select name="project_id">
         <option value="">— No project —</option>
         <?php foreach ($projects as $pr): ?>
@@ -242,7 +251,7 @@ render_header('Time Clock');
         <?php endforeach; ?>
       </select>
 
-      <label>Note (optional)</label>
+      <label>Note (or select a project)</label>
       <input type="text" name="description" maxlength="255" placeholder="What are you working on?" />
 
       <div class="row" style="margin-top:14px;">
@@ -264,7 +273,7 @@ render_header('Time Clock');
         <input type="date" name="entry_date" value="<?= h($today) ?>" required />
       </div>
       <div>
-        <label>Project (optional)</label>
+        <label>Project (or add a description)</label>
         <select name="project_id">
           <option value="">— No project —</option>
           <?php foreach ($projects as $pr): ?>
@@ -281,7 +290,7 @@ render_header('Time Clock');
         <input type="time" name="end_time" required />
       </div>
       <div class="full">
-        <label>Description (optional)</label>
+        <label>Description (or select a project)</label>
         <input type="text" name="description" maxlength="255" placeholder="What did you work on?" />
       </div>
       <div class="full">
