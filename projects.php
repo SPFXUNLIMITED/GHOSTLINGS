@@ -196,7 +196,7 @@ $project_desc_max_length = 50;
   </div>
 
   <div class="table-wrap">
-    <table class="table-auto" data-table-key="tasks" data-default-sort-col="priority" data-default-sort-dir="desc">
+    <table class="table-auto" data-table-key="tasks" data-default-sort-col="createdAt" data-default-sort-dir="desc">
       <thead>
         <tr>
           <th>
@@ -204,10 +204,14 @@ $project_desc_max_length = 50;
               Task
             </button>
           </th>
-          <th class="col-project">Project</th>
           <th class="col-status">
-            <button type="button" class="linklike" data-sort-col="status" data-sort-type="status" aria-label="Sort tasks by status">
-              Status
+            <button type="button" class="linklike" data-sort-col="project" data-sort-type="text" aria-label="Sort tasks by project">
+              Project
+            </button>
+          </th>
+          <th class="col-status">
+            <button type="button" class="linklike" data-sort-col="createdAt" data-sort-type="date" aria-label="Sort tasks by created date">
+              Created
             </button>
           </th>
           <th class="col-status">
@@ -215,6 +219,7 @@ $project_desc_max_length = 50;
               Priority
             </button>
           </th>
+          <th class="col-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -231,25 +236,28 @@ $project_desc_max_length = 50;
             }
           ?>
           <tr data-title="<?= h(strtolower($t['title'])) ?>"
+              data-project="<?= h(strtolower($t['project_name'])) ?>"
               data-status="<?= h($t['status']) ?>"
               data-priority="<?= h($t['priority'] ?? 'medium') ?>"
               data-due="<?= h($t['due_date'] ?? '') ?>"
               data-created-at="<?= h($t['created_at']) ?>">
-            <td class="col-task">
-              <strong><?= h($t['title']) ?></strong><br>
-              <span class="muted">Created: <?= h($task_created) ?></span>
+            <td>
+              <strong><?= h($t['title']) ?></strong>
             </td>
-            <td class="col-project col-project-wrap">
-              <?= h($t['project_name']) ?> <br>
-              <a class="muted" href="tasks.php?project_id=<?= (int)$t['project_id'] ?>">View project tasks</a>
-            </td>
-            <td class="col-status"><span class="badge <?= h($t['status']) ?>"><?= h($t['status']) ?></span></td>
+            <td class="col-desc"><?= h($t['project_name']) ?></td>
+            <td class="col-status"><?= h($task_created) ?></td>
             <td class="col-status"><span class="badge priority-<?= h($t['priority'] ?? 'medium') ?>"><?= h(ucfirst($t['priority'] ?? 'medium')) ?></span></td>
+            <td class="col-actions">
+              <div class="actions project-actions-inline">
+                <a class="btn" href="task_details.php?id=<?= (int)$t['id'] ?>">View</a>
+                <a class="btn" href="tasks.php?project_id=<?= (int)$t['project_id'] ?>">Project Tasks</a>
+              </div>
+            </td>
           </tr>
         <?php endforeach; ?>
 
         <?php if (empty($recent_tasks)): ?>
-          <tr><td colspan="4" class="muted">No tasks yet.</td></tr>
+          <tr><td colspan="5" class="muted">No tasks yet.</td></tr>
         <?php endif; ?>
       </tbody>
     </table>
