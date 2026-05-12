@@ -157,7 +157,7 @@ render_header('Projects');
             <td class="col-status"><span class="badge priority-<?= h($p['priority'] ?? 'medium') ?>"><?= h(ucfirst($p['priority'] ?? 'medium')) ?></span></td>
             <td class="col-actions">
               <div class="actions">
-                <a class="btn" href="tasks.php?project_id=<?= (int)$p['id'] ?>">Tasks</a>
+                <a class="btn" href="project_details.php?id=<?= (int)$p['id'] ?>">View Details</a>
                 <a class="btn" href="project_form.php?id=<?= (int)$p['id'] ?>">Edit</a>
                 <a class="btn" href="project_archive.php?id=<?= (int)$p['id'] ?>&action=archive"
                    onclick="return confirm('Archive this project?');">
