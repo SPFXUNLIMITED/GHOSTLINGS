@@ -142,7 +142,7 @@ $project_desc_max_length = 50;
         <?php foreach ($projects as $p): ?>
           <?php
             $project_description = preg_replace('/\s+/', ' ', (string)($p['description'] ?? ''));
-            $project_description = trim($project_description ?? '');
+            $project_description = trim($project_description);
             if (mb_strlen($project_description) > $project_desc_max_length) {
               $project_description = mb_substr($project_description, 0, $project_desc_max_length) . '...';
             }
