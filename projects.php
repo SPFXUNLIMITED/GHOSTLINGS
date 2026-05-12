@@ -140,7 +140,8 @@ render_header('Projects');
 
         <?php foreach ($projects as $p): ?>
           <?php
-            $project_description = trim((string)($p['description'] ?? ''));
+            $project_description = preg_replace('/\s+/', ' ', (string)($p['description'] ?? ''));
+            $project_description = trim((string)$project_description);
             if (mb_strlen($project_description) > 50) {
               $project_description = mb_substr($project_description, 0, 50) . '...';
             }
