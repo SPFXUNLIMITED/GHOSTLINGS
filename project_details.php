@@ -133,7 +133,6 @@ render_header('Project Details');
       <a class="btn" href="project_archive.php?id=<?= (int)$project['id'] ?>&action=archive"
          onclick="return confirm('Archive this project?');">Archive</a>
       <a class="btn primary" href="task_form.php?project_id=<?= (int)$project['id'] ?>">+ New Task</a>
-      <a class="btn" href="#project-files">Upload Files</a>
     </div>
   </div>
 </div>
