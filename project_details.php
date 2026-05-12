@@ -157,7 +157,7 @@ render_header('Project Details');
           ?>
           <tr>
             <td><?= h($task_title) ?></td>
-            <td><?= h($task_details) ?: '<span class="muted">—</span>' ?></td>
+            <td><?php if ($task_details !== '') { echo h($task_details); } else { ?><span class="muted">—</span><?php } ?></td>
             <td class="col-status"><span class="badge <?= h($t['status']) ?>"><?= h($t['status']) ?></span></td>
             <td class="col-status"><span class="badge priority-<?= h($t['priority'] ?? 'medium') ?>"><?= h(ucfirst($t['priority'] ?? 'medium')) ?></span></td>
             <td class="col-actions">
