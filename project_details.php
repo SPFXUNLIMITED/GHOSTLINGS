@@ -60,6 +60,30 @@ if (!$project) {
   exit('Project not found');
 }
 
+if (is_admin()) {
+  $task_stmt = $pdo->prepare("
+    SELECT t.id, t.title, t.status, t.priority
+    FROM tasks t
+    WHERE t.project_id = ?
+    ORDER BY FIELD(t.priority, 'critical', 'high', 'medium', 'low'), FIELD(t.status, 'todo', 'doing', 'done')
+    LIMIT 5
+  ");
+  $task_stmt->execute([$id]);
+} else {
+  $task_stmt = $pdo->prepare("
+    SELECT t.id, t.title, t.status, t.priority
+    FROM tasks t
+    JOIN projects p ON p.id = t.project_id
+    WHERE t.project_id = ? AND (p.owner_id = ? OR t.assigned_to = ?)
+    ORDER BY FIELD(t.priority, 'critical', 'high', 'medium', 'low'), FIELD(t.status, 'todo', 'doing', 'done')
+    LIMIT 5
+  ");
+  $task_stmt->execute([$id, current_user_id(), current_user_id()]);
+}
+$preview_tasks = $task_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$task_title_max_length = 50;
+
 $created = new DateTime($project['created_at']);
 $created->setTimezone(new DateTimeZone('America/Los_Angeles'));
 
@@ -70,7 +94,6 @@ render_header('Project Details');
     <h1 style="margin:0;">Project Details</h1>
     <div class="actions">
       <a class="btn" href="projects.php">Back to Projects</a>
-      <a class="btn" href="tasks.php?project_id=<?= (int)$project['id'] ?>">View Tasks</a>
     </div>
   </div>
 </div>
@@ -103,12 +126,43 @@ render_header('Project Details');
 </div>
 
 <div class="card">
-  <h2 style="margin-top:0;">Task Summary</h2>
-  <div class="row" style="gap:12px; flex-wrap:wrap;">
-    <span class="badge">Total: <?= (int)$project['total_tasks'] ?></span>
-    <span class="badge todo">To Do: <?= (int)$project['todo_tasks'] ?></span>
-    <span class="badge doing">Doing: <?= (int)$project['doing_tasks'] ?></span>
-    <span class="badge done">Done: <?= (int)$project['done_tasks'] ?></span>
+  <div class="row" style="justify-content:space-between; align-items:center;">
+    <h2 style="margin:0;">Tasks</h2>
+  </div>
+  <div class="table-wrap">
+    <table class="table-auto">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th class="col-status">Status</th>
+          <th class="col-status">Priority</th>
+          <th class="col-actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php if (empty($preview_tasks)): ?>
+          <tr><td colspan="4" class="muted">No tasks yet.</td></tr>
+        <?php endif; ?>
+        <?php foreach ($preview_tasks as $t): ?>
+          <?php
+            $task_title = (string)($t['title'] ?? '');
+            if (mb_strlen($task_title) > $task_title_max_length) {
+              $task_title = mb_substr($task_title, 0, $task_title_max_length) . '...';
+            }
+          ?>
+          <tr>
+            <td><?= h($task_title) ?></td>
+            <td class="col-status"><span class="badge <?= h($t['status']) ?>"><?= h($t['status']) ?></span></td>
+            <td class="col-status"><span class="badge priority-<?= h($t['priority'] ?? 'medium') ?>"><?= h(ucfirst($t['priority'] ?? 'medium')) ?></span></td>
+            <td class="col-actions">
+              <div class="actions">
+                <a class="btn" href="task_details.php?id=<?= (int)$t['id'] ?>">View</a>
+              </div>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
   </div>
 </div>
 
