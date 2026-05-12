@@ -18,7 +18,7 @@ if (is_admin()) {
     SELECT id, name, description, created_at, priority
     FROM projects
     WHERE playbook = 0 AND archived = 0
-    ORDER BY id DESC
+    ORDER BY created_at DESC, id DESC
     LIMIT :limit OFFSET :offset
   ");
   $stmt->bindValue(':limit',  $per_page,    PDO::PARAM_INT);
@@ -40,7 +40,7 @@ if (is_admin()) {
     FROM tasks t
     JOIN projects p ON p.id = t.project_id
     WHERE p.playbook = 0 AND p.archived = 0
-    ORDER BY FIELD(t.priority, 'critical', 'high', 'medium', 'low'), FIELD(t.status, 'todo', 'doing', 'done')
+    ORDER BY t.created_at DESC, t.id DESC
     LIMIT :limit OFFSET :offset
   ");
   $stmt->bindValue(':limit',  $per_page,    PDO::PARAM_INT);
@@ -66,7 +66,7 @@ if (is_admin()) {
     LEFT JOIN tasks t ON t.project_id = pr.id
     WHERE pr.playbook = 0 AND pr.archived = 0
       AND (pr.owner_id = ? OR (t.assigned_to = ? AND t.assigned_to IS NOT NULL))
-    ORDER BY pr.id DESC
+    ORDER BY pr.created_at DESC, pr.id DESC
     LIMIT ? OFFSET ?
   ");
   $stmt->bindValue(1, $uid,          PDO::PARAM_INT);
@@ -94,7 +94,7 @@ if (is_admin()) {
     JOIN projects p ON p.id = t.project_id
     WHERE p.playbook = 0 AND p.archived = 0
       AND t.assigned_to = ?
-    ORDER BY FIELD(t.priority, 'critical', 'high', 'medium', 'low'), FIELD(t.status, 'todo', 'doing', 'done')
+    ORDER BY t.created_at DESC, t.id DESC
     LIMIT ? OFFSET ?
   ");
   $stmt->bindValue(1, $uid,          PDO::PARAM_INT);
@@ -146,6 +146,15 @@ $project_desc_max_length = 50;
             if (mb_strlen($project_description) > $project_desc_max_length) {
               $project_description = mb_substr($project_description, 0, $project_desc_max_length) . '...';
             }
+            $project_created = '';
+            if (!empty($p['created_at'])) {
+              $project_created_dt = new DateTime($p['created_at']);
+              $project_created_dt->setTimezone(new DateTimeZone('America/Los_Angeles'));
+              $project_created = $project_created_dt->format('m-d-Y g:i A');
+            }
+            if ($project_created === '') {
+              $project_created = '—';
+            }
           ?>
           <tr data-name="<?= h(strtolower($p['name'])) ?>"
               data-priority="<?= h($p['priority'] ?? 'medium') ?>"
@@ -153,7 +162,7 @@ $project_desc_max_length = 50;
             <td>
               <strong><?= h($p['name']) ?></strong><br />
               <span class="muted">
-                Project #<?= (int)$p['id'] ?>
+                Created: <?= h($project_created) ?>
               </span>
             </td>
             <td class="col-desc"><?= h($project_description) ?></td>
@@ -207,13 +216,25 @@ $project_desc_max_length = 50;
       </thead>
       <tbody>
         <?php foreach ($recent_tasks as $t): ?>
+          <?php
+            $task_created = '';
+            if (!empty($t['created_at'])) {
+              $task_created_dt = new DateTime($t['created_at']);
+              $task_created_dt->setTimezone(new DateTimeZone('America/Los_Angeles'));
+              $task_created = $task_created_dt->format('m-d-Y g:i A');
+            }
+            if ($task_created === '') {
+              $task_created = '—';
+            }
+          ?>
           <tr data-title="<?= h(strtolower($t['title'])) ?>"
               data-status="<?= h($t['status']) ?>"
               data-priority="<?= h($t['priority'] ?? 'medium') ?>"
               data-due="<?= h($t['due_date'] ?? '') ?>"
               data-created-at="<?= h($t['created_at']) ?>">
             <td class="col-task">
-              <strong><?= h($t['title']) ?></strong>
+              <strong><?= h($t['title']) ?></strong><br>
+              <span class="muted">Created: <?= h($task_created) ?></span>
             </td>
             <td class="col-project col-project-wrap">
               <?= h($t['project_name']) ?> <br>
