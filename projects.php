@@ -166,7 +166,7 @@ $project_desc_max_length = 50;
               data-priority="<?= h($p['priority'] ?? 'medium') ?>"
               data-created-at="<?= h($p['created_at']) ?>">
             <td>
-              <span style="display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span class="name-with-badge">
                 <?php if ($project_is_new): ?><span class="badge new">New</span><?php endif; ?>
                 <strong><?= h($p['name']) ?></strong>
               </span>
@@ -243,7 +243,7 @@ $project_desc_max_length = 50;
               data-due="<?= h($t['due_date'] ?? '') ?>"
               data-created-at="<?= h($t['created_at']) ?>">
             <td>
-              <span style="display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span class="name-with-badge">
                 <?php if ($task_is_new): ?><span class="badge new">New</span><?php endif; ?>
                 <strong><?= h($t['title']) ?></strong>
               </span>

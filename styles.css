@@ -28,6 +28,13 @@ th, td { border-bottom:1px solid var(--b); padding: 10px; text-align:left; verti
   flex-wrap: nowrap;
 }
 
+.name-with-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 /* ONLY the topbar actions should stack (login/logout then clock) */
 .topbar .actions {
   flex-direction: column;
