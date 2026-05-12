@@ -70,6 +70,13 @@ label { display:block; margin: 10px 0 6px; font-size: 14px; color: var(--m); }
 }
 
 /* Priority badges */
+.badge.new {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
+  font-weight: 700;
+}
+
 .badge.priority-low {
   background: #f3f4f6;
   color: #374151;
