@@ -177,12 +177,6 @@ $project_desc_max_length = 50;
             <td class="col-actions">
               <div class="actions project-actions-inline">
                 <a class="btn" href="project_details.php?id=<?= (int)$p['id'] ?>">View</a>
-                <a class="btn" href="project_form.php?id=<?= (int)$p['id'] ?>">Edit</a>
-                <a class="btn" href="project_archive.php?id=<?= (int)$p['id'] ?>&action=archive"
-                   onclick="return confirm('Archive this project?');">
-                  Archive
-                </a>
-
               </div>
             </td>
           </tr>
@@ -257,8 +251,7 @@ $project_desc_max_length = 50;
             <td class="col-status"><span class="badge priority-<?= h($t['priority'] ?? 'medium') ?>"><?= h(ucfirst($t['priority'] ?? 'medium')) ?></span></td>
             <td class="col-actions">
               <div class="actions project-actions-inline">
-                <a class="btn" href="task_details.php?id=<?= (int)$t['id'] ?>">View</a>
-                <a class="btn" href="tasks.php?project_id=<?= (int)$t['project_id'] ?>">Project Tasks</a>
+                <a class="btn" href="project_details.php?id=<?= (int)$t['project_id'] ?>">View</a>
               </div>
             </td>
           </tr>
