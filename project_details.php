@@ -32,10 +32,10 @@ if (is_admin()) {
     SELECT
       p.id, p.name, p.description, p.created_at, p.priority, p.owner_id,
       u.username AS owner_username,
-      SUM(CASE WHEN (p.owner_id = ? OR t.assigned_to = ?) THEN 1 ELSE 0 END) AS total_tasks,
-      SUM(CASE WHEN t.status = 'todo' AND (p.owner_id = ? OR t.assigned_to = ?) THEN 1 ELSE 0 END) AS todo_tasks,
-      SUM(CASE WHEN t.status = 'doing' AND (p.owner_id = ? OR t.assigned_to = ?) THEN 1 ELSE 0 END) AS doing_tasks,
-      SUM(CASE WHEN t.status = 'done' AND (p.owner_id = ? OR t.assigned_to = ?) THEN 1 ELSE 0 END) AS done_tasks
+      SUM(CASE WHEN t.id IS NOT NULL AND (p.owner_id = ? OR t.assigned_to = ?) THEN 1 ELSE 0 END) AS total_tasks,
+      SUM(CASE WHEN t.id IS NOT NULL AND t.status = 'todo' AND (p.owner_id = ? OR t.assigned_to = ?) THEN 1 ELSE 0 END) AS todo_tasks,
+      SUM(CASE WHEN t.id IS NOT NULL AND t.status = 'doing' AND (p.owner_id = ? OR t.assigned_to = ?) THEN 1 ELSE 0 END) AS doing_tasks,
+      SUM(CASE WHEN t.id IS NOT NULL AND t.status = 'done' AND (p.owner_id = ? OR t.assigned_to = ?) THEN 1 ELSE 0 END) AS done_tasks
     FROM projects p
     LEFT JOIN users u ON u.id = p.owner_id
     LEFT JOIN tasks t ON t.project_id = p.id
