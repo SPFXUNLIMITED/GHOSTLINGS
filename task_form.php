@@ -43,46 +43,6 @@ if ($id) {
   if (!$project) { http_response_code(404); exit('Project not found'); }
 }
 
-// Delete comment (edit mode only)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_comment'])) {
-  if (!$id) {
-    $errors[] = "Invalid task.";
-  } else {
-    $comment_id = (int)($_POST['comment_id'] ?? 0);
-    if ($comment_id <= 0) {
-      $errors[] = "Invalid comment.";
-    } else {
-      // Ensure the comment belongs to this task
-      $stmt = $pdo->prepare("DELETE FROM task_comments WHERE id = ? AND task_id = ?");
-      $stmt->execute([$comment_id, $id]);
-
-      $pid = (int)($task['project_id'] ?? $project_id);
-      header("Location: task_form.php?project_id={$pid}&id={$id}");
-      exit;
-    }
-  }
-}
-
-// COMMENTS: handle add-comment first (edit mode only)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment'])) {
-  if (!$id) {
-    $errors[] = "Save the task before adding comments.";
-  } else {
-    // WYSIWYG HTML will come through here
-    $comment = trim($_POST['comment_body'] ?? '');
-    if ($comment === '') {
-      $errors[] = "Comment cannot be empty.";
-    } else {
-      $stmt = $pdo->prepare("INSERT INTO task_comments (task_id, body) VALUES (?, ?)");
-      $stmt->execute([$id, $comment]);
-
-      $pid = (int)($task['project_id'] ?? $project_id);
-      header("Location: task_form.php?project_id={$pid}&id={$id}");
-      exit;
-    }
-  }
-}
-
 // TASK SAVE: normal create/update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['add_comment']) && !isset($_POST['delete_comment'])) {
 
@@ -129,14 +89,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['add_comment']) && !i
   $stmt->execute([$project_id]);
   $project = $stmt->fetch();
   if (!$project) { $errors[] = "Selected project not found."; }
-}
-
-// Load comments for display (edit mode only)
-$comments = [];
-if ($id) {
-  $stmt = $pdo->prepare("SELECT id, body, created_at FROM task_comments WHERE task_id = ? ORDER BY id DESC");
-  $stmt->execute([$id]);
-  $comments = $stmt->fetchAll();
 }
 
 render_header($id ? 'Edit Task' : 'New Task');
@@ -225,69 +177,13 @@ render_header($id ? 'Edit Task' : 'New Task');
     <input type="hidden" name="id" value="<?= (int)$id ?>">
   </form>
 
-  <!-- START COMMENTS -->
-  <?php if ($id): ?>
-    <hr style="border:none; border-top:1px solid #e5e7eb; margin:40px 0 0;" />
-    <h2 style="margin:0 0 10px;">Comments</h2>
-
-    <div class="card" style="padding:12px; border-radius:10px;">
-      <?php if (!$comments): ?>
-        <div class="muted">No comments yet.</div>
-      <?php else: ?>
-        <?php foreach ($comments as $c): ?>
-          <div style="padding:10px 0; border-bottom:1px solid #e5e7eb;">
-            <div class="row" style="justify-content:space-between; align-items:center;">
-              <div class="muted" style="margin-bottom:6px;">
-                <?php
-                if (!empty($c['created_at'])) {
-                  $dt = new DateTime($c['created_at']);
-                  echo h($dt->format('m-d-Y H:i'));
-                } else {
-                  echo '<span class="muted">—</span>';
-                }
-                ?>
-              </div>
-
-              <form method="post" style="margin:0;">
-                <input type="hidden" name="project_id" value="<?= (int)$task['project_id'] ?>">
-                <input type="hidden" name="id" value="<?= (int)$id ?>">
-                <input type="hidden" name="comment_id" value="<?= (int)$c['id'] ?>">
-                <button class="btn danger" type="submit" name="delete_comment" value="1"
-                        onclick="return confirm('Delete this comment?');">
-                  Delete
-                </button>
-              </form>
-            </div>
-
-            <!-- TRUSTED USERS: render comment HTML -->
-            <div><?= $c['body'] ?? '' ?></div>
-          </div>
-        <?php endforeach; ?>
-      <?php endif; ?>
-    </div>
-
-    <form method="post" style="margin-top:12px;">
-      <input type="hidden" name="project_id" value="<?= (int)$task['project_id'] ?>">
-      <input type="hidden" name="id" value="<?= (int)$id ?>">
-
-      <label>Add a comment</label>
-      <textarea id="comment_editor" name="comment_body" rows="3" placeholder="Write a comment..."></textarea>
-
-      <div class="row" style="margin-top:10px;">
-        <button class="btn" type="submit" name="add_comment" value="1">Add Comment</button>
-      </div>
-    </form>
-  <?php else: ?>
-    <div class="muted" style="margin-top:10px;">Save the task first to add comments.</div>
-  <?php endif; ?>
-
 </div>
 
 <!-- TinyMCE WYSIWYG -->
 <script src="https://cdn.tiny.cloud/1/pifs5sjkqqgawy88jx7d10zx5sxezi2ig67u4ci0exbu6hag/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
 <script>
   tinymce.init({
-    selector: '#details_editor, #comment_editor',
+    selector: '#details_editor',
     height: 280,
     menubar: false,
     plugins: 'lists link table code',
