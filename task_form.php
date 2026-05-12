@@ -18,6 +18,8 @@ $task = ['project_id' => $project_id, 'title' => '', 'details' => '', 'status' =
 if (!$id) {
   // Set default selected project for new task
   $task['project_id'] = $project_id;
+  $current_uid = current_user_id();
+  $task['assigned_to'] = $current_uid ?: null;
 
   // Load the project for the header/back link
   $stmt = $pdo->prepare("SELECT id, name FROM projects WHERE id = ?");
