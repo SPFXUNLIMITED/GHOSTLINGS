@@ -10,6 +10,28 @@ if ($id <= 0) {
   exit;
 }
 
+// Delete comment
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_comment'])) {
+  $comment_id = (int)($_POST['comment_id'] ?? 0);
+  if ($comment_id > 0) {
+    $stmt = $pdo->prepare("DELETE FROM project_comments WHERE id = ? AND project_id = ?");
+    $stmt->execute([$comment_id, $id]);
+  }
+  header("Location: project_details.php?id={$id}");
+  exit;
+}
+
+// Add comment
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment'])) {
+  $comment = trim($_POST['comment_body'] ?? '');
+  if ($comment !== '') {
+    $stmt = $pdo->prepare("INSERT INTO project_comments (project_id, body) VALUES (?, ?)");
+    $stmt->execute([$id, $comment]);
+  }
+  header("Location: project_details.php?id={$id}");
+  exit;
+}
+
 if (is_admin()) {
   $stmt = $pdo->prepare("
     SELECT
@@ -81,6 +103,10 @@ if (is_admin()) {
   $task_stmt->execute([$id, current_user_id(), current_user_id()]);
 }
 $preview_tasks = $task_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$comment_stmt = $pdo->prepare("SELECT id, body, created_at FROM project_comments WHERE project_id = ? ORDER BY id DESC");
+$comment_stmt->execute([$id]);
+$comments = $comment_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $task_title_max_length = 50;
 
@@ -175,5 +201,63 @@ render_header('Project Details');
     </table>
   </div>
 </div>
+
+<?php if ($comments): ?>
+<div class="card">
+  <h2 style="margin-top:0;">Comments</h2>
+  <?php foreach ($comments as $c): ?>
+    <div style="padding:10px 0; border-bottom:1px solid #e5e7eb;">
+      <div class="row" style="justify-content:space-between; align-items:center;">
+        <div class="muted" style="margin-bottom:6px;">
+          <?php
+            if (!empty($c['created_at'])) {
+              $dt = new DateTime($c['created_at']);
+              echo h($dt->format('m-d-Y H:i'));
+            } else {
+              echo '<span class="muted">—</span>';
+            }
+          ?>
+        </div>
+        <form method="post" style="margin:0;">
+          <input type="hidden" name="comment_id" value="<?= (int)$c['id'] ?>">
+          <button class="btn danger" type="submit" name="delete_comment" value="1"
+                  onclick="return confirm('Delete this comment?');">
+            Delete
+          </button>
+        </form>
+      </div>
+      <div><?= $c['body'] ?? '' ?></div>
+    </div>
+  <?php endforeach; ?>
+</div>
+<?php else: ?>
+<div class="card">
+  <h2 style="margin-top:0;">Comments</h2>
+  <div class="muted">No comments yet.</div>
+</div>
+<?php endif; ?>
+
+<div class="card">
+  <form method="post">
+    <label>Add a comment</label>
+    <textarea id="comment_editor" name="comment_body" rows="3" placeholder="Write a comment..."></textarea>
+    <div class="row" style="margin-top:10px;">
+      <button class="btn" type="submit" name="add_comment" value="1">Add Comment</button>
+    </div>
+  </form>
+</div>
+
+<!-- TinyMCE WYSIWYG -->
+<script src="https://cdn.tiny.cloud/1/pifs5sjkqqgawy88jx7d10zx5sxezi2ig67u4ci0exbu6hag/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+<script>
+  tinymce.init({
+    selector: '#comment_editor',
+    height: 280,
+    menubar: false,
+    plugins: 'lists link table code',
+    toolbar: 'undo redo | bold italic underline | bullist numlist | link table | removeformat | code',
+    branding: false
+  });
+</script>
 
 <?php render_footer(); ?>
