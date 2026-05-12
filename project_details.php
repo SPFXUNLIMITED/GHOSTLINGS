@@ -32,13 +32,13 @@ if (is_admin()) {
     SELECT
       p.id, p.name, p.description, p.created_at, p.priority, p.owner_id,
       u.username AS owner_username,
-      COUNT(t.id) AS total_tasks,
-      SUM(CASE WHEN t.status = 'todo' THEN 1 ELSE 0 END) AS todo_tasks,
-      SUM(CASE WHEN t.status = 'doing' THEN 1 ELSE 0 END) AS doing_tasks,
-      SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) AS done_tasks
+      SUM(CASE WHEN (p.owner_id = ? OR t.assigned_to = ?) THEN 1 ELSE 0 END) AS total_tasks,
+      SUM(CASE WHEN t.status = 'todo' AND (p.owner_id = ? OR t.assigned_to = ?) THEN 1 ELSE 0 END) AS todo_tasks,
+      SUM(CASE WHEN t.status = 'doing' AND (p.owner_id = ? OR t.assigned_to = ?) THEN 1 ELSE 0 END) AS doing_tasks,
+      SUM(CASE WHEN t.status = 'done' AND (p.owner_id = ? OR t.assigned_to = ?) THEN 1 ELSE 0 END) AS done_tasks
     FROM projects p
     LEFT JOIN users u ON u.id = p.owner_id
-    LEFT JOIN tasks t ON t.project_id = p.id AND (p.owner_id = ? OR t.assigned_to = ?)
+    LEFT JOIN tasks t ON t.project_id = p.id
     WHERE p.id = ? AND p.playbook = 0 AND p.archived = 0
       AND (
         p.owner_id = ?
@@ -51,7 +51,7 @@ if (is_admin()) {
       )
     GROUP BY p.id
   ");
-  $stmt->execute([$uid, $uid, $id, $uid, $uid]);
+  $stmt->execute([$uid, $uid, $uid, $uid, $uid, $uid, $uid, $uid, $id, $uid, $uid]);
 }
 
 $project = $stmt->fetch(PDO::FETCH_ASSOC);
