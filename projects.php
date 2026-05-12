@@ -105,6 +105,7 @@ if (is_admin()) {
 }
 
 render_header('Projects');
+$project_desc_max_length = 50;
 ?>
 <div class="card">
   <div class="row" style="justify-content:space-between; align-items:center;">
@@ -141,9 +142,9 @@ render_header('Projects');
         <?php foreach ($projects as $p): ?>
           <?php
             $project_description = preg_replace('/\s+/', ' ', (string)($p['description'] ?? ''));
-            $project_description = trim((string)$project_description);
-            if (mb_strlen($project_description) > 50) {
-              $project_description = mb_substr($project_description, 0, 50) . '...';
+            $project_description = trim($project_description ?? '');
+            if (mb_strlen($project_description) > $project_desc_max_length) {
+              $project_description = mb_substr($project_description, 0, $project_desc_max_length) . '...';
             }
           ?>
           <tr data-name="<?= h(strtolower($p['name'])) ?>"
