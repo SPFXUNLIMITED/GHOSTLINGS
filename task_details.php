@@ -155,11 +155,16 @@ render_header('Task Details');
       <?php foreach ($task_uploads as $u): ?>
         <?php
           $storedName = (string)($u['stored_name'] ?? '');
-          if (!preg_match('/^[a-zA-Z0-9._-]+$/', $storedName)) {
+          if (
+            $storedName === '' ||
+            basename($storedName) !== $storedName ||
+            strpos($storedName, '..') !== false ||
+            !preg_match('/^[a-zA-Z0-9._-]+$/', $storedName)
+          ) {
             continue;
           }
           $isImg = is_string($u['mime_type']) && preg_match('#^image/(png|jpe?g|gif|webp)$#i', $u['mime_type']);
-          $fileUrl = 'uploads/' . $storedName;
+          $fileUrl = 'uploads/' . rawurlencode($storedName);
         ?>
         <div class="thumb">
           <div class="preview">
