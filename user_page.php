@@ -31,12 +31,16 @@ $has_entry = !empty($data['first_name']);
 
 // Fetch all regular users who currently have service requests ("waiting for service")
 $waiting_stmt = $pdo->query(
-  "SELECT u.email_verified,
-          le.city, le.state, le.zip_code
+  "SELECT u.id,
+          MAX(u.email_verified) AS email_verified,
+          MAX(le.city) AS city,
+          MAX(le.state) AS state,
+          MAX(le.zip_code) AS zip_code
    FROM laser_entries le
    JOIN users u ON u.id = le.user_id
    WHERE u.role = 'user'
-   ORDER BY le.created_at DESC"
+   GROUP BY u.id
+   ORDER BY MAX(le.created_at) DESC"
 );
 $waiting_users = $waiting_stmt->fetchAll();
 $waiting_total = count($waiting_users);
