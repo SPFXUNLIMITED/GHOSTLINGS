@@ -6,6 +6,9 @@
  */
 require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
+$cfg = require __DIR__ . '/config.php';
+$recaptcha_site_key   = $cfg['recaptcha']['site_key']   ?? '';
+$recaptcha_secret_key = $cfg['recaptcha']['secret_key'] ?? '';
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
@@ -31,24 +34,6 @@ function client_ip(): string {
     }
   }
   return '0.0.0.0';
-}
-
-function new_form_captcha(): array {
-  $a = random_int(1, 9);
-  $b = random_int(1, 9);
-  return [
-    'a' => $a,
-    'b' => $b,
-    'answer' => (string)($a + $b),
-  ];
-}
-
-if (
-  empty($_SESSION['form_captcha']) ||
-  !is_array($_SESSION['form_captcha']) ||
-  !isset($_SESSION['form_captcha']['a'], $_SESSION['form_captcha']['b'], $_SESSION['form_captcha']['answer'])
-) {
-  $_SESSION['form_captcha'] = new_form_captcha();
 }
 
 $errors  = [];
@@ -95,12 +80,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!empty($_POST['website'])) {
       // Silent fail for bots
       $success = true;
-      $_SESSION['form_captcha'] = new_form_captcha();
     } else {
-      $captcha_answer = trim((string)($_POST['captcha_answer'] ?? ''));
-      $captcha_expected = (string)($_SESSION['form_captcha']['answer'] ?? '');
-      if (!hash_equals($captcha_expected, $captcha_answer)) {
-        $errors[] = 'Captcha answer is incorrect. Please try again.';
+      // ── reCAPTCHA v2 verification ─────────────────────────────────────
+      $recaptcha_response = trim((string)($_POST['g-recaptcha-response'] ?? ''));
+      if ($recaptcha_response === '') {
+        $errors[] = 'Please complete the reCAPTCHA verification.';
+      } else {
+        $ch = curl_init('https://www.google.com/recaptcha/api/siteverify');
+        curl_setopt_array($ch, [
+          CURLOPT_RETURNTRANSFER => true,
+          CURLOPT_POST           => true,
+          CURLOPT_POSTFIELDS     => http_build_query([
+            'secret'   => $recaptcha_secret_key,
+            'response' => $recaptcha_response,
+            'remoteip' => client_ip(),
+          ]),
+          CURLOPT_TIMEOUT        => 10,
+          CURLOPT_CONNECTTIMEOUT => 5,
+        ]);
+        $verify      = curl_exec($ch);
+        $curl_error  = curl_errno($ch);
+        curl_close($ch);
+        if ($curl_error || $verify === false) {
+          $errors[] = 'Could not reach the verification service. Please try again.';
+        } else {
+          $verify_data = json_decode($verify, true);
+          if (empty($verify_data['success'])) {
+            $errors[] = 'reCAPTCHA verification failed. Please try again.';
+          }
+        }
       }
 
       if (!$errors) {
@@ -246,7 +254,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Regenerate CSRF token after successful submit
             $_SESSION['form_csrf'] = bin2hex(random_bytes(24));
-            $_SESSION['form_captcha'] = new_form_captcha();
             $success = true;
           } catch (\Throwable $ex) {
             $pdo->rollBack();
@@ -255,9 +262,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
       }
 
-      if (!$success) {
-        $_SESSION['form_captcha'] = new_form_captcha();
-      }
     }
   }
 }
@@ -377,10 +381,8 @@ render_header('Service Request Form');
                   maxlength="5000"><?= h($fields['laser_problem']) ?></textarea>
         <p class="muted" style="margin:4px 0 0;">Max 5000 characters.</p>
       </div>
-      <div>
-        <label for="captcha_answer">Captcha: What is <?= (int)($_SESSION['form_captcha']['a'] ?? 0) ?> + <?= (int)($_SESSION['form_captcha']['b'] ?? 0) ?>?</label>
-        <input id="captcha_answer" type="text" name="captcha_answer" inputmode="numeric" pattern="[0-9]+" required aria-required="true" autocomplete="off" aria-describedby="captcha_help" />
-        <p id="captcha_help" class="muted" style="margin:4px 0 0;">Enter the numeric sum of the two numbers above.</p>
+      <div class="full">
+        <div class="g-recaptcha" data-sitekey="<?= h($recaptcha_site_key) ?>"></div>
       </div>
     </div>
 
@@ -391,4 +393,5 @@ render_header('Service Request Form');
   </form>
 <?php endif; ?>
 
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
 <?php render_footer(); ?>

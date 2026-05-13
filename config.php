@@ -9,5 +9,9 @@ return [
     'user' => 'spfx_ghost',
     'pass' => 'Beverly90210##',
     'charset' => 'utf8mb4',
-  ]
+  ],
+  'recaptcha' => [
+    'site_key'   => 'YOUR_RECAPTCHA_SITE_KEY',
+    'secret_key' => 'YOUR_RECAPTCHA_SECRET_KEY',
+  ],
 ];
