@@ -33,6 +33,24 @@ function client_ip(): string {
   return '0.0.0.0';
 }
 
+function new_form_captcha(): array {
+  $a = random_int(1, 9);
+  $b = random_int(1, 9);
+  return [
+    'a' => $a,
+    'b' => $b,
+    'answer' => (string)($a + $b),
+  ];
+}
+
+if (
+  empty($_SESSION['form_captcha']) ||
+  !is_array($_SESSION['form_captcha']) ||
+  !isset($_SESSION['form_captcha']['a'], $_SESSION['form_captcha']['b'], $_SESSION['form_captcha']['answer'])
+) {
+  $_SESSION['form_captcha'] = new_form_captcha();
+}
+
 $errors  = [];
 $success = false;
 $fields  = [
@@ -78,6 +96,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       // Silent fail for bots
       $success = true;
     } else {
+      $captcha_answer = trim((string)($_POST['captcha_answer'] ?? ''));
+      if (
+        $captcha_answer === '' ||
+        !hash_equals((string)($_SESSION['form_captcha']['answer'] ?? ''), $captcha_answer)
+      ) {
+        $errors[] = 'Captcha answer is incorrect. Please try again.';
+      }
+
       // ── Collect & sanitize inputs ─────────────────────────────────────────
       foreach ($fields as $k => $_) {
         $fields[$k] = trim((string)($_POST[$k] ?? ''));
@@ -220,11 +246,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
           // Regenerate CSRF token after successful submit
           $_SESSION['form_csrf'] = bin2hex(random_bytes(24));
+          $_SESSION['form_captcha'] = new_form_captcha();
           $success = true;
         } catch (\Throwable $ex) {
           $pdo->rollBack();
           $errors[] = 'A database error occurred. Please try again.';
         }
+      }
+
+      if (!$success) {
+        $_SESSION['form_captcha'] = new_form_captcha();
       }
     }
   }
@@ -344,6 +375,10 @@ render_header('Service Request Form');
         <textarea name="laser_problem" rows="5" required
                   maxlength="5000"><?= h($fields['laser_problem']) ?></textarea>
         <p class="muted" style="margin:4px 0 0;">Max 5000 characters.</p>
+      </div>
+      <div>
+        <label>Captcha: What is <?= (int)($_SESSION['form_captcha']['a'] ?? 0) ?> + <?= (int)($_SESSION['form_captcha']['b'] ?? 0) ?>? <span style="color:var(--d)">*</span></label>
+        <input type="text" name="captcha_answer" inputmode="numeric" pattern="[0-9]*" required autocomplete="off" />
       </div>
     </div>
 
