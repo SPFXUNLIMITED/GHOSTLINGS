@@ -377,8 +377,8 @@ render_header('Service Request Form');
         <p class="muted" style="margin:4px 0 0;">Max 5000 characters.</p>
       </div>
       <div>
-        <label>Captcha: What is <?= (int)($_SESSION['form_captcha']['a'] ?? 0) ?> + <?= (int)($_SESSION['form_captcha']['b'] ?? 0) ?>? <span style="color:var(--d)">*</span></label>
-        <input type="text" name="captcha_answer" inputmode="numeric" pattern="[0-9]*" required autocomplete="off" />
+        <label for="captcha_answer">Captcha: What is <?= (int)($_SESSION['form_captcha']['a'] ?? 0) ?> + <?= (int)($_SESSION['form_captcha']['b'] ?? 0) ?>? <span style="color:var(--d)">*</span></label>
+        <input id="captcha_answer" type="text" name="captcha_answer" inputmode="numeric" pattern="[0-9]*" required autocomplete="off" aria-label="Enter the captcha sum result" />
       </div>
     </div>
 
