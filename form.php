@@ -97,10 +97,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $success = true;
     } else {
       $captcha_answer = trim((string)($_POST['captcha_answer'] ?? ''));
-      if (
-        $captcha_answer === '' ||
-        !hash_equals((string)($_SESSION['form_captcha']['answer'] ?? ''), $captcha_answer)
-      ) {
+      $captcha_expected = (string)($_SESSION['form_captcha']['answer'] ?? '');
+      if (!hash_equals($captcha_expected, $captcha_answer)) {
         $errors[] = 'Captcha answer is incorrect. Please try again.';
       }
 
@@ -380,7 +378,8 @@ render_header('Service Request Form');
       </div>
       <div>
         <label for="captcha_answer">Captcha: What is <?= (int)($_SESSION['form_captcha']['a'] ?? 0) ?> + <?= (int)($_SESSION['form_captcha']['b'] ?? 0) ?>? <span style="color:var(--d)">*</span></label>
-        <input id="captcha_answer" type="text" name="captcha_answer" inputmode="numeric" pattern="[0-9]*" required autocomplete="off" />
+        <input id="captcha_answer" type="text" name="captcha_answer" inputmode="numeric" pattern="[0-9]*" required autocomplete="off" aria-describedby="captcha_help" />
+        <p id="captcha_help" class="muted" style="margin:4px 0 0;">Enter the numeric sum of the two numbers above.</p>
       </div>
     </div>
 
