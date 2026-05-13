@@ -35,15 +35,15 @@ $waiting_stmt = $pdo->query(
           le.city, le.state, le.zip_code
    FROM users u
    JOIN laser_entries le ON le.user_id = u.id
+   LEFT JOIN laser_entries le_newer
+     ON le_newer.user_id = le.user_id
+    AND (
+      le_newer.created_at > le.created_at
+      OR (le_newer.created_at = le.created_at AND le_newer.id > le.id)
+    )
    WHERE u.role = 'user'
-     AND le.id = (
-       SELECT le2.id
-       FROM laser_entries le2
-       WHERE le2.user_id = u.id
-       ORDER BY le2.created_at DESC, le2.id DESC
-       LIMIT 1
-     )
-   ORDER BY le.created_at DESC"
+     AND le_newer.id IS NULL
+   ORDER BY le.created_at DESC, le.id DESC"
 );
 $waiting_users = $waiting_stmt->fetchAll();
 $waiting_total = count($waiting_users);
@@ -201,7 +201,7 @@ render_header('My Service Request');
   var locations = Object.keys(grouped).map(function (k) { return grouped[k]; });
   var bounds = L.latLngBounds();
   var mappedUsers = 0;
-  // Respect Nominatim public usage guidance of roughly 1 request per second.
+  // Respect Nominatim's ~1 request/second public guidance; 1100ms adds small overhead buffer.
   var NOMINATIM_RATE_LIMIT_MS = 1100;
 
   function geocodeLocation(loc) {
