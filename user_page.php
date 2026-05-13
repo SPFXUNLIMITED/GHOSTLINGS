@@ -31,8 +31,8 @@ $has_entry = !empty($data['first_name']);
 
 // Fetch all regular users who currently have service requests ("waiting for service")
 $waiting_stmt = $pdo->query(
-  "SELECT u.id, u.email_verified,
-          le.first_name, le.last_name, le.city, le.state, le.zip_code, le.created_at
+  "SELECT u.email_verified,
+          le.city, le.state, le.zip_code
    FROM laser_entries le
    JOIN users u ON u.id = le.user_id
    WHERE u.role = 'user'
@@ -194,8 +194,9 @@ render_header('My Service Request');
   var locations = Object.keys(grouped).map(function (k) { return grouped[k]; });
   var bounds = L.latLngBounds();
   var mappedUsers = 0;
+  var geocodeDelayMs = 1100;
 
-  Promise.all(locations.map(function (loc) {
+  function geocodeLocation(loc) {
     var query = encodeURIComponent((loc.zip_code || '') + ' ' + (loc.city || '') + ', ' + (loc.state || '') + ', ' + country);
     return fetch('https://nominatim.openstreetmap.org/search?q=' + query + '&format=json&limit=1', {
       headers: { 'Accept-Language': 'en-US,en' }
@@ -211,19 +212,15 @@ render_header('My Service Request');
       mappedUsers += loc.users.length;
       bounds.extend([lat, lon]);
 
-      var userList = loc.users.slice(0, 8).map(function (u) {
-        return '<li>' + esc((u.first_name || '') + ' ' + (u.last_name || '')) + '</li>';
-      }).join('');
-      var extra = loc.users.length > 8 ? '<li>…and ' + (loc.users.length - 8) + ' more</li>' : '';
-
       L.marker([lat, lon]).addTo(map).bindPopup(
         '<strong>' + esc(loc.city) + ', ' + esc(loc.state) + ' ' + esc(loc.zip_code) + '</strong><br>' +
-        'Users here: <strong>' + loc.users.length + '</strong>' +
-        '<ul style="margin:6px 0 0 18px; padding:0;">' + userList + extra + '</ul>'
+        'Users waiting here: <strong>' + loc.users.length + '</strong>'
       );
     })
     .catch(function () { /* skip failed geocode */ });
-  })).then(function () {
+  }
+
+  function finishMap() {
     if (mappedUsers > 0) {
       map.fitBounds(bounds.pad(0.2), { maxZoom: 10 });
       if (statsEl) {
@@ -232,7 +229,24 @@ render_header('My Service Request');
     } else if (statsEl) {
       statsEl.textContent = 'Could not geocode waiting-user locations; showing US overview.';
     }
-  });
+  }
+
+  function processLocationAt(index) {
+    if (index >= locations.length) {
+      finishMap();
+      return;
+    }
+    geocodeLocation(locations[index]).finally(function () {
+      setTimeout(function () {
+        processLocationAt(index + 1);
+      }, geocodeDelayMs);
+    });
+  }
+
+  if (statsEl) {
+    statsEl.textContent = 'Geocoding ' + locations.length + ' location(s) for ' + waitingUsers.length + ' waiting users...';
+  }
+  processLocationAt(0);
 })();
 </script>
 
