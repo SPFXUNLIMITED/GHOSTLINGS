@@ -95,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!empty($_POST['website'])) {
       // Silent fail for bots
       $success = true;
+      $_SESSION['form_captcha'] = new_form_captcha();
     } else {
       $captcha_answer = trim((string)($_POST['captcha_answer'] ?? ''));
       $captcha_expected = (string)($_SESSION['form_captcha']['answer'] ?? '');
