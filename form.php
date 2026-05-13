@@ -33,6 +33,24 @@ function client_ip(): string {
   return '0.0.0.0';
 }
 
+function new_form_captcha(): array {
+  $a = random_int(1, 9);
+  $b = random_int(1, 9);
+  return [
+    'a' => $a,
+    'b' => $b,
+    'answer' => (string)($a + $b),
+  ];
+}
+
+if (
+  empty($_SESSION['form_captcha']) ||
+  !is_array($_SESSION['form_captcha']) ||
+  !isset($_SESSION['form_captcha']['a'], $_SESSION['form_captcha']['b'], $_SESSION['form_captcha']['answer'])
+) {
+  $_SESSION['form_captcha'] = new_form_captcha();
+}
+
 $errors  = [];
 $success = false;
 $fields  = [
@@ -77,154 +95,168 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!empty($_POST['website'])) {
       // Silent fail for bots
       $success = true;
+      $_SESSION['form_captcha'] = new_form_captcha();
     } else {
-      // ── Collect & sanitize inputs ─────────────────────────────────────────
-      foreach ($fields as $k => $_) {
-        $fields[$k] = trim((string)($_POST[$k] ?? ''));
-      }
-
-      // ── Validate ──────────────────────────────────────────────────────────
-      if ($fields['first_name'] === '')  $errors[] = 'First name is required.';
-      if ($fields['last_name'] === '')   $errors[] = 'Last name is required.';
-      if ($fields['cell_phone'] === '')  $errors[] = 'Cell phone is required.';
-      if ($fields['city'] === '')        $errors[] = 'City is required.';
-      if ($fields['state'] === '')       $errors[] = 'State is required.';
-      if ($fields['zip_code'] === '')    $errors[] = 'ZIP code is required.';
-      if ($fields['email'] === '')       $errors[] = 'Email address is required.';
-      if ($fields['laser_brand'] === '') $errors[] = 'Laser machine brand is required.';
-      if ($fields['laser_model'] === '') $errors[] = 'Laser machine model is required.';
-      if ($fields['laser_watts'] === '') $errors[] = 'Wattage is required.';
-      if ($fields['laser_age'] === '')   $errors[] = 'Machine age is required.';
-      if ($fields['laser_problem'] === '') $errors[] = 'Problem description is required.';
-
-      if ($fields['email'] !== '' && !filter_var($fields['email'], FILTER_VALIDATE_EMAIL)) {
-        $errors[] = 'Please enter a valid email address.';
-      }
-
-      if (!isset($us_states[$fields['state']])) {
-        $errors[] = 'Please select a valid US state.';
-      }
-
-      if (!preg_match('/^\d{5}(-\d{4})?$/', $fields['zip_code'])) {
-        $errors[] = 'ZIP code must be 5 digits (or 5+4 format).';
-      }
-
-      if (strlen($fields['laser_problem']) > 5000) {
-        $errors[] = 'Problem description must be 5000 characters or fewer.';
-      }
-
-      // ── Rate limit: max 5 submissions per IP in 1 hour ───────────────────
-      if (!$errors) {
-        $ip = client_ip();
-        $rl = $pdo->prepare(
-          "SELECT COUNT(*) FROM form_rate_limit WHERE ip = ? AND submitted_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)"
-        );
-        $rl->execute([$ip]);
-        if ((int)$rl->fetchColumn() >= 5) {
-          $errors[] = 'Too many submissions from your location. Please try again later.';
-        }
-      }
-
-      // ── Single entry per email ────────────────────────────────────────────
-      if (!$errors) {
-        $ck = $pdo->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
-        $ck->execute([$fields['email']]);
-        if ($ck->fetch()) {
-          $errors[] = 'An account with that email address already exists. Please <a href="login.php">log in</a>.';
-        }
+      $captcha_answer = trim((string)($_POST['captcha_answer'] ?? ''));
+      $captcha_expected = (string)($_SESSION['form_captcha']['answer'] ?? '');
+      if (!hash_equals($captcha_expected, $captcha_answer)) {
+        $errors[] = 'Captcha answer is incorrect. Please try again.';
       }
 
       if (!$errors) {
-        // ── Generate credentials ─────────────────────────────────────────
-        $plain_password   = substr(str_replace(['+','/','='], '', base64_encode(random_bytes(18))), 0, 12);
-        $password_hash    = password_hash($plain_password, PASSWORD_DEFAULT);
-        $verify_token     = bin2hex(random_bytes(32));
-        $token_expires    = (new DateTime('now', new DateTimeZone(APP_TZ)))
-                              ->modify('+48 hours')
-                              ->format('Y-m-d H:i:s');
-
-        // Build a safe username from email (before @)
-        $base_username = preg_replace('/[^A-Za-z0-9_.]/', '_', explode('@', $fields['email'])[0]);
-        $base_username = substr($base_username, 0, 40);
-        // Ensure uniqueness
-        $un_check = $pdo->prepare("SELECT id FROM users WHERE username = ? LIMIT 1");
-        $un_check->execute([$base_username]);
-        $username = $base_username;
-        if ($un_check->fetch()) {
-          $username = $base_username . '_' . substr(uniqid('', false), -5);
+        // ── Collect & sanitize inputs ─────────────────────────────────────────
+        foreach ($fields as $k => $_) {
+          $fields[$k] = trim((string)($_POST[$k] ?? ''));
         }
 
-        $pdo->beginTransaction();
-        try {
-          // Insert user
-          $ins_user = $pdo->prepare(
-            "INSERT INTO users
-               (username, email, password_hash, is_admin, role, email_verified, verification_token, token_expires)
-             VALUES (?, ?, ?, 0, 'user', 0, ?, ?)"
+        // ── Validate ──────────────────────────────────────────────────────────
+        if ($fields['first_name'] === '')  $errors[] = 'First name is required.';
+        if ($fields['last_name'] === '')   $errors[] = 'Last name is required.';
+        if ($fields['cell_phone'] === '')  $errors[] = 'Cell phone is required.';
+        if ($fields['city'] === '')        $errors[] = 'City is required.';
+        if ($fields['state'] === '')       $errors[] = 'State is required.';
+        if ($fields['zip_code'] === '')    $errors[] = 'ZIP code is required.';
+        if ($fields['email'] === '')       $errors[] = 'Email address is required.';
+        if ($fields['laser_brand'] === '') $errors[] = 'Laser machine brand is required.';
+        if ($fields['laser_model'] === '') $errors[] = 'Laser machine model is required.';
+        if ($fields['laser_watts'] === '') $errors[] = 'Wattage is required.';
+        if ($fields['laser_age'] === '')   $errors[] = 'Machine age is required.';
+        if ($fields['laser_problem'] === '') $errors[] = 'Problem description is required.';
+
+        if ($fields['email'] !== '' && !filter_var($fields['email'], FILTER_VALIDATE_EMAIL)) {
+          $errors[] = 'Please enter a valid email address.';
+        }
+
+        if (!isset($us_states[$fields['state']])) {
+          $errors[] = 'Please select a valid US state.';
+        }
+
+        if (!preg_match('/^\d{5}(-\d{4})?$/', $fields['zip_code'])) {
+          $errors[] = 'ZIP code must be 5 digits (or 5+4 format).';
+        }
+
+        if (strlen($fields['laser_problem']) > 5000) {
+          $errors[] = 'Problem description must be 5000 characters or fewer.';
+        }
+
+        // ── Rate limit: max 5 submissions per IP in 1 hour ───────────────────
+        if (!$errors) {
+          $ip = client_ip();
+          $rl = $pdo->prepare(
+            "SELECT COUNT(*) FROM form_rate_limit WHERE ip = ? AND submitted_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)"
           );
-          $ins_user->execute([$username, $fields['email'], $password_hash, $verify_token, $token_expires]);
-          $new_user_id = (int)$pdo->lastInsertId();
-
-          // Insert laser entry
-          $ins_entry = $pdo->prepare(
-            "INSERT INTO laser_entries
-               (user_id, first_name, last_name, cell_phone, city, state, zip_code,
-                email, laser_brand, laser_model, laser_watts, laser_age, laser_problem, submission_ip)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-          );
-          $ins_entry->execute([
-            $new_user_id,
-            $fields['first_name'], $fields['last_name'], $fields['cell_phone'],
-            $fields['city'], $fields['state'], $fields['zip_code'],
-            $fields['email'],
-            $fields['laser_brand'], $fields['laser_model'],
-            $fields['laser_watts'], $fields['laser_age'], $fields['laser_problem'],
-            client_ip(),
-          ]);
-
-          // Log rate-limit record
-          $pdo->prepare("INSERT INTO form_rate_limit (ip) VALUES (?)")->execute([client_ip()]);
-
-          $pdo->commit();
-
-          // ── Send verification + credentials email ─────────────────────
-          $scheme       = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
-          $host         = $_SERVER['HTTP_HOST'] ?? 'localhost';
-          $script_name  = $_SERVER['SCRIPT_NAME'] ?? '';
-          $project_path = rtrim(dirname($script_name), '/');
-          if ($project_path === '' || $project_path === '.') {
-            $project_path = '';
+          $rl->execute([$ip]);
+          if ((int)$rl->fetchColumn() >= 5) {
+            $errors[] = 'Too many submissions from your location. Please try again later.';
           }
-          $base_url     = $scheme . '://' . $host . $project_path;
-          $verify_url   = $base_url . '/verify_email.php?token=' . urlencode($verify_token);
-          $login_url    = $base_url . '/login.php';
-          $to           = $fields['email'];
-          $subject      = 'Verify your email – Ghostlings Laser Support';
-          $name_display = h($fields['first_name']) . ' ' . h($fields['last_name']);
-          $body = "Hello {$fields['first_name']},\r\n\r\n"
-                . "Thank you for submitting your laser machine service request.\r\n\r\n"
-                . "Your login credentials:\r\n"
-                . "  Email:    {$fields['email']}\r\n"
-                . "  Password: {$plain_password}\r\n\r\n"
-                . "Please verify your email address by clicking the link below:\r\n"
-                . "{$verify_url}\r\n\r\n"
-                . "This link expires in 48 hours.\r\n\r\n"
-                . "After verifying, log in at:\r\n"
-                . "{$login_url}\r\n\r\n"
-                . "– Ghostlings Laser Support Team\r\n";
-          $headers = "From: no-reply@" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "\r\n"
-                   . "Reply-To: no-reply@" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "\r\n"
-                   . "X-Mailer: PHP/" . phpversion() . "\r\n"
-                   . "Content-Type: text/plain; charset=UTF-8\r\n";
-          @mail($to, $subject, $body, $headers);
-
-          // Regenerate CSRF token after successful submit
-          $_SESSION['form_csrf'] = bin2hex(random_bytes(24));
-          $success = true;
-        } catch (\Throwable $ex) {
-          $pdo->rollBack();
-          $errors[] = 'A database error occurred. Please try again.';
         }
+
+        // ── Single entry per email ────────────────────────────────────────────
+        if (!$errors) {
+          $ck = $pdo->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
+          $ck->execute([$fields['email']]);
+          if ($ck->fetch()) {
+            $errors[] = 'An account with that email address already exists. Please <a href="login.php">log in</a>.';
+          }
+        }
+
+        if (!$errors) {
+          // ── Generate credentials ─────────────────────────────────────────
+          $plain_password   = substr(str_replace(['+','/','='], '', base64_encode(random_bytes(18))), 0, 12);
+          $password_hash    = password_hash($plain_password, PASSWORD_DEFAULT);
+          $verify_token     = bin2hex(random_bytes(32));
+          $token_expires    = (new DateTime('now', new DateTimeZone(APP_TZ)))
+                                ->modify('+48 hours')
+                                ->format('Y-m-d H:i:s');
+
+          // Build a safe username from email (before @)
+          $base_username = preg_replace('/[^A-Za-z0-9_.]/', '_', explode('@', $fields['email'])[0]);
+          $base_username = substr($base_username, 0, 40);
+          // Ensure uniqueness
+          $un_check = $pdo->prepare("SELECT id FROM users WHERE username = ? LIMIT 1");
+          $un_check->execute([$base_username]);
+          $username = $base_username;
+          if ($un_check->fetch()) {
+            $username = $base_username . '_' . substr(uniqid('', false), -5);
+          }
+
+          $pdo->beginTransaction();
+          try {
+            // Insert user
+            $ins_user = $pdo->prepare(
+              "INSERT INTO users
+                 (username, email, password_hash, is_admin, role, email_verified, verification_token, token_expires)
+               VALUES (?, ?, ?, 0, 'user', 0, ?, ?)"
+            );
+            $ins_user->execute([$username, $fields['email'], $password_hash, $verify_token, $token_expires]);
+            $new_user_id = (int)$pdo->lastInsertId();
+
+            // Insert laser entry
+            $ins_entry = $pdo->prepare(
+              "INSERT INTO laser_entries
+                 (user_id, first_name, last_name, cell_phone, city, state, zip_code,
+                  email, laser_brand, laser_model, laser_watts, laser_age, laser_problem, submission_ip)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            );
+            $ins_entry->execute([
+              $new_user_id,
+              $fields['first_name'], $fields['last_name'], $fields['cell_phone'],
+              $fields['city'], $fields['state'], $fields['zip_code'],
+              $fields['email'],
+              $fields['laser_brand'], $fields['laser_model'],
+              $fields['laser_watts'], $fields['laser_age'], $fields['laser_problem'],
+              client_ip(),
+            ]);
+
+            // Log rate-limit record
+            $pdo->prepare("INSERT INTO form_rate_limit (ip) VALUES (?)")->execute([client_ip()]);
+
+            $pdo->commit();
+
+            // ── Send verification + credentials email ─────────────────────
+            $scheme       = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+            $host         = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $script_name  = $_SERVER['SCRIPT_NAME'] ?? '';
+            $project_path = rtrim(dirname($script_name), '/');
+            if ($project_path === '' || $project_path === '.') {
+              $project_path = '';
+            }
+            $base_url     = $scheme . '://' . $host . $project_path;
+            $verify_url   = $base_url . '/verify_email.php?token=' . urlencode($verify_token);
+            $login_url    = $base_url . '/login.php';
+            $to           = $fields['email'];
+            $subject      = 'Verify your email – Ghostlings Laser Support';
+            $name_display = h($fields['first_name']) . ' ' . h($fields['last_name']);
+            $body = "Hello {$fields['first_name']},\r\n\r\n"
+                  . "Thank you for submitting your laser machine service request.\r\n\r\n"
+                  . "Your login credentials:\r\n"
+                  . "  Email:    {$fields['email']}\r\n"
+                  . "  Password: {$plain_password}\r\n\r\n"
+                  . "Please verify your email address by clicking the link below:\r\n"
+                  . "{$verify_url}\r\n\r\n"
+                  . "This link expires in 48 hours.\r\n\r\n"
+                  . "After verifying, log in at:\r\n"
+                  . "{$login_url}\r\n\r\n"
+                  . "– Ghostlings Laser Support Team\r\n";
+            $headers = "From: no-reply@" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "\r\n"
+                     . "Reply-To: no-reply@" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "\r\n"
+                     . "X-Mailer: PHP/" . phpversion() . "\r\n"
+                     . "Content-Type: text/plain; charset=UTF-8\r\n";
+            @mail($to, $subject, $body, $headers);
+
+            // Regenerate CSRF token after successful submit
+            $_SESSION['form_csrf'] = bin2hex(random_bytes(24));
+            $_SESSION['form_captcha'] = new_form_captcha();
+            $success = true;
+          } catch (\Throwable $ex) {
+            $pdo->rollBack();
+            $errors[] = 'A database error occurred. Please try again.';
+          }
+        }
+      }
+
+      if (!$success) {
+        $_SESSION['form_captcha'] = new_form_captcha();
       }
     }
   }
@@ -344,6 +376,11 @@ render_header('Service Request Form');
         <textarea name="laser_problem" rows="5" required
                   maxlength="5000"><?= h($fields['laser_problem']) ?></textarea>
         <p class="muted" style="margin:4px 0 0;">Max 5000 characters.</p>
+      </div>
+      <div>
+        <label for="captcha_answer">Captcha: What is <?= (int)($_SESSION['form_captcha']['a'] ?? 0) ?> + <?= (int)($_SESSION['form_captcha']['b'] ?? 0) ?>?</label>
+        <input id="captcha_answer" type="text" name="captcha_answer" inputmode="numeric" pattern="[0-9]+" required aria-required="true" autocomplete="off" aria-describedby="captcha_help" />
+        <p id="captcha_help" class="muted" style="margin:4px 0 0;">Enter the numeric sum of the two numbers above.</p>
       </div>
     </div>
 
