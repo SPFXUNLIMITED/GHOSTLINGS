@@ -160,3 +160,98 @@ $pdo->exec("
     INDEX idx_te_clock_in (clock_in)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+// Add email column to users if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE users ADD COLUMN email VARCHAR(255) NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') throw $e;
+}
+
+// Add unique index on email if not already present (ignore error if exists)
+try {
+  $pdo->exec("ALTER TABLE users ADD UNIQUE INDEX idx_users_email (email)");
+} catch (PDOException $e) {
+  // 42000 duplicate key name or 42S21; just skip
+}
+
+// Add role column to users if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE users ADD COLUMN role ENUM('admin','moderator','user') NOT NULL DEFAULT 'user'");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') throw $e;
+}
+
+// Add email_verified column to users if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE users ADD COLUMN email_verified TINYINT(1) NOT NULL DEFAULT 0");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') throw $e;
+}
+
+// Add verification_token column to users if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE users ADD COLUMN verification_token VARCHAR(64) NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') throw $e;
+}
+
+// Add token_expires column to users if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE users ADD COLUMN token_expires DATETIME NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') throw $e;
+}
+
+// Add lat/lng columns to users if they do not exist yet
+try {
+  $pdo->exec("ALTER TABLE users ADD COLUMN lat DECIMAL(10,7) NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') throw $e;
+}
+try {
+  $pdo->exec("ALTER TABLE users ADD COLUMN lng DECIMAL(10,7) NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') throw $e;
+}
+
+// Sync existing admin users: set role='admin' where is_admin=1 and role='user'
+try {
+  $pdo->exec("UPDATE users SET role='admin' WHERE is_admin=1 AND role='user'");
+} catch (PDOException $e) { /* ignore */ }
+
+// Create laser_entries table if it does not exist yet
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS laser_entries (
+    id                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id             INT UNSIGNED NOT NULL,
+    first_name          VARCHAR(100) NOT NULL,
+    last_name           VARCHAR(100) NOT NULL,
+    cell_phone          VARCHAR(30)  NOT NULL,
+    city                VARCHAR(100) NOT NULL,
+    state               VARCHAR(50)  NOT NULL,
+    zip_code            VARCHAR(20)  NOT NULL,
+    email               VARCHAR(255) NOT NULL,
+    laser_brand         VARCHAR(100) NOT NULL,
+    laser_model         VARCHAR(100) NOT NULL,
+    laser_watts         VARCHAR(50)  NOT NULL,
+    laser_age           VARCHAR(50)  NOT NULL,
+    laser_problem       TEXT         NOT NULL,
+    submission_ip       VARCHAR(45)  NULL,
+    created_at          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY idx_le_user_id (user_id),
+    KEY idx_le_email (email)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// Create form_rate_limit table for CSRF / rate-limit tracking
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS form_rate_limit (
+    id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    ip         VARCHAR(45)  NOT NULL,
+    submitted_at DATETIME   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_frl_ip (ip)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
