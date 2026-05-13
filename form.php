@@ -191,7 +191,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $scheme       = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
           $host         = $_SERVER['HTTP_HOST'] ?? 'localhost';
           $script_name  = $_SERVER['SCRIPT_NAME'] ?? '';
-          $project_path = $script_name !== '' ? str_replace('\\', '/', dirname($script_name)) : '';
+          $project_path = $script_name !== '' ? dirname($script_name) : '';
           if ($project_path === '/' || $project_path === '.') {
             $project_path = '';
           } else {
