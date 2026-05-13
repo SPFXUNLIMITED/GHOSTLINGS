@@ -158,7 +158,7 @@ render_header('My Service Request');
 
 <script>
 (function () {
-  var waitingUsers = <?= json_encode($waiting_users, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?> || [];
+  var waitingUsers = <?= json_encode($waiting_users, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?> || [];
   var statsEl = document.getElementById('mapStats');
   var country = 'United States';
 
