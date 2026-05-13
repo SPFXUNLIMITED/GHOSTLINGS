@@ -29,6 +29,25 @@ if (!$data) {
 
 $has_entry = !empty($data['first_name']);
 
+// Fetch all regular users who currently have service requests ("waiting for service")
+$waiting_stmt = $pdo->query(
+  "SELECT u.id, u.email_verified,
+          le.first_name, le.last_name, le.city, le.state, le.zip_code, le.created_at
+   FROM laser_entries le
+   JOIN users u ON u.id = le.user_id
+   WHERE u.role = 'user'
+   ORDER BY le.created_at DESC"
+);
+$waiting_users = $waiting_stmt->fetchAll();
+$waiting_total = count($waiting_users);
+$waiting_verified = 0;
+foreach ($waiting_users as $wu) {
+  if (!empty($wu['email_verified'])) {
+    $waiting_verified++;
+  }
+}
+$waiting_unverified = $waiting_total - $waiting_verified;
+
 render_header('My Service Request');
 ?>
 
@@ -105,10 +124,22 @@ render_header('My Service Request');
 
 <!-- ── US Map ──────────────────────────────────────────────────────────────── -->
 <div class="card">
-  <h2 style="margin-top:0;">Your Location</h2>
-  <p class="muted" style="margin:0 0 12px;">
-    <?= h($data['city']) ?>, <?= h($data['state']) ?> <?= h($data['zip_code']) ?>
-  </p>
+  <h2 style="margin-top:0;">Users Waiting for Service</h2>
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:10px; margin-bottom:12px;">
+    <div style="border:1px solid var(--b); border-radius:8px; padding:10px 12px;">
+      <p class="muted" style="margin:0 0 4px;">Total Waiting Users</p>
+      <strong style="font-size:20px;"><?= (int)$waiting_total ?></strong>
+    </div>
+    <div style="border:1px solid var(--b); border-radius:8px; padding:10px 12px;">
+      <p class="muted" style="margin:0 0 4px;">Verified Users</p>
+      <strong style="font-size:20px;"><?= (int)$waiting_verified ?></strong>
+    </div>
+    <div style="border:1px solid var(--b); border-radius:8px; padding:10px 12px;">
+      <p class="muted" style="margin:0 0 4px;">Pending Verification</p>
+      <strong style="font-size:20px;"><?= (int)$waiting_unverified ?></strong>
+    </div>
+  </div>
+  <p class="muted" id="mapStats" style="margin:0 0 12px;">Loading map pins…</p>
   <div id="map" style="height:400px; border-radius:8px; border:1px solid var(--b);"></div>
 </div>
 
@@ -120,9 +151,8 @@ render_header('My Service Request');
 
 <script>
 (function () {
-  var city    = <?= json_encode($data['city']) ?>;
-  var state   = <?= json_encode($data['state']) ?>;
-  var zip     = <?= json_encode($data['zip_code']) ?>;
+  var waitingUsers = <?= json_encode($waiting_users, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?> || [];
+  var statsEl = document.getElementById('mapStats');
   var country = 'United States';
 
   // Default center: contiguous USA
@@ -133,31 +163,76 @@ render_header('My Service Request');
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(map);
 
-  // Geocode using Nominatim (free, no key)
-  var query = encodeURIComponent(zip + ' ' + city + ', ' + state + ', ' + country);
-  fetch('https://nominatim.openstreetmap.org/search?q=' + query + '&format=json&limit=1', {
-    headers: { 'Accept-Language': 'en-US,en' }
-  })
-  .then(function (r) { return r.json(); })
-  .then(function (results) {
-    if (results && results.length > 0) {
+  function esc(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  if (!waitingUsers.length) {
+    if (statsEl) statsEl.textContent = 'No waiting users found.';
+    return;
+  }
+
+  var grouped = {};
+  waitingUsers.forEach(function (u) {
+    var key = [u.zip_code || '', u.city || '', u.state || ''].join('|').toLowerCase();
+    if (!grouped[key]) {
+      grouped[key] = {
+        city: u.city || '',
+        state: u.state || '',
+        zip_code: u.zip_code || '',
+        users: []
+      };
+    }
+    grouped[key].users.push(u);
+  });
+
+  var locations = Object.keys(grouped).map(function (k) { return grouped[k]; });
+  var bounds = L.latLngBounds();
+  var mappedUsers = 0;
+
+  Promise.all(locations.map(function (loc) {
+    var query = encodeURIComponent((loc.zip_code || '') + ' ' + (loc.city || '') + ', ' + (loc.state || '') + ', ' + country);
+    return fetch('https://nominatim.openstreetmap.org/search?q=' + query + '&format=json&limit=1', {
+      headers: { 'Accept-Language': 'en-US,en' }
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (results) {
+      if (!results || !results.length) return;
+
       var lat = parseFloat(results[0].lat);
       var lon = parseFloat(results[0].lon);
-      map.setView([lat, lon], 11);
-      L.marker([lat, lon])
-        .addTo(map)
-        .bindPopup('<strong>' + city + ', ' + state + ' ' + zip + '</strong>')
-        .openPopup();
-    } else {
-      // Fallback: show state-level view using US map center
-      var el = document.getElementById('map');
-      if (el) {
-        el.insertAdjacentHTML('afterend',
-          '<p class="muted" style="margin-top:6px;">Could not geocode location exactly; showing approximate US region.</p>');
+      if (!isFinite(lat) || !isFinite(lon)) return;
+
+      mappedUsers += loc.users.length;
+      bounds.extend([lat, lon]);
+
+      var userList = loc.users.slice(0, 8).map(function (u) {
+        return '<li>' + esc((u.first_name || '') + ' ' + (u.last_name || '')) + '</li>';
+      }).join('');
+      var extra = loc.users.length > 8 ? '<li>…and ' + (loc.users.length - 8) + ' more</li>' : '';
+
+      L.marker([lat, lon]).addTo(map).bindPopup(
+        '<strong>' + esc(loc.city) + ', ' + esc(loc.state) + ' ' + esc(loc.zip_code) + '</strong><br>' +
+        'Users here: <strong>' + loc.users.length + '</strong>' +
+        '<ul style="margin:6px 0 0 18px; padding:0;">' + userList + extra + '</ul>'
+      );
+    })
+    .catch(function () { /* skip failed geocode */ });
+  })).then(function () {
+    if (mappedUsers > 0) {
+      map.fitBounds(bounds.pad(0.2), { maxZoom: 10 });
+      if (statsEl) {
+        statsEl.textContent = 'Showing ' + mappedUsers + ' of ' + waitingUsers.length + ' waiting users on the map.';
       }
+    } else if (statsEl) {
+      statsEl.textContent = 'Could not geocode waiting-user locations; showing US overview.';
     }
-  })
-  .catch(function () { /* geocoding unavailable, map still shows */ });
+  });
 })();
 </script>
 
