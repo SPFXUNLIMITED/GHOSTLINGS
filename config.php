@@ -11,7 +11,7 @@ return [
     'charset' => 'utf8mb4',
   ],
   'recaptcha' => [
-    'site_key'   => 'YOUR_RECAPTCHA_SITE_KEY',
-    'secret_key' => 'YOUR_RECAPTCHA_SECRET_KEY',
+    'site_key'   => '6LdUs-csAAAAAO0OwhwPWMTV941Vs7jN3XWB7MhT',
+    'secret_key' => '6LdUs-csAAAAAC1ezjVMiAAUtS0GWoQrvYSsITCo',
   ],
 ];
