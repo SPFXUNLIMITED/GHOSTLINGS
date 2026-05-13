@@ -16,7 +16,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $new_username = trim($_POST['new_username'] ?? '');
     $new_password = (string)($_POST['new_password'] ?? '');
     $new_password2 = (string)($_POST['new_password2'] ?? '');
-    $new_is_admin  = !empty($_POST['new_is_admin']) ? 1 : 0;
+    $new_role     = (string)($_POST['new_role'] ?? 'user');
+    if (!in_array($new_role, ['admin','moderator','user'], true)) $new_role = 'user';
+    $new_is_admin = ($new_role === 'admin') ? 1 : 0;
 
     if ($new_username === '') {
       $errors[] = 'Username is required.';
@@ -37,8 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'That username is already taken.';
       } else {
         $hash = password_hash($new_password, PASSWORD_DEFAULT);
-        $ins  = $pdo->prepare("INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, ?)");
-        $ins->execute([$new_username, $hash, $new_is_admin]);
+        $ins  = $pdo->prepare("INSERT INTO users (username, password_hash, is_admin, role, email_verified) VALUES (?, ?, ?, ?, 1)");
+        $ins->execute([$new_username, $hash, $new_is_admin, $new_role]);
         $success = 'User "' . htmlspecialchars($new_username, ENT_QUOTES, 'UTF-8') . '" created successfully.';
       }
     }
@@ -64,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
   }
 
-  // TOGGLE ADMIN
+  // TOGGLE ADMIN — preserves moderator status (toggles between admin and current non-admin role)
   elseif ($action === 'toggle_admin') {
     $uid = (int)($_POST['uid'] ?? 0);
     if ($uid <= 0) {
@@ -72,16 +74,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($uid === current_user_id()) {
       $errors[] = 'You cannot change your own admin status.';
     } else {
-      $row = $pdo->prepare("SELECT is_admin FROM users WHERE id = ? LIMIT 1");
+      $row = $pdo->prepare("SELECT is_admin, role FROM users WHERE id = ? LIMIT 1");
       $row->execute([$uid]);
       $target = $row->fetch();
       if (!$target) {
         $errors[] = 'User not found.';
       } else {
-        $new_admin = $target['is_admin'] ? 0 : 1;
-        $pdo->prepare("UPDATE users SET is_admin = ? WHERE id = ?")->execute([$new_admin, $uid]);
+        if ($target['is_admin']) {
+          // Demote: revert to moderator if was moderator, else user
+          $new_admin = 0;
+          $new_role  = ($target['role'] === 'moderator') ? 'moderator' : 'user';
+        } else {
+          $new_admin = 1;
+          $new_role  = 'admin';
+        }
+        $pdo->prepare("UPDATE users SET is_admin = ?, role = ? WHERE id = ?")->execute([$new_admin, $new_role, $uid]);
         $success = 'Admin status updated.';
       }
+    }
+  }
+
+  // SET ROLE (admin can set any role)
+  elseif ($action === 'set_role') {
+    $uid      = (int)($_POST['uid']  ?? 0);
+    $new_role = (string)($_POST['new_role'] ?? '');
+    if ($uid <= 0) {
+      $errors[] = 'Invalid user.';
+    } elseif ($uid === current_user_id()) {
+      $errors[] = 'You cannot change your own role.';
+    } elseif (!in_array($new_role, ['admin','moderator','user'], true)) {
+      $errors[] = 'Invalid role.';
+    } else {
+      $new_is_admin = ($new_role === 'admin') ? 1 : 0;
+      $pdo->prepare("UPDATE users SET role = ?, is_admin = ? WHERE id = ?")->execute([$new_role, $new_is_admin, $uid]);
+      $success = 'Role updated to ' . $new_role . '.';
     }
   }
 
@@ -102,7 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // ── Fetch all users ──────────────────────────────────────────────────────────
-$users = $pdo->query("SELECT id, username, is_admin FROM users ORDER BY id ASC")->fetchAll();
+$users = $pdo->query("SELECT id, username, email, is_admin, role FROM users ORDER BY id ASC")->fetchAll();
 
 render_header('User Management');
 ?>
@@ -151,10 +177,16 @@ render_header('User Management');
               <?php if ((int)$u['id'] === current_user_id()): ?>
                 <span class="badge" style="margin-left:6px;">You</span>
               <?php endif; ?>
+              <?php if (!empty($u['email'])): ?>
+                <br><span class="muted" style="font-size:12px;"><?= h($u['email']) ?></span>
+              <?php endif; ?>
             </td>
             <td>
-              <?php if ($u['is_admin']): ?>
+              <?php $role = $u['role'] ?? ($u['is_admin'] ? 'admin' : 'user'); ?>
+              <?php if ($role === 'admin'): ?>
                 <span class="badge priority-high">Admin</span>
+              <?php elseif ($role === 'moderator'): ?>
+                <span class="badge priority-medium">Moderator</span>
               <?php else: ?>
                 <span class="badge">User</span>
               <?php endif; ?>
@@ -167,14 +199,17 @@ render_header('User Management');
                   Change Password
                 </button>
 
-                <!-- Toggle admin -->
+                <!-- Set Role (admin only, not self) -->
                 <?php if ((int)$u['id'] !== current_user_id()): ?>
                   <form method="post" style="display:inline;">
-                    <input type="hidden" name="action" value="toggle_admin">
+                    <input type="hidden" name="action" value="set_role">
                     <input type="hidden" name="uid" value="<?= (int)$u['id'] ?>">
-                    <button type="submit" class="btn">
-                      <?= $u['is_admin'] ? 'Revoke Admin' : 'Make Admin' ?>
-                    </button>
+                    <select name="new_role" style="width:auto; padding:4px 8px; display:inline-block;">
+                      <option value="user"      <?= ($role === 'user')      ? 'selected' : '' ?>>User</option>
+                      <option value="moderator" <?= ($role === 'moderator') ? 'selected' : '' ?>>Moderator</option>
+                      <option value="admin"     <?= ($role === 'admin')     ? 'selected' : '' ?>>Admin</option>
+                    </select>
+                    <button type="submit" class="btn">Set Role</button>
                   </form>
 
                   <!-- Delete -->
@@ -235,12 +270,12 @@ render_header('User Management');
     <label>Confirm Password</label>
     <input type="password" name="new_password2" autocomplete="new-password" required minlength="6" />
 
-    <label style="display:flex; align-items:center; gap:8px; margin-top:12px; cursor:pointer;">
-      <input type="checkbox" name="new_is_admin" value="1"
-             style="width:auto; padding:0;"
-             <?= !empty($_POST['new_is_admin']) ? 'checked' : '' ?> />
-      Grant administrator access
-    </label>
+    <label>Role</label>
+    <select name="new_role" style="width:auto; max-width:200px;">
+      <option value="user">User</option>
+      <option value="moderator">Moderator</option>
+      <option value="admin">Admin</option>
+    </select>
 
     <div class="row" style="margin-top:14px;">
       <button type="submit" class="btn primary">Create User</button>

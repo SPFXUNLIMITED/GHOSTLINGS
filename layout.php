@@ -139,17 +139,25 @@ function render_header(string $title): void {
 
 <nav class="menubar card">
   <div class="menubar-inner">
+    <a class="menu-link <?= $current === 'form.php' ? 'active' : '' ?>" href="form.php">Form</a>
+    <?php if (!empty($_SESSION['user_id'])): ?>
     <a class="menu-link <?= $current === 'index.php' ? 'active' : '' ?>" href="index.php">Home</a>
+    <?php if (($_SESSION['role'] ?? '') === 'user'): ?>
+    <a class="menu-link <?= $current === 'user_page.php' ? 'active' : '' ?>" href="user_page.php">My Request</a>
+    <?php else: ?>
     <a class="menu-link <?= $current === 'projects.php' ? 'active' : '' ?>" href="projects.php">Projects</a>
     <a class="menu-link <?= $current === 'documents.php' ? 'active' : '' ?>" href="documents.php">Documents</a>
     <a class="menu-link <?= $current === 'playbooks.php' ? 'active' : '' ?>" href="playbooks.php">Playbooks</a>
     <a class="menu-link <?= $current === 'archives.php' ? 'active' : '' ?>" href="archives.php">Archives</a>
-    <?php if (!empty($_SESSION['user_id'])): ?>
     <a class="menu-link <?= $current === 'time_clock.php' ? 'active' : '' ?>" href="time_clock.php">Time Clock</a>
+    <?php endif; ?>
+    <?php if (!empty($_SESSION['is_admin']) || !empty($_SESSION['is_moderator'])): ?>
+    <a class="menu-link <?= $current === 'form_admin.php' ? 'active' : '' ?>" href="form_admin.php">Form Entries</a>
     <?php endif; ?>
     <?php if (!empty($_SESSION['is_admin'])): ?>
     <a class="menu-link <?= $current === 'time_report.php' ? 'active' : '' ?>" href="time_report.php">Time Reports</a>
     <a class="menu-link <?= $current === 'users.php' ? 'active' : '' ?>" href="users.php">Users</a>
+    <?php endif; ?>
     <?php endif; ?>
   </div>
 </nav>

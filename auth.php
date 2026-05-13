@@ -24,9 +24,25 @@ function is_admin(): bool {
   return !empty($_SESSION['is_admin']);
 }
 
+function is_moderator(): bool {
+  return !empty($_SESSION['is_moderator']);
+}
+
+function is_admin_or_moderator(): bool {
+  return is_admin() || is_moderator();
+}
+
 function require_admin(): void {
   require_login();
   if (!is_admin()) {
+    http_response_code(403);
+    exit('Access denied.');
+  }
+}
+
+function require_admin_or_moderator(): void {
+  require_login();
+  if (!is_admin_or_moderator()) {
     http_response_code(403);
     exit('Access denied.');
   }
