@@ -139,7 +139,6 @@ function render_header(string $title): void {
 
 <nav class="menubar card">
   <div class="menubar-inner">
-    <a class="menu-link <?= $current === 'form.php' ? 'active' : '' ?>" href="form.php">Form</a>
     <?php if (!empty($_SESSION['user_id'])): ?>
     <a class="menu-link <?= $current === 'index.php' ? 'active' : '' ?>" href="index.php">Home</a>
     <?php if (($_SESSION['role'] ?? '') === 'user'): ?>
@@ -159,6 +158,7 @@ function render_header(string $title): void {
     <a class="menu-link <?= $current === 'users.php' ? 'active' : '' ?>" href="users.php">Users</a>
     <?php endif; ?>
     <?php endif; ?>
+	<a class="menu-link <?= $current === 'form.php' ? 'active' : '' ?>" href="form.php">Form</a>
   </div>
 </nav>
 
