@@ -197,7 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           } else {
             $project_path = rtrim($project_path, '/');
           }
-          $base_url     = $scheme . '://' . $host . ($project_path === '' ? '' : $project_path);
+          $base_url     = $scheme . '://' . $host . $project_path;
           $verify_url   = $base_url . '/verify_email.php?token=' . urlencode($verify_token);
           $login_url    = $base_url . '/login.php';
           $to           = $fields['email'];
