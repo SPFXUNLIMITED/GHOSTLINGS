@@ -31,16 +31,19 @@ $has_entry = !empty($data['first_name']);
 
 // Fetch all regular users who currently have service requests ("waiting for service")
 $waiting_stmt = $pdo->query(
-  "SELECT u.id,
-          MAX(u.email_verified) AS email_verified,
-          MAX(le.city) AS city,
-          MAX(le.state) AS state,
-          MAX(le.zip_code) AS zip_code
-   FROM laser_entries le
-   JOIN users u ON u.id = le.user_id
+  "SELECT u.id, u.email_verified,
+          le.city, le.state, le.zip_code
+   FROM users u
+   JOIN laser_entries le ON le.user_id = u.id
    WHERE u.role = 'user'
-   GROUP BY u.id
-   ORDER BY MAX(le.created_at) DESC"
+     AND le.id = (
+       SELECT le2.id
+       FROM laser_entries le2
+       WHERE le2.user_id = u.id
+       ORDER BY le2.created_at DESC, le2.id DESC
+       LIMIT 1
+     )
+   ORDER BY le.created_at DESC"
 );
 $waiting_users = $waiting_stmt->fetchAll();
 $waiting_total = count($waiting_users);
@@ -183,7 +186,7 @@ render_header('My Service Request');
 
   var grouped = {};
   waitingUsers.forEach(function (u) {
-    var key = [u.zip_code || '', u.city || '', u.state || ''].join('|').toLowerCase();
+    var key = JSON.stringify([u.zip_code || '', u.city || '', u.state || '']);
     if (!grouped[key]) {
       grouped[key] = {
         city: u.city || '',
@@ -198,7 +201,8 @@ render_header('My Service Request');
   var locations = Object.keys(grouped).map(function (k) { return grouped[k]; });
   var bounds = L.latLngBounds();
   var mappedUsers = 0;
-  var geocodeDelayMs = 1100;
+  // Respect Nominatim public usage guidance of roughly 1 request per second.
+  var NOMINATIM_RATE_LIMIT_MS = 1100;
 
   function geocodeLocation(loc) {
     var query = encodeURIComponent((loc.zip_code || '') + ' ' + (loc.city || '') + ', ' + (loc.state || '') + ', ' + country);
@@ -243,7 +247,7 @@ render_header('My Service Request');
     geocodeLocation(locations[index]).finally(function () {
       setTimeout(function () {
         processLocationAt(index + 1);
-      }, geocodeDelayMs);
+      }, NOMINATIM_RATE_LIMIT_MS);
     });
   }
 
