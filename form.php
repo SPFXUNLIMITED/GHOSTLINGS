@@ -191,11 +191,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $scheme       = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
           $host         = $_SERVER['HTTP_HOST'] ?? 'localhost';
           $script_name  = $_SERVER['SCRIPT_NAME'] ?? '';
-          $project_path = $script_name !== '' ? dirname($script_name) : '';
-          if ($project_path === '/' || $project_path === '.') {
+          $project_path = rtrim(dirname($script_name), '/');
+          if ($project_path === '' || $project_path === '.') {
             $project_path = '';
-          } else {
-            $project_path = rtrim($project_path, '/');
           }
           $base_url     = $scheme . '://' . $host . $project_path;
           $verify_url   = $base_url . '/verify_email.php?token=' . urlencode($verify_token);
