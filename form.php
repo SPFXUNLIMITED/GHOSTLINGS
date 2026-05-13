@@ -188,9 +188,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $pdo->commit();
 
           // ── Send verification + credentials email ─────────────────────
-          $verify_url   = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
-                          . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost')
-                          . '/verify_email.php?token=' . urlencode($verify_token);
+          $scheme       = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+          $host         = $_SERVER['HTTP_HOST'] ?? 'localhost';
+          $script_name  = $_SERVER['SCRIPT_NAME'] ?? '';
+          $project_path = rtrim(dirname($script_name), '/');
+          if ($project_path === '' || $project_path === '.') {
+            $project_path = '';
+          }
+          $base_url     = $scheme . '://' . $host . $project_path;
+          $verify_url   = $base_url . '/verify_email.php?token=' . urlencode($verify_token);
+          $login_url    = $base_url . '/login.php';
           $to           = $fields['email'];
           $subject      = 'Verify your email – Ghostlings Laser Support';
           $name_display = h($fields['first_name']) . ' ' . h($fields['last_name']);
@@ -203,8 +210,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 . "{$verify_url}\r\n\r\n"
                 . "This link expires in 48 hours.\r\n\r\n"
                 . "After verifying, log in at:\r\n"
-                . (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
-                . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/login.php\r\n\r\n"
+                . "{$login_url}\r\n\r\n"
                 . "– Ghostlings Laser Support Team\r\n";
           $headers = "From: no-reply@" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "\r\n"
                    . "Reply-To: no-reply@" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "\r\n"
