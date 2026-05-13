@@ -41,9 +41,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       session_regenerate_id(true);
       $_SESSION['user_id']      = (int)$user['id'];
       $_SESSION['username']     = $user['username'];
-      $_SESSION['is_admin']     = ($user['role'] === 'admin' || (bool)$user['is_admin']);
-      $_SESSION['is_moderator'] = ($user['role'] === 'moderator');
-      $_SESSION['role']         = $user['role'];
+      $role                     = $user['role'] ?? ($user['is_admin'] ? 'admin' : 'user');
+      $_SESSION['is_admin']     = ($role === 'admin');
+      $_SESSION['is_moderator'] = ($role === 'moderator');
+      $_SESSION['role']         = $role;
 
       // Determine redirect destination
       if (!is_string($next) || $next === '' || str_starts_with($next, 'http')) {

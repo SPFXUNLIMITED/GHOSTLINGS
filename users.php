@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
   }
 
-  // TOGGLE ADMIN
+  // TOGGLE ADMIN — preserves moderator status (toggles between admin and current non-admin role)
   elseif ($action === 'toggle_admin') {
     $uid = (int)($_POST['uid'] ?? 0);
     if ($uid <= 0) {
@@ -80,8 +80,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (!$target) {
         $errors[] = 'User not found.';
       } else {
-        $new_admin = $target['is_admin'] ? 0 : 1;
-        $new_role  = $new_admin ? 'admin' : 'user';
+        if ($target['is_admin']) {
+          // Demote: revert to moderator if was moderator, else user
+          $new_admin = 0;
+          $new_role  = ($target['role'] === 'moderator') ? 'moderator' : 'user';
+        } else {
+          $new_admin = 1;
+          $new_role  = 'admin';
+        }
         $pdo->prepare("UPDATE users SET is_admin = ?, role = ? WHERE id = ?")->execute([$new_admin, $new_role, $uid]);
         $success = 'Admin status updated.';
       }

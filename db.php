@@ -1,6 +1,7 @@
 <?php
 // db.php
-date_default_timezone_set('America/Los_Angeles');
+define('APP_TZ', 'America/Los_Angeles');
+date_default_timezone_set(APP_TZ);
 
 $config = require __DIR__ . '/config.php';
 $db = $config['db'];

@@ -139,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $plain_password   = substr(str_replace(['+','/','='], '', base64_encode(random_bytes(18))), 0, 12);
         $password_hash    = password_hash($plain_password, PASSWORD_DEFAULT);
         $verify_token     = bin2hex(random_bytes(32));
-        $token_expires    = (new DateTime('now', new DateTimeZone('America/Los_Angeles')))
+        $token_expires    = (new DateTime('now', new DateTimeZone(APP_TZ)))
                               ->modify('+48 hours')
                               ->format('Y-m-d H:i:s');
 

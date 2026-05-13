@@ -31,7 +31,7 @@ if ($token === '') {
     header('Location: login.php?info=' . urlencode('Your email is already verified. Please log in.'));
     exit;
   } elseif ($user['token_expires'] !== null) {
-    $tz = new DateTimeZone('America/Los_Angeles');
+    $tz = new DateTimeZone(APP_TZ);
     $expires = new DateTime($user['token_expires'], $tz);
     $now     = new DateTime('now', $tz);
     if ($now > $expires) {

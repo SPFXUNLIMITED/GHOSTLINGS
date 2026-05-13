@@ -32,9 +32,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_admin()) {
     } elseif ($uid === current_user_id()) {
       $errors[] = 'You cannot delete your own account.';
     } else {
-      $pdo->prepare("DELETE FROM laser_entries WHERE user_id = ?")->execute([$uid]);
-      $pdo->prepare("DELETE FROM users WHERE id = ? AND role = 'user'")->execute([$uid]);
-      $success = 'User and their entry deleted.';
+      $check = $pdo->prepare("SELECT role FROM users WHERE id = ? LIMIT 1");
+      $check->execute([$uid]);
+      $target_user = $check->fetch();
+      if (!$target_user) {
+        $errors[] = 'User not found.';
+      } elseif ($target_user['role'] !== 'user') {
+        $errors[] = 'Only regular user accounts created via the form can be deleted here. Use the Users panel for admin/moderator accounts.';
+      } else {
+        $pdo->prepare("DELETE FROM laser_entries WHERE user_id = ?")->execute([$uid]);
+        $pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$uid]);
+        $success = 'User and their entry deleted.';
+      }
     }
   }
 }
