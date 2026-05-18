@@ -59,6 +59,14 @@ if (!$task) {
   exit('Task not found');
 }
 
+// Mark task done
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_done']) && (string)$task['status'] !== 'done') {
+  $stmt = $pdo->prepare("UPDATE tasks SET status = 'done' WHERE id = ?");
+  $stmt->execute([$id]);
+  header("Location: task_details.php?id={$id}");
+  exit;
+}
+
 $stmt = $pdo->prepare("SELECT id, body, created_at FROM task_comments WHERE task_id = ? ORDER BY id DESC");
 $stmt->execute([$id]);
 $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -80,6 +88,11 @@ render_header('Task Details');
     <div class="actions">
       <a class="btn" href="project_details.php?id=<?= (int)$task['project_id'] ?>">Back to Project</a>
       <a class="btn" href="task_form.php?project_id=<?= (int)$task['project_id'] ?>&id=<?= (int)$task['id'] ?>">Edit</a>
+      <?php if ((string)$task['status'] !== 'done'): ?>
+      <form method="post" style="margin:0;">
+        <button class="btn primary" type="submit" name="mark_done" value="1">Mark Done</button>
+      </form>
+      <?php endif; ?>
       <a class="btn danger" href="task_delete.php?project_id=<?= (int)$task['project_id'] ?>&id=<?= (int)$task['id'] ?>" onclick="return confirm('Delete this task?');">Delete</a>
       <a class="btn" href="#task-files">Upload Files</a>
     </div>
