@@ -6,6 +6,7 @@ require __DIR__ . '/auth.php';
 require_login();
 
 $per_page   = 15;
+$day_in_seconds = 86400;
 $proj_page  = max(1, (int)($_GET['proj_page']  ?? 1));
 $task_page  = max(1, (int)($_GET['task_page']  ?? 1));
 $proj_offset = ($proj_page - 1) * $per_page;
@@ -156,7 +157,7 @@ $project_desc_max_length = 50;
             if (!empty($p['created_at'])) {
               $project_created_dt = new DateTime($p['created_at'], new DateTimeZone('America/Los_Angeles'));
               $project_created = $project_created_dt->format('m-d-Y g:i A');
-               $project_is_recent = (time() - $project_created_dt->getTimestamp()) < 86400;
+               $project_is_recent = (time() - $project_created_dt->getTimestamp()) < $day_in_seconds;
             }
             if ($project_created === '') {
               $project_created = '—';
@@ -230,7 +231,7 @@ $project_desc_max_length = 50;
             if (!empty($t['created_at'])) {
               $task_created_dt = new DateTime($t['created_at'], new DateTimeZone('America/Los_Angeles'));
               $task_created = $task_created_dt->format('m-d-Y g:i A');
-              $task_is_new = (time() - $task_created_dt->getTimestamp()) < 86400;
+              $task_is_new = (time() - $task_created_dt->getTimestamp()) < $day_in_seconds;
             }
             if ($task_created === '') {
               $task_created = '—';
