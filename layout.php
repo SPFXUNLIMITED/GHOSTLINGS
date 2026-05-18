@@ -320,10 +320,8 @@ function render_footer(): void {
     resetTimer();
 
     // Session keep-alive: ping the server every 10 minutes so the PHP session
-    // does not expire while the user has this tab open.
+    // does not expire while the browser remains open, including hidden tabs.
     setInterval(function () {
-      // Skip the ping while the tab is hidden to avoid unnecessary server load.
-      if (document.visibilityState === 'hidden') { return; }
       fetch('ping.php', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function (r) {
           // Session has expired — redirect to login so the user can re-authenticate.
