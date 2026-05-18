@@ -264,6 +264,15 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Add bumped_at column to projects if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE projects ADD COLUMN bumped_at DATETIME NULL DEFAULT NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
 // Create form_rate_limit table for CSRF / rate-limit tracking
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS form_rate_limit (

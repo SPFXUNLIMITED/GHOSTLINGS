@@ -16,10 +16,10 @@ if (is_admin()) {
   $proj_total = (int)$pdo->query("SELECT COUNT(*) FROM projects WHERE playbook = 0 AND archived = 0")->fetchColumn();
 
   $stmt = $pdo->prepare("
-    SELECT id, name, description, created_at, priority
+    SELECT id, name, description, created_at, bumped_at, priority
     FROM projects
     WHERE playbook = 0 AND archived = 0
-    ORDER BY created_at DESC, id DESC
+    ORDER BY GREATEST(created_at, COALESCE(bumped_at, '1970-01-01')) DESC, id DESC
     LIMIT :limit OFFSET :offset
   ");
   $stmt->bindValue(':limit',  $per_page,    PDO::PARAM_INT);
@@ -62,12 +62,12 @@ if (is_admin()) {
   $proj_total = (int)$stmt->fetchColumn();
 
   $stmt = $pdo->prepare("
-    SELECT DISTINCT pr.id, pr.name, pr.description, pr.created_at, pr.priority
+    SELECT DISTINCT pr.id, pr.name, pr.description, pr.created_at, pr.bumped_at, pr.priority
     FROM projects pr
     LEFT JOIN tasks t ON t.project_id = pr.id
     WHERE pr.playbook = 0 AND pr.archived = 0
       AND (pr.owner_id = ? OR (t.assigned_to = ? AND t.assigned_to IS NOT NULL))
-    ORDER BY pr.created_at DESC, pr.id DESC
+    ORDER BY GREATEST(pr.created_at, COALESCE(pr.bumped_at, '1970-01-01')) DESC, pr.id DESC
     LIMIT ? OFFSET ?
   ");
   $stmt->bindValue(1, $uid,          PDO::PARAM_INT);
@@ -153,11 +153,20 @@ $project_desc_max_length = 50;
               $project_description = mb_substr($project_description, 0, $project_desc_max_length) . '...';
             }
             $project_created = '';
-            $project_is_recent = false;
+            $project_is_new = false;
+            $project_is_bumped = false;
+            $sort_date = $p['created_at'] ?? '';
             if (!empty($p['created_at'])) {
               $project_created_dt = new DateTime($p['created_at'], new DateTimeZone('America/Los_Angeles'));
               $project_created = $project_created_dt->format('m-d-Y g:i A');
-               $project_is_recent = (time() - $project_created_dt->getTimestamp()) < $day_in_seconds;
+              $project_is_new = (time() - $project_created_dt->getTimestamp()) < $day_in_seconds;
+            }
+            if (!empty($p['bumped_at'])) {
+              $bumped_dt = new DateTime($p['bumped_at'], new DateTimeZone('America/Los_Angeles'));
+              $project_is_bumped = (time() - $bumped_dt->getTimestamp()) < $day_in_seconds;
+              if ($p['bumped_at'] > ($p['created_at'] ?? '')) {
+                $sort_date = $p['bumped_at'];
+              }
             }
             if ($project_created === '') {
               $project_created = '—';
@@ -165,10 +174,10 @@ $project_desc_max_length = 50;
           ?>
           <tr data-name="<?= h(strtolower($p['name'])) ?>"
               data-priority="<?= h($p['priority'] ?? 'medium') ?>"
-              data-created-at="<?= h($p['created_at']) ?>">
+              data-created-at="<?= h($sort_date) ?>">
             <td>
               <span class="name-with-badge">
-                <?php if ($project_is_recent): ?><span class="badge new">Bumped</span><?php endif; ?>
+                <?php if ($project_is_bumped): ?><span class="badge new">Bumped</span><?php elseif ($project_is_new): ?><span class="badge new">New</span><?php endif; ?>
                 <strong><?= h($p['name']) ?></strong>
               </span>
             </td>
