@@ -56,6 +56,11 @@ function render_header(string $title): void {
     session_start();
   }
   $username = $_SESSION['username'] ?? null;
+  $role = (string)($_SESSION['role'] ?? '');
+  $show_global_search = !empty($_SESSION['user_id']) && $role !== 'user';
+  $header_search_query = basename((string)($_SERVER['PHP_SELF'] ?? '')) === 'search.php'
+    ? trim((string)($_GET['q'] ?? ''))
+    : '';
   $clock_status_badge = '';
   $user_id = (int)($_SESSION['user_id'] ?? 0);
   global $pdo;
@@ -103,6 +108,19 @@ function render_header(string $title): void {
 			  <a class="btn" href="login.php">Login</a>
 			<?php endif; ?>
 		  </div>
+
+      <?php if ($show_global_search): ?>
+        <form method="get" action="search.php" class="topbar-search" role="search">
+          <input
+            type="text"
+            name="q"
+            value="<?= h($header_search_query) ?>"
+            placeholder="Search projects, playbooks, tasks..."
+            aria-label="Search projects, playbooks, and tasks"
+          />
+          <button type="submit" class="btn">Search</button>
+        </form>
+      <?php endif; ?>
 
 
 
