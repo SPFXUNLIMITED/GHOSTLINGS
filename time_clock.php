@@ -26,6 +26,9 @@ if (is_admin()) {
   $projects = $proj_stmt->fetchAll();
 }
 
+// ── Fetch playbooks for the clock-in dropdown ─────────────────────────────
+$playbooks = $pdo->query("SELECT id, name FROM projects WHERE playbook = 1 AND archived = 0 ORDER BY name ASC")->fetchAll();
+
 // ── Check for an open clock-in (clock_out IS NULL) ────────────────────────
 $open_stmt = $pdo->prepare("
   SELECT id, clock_in, project_id, description
@@ -50,9 +53,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $errors[] = 'You are already clocked in. Clock out first.';
     } else {
       $proj = (int)($_POST['project_id'] ?? 0) ?: null;
+      if (!$proj) {
+        $proj = (int)($_POST['playbook_id'] ?? 0) ?: null;
+      }
       $desc = trim($_POST['description'] ?? '');
       if (!$has_project_or_text($proj, $desc)) {
-        $errors[] = 'Please select a project or enter a note before clocking in.';
+        $errors[] = 'Please select a project, playbook, or enter a note before clocking in.';
       } else {
         $now  = (new DateTime('now', $tz))->format('Y-m-d H:i:s');
         $stmt = $pdo->prepare("
@@ -240,10 +246,18 @@ render_header('Time Clock');
       <input type="hidden" name="action" value="clock_in">
 
       <label>Project (or add a note)</label>
-      <select name="project_id">
+      <select name="project_id" id="ci_project_id" onchange="if(this.value){document.getElementById('ci_playbook_id').value='';}">
         <option value="">— No project —</option>
         <?php foreach ($projects as $pr): ?>
           <option value="<?= (int)$pr['id'] ?>"><?= h($pr['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+
+      <label>Playbook</label>
+      <select name="playbook_id" id="ci_playbook_id" onchange="if(this.value){document.getElementById('ci_project_id').value='';}">
+        <option value="">— No playbook —</option>
+        <?php foreach ($playbooks as $pb): ?>
+          <option value="<?= (int)$pb['id'] ?>"><?= h($pb['name']) ?></option>
         <?php endforeach; ?>
       </select>
 
