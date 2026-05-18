@@ -59,10 +59,20 @@ if (!$task) {
   exit('Task not found');
 }
 
+if (empty($_SESSION['task_mark_done_csrf'])) {
+  $_SESSION['task_mark_done_csrf'] = bin2hex(random_bytes(24));
+}
+
 // Mark task done
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_done']) && (string)$task['status'] !== 'done') {
+  $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
+  if (!hash_equals((string)$_SESSION['task_mark_done_csrf'], $submitted_csrf)) {
+    http_response_code(400);
+    exit('Invalid request token.');
+  }
   $stmt = $pdo->prepare("UPDATE tasks SET status = 'done' WHERE id = ?");
   $stmt->execute([$id]);
+  $_SESSION['task_mark_done_csrf'] = bin2hex(random_bytes(24));
   header("Location: task_details.php?id={$id}");
   exit;
 }
@@ -89,7 +99,8 @@ render_header('Task Details');
       <a class="btn" href="project_details.php?id=<?= (int)$task['project_id'] ?>">Back to Project</a>
       <a class="btn" href="task_form.php?project_id=<?= (int)$task['project_id'] ?>&id=<?= (int)$task['id'] ?>">Edit</a>
       <?php if ((string)$task['status'] !== 'done'): ?>
-      <form method="post" style="margin:0;">
+      <form method="post" class="inline-form">
+        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['task_mark_done_csrf']) ?>">
         <button class="btn primary" type="submit" name="mark_done" value="1">Mark Done</button>
       </form>
       <?php endif; ?>
@@ -215,6 +226,7 @@ render_header('Task Details');
 </div>
 
 <style>
+  .inline-form{margin:0;}
   .thumb-grid{display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:12px;}
   .thumb{border:1px solid rgba(0,0,0,.08); border-radius:12px; overflow:hidden; background:#fff;}
   .thumb .preview{height:150px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.03);}
