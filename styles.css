@@ -382,8 +382,30 @@ td.col-project-wrap, th.col-project-wrap {
   font-weight: 600;
 }
 
+@keyframes clocked-out-flash {
+  0%,
+  100% {
+    background: #fef2f2;
+    color: #991b1b;
+    border-color: #fca5a5;
+  }
+  50% {
+    background: #f3f4f6;
+    color: #374151;
+    border-color: #d1d5db;
+  }
+}
+
 .badge.clocked-out {
-  background: #f3f4f6;
-  color: #374151;
-  border-color: #d1d5db;
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fca5a5;
+  font-weight: 600;
+  animation: clocked-out-flash 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badge.clocked-out {
+    animation: none;
+  }
 }
