@@ -152,7 +152,11 @@ function render_header(string $title): void {
 	</div>
 
 
-<?php $current = basename($_SERVER['PHP_SELF']); ?>	
+<?php
+$current = basename($_SERVER['PHP_SELF']);
+$show_mod_menu = !empty($_SESSION['is_admin']) || !empty($_SESSION['is_moderator']);
+$show_admin_menu = !empty($_SESSION['is_admin']);
+?>	
 
 <nav class="menubar card">
   <div class="menubar-inner">
@@ -167,17 +171,24 @@ function render_header(string $title): void {
     <a class="menu-link <?= $current === 'archives.php' ? 'active' : '' ?>" href="archives.php">Archives</a>
     <a class="menu-link <?= $current === 'time_clock.php' ? 'active' : '' ?>" href="time_clock.php">Time Clock</a>
     <?php endif; ?>
-    <?php if (!empty($_SESSION['is_admin']) || !empty($_SESSION['is_moderator'])): ?>
-    <a class="menu-link <?= $current === 'form_admin.php' ? 'active' : '' ?>" href="form_admin.php">Form Entries</a>
-    <?php endif; ?>
-    <?php if (!empty($_SESSION['is_admin'])): ?>
-    <a class="menu-link <?= $current === 'time_report.php' ? 'active' : '' ?>" href="time_report.php">Time Reports</a>
-    <a class="menu-link <?= $current === 'users.php' ? 'active' : '' ?>" href="users.php">Users</a>
-    <?php endif; ?>
     <?php endif; ?>
 	<a class="menu-link <?= $current === 'form.php' ? 'active' : '' ?>" href="form.php">Form</a>
   </div>
 </nav>
+
+<?php if ($show_mod_menu || $show_admin_menu): ?>
+<nav class="menubar card">
+  <div class="menubar-inner">
+    <?php if ($show_mod_menu): ?>
+    <a class="menu-link <?= $current === 'form_admin.php' ? 'active' : '' ?>" href="form_admin.php">Form Entries</a>
+    <?php endif; ?>
+    <?php if ($show_admin_menu): ?>
+    <a class="menu-link <?= $current === 'time_report.php' ? 'active' : '' ?>" href="time_report.php">Time Reports</a>
+    <a class="menu-link <?= $current === 'users.php' ? 'active' : '' ?>" href="users.php">Users</a>
+    <?php endif; ?>
+  </div>
+</nav>
+<?php endif; ?>
 
 
 
