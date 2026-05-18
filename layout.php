@@ -273,9 +273,9 @@ function render_footer(): void {
           osc.type = 'sine';
           osc.frequency.setValueAtTime(880, ctx.currentTime);
           gain.gain.setValueAtTime(0.4, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 3);
           osc.start(ctx.currentTime);
-          osc.stop(ctx.currentTime + 0.8);
+          osc.stop(ctx.currentTime + 3);
         }).catch(function () { /* audio not supported */ });
       } catch (e) { /* audio not supported */ }
     }
