@@ -12,6 +12,8 @@ if (isset($changeTracker['changes']) && is_array($changeTracker['changes'])) {
 require_login();
 
 $recent_comments = [];
+$recent_comments_limit = 100;
+$new_badge_duration_seconds = 24 * 60 * 60;
 $uid = current_user_id();
 if ($uid !== null) {
     $stmt = $pdo->prepare("
@@ -59,7 +61,7 @@ if ($uid !== null) {
           )
       ) x
       ORDER BY x.created_at DESC, x.comment_id DESC
-      LIMIT 100
+      LIMIT {$recent_comments_limit}
     ");
     $stmt->execute([$uid, $uid]);
     $recent_comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -89,7 +91,6 @@ render_header('Home');
 <div class="card">
   <h2 style="margin-top:0; margin-bottom:8px;">Recent Comments</h2>
   <?php if ($recent_comments): ?>
-    <?php $new_badge_duration_seconds = 24 * 60 * 60; ?>
     <?php $new_cutoff = time() - $new_badge_duration_seconds; ?>
     <?php foreach ($recent_comments as $comment): ?>
       <?php
