@@ -152,11 +152,11 @@ $project_desc_max_length = 50;
               $project_description = mb_substr($project_description, 0, $project_desc_max_length) . '...';
             }
             $project_created = '';
-            $project_is_new = false;
+            $project_is_bumped = false;
             if (!empty($p['created_at'])) {
               $project_created_dt = new DateTime($p['created_at'], new DateTimeZone('America/Los_Angeles'));
               $project_created = $project_created_dt->format('m-d-Y g:i A');
-              $project_is_new = (time() - $project_created_dt->getTimestamp()) < 86400;
+               $project_is_bumped = (time() - $project_created_dt->getTimestamp()) < 86400;
             }
             if ($project_created === '') {
               $project_created = '—';
@@ -167,7 +167,7 @@ $project_desc_max_length = 50;
               data-created-at="<?= h($p['created_at']) ?>">
             <td>
               <span class="name-with-badge">
-                <?php if ($project_is_new): ?><span class="badge new">New</span><?php endif; ?>
+                <?php if ($project_is_bumped): ?><span class="badge new">Bumped</span><?php endif; ?>
                 <strong><?= h($p['name']) ?></strong>
               </span>
             </td>

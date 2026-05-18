@@ -10,6 +10,14 @@ if ($id <= 0) {
   exit;
 }
 
+// Bump project
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bump_project'])) {
+  $stmt = $pdo->prepare("UPDATE projects SET created_at = NOW() WHERE id = ? AND playbook = 0 AND archived = 0");
+  $stmt->execute([$id]);
+  header("Location: project_details.php?id={$id}");
+  exit;
+}
+
 // Delete comment
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_comment'])) {
   $comment_id = (int)($_POST['comment_id'] ?? 0);
@@ -132,6 +140,9 @@ render_header('Project Details');
       <a class="btn" href="project_form.php?id=<?= (int)$project['id'] ?>">Edit</a>
       <a class="btn" href="project_archive.php?id=<?= (int)$project['id'] ?>&action=archive"
          onclick="return confirm('Archive this project?');">Archive</a>
+      <form method="post" style="margin:0;">
+        <button class="btn" type="submit" name="bump_project" value="1">Bump</button>
+      </form>
       <a class="btn primary" href="task_form.php?project_id=<?= (int)$project['id'] ?>">+ New Task</a>
     </div>
   </div>
