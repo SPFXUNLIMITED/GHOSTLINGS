@@ -95,7 +95,6 @@ if ($search !== '') {
             FROM tasks t
             WHERE t.project_id = pr.id
               AND t.assigned_to = ?
-              AND t.assigned_to IS NOT NULL
           )
         )
         AND (pr.name LIKE ? ESCAPE '!' OR pr.description LIKE ? ESCAPE '!')
