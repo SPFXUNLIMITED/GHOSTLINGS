@@ -10,14 +10,6 @@ if ($id <= 0) {
   exit;
 }
 
-// Bump project
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bump_project'])) {
-  $stmt = $pdo->prepare("UPDATE projects SET created_at = NOW() WHERE id = ? AND playbook = 0 AND archived = 0");
-  $stmt->execute([$id]);
-  header("Location: project_details.php?id={$id}");
-  exit;
-}
-
 // Delete comment
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_comment'])) {
   $comment_id = (int)($_POST['comment_id'] ?? 0);
@@ -90,6 +82,25 @@ if (!$project) {
   exit('Project not found');
 }
 
+if (empty($_SESSION['project_bump_csrf'])) {
+  $_SESSION['project_bump_csrf'] = bin2hex(random_bytes(24));
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bump_project'])) {
+  $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
+  if (!hash_equals((string)$_SESSION['project_bump_csrf'], $submitted_csrf)) {
+    http_response_code(400);
+    exit('Invalid request token.');
+  }
+
+  $bump_stmt = $pdo->prepare("UPDATE projects SET created_at = NOW() WHERE id = ? AND playbook = 0 AND archived = 0");
+  $bump_stmt->execute([$id]);
+
+  $_SESSION['project_bump_csrf'] = bin2hex(random_bytes(24));
+  header("Location: project_details.php?id={$id}");
+  exit;
+}
+
 if (is_admin()) {
   $task_stmt = $pdo->prepare("
     SELECT t.id, t.title, t.status, t.priority, t.details
@@ -141,6 +152,7 @@ render_header('Project Details');
       <a class="btn" href="project_archive.php?id=<?= (int)$project['id'] ?>&action=archive"
          onclick="return confirm('Archive this project?');">Archive</a>
       <form method="post" style="margin:0;">
+        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['project_bump_csrf']) ?>">
         <button class="btn" type="submit" name="bump_project" value="1">Bump</button>
       </form>
       <a class="btn primary" href="task_form.php?project_id=<?= (int)$project['id'] ?>">+ New Task</a>
