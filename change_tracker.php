@@ -4,8 +4,8 @@ return [
     'version' => '1.1.3',
     'changes' => [
         '2026-05-18: Updated version and release change notes for today.',
-        '2026-05-18: Re-enabled session heartbeat while browser tabs are hidden so keep-alive pings continue.',
-        '2026-05-18: Paused session heartbeat while browser tab is hidden to reduce unnecessary ping traffic.',
+        '2026-05-18: Temporarily paused session heartbeat while browser tab is hidden to reduce unnecessary ping traffic.',
+        '2026-05-18: Re-enabled session heartbeat while browser tabs are hidden after confirming keep-alive pings are required.',
         '2026-05-18: Added 401 session-expiry handling in ping.php so inactive sessions are handled gracefully.',
     ],
 ];
