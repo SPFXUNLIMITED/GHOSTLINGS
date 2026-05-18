@@ -13,6 +13,7 @@ require_login();
 
 $recent_comments = [];
 $recent_comments_limit = 100;
+$recent_comment_preview_max_chars = 140;
 $new_badge_duration_seconds = 24 * 60 * 60;
 $new_cutoff = time() - $new_badge_duration_seconds;
 $uid = current_user_id();
@@ -125,19 +126,6 @@ render_header('Home');
 </div>
 
 <div class="card">
-  <h2 style="margin-top:0; margin-bottom:8px;">Version</h2>
-  <p class="muted" style="margin-top:0;">
-    v<?= htmlspecialchars($version, ENT_QUOTES, 'UTF-8') ?>
-  </p>
-  <h3 style="margin-bottom:6px;">Changes</h3>
-  <ul style="margin:0; padding-left:18px;">
-    <?php foreach ($changes as $change): ?>
-      <li><?= htmlspecialchars((string)$change, ENT_QUOTES, 'UTF-8') ?></li>
-    <?php endforeach; ?>
-  </ul>
-</div>
-
-<div class="card">
   <h2 style="margin-top:0; margin-bottom:8px;">Recent Comments</h2>
   <?php if ($recent_comments): ?>
     <?php foreach ($recent_comments as $comment): ?>
@@ -147,6 +135,14 @@ render_header('Home');
         $link = ((string)$comment['comment_type'] === 'task')
           ? ('task_details.php?id=' . (int)$comment['item_id'])
           : ('project_details.php?id=' . (int)$comment['item_id']);
+        $comment_preview = trim(preg_replace('/\s+/', ' ', strip_tags((string)($comment['body'] ?? ''))));
+        if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+          if (mb_strlen($comment_preview, 'UTF-8') > $recent_comment_preview_max_chars) {
+            $comment_preview = rtrim(mb_substr($comment_preview, 0, $recent_comment_preview_max_chars, 'UTF-8')) . '...';
+          }
+        } elseif (strlen($comment_preview) > $recent_comment_preview_max_chars) {
+          $comment_preview = rtrim(substr($comment_preview, 0, $recent_comment_preview_max_chars)) . '...';
+        }
       ?>
       <div style="padding:10px 0; border-bottom:1px solid #e5e7eb;">
         <div class="row" style="justify-content:space-between; align-items:center;">
@@ -172,12 +168,25 @@ render_header('Home');
             ?>
           </div>
         </div>
-        <div><?= h($comment['body'] ?? '') ?></div>
+        <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><?= h($comment_preview) ?></div>
       </div>
     <?php endforeach; ?>
   <?php else: ?>
     <div class="muted"><?= is_admin() ? 'No recent comments.' : 'No recent comments for your assigned work.' ?></div>
   <?php endif; ?>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0; margin-bottom:8px;">Version</h2>
+  <p class="muted" style="margin-top:0;">
+    v<?= htmlspecialchars($version, ENT_QUOTES, 'UTF-8') ?>
+  </p>
+  <h3 style="margin-bottom:6px;">Changes</h3>
+  <ul style="margin:0; padding-left:18px;">
+    <?php foreach ($changes as $change): ?>
+      <li><?= htmlspecialchars((string)$change, ENT_QUOTES, 'UTF-8') ?></li>
+    <?php endforeach; ?>
+  </ul>
 </div>
 
 <?php render_footer(); ?>
