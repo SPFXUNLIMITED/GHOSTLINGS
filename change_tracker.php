@@ -1,11 +1,10 @@
 <?php
 
 return [
-    'version' => '1.1.3',
+    'version' => '1.1.4',
     'changes' => [
-        '2026-05-18: Updated version and release change notes for today.',
-        '2026-05-18: Temporarily paused session heartbeat while browser tab is hidden to reduce unnecessary ping traffic.',
-        '2026-05-18: Re-enabled session heartbeat while browser tabs are hidden after confirming keep-alive pings are required.',
-        '2026-05-18: Added 401 session-expiry handling in ping.php so inactive sessions are handled gracefully.',
+        '2026-05-18: Excluded archived projects from the time clock clock-in dropdown.',
+        '2026-05-18: Added a pulsing red "Clocked Out" status badge with reduced-motion fallback.',
+        '2026-05-18: Updated version and release change notes for the last 2 days.',
     ],
 ];
