@@ -19,7 +19,7 @@ if (is_admin()) {
     SELECT id, name, description, created_at, bumped_at, priority
     FROM projects
     WHERE playbook = 0 AND archived = 0
-    ORDER BY created_at DESC, id DESC
+    ORDER BY GREATEST(created_at, COALESCE(bumped_at, '1970-01-01')) DESC, id DESC
     LIMIT :limit OFFSET :offset
   ");
   $stmt->bindValue(':limit',  $per_page,    PDO::PARAM_INT);
@@ -67,7 +67,7 @@ if (is_admin()) {
     LEFT JOIN tasks t ON t.project_id = pr.id
     WHERE pr.playbook = 0 AND pr.archived = 0
       AND (pr.owner_id = ? OR (t.assigned_to = ? AND t.assigned_to IS NOT NULL))
-    ORDER BY pr.created_at DESC, pr.id DESC
+    ORDER BY GREATEST(pr.created_at, COALESCE(pr.bumped_at, '1970-01-01')) DESC, pr.id DESC
     LIMIT ? OFFSET ?
   ");
   $stmt->bindValue(1, $uid,          PDO::PARAM_INT);
