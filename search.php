@@ -11,7 +11,8 @@ $playbooks = [];
 $tasks = [];
 
 if ($search !== '') {
-  $like = '%' . $search . '%';
+  $escaped_search = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search);
+  $like = '%' . $escaped_search . '%';
 
   if (is_admin()) {
     $stmt = $pdo->prepare("
@@ -19,7 +20,7 @@ if ($search !== '') {
       FROM projects
       WHERE playbook = 0
         AND archived = 0
-        AND (name LIKE ? OR description LIKE ?)
+        AND (name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')
       ORDER BY created_at DESC, id DESC
       LIMIT ?
     ");
@@ -36,7 +37,7 @@ if ($search !== '') {
       WHERE pr.playbook = 0
         AND pr.archived = 0
         AND (pr.owner_id = ? OR (t.assigned_to = ? AND t.assigned_to IS NOT NULL))
-        AND (pr.name LIKE ? OR pr.description LIKE ?)
+        AND (pr.name LIKE ? ESCAPE '\\' OR pr.description LIKE ? ESCAPE '\\')
       ORDER BY pr.created_at DESC, pr.id DESC
       LIMIT ?
     ");
@@ -54,7 +55,7 @@ if ($search !== '') {
     FROM projects
     WHERE playbook = 1
       AND archived = 0
-      AND (name LIKE ? OR description LIKE ?)
+      AND (name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')
     ORDER BY created_at DESC, id DESC
     LIMIT ?
   ");
@@ -72,7 +73,7 @@ if ($search !== '') {
       FROM tasks t
       JOIN projects p ON p.id = t.project_id
       WHERE p.archived = 0
-        AND (t.title LIKE ? OR COALESCE(t.details, '') LIKE ? OR p.name LIKE ?)
+        AND (t.title LIKE ? ESCAPE '\\' OR COALESCE(t.details, '') LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\')
       ORDER BY t.created_at DESC, t.id DESC
       LIMIT ?
     ");
@@ -91,7 +92,7 @@ if ($search !== '') {
       JOIN projects p ON p.id = t.project_id
       WHERE p.archived = 0
         AND (t.assigned_to = ? OR p.owner_id = ?)
-        AND (t.title LIKE ? OR COALESCE(t.details, '') LIKE ? OR p.name LIKE ?)
+        AND (t.title LIKE ? ESCAPE '\\' OR COALESCE(t.details, '') LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\')
       ORDER BY t.created_at DESC, t.id DESC
       LIMIT ?
     ");
