@@ -135,7 +135,10 @@ render_header('Home');
         $link = ((string)$comment['comment_type'] === 'task')
           ? ('task_details.php?id=' . (int)$comment['item_id'])
           : ('project_details.php?id=' . (int)$comment['item_id']);
-        $comment_preview = trim(preg_replace('/\s+/', ' ', strip_tags((string)($comment['body'] ?? ''))));
+        $comment_preview_raw = strip_tags((string)($comment['body'] ?? ''));
+        $comment_preview_raw = html_entity_decode($comment_preview_raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $comment_preview_raw = str_replace("\xC2\xA0", ' ', $comment_preview_raw);
+        $comment_preview = trim(preg_replace('/\s+/u', ' ', $comment_preview_raw));
         if (function_exists('mb_strlen') && function_exists('mb_substr')) {
           if (mb_strlen($comment_preview, 'UTF-8') > $recent_comment_preview_max_chars) {
             $comment_preview = rtrim(mb_substr($comment_preview, 0, $recent_comment_preview_max_chars, 'UTF-8')) . '...';
