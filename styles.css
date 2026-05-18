@@ -384,13 +384,12 @@ td.col-project-wrap, th.col-project-wrap {
 
 @keyframes clocked-out-flash {
   0%,
-  49% {
+  100% {
     background: #fef2f2;
     color: #991b1b;
     border-color: #fca5a5;
   }
-  50%,
-  100% {
+  50% {
     background: #f3f4f6;
     color: #374151;
     border-color: #d1d5db;
@@ -402,7 +401,7 @@ td.col-project-wrap, th.col-project-wrap {
   color: #991b1b;
   border-color: #fca5a5;
   font-weight: 600;
-  animation: clocked-out-flash 1s step-end infinite;
+  animation: clocked-out-flash 1s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
