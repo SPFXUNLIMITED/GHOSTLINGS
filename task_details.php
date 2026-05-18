@@ -73,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_done']) && (stri
   $stmt = $pdo->prepare("UPDATE tasks SET status = 'done' WHERE id = ?");
   $stmt->execute([$id]);
   $_SESSION['task_mark_done_csrf'] = bin2hex(random_bytes(24));
-  header("Location: task_details.php?id={$id}");
+  header('Location: task_details.php?' . http_build_query(['id' => (int)$id]));
   exit;
 }
 
