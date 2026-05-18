@@ -96,6 +96,15 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Add caption column to task_uploads if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE task_uploads ADD COLUMN caption VARCHAR(255) NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
 // Add is_doc_category column to projects if it does not exist yet
 try {
   $pdo->exec("ALTER TABLE projects ADD COLUMN is_doc_category TINYINT(1) NOT NULL DEFAULT 0");
@@ -144,6 +153,15 @@ $pdo->exec("
     KEY idx_project_uploads_project_id (project_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+// Add caption column to project_uploads if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE project_uploads ADD COLUMN caption VARCHAR(255) NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
 
 // Create time_entries table if it does not exist yet
 $pdo->exec("
