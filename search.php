@@ -9,10 +9,12 @@ $max_results = 25;
 $projects = [];
 $playbooks = [];
 $tasks = [];
+$files = [];
 
 if ($search !== '') {
   $escaped_search = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search);
   $like = '%' . $escaped_search . '%';
+  $uid = (int)current_user_id();
 
   if (is_admin()) {
     $stmt = $pdo->prepare("
@@ -29,7 +31,6 @@ if ($search !== '') {
     $stmt->bindValue(3, $max_results, PDO::PARAM_INT);
     $stmt->execute();
   } else {
-    $uid = (int)current_user_id();
     $stmt = $pdo->prepare("
       SELECT DISTINCT pr.id, pr.name, pr.description, pr.created_at, pr.priority
       FROM projects pr
@@ -83,7 +84,6 @@ if ($search !== '') {
     $stmt->bindValue(4, $max_results, PDO::PARAM_INT);
     $stmt->execute();
   } else {
-    $uid = (int)current_user_id();
     $stmt = $pdo->prepare("
       SELECT
         t.id, t.title, t.status, t.priority, t.created_at,
@@ -105,13 +105,159 @@ if ($search !== '') {
     $stmt->execute();
   }
   $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  if (is_admin()) {
+    $stmt = $pdo->prepare("
+      SELECT
+        'project' AS file_scope,
+        pu.id AS file_id,
+        pu.original_name,
+        pu.caption,
+        pu.created_at,
+        NULL AS task_id,
+        NULL AS task_title,
+        p.id AS project_id,
+        p.name AS project_name
+      FROM project_uploads pu
+      JOIN projects p ON p.id = pu.project_id
+      WHERE p.archived = 0
+        AND (
+          pu.original_name LIKE ? ESCAPE '\\'
+          OR COALESCE(pu.caption, '') LIKE ? ESCAPE '\\'
+          OR p.name LIKE ? ESCAPE '\\'
+        )
+      ORDER BY pu.created_at DESC, pu.id DESC
+      LIMIT ?
+    ");
+    $stmt->bindValue(1, $like, PDO::PARAM_STR);
+    $stmt->bindValue(2, $like, PDO::PARAM_STR);
+    $stmt->bindValue(3, $like, PDO::PARAM_STR);
+    $stmt->bindValue(4, $max_results, PDO::PARAM_INT);
+    $stmt->execute();
+  } else {
+    $stmt = $pdo->prepare("
+      SELECT
+        'project' AS file_scope,
+        pu.id AS file_id,
+        pu.original_name,
+        pu.caption,
+        pu.created_at,
+        NULL AS task_id,
+        NULL AS task_title,
+        p.id AS project_id,
+        p.name AS project_name
+      FROM project_uploads pu
+      JOIN projects p ON p.id = pu.project_id
+      WHERE p.archived = 0
+        AND (
+          p.owner_id = ?
+          OR EXISTS (
+            SELECT 1
+            FROM tasks tx
+            WHERE tx.project_id = p.id
+              AND tx.assigned_to = ?
+          )
+        )
+        AND (
+          pu.original_name LIKE ? ESCAPE '\\'
+          OR COALESCE(pu.caption, '') LIKE ? ESCAPE '\\'
+          OR p.name LIKE ? ESCAPE '\\'
+        )
+      ORDER BY pu.created_at DESC, pu.id DESC
+      LIMIT ?
+    ");
+    $stmt->bindValue(1, $uid, PDO::PARAM_INT);
+    $stmt->bindValue(2, $uid, PDO::PARAM_INT);
+    $stmt->bindValue(3, $like, PDO::PARAM_STR);
+    $stmt->bindValue(4, $like, PDO::PARAM_STR);
+    $stmt->bindValue(5, $like, PDO::PARAM_STR);
+    $stmt->bindValue(6, $max_results, PDO::PARAM_INT);
+    $stmt->execute();
+  }
+  $project_files = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  if (is_admin()) {
+    $stmt = $pdo->prepare("
+      SELECT
+        'task' AS file_scope,
+        tu.id AS file_id,
+        tu.original_name,
+        tu.caption,
+        tu.created_at,
+        t.id AS task_id,
+        t.title AS task_title,
+        p.id AS project_id,
+        p.name AS project_name
+      FROM task_uploads tu
+      JOIN tasks t ON t.id = tu.task_id
+      JOIN projects p ON p.id = t.project_id
+      WHERE p.archived = 0
+        AND (
+          tu.original_name LIKE ? ESCAPE '\\'
+          OR COALESCE(tu.caption, '') LIKE ? ESCAPE '\\'
+          OR t.title LIKE ? ESCAPE '\\'
+          OR p.name LIKE ? ESCAPE '\\'
+        )
+      ORDER BY tu.created_at DESC, tu.id DESC
+      LIMIT ?
+    ");
+    $stmt->bindValue(1, $like, PDO::PARAM_STR);
+    $stmt->bindValue(2, $like, PDO::PARAM_STR);
+    $stmt->bindValue(3, $like, PDO::PARAM_STR);
+    $stmt->bindValue(4, $like, PDO::PARAM_STR);
+    $stmt->bindValue(5, $max_results, PDO::PARAM_INT);
+    $stmt->execute();
+  } else {
+    $stmt = $pdo->prepare("
+      SELECT
+        'task' AS file_scope,
+        tu.id AS file_id,
+        tu.original_name,
+        tu.caption,
+        tu.created_at,
+        t.id AS task_id,
+        t.title AS task_title,
+        p.id AS project_id,
+        p.name AS project_name
+      FROM task_uploads tu
+      JOIN tasks t ON t.id = tu.task_id
+      JOIN projects p ON p.id = t.project_id
+      WHERE p.archived = 0
+        AND (t.assigned_to = ? OR p.owner_id = ?)
+        AND (
+          tu.original_name LIKE ? ESCAPE '\\'
+          OR COALESCE(tu.caption, '') LIKE ? ESCAPE '\\'
+          OR t.title LIKE ? ESCAPE '\\'
+          OR p.name LIKE ? ESCAPE '\\'
+        )
+      ORDER BY tu.created_at DESC, tu.id DESC
+      LIMIT ?
+    ");
+    $stmt->bindValue(1, $uid, PDO::PARAM_INT);
+    $stmt->bindValue(2, $uid, PDO::PARAM_INT);
+    $stmt->bindValue(3, $like, PDO::PARAM_STR);
+    $stmt->bindValue(4, $like, PDO::PARAM_STR);
+    $stmt->bindValue(5, $like, PDO::PARAM_STR);
+    $stmt->bindValue(6, $like, PDO::PARAM_STR);
+    $stmt->bindValue(7, $max_results, PDO::PARAM_INT);
+    $stmt->execute();
+  }
+  $task_files = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  $files = array_merge($project_files, $task_files);
+  usort($files, static function (array $a, array $b): int {
+    return strcmp((string)($b['created_at'] ?? ''), (string)($a['created_at'] ?? ''));
+  });
+  if (count($files) > $max_results) {
+    $files = array_slice($files, 0, $max_results);
+  }
 }
 
 render_header('Search');
 ?>
 <div class="card">
   <h1 style="margin:0 0 8px;">Search</h1>
-  <p class="muted" style="margin:0;">Search projects, playbooks, and tasks.</p>
+  <p class="muted" style="margin:0;">Search projects, playbooks, tasks, and files.</p>
 </div>
 
 <div class="card">
@@ -120,8 +266,8 @@ render_header('Search');
       type="text"
       name="q"
       value="<?= h($search) ?>"
-      placeholder="Search projects, playbooks, tasks..."
-      aria-label="Search projects, playbooks, and tasks"
+      placeholder="Search projects, playbooks, tasks, files..."
+      aria-label="Search projects, playbooks, tasks, and files"
     />
     <button type="submit" class="btn primary">Search</button>
     <?php if ($search !== ''): ?>
@@ -234,6 +380,56 @@ render_header('Search');
                     <a class="btn" href="project_details.php?id=<?= (int)$task['project_id'] ?>">Project</a>
                   <?php endif; ?>
                 </div>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0;">Files</h2>
+    <?php if (!$files): ?>
+      <div class="muted">No matching files found.</div>
+    <?php else: ?>
+      <table class="table-auto">
+        <thead>
+          <tr>
+            <th>File</th>
+            <th class="col-status">Location</th>
+            <th class="col-status">Uploaded</th>
+            <th class="col-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($files as $file): ?>
+            <?php
+              $is_task_file = (string)($file['file_scope'] ?? '') === 'task';
+              $open_href = $is_task_file
+                ? 'task_details.php?id=' . (int)($file['task_id'] ?? 0) . '#task-files'
+                : 'project_details.php?id=' . (int)($file['project_id'] ?? 0) . '#project-files';
+            ?>
+            <tr>
+              <td>
+                <strong><?= h($file['original_name'] ?? '') ?></strong><br>
+                <?php if (!empty($file['caption'])): ?>
+                  <span class="muted"><?= h($file['caption']) ?></span>
+                <?php else: ?>
+                  <span class="muted">—</span>
+                <?php endif; ?>
+              </td>
+              <td class="col-status">
+                <?= h($file['project_name'] ?? '') ?>
+                <?php if ($is_task_file): ?>
+                  <br><span class="muted">Task: <?= h($file['task_title'] ?? '') ?></span>
+                <?php else: ?>
+                  <br><span class="muted">Project file</span>
+                <?php endif; ?>
+              </td>
+              <td class="col-status"><?= h($file['created_at'] ?? '') ?></td>
+              <td class="col-actions">
+                <a class="btn" href="<?= h($open_href) ?>">Open</a>
               </td>
             </tr>
           <?php endforeach; ?>

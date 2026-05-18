@@ -109,22 +109,6 @@ function render_header(string $title): void {
 			<?php endif; ?>
 		  </div>
 
-      <?php if ($show_global_search): ?>
-        <form method="get" action="search.php" class="topbar-search" role="search">
-          <input
-            type="text"
-            name="q"
-            value="<?= h($header_search_query) ?>"
-            placeholder="Search projects, playbooks, tasks..."
-            aria-label="Search projects, playbooks, and tasks"
-          />
-          <button type="submit" class="btn">Search</button>
-        </form>
-      <?php endif; ?>
-
-
-
-
 		<!-- START TIME (under Login/Logout) -->
 		<?php
 		  $tz = new DateTimeZone('America/Los_Angeles');
@@ -166,6 +150,19 @@ function render_header(string $title): void {
 		  })();
 		</script>
 		<!-- END TIME -->
+
+      <?php if ($show_global_search): ?>
+        <form method="get" action="search.php" class="topbar-search" role="search">
+          <input
+            type="text"
+            name="q"
+            value="<?= h($header_search_query) ?>"
+            placeholder="Search projects, playbooks, tasks, files..."
+            aria-label="Search projects, playbooks, tasks, and files"
+          />
+          <button type="submit" class="btn">Search</button>
+        </form>
+      <?php endif; ?>
 	  </div>
 	</div>
 
