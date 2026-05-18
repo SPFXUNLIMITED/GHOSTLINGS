@@ -89,7 +89,8 @@ render_header('Home');
 <div class="card">
   <h2 style="margin-top:0; margin-bottom:8px;">Recent Comments</h2>
   <?php if ($recent_comments): ?>
-    <?php $new_cutoff = time() - 86400; ?>
+    <?php $new_badge_duration_seconds = 24 * 60 * 60; ?>
+    <?php $new_cutoff = time() - $new_badge_duration_seconds; ?>
     <?php foreach ($recent_comments as $comment): ?>
       <?php
         $created_ts = !empty($comment['created_at']) ? strtotime((string)$comment['created_at']) : false;
@@ -122,7 +123,7 @@ render_header('Home');
             ?>
           </div>
         </div>
-        <div><?= $comment['body'] ?? '' ?></div>
+        <div><?= h($comment['body'] ?? '') ?></div>
       </div>
     <?php endforeach; ?>
   <?php else: ?>
