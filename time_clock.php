@@ -11,13 +11,14 @@ $success = '';
 
 // ── Fetch projects for the manual-entry dropdown ──────────────────────────
 if (is_admin()) {
-  $projects = $pdo->query("SELECT id, name FROM projects WHERE playbook = 0 ORDER BY name ASC")->fetchAll();
+  $projects = $pdo->query("SELECT id, name FROM projects WHERE playbook = 0 AND archived = 0 ORDER BY name ASC")->fetchAll();
 } else {
   $proj_stmt = $pdo->prepare("
     SELECT DISTINCT p.id, p.name
     FROM projects p
     LEFT JOIN tasks t ON t.project_id = p.id AND t.assigned_to = ?
     WHERE p.playbook = 0
+      AND p.archived = 0
       AND (p.owner_id = ? OR t.id IS NOT NULL)
     ORDER BY p.name ASC
   ");
