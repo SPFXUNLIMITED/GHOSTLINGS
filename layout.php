@@ -56,6 +56,22 @@ function render_header(string $title): void {
     session_start();
   }
   $username = $_SESSION['username'] ?? null;
+  $clock_status_badge = '';
+  $user_id = (int)($_SESSION['user_id'] ?? 0);
+  global $pdo;
+  if ($user_id > 0 && isset($pdo) && $pdo instanceof PDO) {
+    $open_stmt = $pdo->prepare("
+      SELECT id
+      FROM time_entries
+      WHERE user_id = ? AND clock_out IS NULL AND hours_override IS NULL
+      ORDER BY clock_in DESC
+      LIMIT 1
+    ");
+    $open_stmt->execute([$user_id]);
+    $clock_status_badge = $open_stmt->fetch()
+      ? '<span class="badge clocked-in">● Clocked In</span>'
+      : '<span class="badge clocked-out">○ Clocked Out</span>';
+  }
 ?>
 <!doctype html>
 <html lang="en">
@@ -80,6 +96,7 @@ function render_header(string $title): void {
 		<div class="actions">
 		  <div class="row" style="justify-content:flex-end; align-items:center;">
 			<?php if ($username): ?>
+              <?= $clock_status_badge ?>
 			  <span class="muted">Signed in as <strong><?= h($username) ?></strong></span>
 			  <a class="btn" href="logout.php">Logout</a>
 			<?php else: ?>

@@ -189,11 +189,6 @@ render_header('Time Clock');
 <div class="card">
   <div class="row" style="justify-content:space-between; align-items:center;">
     <h1 style="margin:0;">Time Clock</h1>
-    <?php if ($open_entry): ?>
-      <span class="badge clocked-in">● Clocked In</span>
-    <?php else: ?>
-      <span class="badge clocked-out">○ Clocked Out</span>
-    <?php endif; ?>
   </div>
   <p class="muted">Clock in and out, log manual entries, and review your time.</p>
 </div>
