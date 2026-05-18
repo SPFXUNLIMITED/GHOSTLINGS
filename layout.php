@@ -58,8 +58,9 @@ function render_header(string $title): void {
   $username = $_SESSION['username'] ?? null;
   $clock_status_badge = '';
   $user_id = (int)($_SESSION['user_id'] ?? 0);
-  if ($user_id > 0 && isset($GLOBALS['pdo']) && $GLOBALS['pdo'] instanceof PDO) {
-    $open_stmt = $GLOBALS['pdo']->prepare("
+  global $pdo;
+  if ($user_id > 0 && isset($pdo) && $pdo instanceof PDO) {
+    $open_stmt = $pdo->prepare("
       SELECT id
       FROM time_entries
       WHERE user_id = ? AND clock_out IS NULL AND hours_override IS NULL
