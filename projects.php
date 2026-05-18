@@ -6,6 +6,7 @@ require __DIR__ . '/auth.php';
 require_login();
 
 $per_page   = 15;
+$day_in_seconds = 86400;
 $proj_page  = max(1, (int)($_GET['proj_page']  ?? 1));
 $task_page  = max(1, (int)($_GET['task_page']  ?? 1));
 $proj_offset = ($proj_page - 1) * $per_page;
@@ -152,11 +153,11 @@ $project_desc_max_length = 50;
               $project_description = mb_substr($project_description, 0, $project_desc_max_length) . '...';
             }
             $project_created = '';
-            $project_is_new = false;
+            $project_is_recent = false;
             if (!empty($p['created_at'])) {
               $project_created_dt = new DateTime($p['created_at'], new DateTimeZone('America/Los_Angeles'));
               $project_created = $project_created_dt->format('m-d-Y g:i A');
-              $project_is_new = (time() - $project_created_dt->getTimestamp()) < 86400;
+               $project_is_recent = (time() - $project_created_dt->getTimestamp()) < $day_in_seconds;
             }
             if ($project_created === '') {
               $project_created = '—';
@@ -167,7 +168,7 @@ $project_desc_max_length = 50;
               data-created-at="<?= h($p['created_at']) ?>">
             <td>
               <span class="name-with-badge">
-                <?php if ($project_is_new): ?><span class="badge new">New</span><?php endif; ?>
+                <?php if ($project_is_recent): ?><span class="badge new">Bumped</span><?php endif; ?>
                 <strong><?= h($p['name']) ?></strong>
               </span>
             </td>
@@ -230,7 +231,7 @@ $project_desc_max_length = 50;
             if (!empty($t['created_at'])) {
               $task_created_dt = new DateTime($t['created_at'], new DateTimeZone('America/Los_Angeles'));
               $task_created = $task_created_dt->format('m-d-Y g:i A');
-              $task_is_new = (time() - $task_created_dt->getTimestamp()) < 86400;
+              $task_is_new = (time() - $task_created_dt->getTimestamp()) < $day_in_seconds;
             }
             if ($task_created === '') {
               $task_created = '—';
