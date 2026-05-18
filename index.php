@@ -18,56 +18,100 @@ $new_cutoff = time() - $new_badge_duration_seconds;
 $uid = current_user_id();
 if ($uid !== null) {
     $recent_comments_limit = max(1, (int)$recent_comments_limit);
-    $stmt = $pdo->prepare("
-      SELECT
-        x.comment_type,
-        x.comment_id,
-        x.item_id,
-        x.item_title,
-        x.project_name,
-        x.body,
-        x.created_at
-      FROM (
-        SELECT
-          'task' AS comment_type,
-          tc.id AS comment_id,
-          t.id AS item_id,
-          t.title AS item_title,
-          p.name AS project_name,
-          tc.body,
-          tc.created_at
-        FROM task_comments tc
-        JOIN tasks t ON t.id = tc.task_id
-        JOIN projects p ON p.id = t.project_id
-        WHERE t.assigned_to = ?
-          AND p.archived = 0
+    if (is_admin()) {
+        $stmt = $pdo->prepare("
+          SELECT
+            x.comment_type,
+            x.comment_id,
+            x.item_id,
+            x.item_title,
+            x.project_name,
+            x.body,
+            x.created_at
+          FROM (
+            SELECT
+              'task' AS comment_type,
+              tc.id AS comment_id,
+              t.id AS item_id,
+              t.title AS item_title,
+              p.name AS project_name,
+              tc.body,
+              tc.created_at
+            FROM task_comments tc
+            JOIN tasks t ON t.id = tc.task_id
+            JOIN projects p ON p.id = t.project_id
+            WHERE p.archived = 0
 
-        UNION ALL
+            UNION ALL
 
-        SELECT
-          'project' AS comment_type,
-          pc.id AS comment_id,
-          p.id AS item_id,
-          p.name AS item_title,
-          p.name AS project_name,
-          pc.body,
-          pc.created_at
-        FROM project_comments pc
-        JOIN projects p ON p.id = pc.project_id
-        WHERE p.archived = 0
-          AND EXISTS (
-            SELECT 1
-            FROM tasks tx
-            WHERE tx.project_id = p.id
-              AND tx.assigned_to = ?
-          )
-      ) x
-      ORDER BY x.created_at DESC, x.comment_id DESC
-      LIMIT ?
-    ");
-    $stmt->bindValue(1, (int)$uid, PDO::PARAM_INT);
-    $stmt->bindValue(2, (int)$uid, PDO::PARAM_INT);
-    $stmt->bindValue(3, $recent_comments_limit, PDO::PARAM_INT);
+            SELECT
+              'project' AS comment_type,
+              pc.id AS comment_id,
+              p.id AS item_id,
+              p.name AS item_title,
+              p.name AS project_name,
+              pc.body,
+              pc.created_at
+            FROM project_comments pc
+            JOIN projects p ON p.id = pc.project_id
+            WHERE p.archived = 0
+          ) x
+          ORDER BY x.created_at DESC, x.comment_id DESC
+          LIMIT ?
+        ");
+        $stmt->bindValue(1, $recent_comments_limit, PDO::PARAM_INT);
+    } else {
+        $stmt = $pdo->prepare("
+          SELECT
+            x.comment_type,
+            x.comment_id,
+            x.item_id,
+            x.item_title,
+            x.project_name,
+            x.body,
+            x.created_at
+          FROM (
+            SELECT
+              'task' AS comment_type,
+              tc.id AS comment_id,
+              t.id AS item_id,
+              t.title AS item_title,
+              p.name AS project_name,
+              tc.body,
+              tc.created_at
+            FROM task_comments tc
+            JOIN tasks t ON t.id = tc.task_id
+            JOIN projects p ON p.id = t.project_id
+            WHERE t.assigned_to = ?
+              AND p.archived = 0
+
+            UNION ALL
+
+            SELECT
+              'project' AS comment_type,
+              pc.id AS comment_id,
+              p.id AS item_id,
+              p.name AS item_title,
+              p.name AS project_name,
+              pc.body,
+              pc.created_at
+            FROM project_comments pc
+            JOIN projects p ON p.id = pc.project_id
+            WHERE p.archived = 0
+              AND EXISTS (
+                SELECT 1
+                FROM tasks tx
+                WHERE tx.project_id = p.id
+                  AND tx.assigned_to = ?
+              )
+          ) x
+          ORDER BY x.created_at DESC, x.comment_id DESC
+          LIMIT ?
+        ");
+        $stmt->bindValue(1, (int)$uid, PDO::PARAM_INT);
+        $stmt->bindValue(2, (int)$uid, PDO::PARAM_INT);
+        $stmt->bindValue(3, $recent_comments_limit, PDO::PARAM_INT);
+    }
     $stmt->execute();
     $recent_comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
@@ -132,7 +176,7 @@ render_header('Home');
       </div>
     <?php endforeach; ?>
   <?php else: ?>
-    <div class="muted">No recent comments for your assigned work.</div>
+    <div class="muted"><?= is_admin() ? 'No recent comments.' : 'No recent comments for your assigned work.' ?></div>
   <?php endif; ?>
 </div>
 
