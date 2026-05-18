@@ -84,12 +84,20 @@ if ($search !== '') {
     $stmt->execute();
   } else {
     $stmt = $pdo->prepare("
-      SELECT DISTINCT pr.id, pr.name, pr.description, pr.created_at, pr.priority
+      SELECT pr.id, pr.name, pr.description, pr.created_at, pr.priority
       FROM projects pr
-      LEFT JOIN tasks t ON t.project_id = pr.id
       WHERE pr.is_doc_category = 1
         AND pr.archived = 0
-        AND (pr.owner_id = ? OR (t.assigned_to = ? AND t.assigned_to IS NOT NULL))
+        AND (
+          pr.owner_id = ?
+          OR EXISTS (
+            SELECT 1
+            FROM tasks t
+            WHERE t.project_id = pr.id
+              AND t.assigned_to = ?
+              AND t.assigned_to IS NOT NULL
+          )
+        )
         AND (pr.name LIKE ? ESCAPE '!' OR pr.description LIKE ? ESCAPE '!')
       ORDER BY pr.created_at DESC, pr.id DESC
       LIMIT ?
