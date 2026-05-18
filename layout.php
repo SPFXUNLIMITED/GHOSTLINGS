@@ -157,8 +157,8 @@ function render_header(string $title): void {
             type="text"
             name="q"
             value="<?= h($header_search_query) ?>"
-            placeholder="Search projects, playbooks, tasks, files..."
-            aria-label="Search projects, playbooks, tasks, and files"
+            placeholder="Search projects, playbooks, documents, tasks, files..."
+            aria-label="Search projects, playbooks, documents, tasks, and files"
           />
           <button type="submit" class="btn">Search</button>
         </form>
