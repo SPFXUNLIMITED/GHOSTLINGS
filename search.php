@@ -208,7 +208,6 @@ if ($search !== '') {
     $stmt->bindValue(5, $max_results, PDO::PARAM_INT);
     $stmt->execute();
   } else {
-    $uid = (int)current_user_id();
     $stmt = $pdo->prepare("
       SELECT
         'task' AS file_scope,
