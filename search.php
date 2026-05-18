@@ -14,6 +14,7 @@ $files = [];
 if ($search !== '') {
   $escaped_search = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search);
   $like = '%' . $escaped_search . '%';
+  $uid = (int)current_user_id();
 
   if (is_admin()) {
     $stmt = $pdo->prepare("
@@ -30,7 +31,6 @@ if ($search !== '') {
     $stmt->bindValue(3, $max_results, PDO::PARAM_INT);
     $stmt->execute();
   } else {
-    $uid = (int)current_user_id();
     $stmt = $pdo->prepare("
       SELECT DISTINCT pr.id, pr.name, pr.description, pr.created_at, pr.priority
       FROM projects pr
@@ -84,7 +84,6 @@ if ($search !== '') {
     $stmt->bindValue(4, $max_results, PDO::PARAM_INT);
     $stmt->execute();
   } else {
-    $uid = (int)current_user_id();
     $stmt = $pdo->prepare("
       SELECT
         t.id, t.title, t.status, t.priority, t.created_at,
@@ -136,7 +135,6 @@ if ($search !== '') {
     $stmt->bindValue(4, $max_results, PDO::PARAM_INT);
     $stmt->execute();
   } else {
-    $uid = (int)current_user_id();
     $stmt = $pdo->prepare("
       SELECT
         'project' AS file_scope,
