@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bump_project'])) {
     exit('Invalid request token.');
   }
 
-  $bump_stmt = $pdo->prepare("UPDATE projects SET created_at = NOW() WHERE id = ? AND playbook = 0 AND archived = 0");
+  $bump_stmt = $pdo->prepare("UPDATE projects SET created_at = NOW() WHERE id = ?");
   $bump_stmt->execute([$id]);
 
   $_SESSION['project_bump_csrf'] = bin2hex(random_bytes(24));
@@ -151,7 +151,7 @@ render_header('Project Details');
       <a class="btn" href="project_form.php?id=<?= (int)$project['id'] ?>">Edit</a>
       <a class="btn" href="project_archive.php?id=<?= (int)$project['id'] ?>&action=archive"
          onclick="return confirm('Archive this project?');">Archive</a>
-      <form method="post" style="margin:0;">
+      <form method="post" class="inline-form">
         <input type="hidden" name="csrf_token" value="<?= h($_SESSION['project_bump_csrf']) ?>">
         <button class="btn" type="submit" name="bump_project" value="1">Bump</button>
       </form>
@@ -253,6 +253,7 @@ render_header('Project Details');
 </div>
 
 <style>
+  .inline-form{margin:0;}
   .thumb-grid{display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:12px;}
   .thumb{border:1px solid rgba(0,0,0,.08); border-radius:12px; overflow:hidden; background:#fff;}
   .thumb .preview{height:150px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.03);}
