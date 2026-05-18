@@ -12,7 +12,7 @@ $tasks = [];
 $files = [];
 
 if ($search !== '') {
-  $escaped_search = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search);
+  $escaped_search = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search);
   $like = '%' . $escaped_search . '%';
   $uid = (int)current_user_id();
 
@@ -22,7 +22,7 @@ if ($search !== '') {
       FROM projects
       WHERE playbook = 0
         AND archived = 0
-        AND (name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')
+        AND (name LIKE ? ESCAPE '!' OR description LIKE ? ESCAPE '!')
       ORDER BY created_at DESC, id DESC
       LIMIT ?
     ");
@@ -38,7 +38,7 @@ if ($search !== '') {
       WHERE pr.playbook = 0
         AND pr.archived = 0
         AND (pr.owner_id = ? OR (t.assigned_to = ? AND t.assigned_to IS NOT NULL))
-        AND (pr.name LIKE ? ESCAPE '\\' OR pr.description LIKE ? ESCAPE '\\')
+        AND (pr.name LIKE ? ESCAPE '!' OR pr.description LIKE ? ESCAPE '!')
       ORDER BY pr.created_at DESC, pr.id DESC
       LIMIT ?
     ");
@@ -56,7 +56,7 @@ if ($search !== '') {
     FROM projects
     WHERE playbook = 1
       AND archived = 0
-      AND (name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')
+      AND (name LIKE ? ESCAPE '!' OR description LIKE ? ESCAPE '!')
     ORDER BY created_at DESC, id DESC
     LIMIT ?
   ");
@@ -74,7 +74,7 @@ if ($search !== '') {
       FROM tasks t
       JOIN projects p ON p.id = t.project_id
       WHERE p.archived = 0
-        AND (t.title LIKE ? ESCAPE '\\' OR COALESCE(t.details, '') LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\')
+        AND (t.title LIKE ? ESCAPE '!' OR COALESCE(t.details, '') LIKE ? ESCAPE '!' OR p.name LIKE ? ESCAPE '!')
       ORDER BY t.created_at DESC, t.id DESC
       LIMIT ?
     ");
@@ -92,7 +92,7 @@ if ($search !== '') {
       JOIN projects p ON p.id = t.project_id
       WHERE p.archived = 0
         AND (t.assigned_to = ? OR p.owner_id = ?)
-        AND (t.title LIKE ? ESCAPE '\\' OR COALESCE(t.details, '') LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\')
+        AND (t.title LIKE ? ESCAPE '!' OR COALESCE(t.details, '') LIKE ? ESCAPE '!' OR p.name LIKE ? ESCAPE '!')
       ORDER BY t.created_at DESC, t.id DESC
       LIMIT ?
     ");
@@ -122,9 +122,9 @@ if ($search !== '') {
       JOIN projects p ON p.id = pu.project_id
       WHERE p.archived = 0
         AND (
-          pu.original_name LIKE ? ESCAPE '\\'
-          OR COALESCE(pu.caption, '') LIKE ? ESCAPE '\\'
-          OR p.name LIKE ? ESCAPE '\\'
+          pu.original_name LIKE ? ESCAPE '!'
+          OR COALESCE(pu.caption, '') LIKE ? ESCAPE '!'
+          OR p.name LIKE ? ESCAPE '!'
         )
       ORDER BY pu.created_at DESC, pu.id DESC
       LIMIT ?
@@ -159,9 +159,9 @@ if ($search !== '') {
           )
         )
         AND (
-          pu.original_name LIKE ? ESCAPE '\\'
-          OR COALESCE(pu.caption, '') LIKE ? ESCAPE '\\'
-          OR p.name LIKE ? ESCAPE '\\'
+          pu.original_name LIKE ? ESCAPE '!'
+          OR COALESCE(pu.caption, '') LIKE ? ESCAPE '!'
+          OR p.name LIKE ? ESCAPE '!'
         )
       ORDER BY pu.created_at DESC, pu.id DESC
       LIMIT ?
@@ -193,10 +193,10 @@ if ($search !== '') {
       JOIN projects p ON p.id = t.project_id
       WHERE p.archived = 0
         AND (
-          tu.original_name LIKE ? ESCAPE '\\'
-          OR COALESCE(tu.caption, '') LIKE ? ESCAPE '\\'
-          OR t.title LIKE ? ESCAPE '\\'
-          OR p.name LIKE ? ESCAPE '\\'
+          tu.original_name LIKE ? ESCAPE '!'
+          OR COALESCE(tu.caption, '') LIKE ? ESCAPE '!'
+          OR t.title LIKE ? ESCAPE '!'
+          OR p.name LIKE ? ESCAPE '!'
         )
       ORDER BY tu.created_at DESC, tu.id DESC
       LIMIT ?
@@ -225,10 +225,10 @@ if ($search !== '') {
       WHERE p.archived = 0
         AND (t.assigned_to = ? OR p.owner_id = ?)
         AND (
-          tu.original_name LIKE ? ESCAPE '\\'
-          OR COALESCE(tu.caption, '') LIKE ? ESCAPE '\\'
-          OR t.title LIKE ? ESCAPE '\\'
-          OR p.name LIKE ? ESCAPE '\\'
+          tu.original_name LIKE ? ESCAPE '!'
+          OR COALESCE(tu.caption, '') LIKE ? ESCAPE '!'
+          OR t.title LIKE ? ESCAPE '!'
+          OR p.name LIKE ? ESCAPE '!'
         )
       ORDER BY tu.created_at DESC, tu.id DESC
       LIMIT ?
