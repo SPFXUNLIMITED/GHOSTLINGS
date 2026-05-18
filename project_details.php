@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bump_project'])) {
     exit('Invalid request token.');
   }
 
-  $bump_stmt = $pdo->prepare("UPDATE projects SET created_at = NOW() WHERE id = ?");
+  $bump_stmt = $pdo->prepare("UPDATE projects SET bumped_at = NOW() WHERE id = ?");
   $bump_stmt->execute([$id]);
 
   $_SESSION['project_bump_csrf'] = bin2hex(random_bytes(24));
