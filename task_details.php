@@ -226,7 +226,7 @@ render_header('Task Details');
 </div>
 
 <style>
-  .inline-form{margin:0;}
+  .inline-form { margin: 0; }
   .thumb-grid{display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:12px;}
   .thumb{border:1px solid rgba(0,0,0,.08); border-radius:12px; overflow:hidden; background:#fff;}
   .thumb .preview{height:150px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.03);}
