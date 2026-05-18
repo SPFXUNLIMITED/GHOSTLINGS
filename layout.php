@@ -301,6 +301,13 @@ function render_footer(): void {
     });
 
     resetTimer();
+
+    // Session keep-alive: ping the server every 10 minutes so the PHP session
+    // does not expire while the user has this tab open.
+    setInterval(function () {
+      fetch('ping.php', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .catch(function () { /* ignore network errors */ });
+    }, 10 * 60 * 1000);
   })();
   </script>
 <?php endif; ?>
