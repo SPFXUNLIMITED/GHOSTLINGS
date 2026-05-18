@@ -14,8 +14,10 @@ require_login();
 $recent_comments = [];
 $recent_comments_limit = 100;
 $new_badge_duration_seconds = 24 * 60 * 60;
+$new_cutoff = time() - $new_badge_duration_seconds;
 $uid = current_user_id();
 if ($uid !== null) {
+    $recent_comments_limit = max(1, (int)$recent_comments_limit);
     $stmt = $pdo->prepare("
       SELECT
         x.comment_type,
@@ -61,9 +63,12 @@ if ($uid !== null) {
           )
       ) x
       ORDER BY x.created_at DESC, x.comment_id DESC
-      LIMIT {$recent_comments_limit}
+      LIMIT ?
     ");
-    $stmt->execute([$uid, $uid]);
+    $stmt->bindValue(1, (int)$uid, PDO::PARAM_INT);
+    $stmt->bindValue(2, (int)$uid, PDO::PARAM_INT);
+    $stmt->bindValue(3, $recent_comments_limit, PDO::PARAM_INT);
+    $stmt->execute();
     $recent_comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
@@ -91,7 +96,6 @@ render_header('Home');
 <div class="card">
   <h2 style="margin-top:0; margin-bottom:8px;">Recent Comments</h2>
   <?php if ($recent_comments): ?>
-    <?php $new_cutoff = time() - $new_badge_duration_seconds; ?>
     <?php foreach ($recent_comments as $comment): ?>
       <?php
         $created_ts = !empty($comment['created_at']) ? strtotime((string)$comment['created_at']) : false;
