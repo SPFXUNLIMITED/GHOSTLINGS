@@ -401,7 +401,7 @@ td.col-project-wrap, th.col-project-wrap {
   color: #991b1b;
   border-color: #fca5a5;
   font-weight: 600;
-  animation: clocked-out-flash 1s linear infinite;
+  animation: clocked-out-flash 2s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
