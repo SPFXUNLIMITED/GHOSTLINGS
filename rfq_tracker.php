@@ -50,6 +50,42 @@ function is_safe_stored_upload_name(string $name): bool {
   return (bool)preg_match('/^[a-zA-Z0-9._-]+$/', $name);
 }
 
+function sanitize_upload_original_name(string $name): string {
+  $name = trim($name);
+  $name = preg_replace('/[\x00-\x1F\x7F]+/u', '', $name) ?? '';
+  $name = str_replace(['\\', '/'], '_', $name);
+  $name = preg_replace('/\s+/', ' ', $name) ?? '';
+  if ($name === '') {
+    return 'quote-file';
+  }
+  if (mb_strlen($name) > 255) {
+    return mb_substr($name, 0, 255);
+  }
+  return $name;
+}
+
+function allowed_quote_upload_extensions(): array {
+  return ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'zip'];
+}
+
+function allowed_quote_upload_mime_types(): array {
+  return [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/csv',
+    'text/plain',
+    'image/png',
+    'image/jpeg',
+    'image/gif',
+    'image/webp',
+    'application/zip',
+    'application/x-zip-compressed',
+  ];
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
   if (empty($_SESSION['rfq_tracker_csrf']) || !hash_equals((string)$_SESSION['rfq_tracker_csrf'], $submitted_csrf)) {
@@ -138,17 +174,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
           if ($has_quote_file) {
             $uploads_dir = __DIR__ . '/uploads';
-            if (!is_dir($uploads_dir)) {
-              @mkdir($uploads_dir, 0775, true);
+            if (!is_dir($uploads_dir) && !mkdir($uploads_dir, 0775, true) && !is_dir($uploads_dir)) {
+              $errors[] = 'Failed to create uploads directory.';
             }
             if (!is_dir($uploads_dir) || !is_writable($uploads_dir)) {
               $errors[] = 'Uploads directory is missing or not writable.';
             } else {
-              $quote_file_original_name = (string)($quote_file['name'] ?? 'quote-file');
+              $quote_file_original_name = sanitize_upload_original_name((string)($quote_file['name'] ?? 'quote-file'));
               $tmp_path = (string)($quote_file['tmp_name'] ?? '');
               $quote_file_size_bytes = (int)($quote_file['size'] ?? 0);
               if ($quote_file_size_bytes < 0) {
                 $quote_file_size_bytes = 0;
+              }
+
+              $ext_raw = '';
+              $dot = strrpos($quote_file_original_name, '.');
+              if ($dot !== false) {
+                $ext_raw = strtolower(substr($quote_file_original_name, $dot + 1));
+                $ext_raw = preg_replace('/[^a-z0-9]+/i', '', $ext_raw) ?? '';
+              }
+              if ($ext_raw === '' || !in_array($ext_raw, allowed_quote_upload_extensions(), true)) {
+                $errors[] = 'Unsupported quote file type.';
               }
 
               if (is_file($tmp_path) && function_exists('finfo_open')) {
@@ -158,26 +204,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   finfo_close($fi);
                 }
               }
-
-              $ext = '';
-              $dot = strrpos($quote_file_original_name, '.');
-              if ($dot !== false) {
-                $ext = strtolower(substr($quote_file_original_name, $dot + 1));
-                $ext = preg_replace('/[^a-z0-9]+/i', '', $ext);
-                if ($ext !== '') {
-                  $ext = '.' . $ext;
-                }
+              if ($quote_file_mime_type === null || !in_array($quote_file_mime_type, allowed_quote_upload_mime_types(), true)) {
+                $errors[] = 'Unsupported quote file MIME type.';
               }
 
-              $quote_file_stored_name = 'rfq' . $rfq_id . '_' . bin2hex(random_bytes(16)) . $ext;
-              $dest_path = $uploads_dir . '/' . $quote_file_stored_name;
-
-              if (!move_uploaded_file($tmp_path, $dest_path)) {
-                $errors[] = 'Failed to save uploaded quote file.';
+              $ext = '';
+              if ($ext_raw !== '') {
+                $ext = '.' . $ext_raw;
+              }
+              if ($errors) {
                 $quote_file_original_name = null;
                 $quote_file_stored_name = null;
                 $quote_file_mime_type = null;
                 $quote_file_size_bytes = null;
+              } else {
+                $quote_file_stored_name = 'rfq' . $rfq_id . '_' . bin2hex(random_bytes(16)) . $ext;
+                $dest_path = $uploads_dir . '/' . $quote_file_stored_name;
+
+                if (!move_uploaded_file($tmp_path, $dest_path)) {
+                  $errors[] = 'Failed to save uploaded quote file.';
+                  $quote_file_original_name = null;
+                  $quote_file_stored_name = null;
+                  $quote_file_mime_type = null;
+                  $quote_file_size_bytes = null;
+                }
               }
             }
           }
@@ -511,11 +561,11 @@ render_header('RFQ Tracker');
                   $file_name = (string)($q['quote_file_stored_name'] ?? '');
                   $file_url = '';
                   if ($file_name !== '' && is_safe_stored_upload_name($file_name)) {
-                    $file_url = 'uploads/' . $file_name;
+                    $file_url = 'rfq_quote_file.php?quote_id=' . (int)$q['id'];
                   }
                 ?>
                 <?php if ($file_url !== ''): ?>
-                  <a class="btn" href="<?= h($file_url) ?>" target="_blank" rel="noopener">Open</a><br>
+                  <a class="btn" href="<?= h($file_url) ?>" target="_blank" rel="noopener noreferrer">Open</a><br>
                   <span class="muted" style="font-size:12px;">
                     <?= h((string)($q['quote_file_original_name'] ?? 'Attachment')) ?>
                   </span>

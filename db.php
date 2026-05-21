@@ -341,6 +341,7 @@ foreach ([
   try {
     $pdo->exec($sql);
   } catch (PDOException $e) {
+    // 42S21 = SQLSTATE duplicate column name (column already exists)
     if ($e->getCode() !== '42S21') {
       throw $e;
     }
