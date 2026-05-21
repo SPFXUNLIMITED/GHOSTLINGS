@@ -333,7 +333,7 @@ render_header('RFQ Tracker');
         <input type="text" name="shipping_method" maxlength="100" placeholder="e.g. Sea freight / Air cargo" />
       </div>
       <div>
-        <label>Shipping Origin (China)</label>
+        <label>Shipping Origin</label>
         <input type="text" name="shipping_origin" maxlength="255" placeholder="e.g. Qingdao, China" />
       </div>
       <div>
