@@ -32,6 +32,10 @@ function is_admin_or_moderator(): bool {
   return is_admin() || is_moderator();
 }
 
+function can_access_rfq(): bool {
+  return is_admin_or_moderator();
+}
+
 function require_admin(): void {
   require_login();
   if (!is_admin()) {
@@ -43,6 +47,14 @@ function require_admin(): void {
 function require_admin_or_moderator(): void {
   require_login();
   if (!is_admin_or_moderator()) {
+    http_response_code(403);
+    exit('Access denied.');
+  }
+}
+
+function require_rfq_access(): void {
+  require_login();
+  if (!can_access_rfq()) {
     http_response_code(403);
     exit('Access denied.');
   }
