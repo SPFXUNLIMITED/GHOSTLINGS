@@ -5,6 +5,7 @@ require __DIR__ . '/auth.php';
 require_rfq_access();
 
 const MAX_LEAD_TIME_DAYS = 3650;
+const MAX_QUOTE_UPLOAD_BYTES = 26214400; // 25 MB
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
@@ -45,6 +46,10 @@ function format_shipping_details(?string $origin, ?string $method): string {
   return $origin !== '' ? $origin : $method;
 }
 
+function is_safe_stored_upload_name(string $name): bool {
+  return (bool)preg_match('/^[a-zA-Z0-9._-]+$/', $name);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
   if (empty($_SESSION['rfq_tracker_csrf']) || !hash_equals((string)$_SESSION['rfq_tracker_csrf'], $submitted_csrf)) {
@@ -79,6 +84,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $quote_status = (string)($_POST['quote_status'] ?? 'received');
       $received_on = trim((string)($_POST['received_on'] ?? ''));
       $notes = trim((string)($_POST['notes'] ?? ''));
+      $quote_file = $_FILES['quote_file'] ?? null;
+      $has_quote_file = is_array($quote_file) && (($quote_file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
 
       if ($rfq_id <= 0) $errors[] = 'Invalid RFQ request selected.';
       if ($supplier_name === '') $errors[] = 'Supplier name is required.';
@@ -111,6 +118,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (strlen($notes) > 5000) {
         $errors[] = 'Notes must be 5000 characters or fewer.';
       }
+      if ($has_quote_file && ($quote_file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        $errors[] = 'Quote file upload failed (code ' . (int)($quote_file['error'] ?? 0) . ').';
+      }
+      if ($has_quote_file && ((int)($quote_file['size'] ?? 0) > MAX_QUOTE_UPLOAD_BYTES)) {
+        $errors[] = 'Quote file must be 25 MB or smaller.';
+      }
 
       if (!$errors) {
         $exists = $pdo->prepare("SELECT id FROM rfq_requests WHERE id = ? LIMIT 1");
@@ -118,11 +131,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$exists->fetch()) {
           $errors[] = 'RFQ request not found.';
         } else {
+          $quote_file_original_name = null;
+          $quote_file_stored_name = null;
+          $quote_file_mime_type = null;
+          $quote_file_size_bytes = null;
+
+          if ($has_quote_file) {
+            $uploads_dir = __DIR__ . '/uploads';
+            if (!is_dir($uploads_dir)) {
+              @mkdir($uploads_dir, 0775, true);
+            }
+            if (!is_dir($uploads_dir) || !is_writable($uploads_dir)) {
+              $errors[] = 'Uploads directory is missing or not writable.';
+            } else {
+              $quote_file_original_name = (string)($quote_file['name'] ?? 'quote-file');
+              $tmp_path = (string)($quote_file['tmp_name'] ?? '');
+              $quote_file_size_bytes = (int)($quote_file['size'] ?? 0);
+              if ($quote_file_size_bytes < 0) {
+                $quote_file_size_bytes = 0;
+              }
+
+              if (is_file($tmp_path) && function_exists('finfo_open')) {
+                $fi = finfo_open(FILEINFO_MIME_TYPE);
+                if ($fi) {
+                  $quote_file_mime_type = finfo_file($fi, $tmp_path) ?: null;
+                  finfo_close($fi);
+                }
+              }
+
+              $ext = '';
+              $dot = strrpos($quote_file_original_name, '.');
+              if ($dot !== false) {
+                $ext = strtolower(substr($quote_file_original_name, $dot + 1));
+                $ext = preg_replace('/[^a-z0-9]+/i', '', $ext);
+                if ($ext !== '') {
+                  $ext = '.' . $ext;
+                }
+              }
+
+              $quote_file_stored_name = 'rfq' . $rfq_id . '_' . bin2hex(random_bytes(16)) . $ext;
+              $dest_path = $uploads_dir . '/' . $quote_file_stored_name;
+
+              if (!move_uploaded_file($tmp_path, $dest_path)) {
+                $errors[] = 'Failed to save uploaded quote file.';
+                $quote_file_original_name = null;
+                $quote_file_stored_name = null;
+                $quote_file_mime_type = null;
+                $quote_file_size_bytes = null;
+              }
+            }
+          }
+
+          if ($errors) {
+            // keep request selected so user can retry quickly
+            $selected_rfq_id = $rfq_id;
+          } else {
           $ins = $pdo->prepare(
             "INSERT INTO rfq_quotes
               (rfq_request_id, supplier_name, quote_amount, currency, lead_time_days, shipping_cost,
-               shipping_origin, shipping_method, quote_status, received_on, notes, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+               shipping_origin, shipping_method, quote_status, received_on, notes, created_by,
+               quote_file_original_name, quote_file_stored_name, quote_file_mime_type, quote_file_size_bytes)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
           );
           $ins->execute([
             $rfq_id,
@@ -137,9 +206,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $received_on === '' ? null : $received_on,
             $notes === '' ? null : $notes,
             (int)current_user_id(),
+            $quote_file_original_name,
+            $quote_file_stored_name,
+            $quote_file_mime_type,
+            $quote_file_size_bytes,
           ]);
           $success = 'Quote added to RFQ tracker.';
           $selected_rfq_id = $rfq_id;
+          }
         }
       }
     }
@@ -339,7 +413,7 @@ render_header('RFQ Tracker');
 <?php if ($selected_rfq): ?>
   <div class="card">
     <h2 style="margin-top:0;">Quotes for RFQ #<?= (int)$selected_rfq['id'] ?> — <?= h($selected_rfq['request_title']) ?></h2>
-    <form method="post" class="form-grid" novalidate>
+    <form method="post" class="form-grid" enctype="multipart/form-data" novalidate>
       <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
       <input type="hidden" name="action" value="add_quote" />
       <input type="hidden" name="rfq_id" value="<?= (int)$selected_rfq['id'] ?>" />
@@ -389,6 +463,11 @@ render_header('RFQ Tracker');
         <textarea name="notes" rows="4" maxlength="5000"
                   placeholder="Include quote terms, included accessories, warranty, or negotiation details."></textarea>
       </div>
+      <div>
+        <label>Quote File</label>
+        <input type="file" name="quote_file" />
+        <div class="muted" style="font-size:12px; margin-top:4px;">Optional, up to 25 MB.</div>
+      </div>
       <div class="full row" style="margin-top:8px;">
         <button type="submit" class="btn primary">Add Quote</button>
       </div>
@@ -405,12 +484,13 @@ render_header('RFQ Tracker');
             <th>Status</th>
             <th>Received</th>
             <th>Notes</th>
+            <th>Attachment</th>
             <th>Added By</th>
           </tr>
         </thead>
         <tbody>
           <?php if (!$quotes): ?>
-            <tr><td colspan="8" class="muted">No quotes added yet for this RFQ.</td></tr>
+            <tr><td colspan="9" class="muted">No quotes added yet for this RFQ.</td></tr>
           <?php endif; ?>
           <?php foreach ($quotes as $q): ?>
             <tr>
@@ -426,6 +506,23 @@ render_header('RFQ Tracker');
               <td><?= h($quote_statuses[$q['quote_status']] ?? $q['quote_status']) ?></td>
               <td><?= h($q['received_on'] ?? '') ?></td>
               <td style="max-width:240px; white-space:normal;"><?= nl2br(h(mb_strimwidth((string)($q['notes'] ?? ''), 0, 180, '…'))) ?></td>
+              <td>
+                <?php
+                  $file_name = (string)($q['quote_file_stored_name'] ?? '');
+                  $file_url = '';
+                  if ($file_name !== '' && is_safe_stored_upload_name($file_name)) {
+                    $file_url = 'uploads/' . $file_name;
+                  }
+                ?>
+                <?php if ($file_url !== ''): ?>
+                  <a class="btn" href="<?= h($file_url) ?>" target="_blank" rel="noopener">Open</a><br>
+                  <span class="muted" style="font-size:12px;">
+                    <?= h((string)($q['quote_file_original_name'] ?? 'Attachment')) ?>
+                  </span>
+                <?php else: ?>
+                  —
+                <?php endif; ?>
+              </td>
               <td class="muted"><?= h($q['created_by_username'] ?? 'Unknown') ?></td>
             </tr>
           <?php endforeach; ?>

@@ -330,3 +330,19 @@ $pdo->exec("
     KEY idx_rfq_quotes_received_on (received_on)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+// Add RFQ quote file metadata columns if they do not exist yet
+foreach ([
+  "ALTER TABLE rfq_quotes ADD COLUMN quote_file_original_name VARCHAR(255) NULL",
+  "ALTER TABLE rfq_quotes ADD COLUMN quote_file_stored_name VARCHAR(255) NULL",
+  "ALTER TABLE rfq_quotes ADD COLUMN quote_file_mime_type VARCHAR(191) NULL",
+  "ALTER TABLE rfq_quotes ADD COLUMN quote_file_size_bytes BIGINT UNSIGNED NULL",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    if ($e->getCode() !== '42S21') {
+      throw $e;
+    }
+  }
+}
