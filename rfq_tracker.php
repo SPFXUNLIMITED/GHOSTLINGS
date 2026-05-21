@@ -425,7 +425,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
 
             // Delete old file from disk if it was replaced or removed
-            if (($has_quote_file || $remove_file) && $old_stored_name !== '' && $old_stored_name !== $new_file_stored_name && is_safe_stored_upload_name($old_stored_name)) {
+            if (($has_quote_file || $remove_file) && $old_stored_name !== '' && is_safe_stored_upload_name($old_stored_name)) {
               $old_path = __DIR__ . '/uploads/' . $old_stored_name;
               if (is_file($old_path)) {
                 @unlink($old_path);
