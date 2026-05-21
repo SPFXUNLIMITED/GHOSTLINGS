@@ -190,7 +190,7 @@ render_header('RFQ Tracker');
 <div class="card">
   <h1 style="margin-top:0; margin-bottom:4px;">RFQ Quote Tracking</h1>
   <p class="muted" style="margin:0;">
-    Track supplier quotes, lead times, and shipping costs from China for CO2 laser cutter purchases.
+    Track supplier quotes, lead times, and shipping costs for CO2 laser cutter purchases.
   </p>
 </div>
 
@@ -310,7 +310,7 @@ render_header('RFQ Tracker');
 
       <div>
         <label>Supplier Name <span style="color:var(--d)">*</span></label>
-        <input type="text" name="supplier_name" maxlength="255" required placeholder="e.g. Jinan XYZ Laser" />
+        <input type="text" name="supplier_name" maxlength="255" required placeholder="e.g. ABC Laser Systems" />
       </div>
       <div>
         <label>Quote Amount <span style="color:var(--d)">*</span></label>

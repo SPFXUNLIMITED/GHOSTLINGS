@@ -306,7 +306,7 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
-// Create rfq_quotes table for quote, lead time, and China shipping tracking
+// Create rfq_quotes table for quote, lead time, and shipping tracking
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS rfq_quotes (
     id                 INT UNSIGNED NOT NULL AUTO_INCREMENT,
