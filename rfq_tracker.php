@@ -33,6 +33,7 @@ $quote_statuses = [
 $errors = [];
 $success = '';
 $selected_rfq_id = 0;
+$edit_quote_id = 0;
 
 function format_shipping_details(?string $origin, ?string $method): string {
   $origin = trim((string)$origin);
@@ -265,6 +266,183 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           }
         }
       }
+    } elseif ($action === 'edit_quote') {
+      $quote_id = (int)($_POST['quote_id'] ?? 0);
+      $rfq_id = (int)($_POST['rfq_id'] ?? 0);
+      $supplier_name = trim((string)($_POST['supplier_name'] ?? ''));
+      $quote_amount_raw = trim((string)($_POST['quote_amount'] ?? ''));
+      $currency = strtoupper(trim((string)($_POST['currency'] ?? 'USD')));
+      $lead_time_days_raw = trim((string)($_POST['lead_time_days'] ?? ''));
+      $shipping_cost_raw = trim((string)($_POST['shipping_cost'] ?? ''));
+      $shipping_origin = trim((string)($_POST['shipping_origin'] ?? ''));
+      $shipping_method = trim((string)($_POST['shipping_method'] ?? ''));
+      $quote_status = (string)($_POST['quote_status'] ?? 'received');
+      $received_on = trim((string)($_POST['received_on'] ?? ''));
+      $notes = trim((string)($_POST['notes'] ?? ''));
+      $remove_file = !empty($_POST['remove_file']);
+      $quote_file = $_FILES['quote_file'] ?? null;
+      $has_quote_file = is_array($quote_file) && (($quote_file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+
+      if ($quote_id <= 0) $errors[] = 'Invalid quote.';
+      if ($rfq_id <= 0) $errors[] = 'Invalid RFQ request.';
+      if ($supplier_name === '') $errors[] = 'Supplier name is required.';
+      if ($quote_amount_raw === '' || !is_numeric($quote_amount_raw) || (float)$quote_amount_raw < 0) {
+        $errors[] = 'Quote amount must be a non-negative number.';
+      }
+      if (!preg_match('/^[A-Z]{3}$/', $currency)) {
+        $errors[] = 'Currency must be a 3-letter code (e.g. USD, CNY).';
+      }
+      if ($lead_time_days_raw !== '' && (!ctype_digit($lead_time_days_raw) || (int)$lead_time_days_raw > MAX_LEAD_TIME_DAYS)) {
+        $errors[] = 'Lead time must be a whole number of days up to ' . MAX_LEAD_TIME_DAYS . '.';
+      }
+      if ($shipping_cost_raw !== '' && (!is_numeric($shipping_cost_raw) || (float)$shipping_cost_raw < 0)) {
+        $errors[] = 'Shipping cost must be a non-negative number.';
+      }
+      if (!isset($quote_statuses[$quote_status])) {
+        $errors[] = 'Invalid quote status selected.';
+      }
+      if ($received_on !== '') {
+        $dt = DateTime::createFromFormat('Y-m-d', $received_on);
+        if (!$dt || $dt->format('Y-m-d') !== $received_on) {
+          $errors[] = 'Received date must be in YYYY-MM-DD format.';
+        } else {
+          $today = new DateTime('today');
+          if ($dt > $today) {
+            $errors[] = 'Received date cannot be in the future.';
+          }
+        }
+      }
+      if (strlen($notes) > 5000) {
+        $errors[] = 'Notes must be 5000 characters or fewer.';
+      }
+      if ($has_quote_file && ($quote_file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        $errors[] = 'Quote file upload failed (code ' . (int)($quote_file['error'] ?? 0) . ').';
+      }
+      if ($has_quote_file && ((int)($quote_file['size'] ?? 0) > MAX_QUOTE_UPLOAD_BYTES)) {
+        $errors[] = 'Quote file must be 25 MB or smaller.';
+      }
+
+      if (!$errors) {
+        $existing = $pdo->prepare("SELECT * FROM rfq_quotes WHERE id = ? AND rfq_request_id = ? LIMIT 1");
+        $existing->execute([$quote_id, $rfq_id]);
+        $existing_quote = $existing->fetch();
+        if (!$existing_quote) {
+          $errors[] = 'Quote not found.';
+        } else {
+          $new_file_original_name = $existing_quote['quote_file_original_name'];
+          $new_file_stored_name = $existing_quote['quote_file_stored_name'];
+          $new_file_mime_type = $existing_quote['quote_file_mime_type'];
+          $new_file_size_bytes = $existing_quote['quote_file_size_bytes'];
+          $old_stored_name = (string)($existing_quote['quote_file_stored_name'] ?? '');
+
+          if ($has_quote_file) {
+            $uploads_dir = __DIR__ . '/uploads';
+            if (!is_dir($uploads_dir) && !mkdir($uploads_dir, 0775, true) && !is_dir($uploads_dir)) {
+              $errors[] = 'Failed to create uploads directory.';
+            }
+            if (!is_dir($uploads_dir) || !is_writable($uploads_dir)) {
+              $errors[] = 'Uploads directory is missing or not writable.';
+            } else {
+              $new_file_original_name = sanitize_upload_original_name((string)($quote_file['name'] ?? 'quote-file'));
+              $tmp_path = (string)($quote_file['tmp_name'] ?? '');
+              $new_file_size_bytes = (int)($quote_file['size'] ?? 0);
+
+              $ext_raw = '';
+              $dot = strrpos($new_file_original_name, '.');
+              if ($dot !== false) {
+                $ext_raw = strtolower(substr($new_file_original_name, $dot + 1));
+                $ext_raw = preg_replace('/[^a-z0-9]+/i', '', $ext_raw) ?? '';
+              }
+              if ($ext_raw === '' || !in_array($ext_raw, allowed_quote_upload_extensions(), true)) {
+                $errors[] = 'Unsupported quote file type.';
+              }
+
+              if (!function_exists('finfo_open')) {
+                $errors[] = 'Server configuration error: MIME detection is unavailable.';
+              } elseif (is_file($tmp_path)) {
+                $fi = finfo_open(FILEINFO_MIME_TYPE);
+                if ($fi) {
+                  $new_file_mime_type = finfo_file($fi, $tmp_path) ?: null;
+                  finfo_close($fi);
+                }
+              }
+              if ($new_file_mime_type === null || !in_array($new_file_mime_type, allowed_quote_upload_mime_types(), true)) {
+                $errors[] = 'Unsupported quote file MIME type.';
+              }
+
+              $ext = $ext_raw !== '' ? '.' . $ext_raw : '';
+              if ($errors) {
+                $new_file_original_name = $existing_quote['quote_file_original_name'];
+                $new_file_stored_name = $existing_quote['quote_file_stored_name'];
+                $new_file_mime_type = $existing_quote['quote_file_mime_type'];
+                $new_file_size_bytes = $existing_quote['quote_file_size_bytes'];
+              } else {
+                $new_file_stored_name = 'rfq' . $rfq_id . '_' . bin2hex(random_bytes(16)) . $ext;
+                $dest_path = __DIR__ . '/uploads/' . $new_file_stored_name;
+                if (!move_uploaded_file($tmp_path, $dest_path)) {
+                  $errors[] = 'Failed to save uploaded quote file.';
+                  $new_file_original_name = $existing_quote['quote_file_original_name'];
+                  $new_file_stored_name = $existing_quote['quote_file_stored_name'];
+                  $new_file_mime_type = $existing_quote['quote_file_mime_type'];
+                  $new_file_size_bytes = $existing_quote['quote_file_size_bytes'];
+                }
+              }
+            }
+          } elseif ($remove_file) {
+            $new_file_original_name = null;
+            $new_file_stored_name = null;
+            $new_file_mime_type = null;
+            $new_file_size_bytes = null;
+          }
+
+          if (!$errors) {
+            $upd = $pdo->prepare(
+              "UPDATE rfq_quotes SET
+                supplier_name = ?, quote_amount = ?, currency = ?, lead_time_days = ?,
+                shipping_cost = ?, shipping_origin = ?, shipping_method = ?, quote_status = ?,
+                received_on = ?, notes = ?,
+                quote_file_original_name = ?, quote_file_stored_name = ?,
+                quote_file_mime_type = ?, quote_file_size_bytes = ?
+               WHERE id = ? AND rfq_request_id = ?"
+            );
+            $upd->execute([
+              $supplier_name,
+              (float)$quote_amount_raw,
+              $currency,
+              $lead_time_days_raw === '' ? null : (int)$lead_time_days_raw,
+              $shipping_cost_raw === '' ? null : (float)$shipping_cost_raw,
+              $shipping_origin === '' ? null : $shipping_origin,
+              $shipping_method === '' ? null : $shipping_method,
+              $quote_status,
+              $received_on === '' ? null : $received_on,
+              $notes === '' ? null : $notes,
+              $new_file_original_name,
+              $new_file_stored_name,
+              $new_file_mime_type,
+              $new_file_size_bytes,
+              $quote_id,
+              $rfq_id,
+            ]);
+
+            // Delete old file from disk if it was replaced or removed
+            if (($has_quote_file || $remove_file) && $old_stored_name !== '' && is_safe_stored_upload_name($old_stored_name)) {
+              $old_path = __DIR__ . '/uploads/' . $old_stored_name;
+              if (is_file($old_path)) {
+                @unlink($old_path);
+              }
+            }
+
+            $success = 'Quote updated successfully.';
+            $selected_rfq_id = $rfq_id;
+          } else {
+            $selected_rfq_id = $rfq_id;
+            $edit_quote_id = $quote_id;
+          }
+        }
+      } else {
+        $selected_rfq_id = $rfq_id;
+        $edit_quote_id = $quote_id;
+      }
     }
   }
 }
@@ -273,6 +451,9 @@ $search = trim((string)($_GET['q'] ?? ''));
 $status_filter = trim((string)($_GET['status'] ?? ''));
 if ($selected_rfq_id <= 0) {
   $selected_rfq_id = max(0, (int)($_GET['rfq_id'] ?? 0));
+}
+if ($edit_quote_id <= 0) {
+  $edit_quote_id = max(0, (int)($_GET['edit_quote_id'] ?? 0));
 }
 
 $where_parts = [];
@@ -313,6 +494,7 @@ $rfqs = $stmt->fetchAll();
 
 $selected_rfq = null;
 $quotes = [];
+$editing_quote = null;
 if ($selected_rfq_id > 0) {
   $sel = $pdo->prepare("SELECT id, request_title FROM rfq_requests WHERE id = ? LIMIT 1");
   $sel->execute([$selected_rfq_id]);
@@ -327,6 +509,15 @@ if ($selected_rfq_id > 0) {
     );
     $qs->execute([$selected_rfq_id]);
     $quotes = $qs->fetchAll();
+
+    if ($edit_quote_id > 0) {
+      foreach ($quotes as $q) {
+        if ((int)$q['id'] === $edit_quote_id) {
+          $editing_quote = $q;
+          break;
+        }
+      }
+    }
   }
 }
 
@@ -462,68 +653,155 @@ render_header('RFQ Tracker');
 <?php if ($selected_rfq): ?>
   <div class="card">
     <h2 style="margin-top:0;">Quotes for RFQ #<?= (int)$selected_rfq['id'] ?> — <?= h($selected_rfq['request_title']) ?></h2>
-    <form method="post" class="form-grid" enctype="multipart/form-data" novalidate>
-      <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
-      <input type="hidden" name="action" value="add_quote" />
-      <input type="hidden" name="rfq_id" value="<?= (int)$selected_rfq['id'] ?>" />
 
-      <div>
-        <label>Supplier Name <span style="color:var(--d)">*</span></label>
-        <input type="text" name="supplier_name" maxlength="255" required placeholder="e.g. ABC Laser Systems" />
-      </div>
-      <div>
-        <label>Quote Amount <span style="color:var(--d)">*</span></label>
-        <input type="number" name="quote_amount" min="0" step="0.01" required placeholder="e.g. 10800.00" />
-      </div>
-      <div>
-        <label>Currency <span style="color:var(--d)">*</span></label>
-        <input type="text" name="currency" maxlength="3" required value="USD" />
-      </div>
-      <div>
-        <label>Lead Time (days)</label>
-        <input type="number" name="lead_time_days" min="0" max="<?= MAX_LEAD_TIME_DAYS ?>" placeholder="e.g. 35" />
-      </div>
-      <div>
-        <label>Shipping Cost</label>
-        <input type="number" name="shipping_cost" min="0" step="0.01" placeholder="e.g. 1800.00" />
-      </div>
-      <div>
-        <label>Shipping Method</label>
-        <input type="text" name="shipping_method" maxlength="100" placeholder="e.g. Sea freight / Air cargo" />
-      </div>
-      <div>
-        <label>Shipping Origin</label>
-        <input type="text" name="shipping_origin" maxlength="255" placeholder="e.g. Qingdao, China" />
-      </div>
-      <div>
-        <label>Quote Status</label>
-        <select name="quote_status">
-          <?php foreach ($quote_statuses as $k => $label): ?>
-            <option value="<?= h($k) ?>"><?= h($label) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <div>
-        <label>Quote Received On</label>
-        <input type="date" name="received_on" />
-      </div>
-      <div class="full">
-        <label>Notes</label>
-        <textarea name="notes" rows="4" maxlength="5000"
-                  placeholder="Include quote terms, included accessories, warranty, or negotiation details."></textarea>
-      </div>
-      <div>
-        <label>Quote File</label>
-        <input type="file" name="quote_file" />
-        <div class="muted" style="font-size:12px; margin-top:4px;">Optional, up to 25 MB.</div>
-      </div>
-      <div class="full row" style="margin-top:8px;">
-        <button type="submit" class="btn primary">Add Quote</button>
-      </div>
-    </form>
+    <?php if ($editing_quote): ?>
+      <h3 style="margin-top:0; margin-bottom:12px;">Edit Quote</h3>
+      <form method="post" class="form-grid" enctype="multipart/form-data" novalidate>
+        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
+        <input type="hidden" name="action" value="edit_quote" />
+        <input type="hidden" name="rfq_id" value="<?= (int)$selected_rfq['id'] ?>" />
+        <input type="hidden" name="quote_id" value="<?= (int)$editing_quote['id'] ?>" />
+
+        <div>
+          <label>Supplier Name <span style="color:var(--d)">*</span></label>
+          <input type="text" name="supplier_name" maxlength="255" required
+                 value="<?= h($editing_quote['supplier_name']) ?>" />
+        </div>
+        <div>
+          <label>Quote Amount <span style="color:var(--d)">*</span></label>
+          <input type="number" name="quote_amount" min="0" step="0.01" required
+                 value="<?= h((string)$editing_quote['quote_amount']) ?>" />
+        </div>
+        <div>
+          <label>Currency <span style="color:var(--d)">*</span></label>
+          <input type="text" name="currency" maxlength="3" required
+                 value="<?= h($editing_quote['currency']) ?>" />
+        </div>
+        <div>
+          <label>Lead Time (days)</label>
+          <input type="number" name="lead_time_days" min="0" max="<?= MAX_LEAD_TIME_DAYS ?>"
+                 value="<?= $editing_quote['lead_time_days'] !== null ? h((string)$editing_quote['lead_time_days']) : '' ?>" />
+        </div>
+        <div>
+          <label>Shipping Cost</label>
+          <input type="number" name="shipping_cost" min="0" step="0.01"
+                 value="<?= $editing_quote['shipping_cost'] !== null ? h((string)$editing_quote['shipping_cost']) : '' ?>" />
+        </div>
+        <div>
+          <label>Shipping Method</label>
+          <input type="text" name="shipping_method" maxlength="100"
+                 value="<?= h((string)($editing_quote['shipping_method'] ?? '')) ?>" />
+        </div>
+        <div>
+          <label>Shipping Origin</label>
+          <input type="text" name="shipping_origin" maxlength="255"
+                 value="<?= h((string)($editing_quote['shipping_origin'] ?? '')) ?>" />
+        </div>
+        <div>
+          <label>Quote Status</label>
+          <select name="quote_status">
+            <?php foreach ($quote_statuses as $k => $label): ?>
+              <option value="<?= h($k) ?>" <?= $editing_quote['quote_status'] === $k ? 'selected' : '' ?>><?= h($label) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div>
+          <label>Quote Received On</label>
+          <input type="date" name="received_on"
+                 value="<?= h((string)($editing_quote['received_on'] ?? '')) ?>" />
+        </div>
+        <div class="full">
+          <label>Notes</label>
+          <textarea name="notes" rows="4" maxlength="5000"><?= h((string)($editing_quote['notes'] ?? '')) ?></textarea>
+        </div>
+        <div>
+          <label>Replace Quote File</label>
+          <input type="file" name="quote_file" />
+          <div class="muted" style="font-size:12px; margin-top:4px;">
+            <?php if (!empty($editing_quote['quote_file_original_name'])): ?>
+              Current: <?= h($editing_quote['quote_file_original_name']) ?>.
+              Upload a new file to replace it, or check below to remove it.
+            <?php else: ?>
+              Optional, up to 25 MB.
+            <?php endif; ?>
+          </div>
+          <?php if (!empty($editing_quote['quote_file_original_name'])): ?>
+            <label style="display:flex; align-items:center; gap:6px; margin-top:6px; font-weight:normal;">
+              <input type="checkbox" name="remove_file" value="1" />
+              Remove current attachment
+            </label>
+          <?php endif; ?>
+        </div>
+        <div class="full row" style="margin-top:8px;">
+          <button type="submit" class="btn primary">Save Changes</button>
+          <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>">Cancel</a>
+        </div>
+      </form>
+    <?php else: ?>
+      <h3 style="margin-top:0; margin-bottom:12px;">Add Quote</h3>
+      <form method="post" class="form-grid" enctype="multipart/form-data" novalidate>
+        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
+        <input type="hidden" name="action" value="add_quote" />
+        <input type="hidden" name="rfq_id" value="<?= (int)$selected_rfq['id'] ?>" />
+
+        <div>
+          <label>Supplier Name <span style="color:var(--d)">*</span></label>
+          <input type="text" name="supplier_name" maxlength="255" required placeholder="e.g. ABC Laser Systems" />
+        </div>
+        <div>
+          <label>Quote Amount <span style="color:var(--d)">*</span></label>
+          <input type="number" name="quote_amount" min="0" step="0.01" required placeholder="e.g. 10800.00" />
+        </div>
+        <div>
+          <label>Currency <span style="color:var(--d)">*</span></label>
+          <input type="text" name="currency" maxlength="3" required value="USD" />
+        </div>
+        <div>
+          <label>Lead Time (days)</label>
+          <input type="number" name="lead_time_days" min="0" max="<?= MAX_LEAD_TIME_DAYS ?>" placeholder="e.g. 35" />
+        </div>
+        <div>
+          <label>Shipping Cost</label>
+          <input type="number" name="shipping_cost" min="0" step="0.01" placeholder="e.g. 1800.00" />
+        </div>
+        <div>
+          <label>Shipping Method</label>
+          <input type="text" name="shipping_method" maxlength="100" placeholder="e.g. Sea freight / Air cargo" />
+        </div>
+        <div>
+          <label>Shipping Origin</label>
+          <input type="text" name="shipping_origin" maxlength="255" placeholder="e.g. Qingdao, China" />
+        </div>
+        <div>
+          <label>Quote Status</label>
+          <select name="quote_status">
+            <?php foreach ($quote_statuses as $k => $label): ?>
+              <option value="<?= h($k) ?>"><?= h($label) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div>
+          <label>Quote Received On</label>
+          <input type="date" name="received_on" />
+        </div>
+        <div class="full">
+          <label>Notes</label>
+          <textarea name="notes" rows="4" maxlength="5000"
+                    placeholder="Include quote terms, included accessories, warranty, or negotiation details."></textarea>
+        </div>
+        <div>
+          <label>Quote File</label>
+          <input type="file" name="quote_file" />
+          <div class="muted" style="font-size:12px; margin-top:4px;">Optional, up to 25 MB.</div>
+        </div>
+        <div class="full row" style="margin-top:8px;">
+          <button type="submit" class="btn primary">Add Quote</button>
+        </div>
+      </form>
+    <?php endif; ?>
 
     <div class="table-wrap" style="overflow-x:auto; margin-top:14px;">
-      <table class="table-auto" style="min-width:980px;">
+      <table class="table-auto" style="min-width:1020px;">
         <thead>
           <tr>
             <th>Supplier</th>
@@ -535,11 +813,12 @@ render_header('RFQ Tracker');
             <th>Notes</th>
             <th>Attachment</th>
             <th>Added By</th>
+            <th class="col-actions">Actions</th>
           </tr>
         </thead>
         <tbody>
           <?php if (!$quotes): ?>
-            <tr><td colspan="9" class="muted">No quotes added yet for this RFQ.</td></tr>
+            <tr><td colspan="10" class="muted">No quotes added yet for this RFQ.</td></tr>
           <?php endif; ?>
           <?php foreach ($quotes as $q): ?>
             <tr>
@@ -573,6 +852,9 @@ render_header('RFQ Tracker');
                 <?php endif; ?>
               </td>
               <td class="muted"><?= h($q['created_by_username'] ?? 'Unknown') ?></td>
+              <td class="col-actions">
+                <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>&edit_quote_id=<?= (int)$q['id'] ?>">Edit</a>
+              </td>
             </tr>
           <?php endforeach; ?>
         </tbody>
