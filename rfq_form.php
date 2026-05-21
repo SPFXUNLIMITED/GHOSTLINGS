@@ -4,6 +4,8 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_admin_or_moderator();
 
+const MAX_RFQ_QUANTITY = 1000;
+
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
 }
@@ -25,7 +27,7 @@ $fields = [
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
-  if (!hash_equals($_SESSION['rfq_form_csrf'] ?? '', $submitted_csrf)) {
+  if (empty($_SESSION['rfq_form_csrf']) || !hash_equals((string)$_SESSION['rfq_form_csrf'], $submitted_csrf)) {
     $errors[] = 'Security token mismatch. Please refresh and try again.';
   }
 
@@ -39,8 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if ($fields['tube_type'] === '') $errors[] = 'Tube type is required.';
   if ($fields['required_features'] === '') $errors[] = 'Required features are required.';
 
-  if (!ctype_digit($fields['quantity']) || (int)$fields['quantity'] < 1 || (int)$fields['quantity'] > 1000) {
-    $errors[] = 'Quantity must be a whole number between 1 and 1000.';
+  if (!ctype_digit($fields['quantity']) || (int)$fields['quantity'] < 1 || (int)$fields['quantity'] > MAX_RFQ_QUANTITY) {
+    $errors[] = 'Quantity must be a whole number between 1 and ' . MAX_RFQ_QUANTITY . '.';
   }
 
   if (strlen($fields['required_features']) > 5000) {
@@ -135,7 +137,7 @@ render_header('RFQ Request Form');
     </div>
     <div>
       <label>Quantity <span style="color:var(--d)">*</span></label>
-      <input type="number" name="quantity" min="1" max="1000" required
+      <input type="number" name="quantity" min="1" max="<?= MAX_RFQ_QUANTITY ?>" required
              value="<?= h($fields['quantity']) ?>" />
     </div>
     <div class="full">

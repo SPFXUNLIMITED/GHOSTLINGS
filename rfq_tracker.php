@@ -4,6 +4,8 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_admin_or_moderator();
 
+const MAX_LEAD_TIME_DAYS = 3650;
+
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
 }
@@ -31,9 +33,21 @@ $errors = [];
 $success = '';
 $selected_rfq_id = 0;
 
+function format_shipping_details(?string $origin, ?string $method): string {
+  $origin = trim((string)$origin);
+  $method = trim((string)$method);
+  if ($origin === '' && $method === '') {
+    return '—';
+  }
+  if ($origin !== '' && $method !== '') {
+    return $origin . ' • ' . $method;
+  }
+  return $origin !== '' ? $origin : $method;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
-  if (!hash_equals($_SESSION['rfq_tracker_csrf'] ?? '', $submitted_csrf)) {
+  if (empty($_SESSION['rfq_tracker_csrf']) || !hash_equals((string)$_SESSION['rfq_tracker_csrf'], $submitted_csrf)) {
     $errors[] = 'Security token mismatch. Please refresh and try again.';
   } else {
     $action = (string)($_POST['action'] ?? '');
@@ -74,8 +88,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (!preg_match('/^[A-Z]{3}$/', $currency)) {
         $errors[] = 'Currency must be a 3-letter code (e.g. USD, CNY).';
       }
-      if ($lead_time_days_raw !== '' && (!ctype_digit($lead_time_days_raw) || (int)$lead_time_days_raw > 3650)) {
-        $errors[] = 'Lead time must be a whole number of days up to 3650.';
+      if ($lead_time_days_raw !== '' && (!ctype_digit($lead_time_days_raw) || (int)$lead_time_days_raw > MAX_LEAD_TIME_DAYS)) {
+        $errors[] = 'Lead time must be a whole number of days up to ' . MAX_LEAD_TIME_DAYS . '.';
       }
       if ($shipping_cost_raw !== '' && (!is_numeric($shipping_cost_raw) || (float)$shipping_cost_raw < 0)) {
         $errors[] = 'Shipping cost must be a non-negative number.';
@@ -153,7 +167,8 @@ $sql = "
     COUNT(q.id) AS quote_count,
     MIN(q.quote_amount) AS lowest_quote_amount,
     MIN(q.lead_time_days) AS best_lead_time_days,
-    MIN(q.shipping_cost) AS lowest_shipping_cost
+    MIN(q.shipping_cost) AS lowest_shipping_cost,
+    GROUP_CONCAT(DISTINCT q.currency ORDER BY q.currency SEPARATOR ', ') AS quote_currencies
   FROM rfq_requests r
   LEFT JOIN users u ON u.id = r.requested_by
   LEFT JOIN rfq_quotes q ON q.rfq_request_id = r.id
@@ -273,9 +288,22 @@ render_header('RFQ Tracker');
             <td>
               <span class="badge"><?= (int)$r['quote_count'] ?> quote(s)</span><br>
               <span class="muted">
-                Best quote: <?= $r['lowest_quote_amount'] !== null ? h(number_format((float)$r['lowest_quote_amount'], 2)) : '—' ?><br>
+                Best quote:
+                <?php if ($r['lowest_quote_amount'] !== null): ?>
+                  <?= h(number_format((float)$r['lowest_quote_amount'], 2)) ?>
+                  <span title="Currencies seen in quotes"><?= h((string)($r['quote_currencies'] ?: '')) ?></span>
+                <?php else: ?>
+                  —
+                <?php endif; ?>
+                <br>
                 Best lead: <?= $r['best_lead_time_days'] !== null ? h((string)$r['best_lead_time_days']) . ' days' : '—' ?><br>
-                Lowest ship: <?= $r['lowest_shipping_cost'] !== null ? h(number_format((float)$r['lowest_shipping_cost'], 2)) : '—' ?>
+                Lowest ship:
+                <?php if ($r['lowest_shipping_cost'] !== null): ?>
+                  <?= h(number_format((float)$r['lowest_shipping_cost'], 2)) ?>
+                  <span title="Currencies seen in quotes"><?= h((string)($r['quote_currencies'] ?: '')) ?></span>
+                <?php else: ?>
+                  —
+                <?php endif; ?>
               </span>
             </td>
             <td>
@@ -325,7 +353,7 @@ render_header('RFQ Tracker');
       </div>
       <div>
         <label>Lead Time (days)</label>
-        <input type="number" name="lead_time_days" min="0" max="3650" placeholder="e.g. 35" />
+        <input type="number" name="lead_time_days" min="0" max="<?= MAX_LEAD_TIME_DAYS ?>" placeholder="e.g. 35" />
       </div>
       <div>
         <label>Shipping Cost</label>
@@ -388,7 +416,7 @@ render_header('RFQ Tracker');
               <td><?= $q['lead_time_days'] !== null ? h((string)$q['lead_time_days']) . ' days' : '—' ?></td>
               <td>
                 <?= $q['shipping_cost'] !== null ? h(number_format((float)$q['shipping_cost'], 2)) : '—' ?><br>
-                <span class="muted"><?= h(($q['shipping_origin'] ?? '—') . (($q['shipping_method'] ?? '') !== '' ? ' • ' . $q['shipping_method'] : '')) ?></span>
+                <span class="muted"><?= h(format_shipping_details($q['shipping_origin'] ?? null, $q['shipping_method'] ?? null)) ?></span>
               </td>
               <td><?= h($quote_statuses[$q['quote_status']] ?? $q['quote_status']) ?></td>
               <td><?= h($q['received_on'] ?? '') ?></td>
