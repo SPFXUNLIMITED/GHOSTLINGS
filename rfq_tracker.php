@@ -29,6 +29,7 @@ $quote_statuses = [
 
 $errors = [];
 $success = '';
+$selected_rfq_id = 0;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
@@ -119,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             (int)current_user_id(),
           ]);
           $success = 'Quote added to RFQ tracker.';
-          $_GET['rfq_id'] = (string)$rfq_id;
+          $selected_rfq_id = $rfq_id;
         }
       }
     }
@@ -128,7 +129,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $search = trim((string)($_GET['q'] ?? ''));
 $status_filter = trim((string)($_GET['status'] ?? ''));
-$selected_rfq_id = max(0, (int)($_GET['rfq_id'] ?? 0));
+if ($selected_rfq_id <= 0) {
+  $selected_rfq_id = max(0, (int)($_GET['rfq_id'] ?? 0));
+}
 
 $where_parts = [];
 $params = [];
