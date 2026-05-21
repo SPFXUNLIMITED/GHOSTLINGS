@@ -283,3 +283,50 @@ $pdo->exec("
     KEY idx_frl_ip (ip)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+// Create rfq_requests table for CO2 laser cutter procurement requests
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS rfq_requests (
+    id                 INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    requested_by       INT UNSIGNED NOT NULL,
+    request_title      VARCHAR(255) NOT NULL,
+    machine_size       VARCHAR(100) NOT NULL,
+    laser_watts        VARCHAR(50)  NOT NULL,
+    tube_type          VARCHAR(100) NOT NULL,
+    quantity           INT UNSIGNED NOT NULL DEFAULT 1,
+    required_features  TEXT         NOT NULL,
+    additional_notes   TEXT         NULL,
+    request_status     ENUM('draft','sourcing','quotes_received','shortlisted','ordered','closed') NOT NULL DEFAULT 'sourcing',
+    created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_rfq_requests_requested_by (requested_by),
+    KEY idx_rfq_requests_status (request_status),
+    KEY idx_rfq_requests_created_at (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// Create rfq_quotes table for quote, lead time, and shipping tracking
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS rfq_quotes (
+    id                 INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    rfq_request_id     INT UNSIGNED NOT NULL,
+    supplier_name      VARCHAR(255) NOT NULL,
+    quote_amount       DECIMAL(12,2) NOT NULL DEFAULT 0,
+    currency           CHAR(3) NOT NULL DEFAULT 'USD',
+    lead_time_days     INT UNSIGNED NULL,
+    shipping_cost      DECIMAL(12,2) NULL,
+    shipping_origin    VARCHAR(255) NULL,
+    shipping_method    VARCHAR(100) NULL,
+    quote_status       ENUM('received','under_review','negotiating','accepted','rejected') NOT NULL DEFAULT 'received',
+    received_on        DATE NULL,
+    notes              TEXT NULL,
+    created_by         INT UNSIGNED NOT NULL,
+    created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_rfq_quotes_request_id (rfq_request_id),
+    KEY idx_rfq_quotes_status (quote_status),
+    KEY idx_rfq_quotes_received_on (received_on)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");

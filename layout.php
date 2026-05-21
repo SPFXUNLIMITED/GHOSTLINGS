@@ -185,6 +185,7 @@ $show_admin_menu = !empty($_SESSION['is_admin']);
     <a class="menu-link <?= $current === 'playbooks.php' ? 'active' : '' ?>" href="playbooks.php">Playbooks</a>
     <a class="menu-link <?= $current === 'archives.php' ? 'active' : '' ?>" href="archives.php">Archives</a>
     <a class="menu-link <?= $current === 'time_clock.php' ? 'active' : '' ?>" href="time_clock.php">Time Clock</a>
+    <a class="menu-link <?= $current === 'rfq_form.php' ? 'active' : '' ?>" href="rfq_form.php">RFQ Form</a>
     <?php endif; ?>
     <?php endif; ?>
 	<a class="menu-link <?= $current === 'form.php' ? 'active' : '' ?>" href="form.php">Form</a>
@@ -196,6 +197,7 @@ $show_admin_menu = !empty($_SESSION['is_admin']);
   <div class="menubar-inner">
     <?php if ($show_mod_menu): ?>
     <a class="menu-link <?= $current === 'form_admin.php' ? 'active' : '' ?>" href="form_admin.php">Form Entries</a>
+    <a class="menu-link <?= $current === 'rfq_tracker.php' ? 'active' : '' ?>" href="rfq_tracker.php">RFQ Tracker</a>
     <?php endif; ?>
     <?php if ($show_admin_menu): ?>
     <a class="menu-link <?= $current === 'time_report.php' ? 'active' : '' ?>" href="time_report.php">Time Reports</a>
