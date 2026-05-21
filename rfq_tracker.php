@@ -101,6 +101,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $dt = DateTime::createFromFormat('Y-m-d', $received_on);
         if (!$dt || $dt->format('Y-m-d') !== $received_on) {
           $errors[] = 'Received date must be in YYYY-MM-DD format.';
+        } else {
+          $today = new DateTime('today');
+          if ($dt > $today) {
+            $errors[] = 'Received date cannot be in the future.';
+          }
         }
       }
       if (strlen($notes) > 5000) {
@@ -291,7 +296,6 @@ render_header('RFQ Tracker');
                 Best quote:
                 <?php if ($r['lowest_quote_amount'] !== null): ?>
                   <?= h(number_format((float)$r['lowest_quote_amount'], 2)) ?>
-                  <span title="Currencies seen in quotes"><?= h((string)($r['quote_currencies'] ?: '')) ?></span>
                 <?php else: ?>
                   —
                 <?php endif; ?>
@@ -300,10 +304,11 @@ render_header('RFQ Tracker');
                 Lowest ship:
                 <?php if ($r['lowest_shipping_cost'] !== null): ?>
                   <?= h(number_format((float)$r['lowest_shipping_cost'], 2)) ?>
-                  <span title="Currencies seen in quotes"><?= h((string)($r['quote_currencies'] ?: '')) ?></span>
                 <?php else: ?>
                   —
                 <?php endif; ?>
+                <br>
+                Currencies in quotes: <?= h((string)($r['quote_currencies'] ?: '—')) ?>
               </span>
             </td>
             <td>
