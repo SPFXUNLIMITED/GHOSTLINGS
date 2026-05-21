@@ -183,9 +183,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $quote_file_original_name = sanitize_upload_original_name((string)($quote_file['name'] ?? 'quote-file'));
               $tmp_path = (string)($quote_file['tmp_name'] ?? '');
               $quote_file_size_bytes = (int)($quote_file['size'] ?? 0);
-              if ($quote_file_size_bytes < 0) {
-                $quote_file_size_bytes = 0;
-              }
 
               $ext_raw = '';
               $dot = strrpos($quote_file_original_name, '.');
@@ -197,7 +194,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'Unsupported quote file type.';
               }
 
-              if (is_file($tmp_path) && function_exists('finfo_open')) {
+              if (!function_exists('finfo_open')) {
+                $errors[] = 'Server configuration error: MIME detection is unavailable.';
+              } elseif (is_file($tmp_path)) {
                 $fi = finfo_open(FILEINFO_MIME_TYPE);
                 if ($fi) {
                   $quote_file_mime_type = finfo_file($fi, $tmp_path) ?: null;
