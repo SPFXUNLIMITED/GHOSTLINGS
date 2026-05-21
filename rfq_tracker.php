@@ -2,7 +2,7 @@
 require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
-require_admin_or_moderator();
+require_rfq_access();
 
 const MAX_LEAD_TIME_DAYS = 3650;
 

@@ -171,6 +171,7 @@ function render_header(string $title): void {
 $current = basename($_SERVER['PHP_SELF']);
 $show_mod_menu = !empty($_SESSION['is_admin']) || !empty($_SESSION['is_moderator']);
 $show_admin_menu = !empty($_SESSION['is_admin']);
+$show_rfq_menu = $show_mod_menu;
 ?>	
 
 <nav class="menubar card">
@@ -185,7 +186,6 @@ $show_admin_menu = !empty($_SESSION['is_admin']);
     <a class="menu-link <?= $current === 'playbooks.php' ? 'active' : '' ?>" href="playbooks.php">Playbooks</a>
     <a class="menu-link <?= $current === 'archives.php' ? 'active' : '' ?>" href="archives.php">Archives</a>
     <a class="menu-link <?= $current === 'time_clock.php' ? 'active' : '' ?>" href="time_clock.php">Time Clock</a>
-    <a class="menu-link <?= $current === 'rfq_form.php' ? 'active' : '' ?>" href="rfq_form.php">RFQ Form</a>
     <?php endif; ?>
     <?php endif; ?>
 	<a class="menu-link <?= $current === 'form.php' ? 'active' : '' ?>" href="form.php">Form</a>
@@ -197,6 +197,9 @@ $show_admin_menu = !empty($_SESSION['is_admin']);
   <div class="menubar-inner">
     <?php if ($show_mod_menu): ?>
     <a class="menu-link <?= $current === 'form_admin.php' ? 'active' : '' ?>" href="form_admin.php">Form Entries</a>
+    <?php endif; ?>
+    <?php if ($show_rfq_menu): ?>
+    <a class="menu-link <?= $current === 'rfq_form.php' ? 'active' : '' ?>" href="rfq_form.php">RFQ Form</a>
     <a class="menu-link <?= $current === 'rfq_tracker.php' ? 'active' : '' ?>" href="rfq_tracker.php">RFQ Tracker</a>
     <?php endif; ?>
     <?php if ($show_admin_menu): ?>
