@@ -796,12 +796,18 @@ render_header('RFQ Tracker');
   </div>
   <script>
     function copyRfqEmailText() {
-      var text = document.getElementById('rfq_email_text').value;
-      var status = document.getElementById('rfq_copy_status');
+      const text = document.getElementById('rfq_email_text').value;
+      const status = document.getElementById('rfq_copy_status');
       navigator.clipboard.writeText(text).then(function() {
         status.textContent = 'Copied to clipboard.';
+        setTimeout(function() {
+          status.textContent = '';
+        }, 3000);
       }, function() {
         status.textContent = 'Copy failed. Please select the text and copy manually.';
+        setTimeout(function() {
+          status.textContent = '';
+        }, 5000);
       });
     }
   </script>
