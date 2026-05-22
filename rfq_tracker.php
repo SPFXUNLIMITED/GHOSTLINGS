@@ -49,6 +49,32 @@ function format_shipping_details(?string $origin, ?string $method): string {
   return $origin !== '' ? $origin : $method;
 }
 
+function build_rfq_email_text(array $rfq): string {
+  $lines = [
+    'RFQ #' . (int)$rfq['id'] . ': ' . trim((string)$rfq['request_title']),
+    '',
+    'Machine Size: ' . trim((string)$rfq['machine_size']),
+    'Laser Watts: ' . trim((string)$rfq['laser_watts']),
+    'Tube Type: ' . trim((string)$rfq['tube_type']),
+    'Quantity: ' . (int)$rfq['quantity'],
+    'Status: ' . trim((string)$rfq['request_status']),
+    'Requested By: ' . trim((string)($rfq['requested_by_username'] ?? 'Unknown')),
+    'Created: ' . trim((string)$rfq['created_at']),
+    '',
+    'Required Features:',
+    trim((string)$rfq['required_features']),
+  ];
+
+  $additional_notes = trim((string)($rfq['additional_notes'] ?? ''));
+  if ($additional_notes !== '') {
+    $lines[] = '';
+    $lines[] = 'Additional Notes:';
+    $lines[] = $additional_notes;
+  }
+
+  return implode("\n", $lines);
+}
+
 function is_safe_stored_upload_name(string $name): bool {
   return (bool)preg_match('/^[a-zA-Z0-9._-]+$/', $name);
 }
@@ -562,6 +588,7 @@ if ($edit_quote_id <= 0) {
 if ($edit_rfq_id <= 0) {
   $edit_rfq_id = max(0, (int)($_GET['edit_rfq_id'] ?? 0));
 }
+$rfq_text_id = max(0, (int)($_GET['rfq_text_id'] ?? 0));
 
 $where_parts = [];
 $params = [];
@@ -603,6 +630,7 @@ $selected_rfq = null;
 $quotes = [];
 $editing_quote = null;
 $editing_rfq = null;
+$rfq_email_text = '';
 if ($selected_rfq_id > 0) {
   $sel = $pdo->prepare("SELECT id, request_title FROM rfq_requests WHERE id = ? LIMIT 1");
   $sel->execute([$selected_rfq_id]);
@@ -636,6 +664,24 @@ if ($edit_rfq_id > 0) {
   );
   $er->execute([$edit_rfq_id]);
   $editing_rfq = $er->fetch() ?: null;
+}
+
+if ($rfq_text_id > 0) {
+  $txt = $pdo->prepare(
+    "SELECT r.id, r.request_title, r.machine_size, r.laser_watts, r.tube_type, r.quantity,
+            r.required_features, r.additional_notes, r.request_status, r.created_at,
+            u.username AS requested_by_username
+     FROM rfq_requests r
+     LEFT JOIN users u ON u.id = r.requested_by
+     WHERE r.id = ? LIMIT 1"
+  );
+  $txt->execute([$rfq_text_id]);
+  $rfq_for_email = $txt->fetch();
+  if ($rfq_for_email) {
+    $rfq_email_text = build_rfq_email_text($rfq_for_email);
+  } else {
+    $errors[] = 'RFQ not found for email text export.';
+  }
 }
 
 render_header('RFQ Tracker');
@@ -735,6 +781,49 @@ render_header('RFQ Tracker');
   </form>
 </div>
 
+<?php if ($rfq_email_text !== ''): ?>
+  <div class="card">
+    <h2 style="margin-top:0;">RFQ Email Text</h2>
+    <p class="muted" style="margin-top:0;">
+      Copy this text and paste it into your email.
+    </p>
+    <label id="rfq_email_text_label" for="rfq_email_text">Email content</label>
+    <textarea id="rfq_email_text" rows="16" readonly aria-labelledby="rfq_email_text_label"><?= h($rfq_email_text) ?></textarea>
+    <div class="row" style="margin-top:8px;">
+      <button type="button" class="btn" onclick="copyRfqEmailText()">Copy Text</button>
+      <span id="rfq_copy_status" class="muted" role="status" aria-live="polite"></span>
+    </div>
+  </div>
+  <script>
+    function copyRfqEmailText() {
+      const text = document.getElementById('rfq_email_text').value;
+      const status = document.getElementById('rfq_copy_status');
+      const copyFailedMessage = 'Failed to copy to clipboard. Your browser may not support this feature. Please select the text and copy manually.';
+      const copySuccessDurationMs = 3000;
+      const copyErrorDurationMs = 5000;
+      const canUseClipboard = navigator.clipboard && typeof navigator.clipboard.writeText === 'function';
+      if (!canUseClipboard) {
+        status.textContent = copyFailedMessage;
+        setTimeout(function() {
+          status.textContent = '';
+        }, copyErrorDurationMs);
+        return;
+      }
+      navigator.clipboard.writeText(text).then(function() {
+        status.textContent = 'Copied to clipboard.';
+        setTimeout(function() {
+          status.textContent = '';
+        }, copySuccessDurationMs);
+      }, function() {
+        status.textContent = copyFailedMessage;
+        setTimeout(function() {
+          status.textContent = '';
+        }, copyErrorDurationMs);
+      });
+    }
+  </script>
+<?php endif; ?>
+
 <div class="card">
   <div class="table-wrap" style="overflow-x:auto;">
     <table class="table-auto" style="min-width:1100px;">
@@ -808,6 +897,7 @@ render_header('RFQ Tracker');
             <td class="muted" style="white-space:nowrap;"><?= h($r['created_at']) ?></td>
             <td class="col-actions">
               <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$r['id'] ?>">Quotes</a>
+              <a class="btn" href="rfq_tracker.php?rfq_text_id=<?= (int)$r['id'] ?>">Email Text</a>
               <a class="btn" href="rfq_tracker.php?edit_rfq_id=<?= (int)$r['id'] ?>">Edit</a>
               <form method="post" style="display:inline;"
                     onsubmit="return confirm('Delete this RFQ and all its quotes? This cannot be undone.');">
