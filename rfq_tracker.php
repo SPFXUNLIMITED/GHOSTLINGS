@@ -34,6 +34,7 @@ $errors = [];
 $success = '';
 $selected_rfq_id = 0;
 $edit_quote_id = 0;
+$edit_rfq_id = 0;
 
 function format_shipping_details(?string $origin, ?string $method): string {
   $origin = trim((string)$origin);
@@ -443,6 +444,108 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $selected_rfq_id = $rfq_id;
         $edit_quote_id = $quote_id;
       }
+    } elseif ($action === 'edit_rfq') {
+      $rfq_id = (int)($_POST['rfq_id'] ?? 0);
+      $request_title = trim((string)($_POST['request_title'] ?? ''));
+      $machine_size = trim((string)($_POST['machine_size'] ?? ''));
+      $laser_watts = trim((string)($_POST['laser_watts'] ?? ''));
+      $tube_type = trim((string)($_POST['tube_type'] ?? ''));
+      $quantity_raw = trim((string)($_POST['quantity'] ?? ''));
+      $required_features = trim((string)($_POST['required_features'] ?? ''));
+      $additional_notes = trim((string)($_POST['additional_notes'] ?? ''));
+
+      if ($rfq_id <= 0) $errors[] = 'Invalid RFQ request.';
+      if ($request_title === '') $errors[] = 'Request title is required.';
+      if ($machine_size === '') $errors[] = 'Machine size is required.';
+      if ($laser_watts === '') $errors[] = 'Laser watts is required.';
+      if ($tube_type === '') $errors[] = 'Tube type is required.';
+      if ($required_features === '') $errors[] = 'Required features are required.';
+      if (!ctype_digit($quantity_raw) || (int)$quantity_raw < 1 || (int)$quantity_raw > MAX_RFQ_QUANTITY) {
+        $errors[] = 'Quantity must be a whole number between 1 and ' . MAX_RFQ_QUANTITY . '.';
+      }
+      if (strlen($required_features) > 5000) {
+        $errors[] = 'Required features must be 5000 characters or fewer.';
+      }
+      if (strlen($additional_notes) > 5000) {
+        $errors[] = 'Additional notes must be 5000 characters or fewer.';
+      }
+
+      if (!$errors) {
+        $upd = $pdo->prepare(
+          "UPDATE rfq_requests SET
+            request_title = ?, machine_size = ?, laser_watts = ?, tube_type = ?,
+            quantity = ?, required_features = ?, additional_notes = ?
+           WHERE id = ?"
+        );
+        $upd->execute([
+          $request_title,
+          $machine_size,
+          $laser_watts,
+          $tube_type,
+          (int)$quantity_raw,
+          $required_features,
+          $additional_notes === '' ? null : $additional_notes,
+          $rfq_id,
+        ]);
+        if ($upd->rowCount() > 0) {
+          $success = 'RFQ request updated successfully.';
+        } else {
+          $errors[] = 'RFQ not found or no changes made.';
+          $edit_rfq_id = $rfq_id;
+        }
+      } else {
+        $edit_rfq_id = $rfq_id;
+      }
+    } elseif ($action === 'delete_rfq') {
+      $rfq_id = (int)($_POST['rfq_id'] ?? 0);
+      if ($rfq_id <= 0) {
+        $errors[] = 'Invalid RFQ request.';
+      } else {
+        // Delete uploaded files for all quotes in this RFQ
+        $file_rows = $pdo->prepare("SELECT quote_file_stored_name FROM rfq_quotes WHERE rfq_request_id = ?");
+        $file_rows->execute([$rfq_id]);
+        foreach ($file_rows->fetchAll() as $fr) {
+          $stored = (string)($fr['quote_file_stored_name'] ?? '');
+          if ($stored !== '' && is_safe_stored_upload_name($stored)) {
+            $old_path = __DIR__ . '/uploads/' . $stored;
+            if (is_file($old_path)) {
+              @unlink($old_path);
+            }
+          }
+        }
+        $pdo->prepare("DELETE FROM rfq_quotes WHERE rfq_request_id = ?")->execute([$rfq_id]);
+        $del = $pdo->prepare("DELETE FROM rfq_requests WHERE id = ?");
+        $del->execute([$rfq_id]);
+        if ($del->rowCount() > 0) {
+          $success = 'RFQ request and all associated quotes deleted.';
+        } else {
+          $errors[] = 'RFQ not found.';
+        }
+      }
+    } elseif ($action === 'delete_quote') {
+      $quote_id = (int)($_POST['quote_id'] ?? 0);
+      $rfq_id = (int)($_POST['rfq_id'] ?? 0);
+      if ($quote_id <= 0 || $rfq_id <= 0) {
+        $errors[] = 'Invalid quote or RFQ.';
+      } else {
+        $row = $pdo->prepare("SELECT quote_file_stored_name FROM rfq_quotes WHERE id = ? AND rfq_request_id = ? LIMIT 1");
+        $row->execute([$quote_id, $rfq_id]);
+        $del_quote = $row->fetch();
+        if (!$del_quote) {
+          $errors[] = 'Quote not found.';
+        } else {
+          $stored = (string)($del_quote['quote_file_stored_name'] ?? '');
+          if ($stored !== '' && is_safe_stored_upload_name($stored)) {
+            $old_path = __DIR__ . '/uploads/' . $stored;
+            if (is_file($old_path)) {
+              @unlink($old_path);
+            }
+          }
+          $pdo->prepare("DELETE FROM rfq_quotes WHERE id = ? AND rfq_request_id = ?")->execute([$quote_id, $rfq_id]);
+          $success = 'Quote deleted successfully.';
+          $selected_rfq_id = $rfq_id;
+        }
+      }
     }
   }
 }
@@ -454,6 +557,9 @@ if ($selected_rfq_id <= 0) {
 }
 if ($edit_quote_id <= 0) {
   $edit_quote_id = max(0, (int)($_GET['edit_quote_id'] ?? 0));
+}
+if ($edit_rfq_id <= 0) {
+  $edit_rfq_id = max(0, (int)($_GET['edit_rfq_id'] ?? 0));
 }
 
 $where_parts = [];
@@ -495,6 +601,7 @@ $rfqs = $stmt->fetchAll();
 $selected_rfq = null;
 $quotes = [];
 $editing_quote = null;
+$editing_rfq = null;
 if ($selected_rfq_id > 0) {
   $sel = $pdo->prepare("SELECT id, request_title FROM rfq_requests WHERE id = ? LIMIT 1");
   $sel->execute([$selected_rfq_id]);
@@ -521,6 +628,15 @@ if ($selected_rfq_id > 0) {
   }
 }
 
+if ($edit_rfq_id > 0) {
+  $er = $pdo->prepare(
+    "SELECT id, request_title, machine_size, laser_watts, tube_type, quantity, required_features, additional_notes
+     FROM rfq_requests WHERE id = ? LIMIT 1"
+  );
+  $er->execute([$edit_rfq_id]);
+  $editing_rfq = $er->fetch() ?: null;
+}
+
 render_header('RFQ Tracker');
 ?>
 
@@ -545,8 +661,56 @@ render_header('RFQ Tracker');
   </div>
 <?php endif; ?>
 
+<?php if ($editing_rfq): ?>
 <div class="card">
-  <form method="get" class="row" style="align-items:flex-end;">
+  <h2 style="margin-top:0; margin-bottom:12px;">Edit RFQ #<?= (int)$editing_rfq['id'] ?></h2>
+  <form method="post" class="form-grid" novalidate>
+    <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
+    <input type="hidden" name="action" value="edit_rfq" />
+    <input type="hidden" name="rfq_id" value="<?= (int)$editing_rfq['id'] ?>" />
+
+    <div class="full">
+      <label>RFQ Title <span style="color:var(--d)">*</span></label>
+      <input type="text" name="request_title" maxlength="255" required
+             value="<?= h($editing_rfq['request_title']) ?>" />
+    </div>
+    <div>
+      <label>Machine Size <span style="color:var(--d)">*</span></label>
+      <input type="text" name="machine_size" maxlength="100" required
+             value="<?= h($editing_rfq['machine_size']) ?>" />
+    </div>
+    <div>
+      <label>Laser Watts <span style="color:var(--d)">*</span></label>
+      <input type="text" name="laser_watts" maxlength="50" required
+             value="<?= h($editing_rfq['laser_watts']) ?>" />
+    </div>
+    <div>
+      <label>Tube Type <span style="color:var(--d)">*</span></label>
+      <input type="text" name="tube_type" maxlength="100" required
+             value="<?= h($editing_rfq['tube_type']) ?>" />
+    </div>
+    <div>
+      <label>Quantity <span style="color:var(--d)">*</span></label>
+      <input type="number" name="quantity" min="1" max="<?= MAX_RFQ_QUANTITY ?>" required
+             value="<?= h((string)$editing_rfq['quantity']) ?>" />
+    </div>
+    <div class="full">
+      <label>Required Features <span style="color:var(--d)">*</span></label>
+      <textarea name="required_features" rows="5" maxlength="5000" required><?= h($editing_rfq['required_features']) ?></textarea>
+    </div>
+    <div class="full">
+      <label>Additional Notes</label>
+      <textarea name="additional_notes" rows="4" maxlength="5000"><?= h((string)($editing_rfq['additional_notes'] ?? '')) ?></textarea>
+    </div>
+    <div class="full row" style="margin-top:8px;">
+      <button type="submit" class="btn primary">Save Changes</button>
+      <a class="btn" href="rfq_tracker.php">Cancel</a>
+    </div>
+  </form>
+</div>
+<?php endif; ?>
+
+<div class="card">
     <div style="flex:1 1 300px;">
       <label>Search RFQs</label>
       <input type="text" name="q" value="<?= h($search) ?>"
@@ -642,6 +806,14 @@ render_header('RFQ Tracker');
             <td class="muted" style="white-space:nowrap;"><?= h($r['created_at']) ?></td>
             <td class="col-actions">
               <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$r['id'] ?>">Quotes</a>
+              <a class="btn" href="rfq_tracker.php?edit_rfq_id=<?= (int)$r['id'] ?>">Edit</a>
+              <form method="post" style="display:inline;"
+                    onsubmit="return confirm('Delete this RFQ and all its quotes? This cannot be undone.');">
+                <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
+                <input type="hidden" name="action" value="delete_rfq" />
+                <input type="hidden" name="rfq_id" value="<?= (int)$r['id'] ?>" />
+                <button type="submit" class="btn" style="color:#b91c1c;">Delete</button>
+              </form>
             </td>
           </tr>
         <?php endforeach; ?>
@@ -854,6 +1026,14 @@ render_header('RFQ Tracker');
               <td class="muted"><?= h($q['created_by_username'] ?? 'Unknown') ?></td>
               <td class="col-actions">
                 <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>&edit_quote_id=<?= (int)$q['id'] ?>">Edit</a>
+                <form method="post" style="display:inline;"
+                      onsubmit="return confirm('Delete this quote? This cannot be undone.');">
+                  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
+                  <input type="hidden" name="action" value="delete_quote" />
+                  <input type="hidden" name="rfq_id" value="<?= (int)$selected_rfq['id'] ?>" />
+                  <input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>" />
+                  <button type="submit" class="btn" style="color:#b91c1c;">Delete</button>
+                </form>
               </td>
             </tr>
           <?php endforeach; ?>
