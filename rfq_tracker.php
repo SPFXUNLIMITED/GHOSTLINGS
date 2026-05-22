@@ -799,24 +799,26 @@ render_header('RFQ Tracker');
       const text = document.getElementById('rfq_email_text').value;
       const status = document.getElementById('rfq_copy_status');
       const copyFailedMessage = 'Failed to copy to clipboard. Your browser may not support this feature. Please select the text and copy manually.';
+      const copySuccessDurationMs = 3000;
+      const copyErrorDurationMs = 5000;
       const canUseClipboard = navigator.clipboard && typeof navigator.clipboard.writeText === 'function';
       if (!canUseClipboard) {
         status.textContent = copyFailedMessage;
         setTimeout(function() {
           status.textContent = '';
-        }, 5000);
+        }, copyErrorDurationMs);
         return;
       }
       navigator.clipboard.writeText(text).then(function() {
         status.textContent = 'Copied to clipboard.';
         setTimeout(function() {
           status.textContent = '';
-        }, 3000);
+        }, copySuccessDurationMs);
       }, function() {
         status.textContent = copyFailedMessage;
         setTimeout(function() {
           status.textContent = '';
-        }, 5000);
+        }, copyErrorDurationMs);
       });
     }
   </script>
