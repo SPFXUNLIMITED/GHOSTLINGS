@@ -16,13 +16,17 @@ if (empty($_SESSION['rfq_form_csrf'])) {
 $errors = [];
 $success = '';
 $fields = [
-  'request_title' => '',
-  'machine_size' => '',
-  'laser_watts' => '',
-  'tube_type' => '',
-  'quantity' => '1',
+  'contact_name'    => '',
+  'company_name'    => '',
+  'contact_email'   => '',
+  'contact_phone'   => '',
+  'request_title'   => '',
+  'machine_size'    => '',
+  'laser_watts'     => '',
+  'tube_type'       => '',
+  'quantity'        => '1',
   'required_features' => '',
-  'additional_notes' => '',
+  'additional_notes'  => '',
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -40,6 +44,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if ($fields['laser_watts'] === '') $errors[] = 'Laser watts is required.';
   if ($fields['tube_type'] === '') $errors[] = 'Tube type is required.';
   if ($fields['required_features'] === '') $errors[] = 'Required features are required.';
+  if ($fields['contact_email'] !== '' && !filter_var($fields['contact_email'], FILTER_VALIDATE_EMAIL)) {
+    $errors[] = 'Contact email must be a valid email address.';
+  }
 
   if (!ctype_digit($fields['quantity']) || (int)$fields['quantity'] < 1 || (int)$fields['quantity'] > MAX_RFQ_QUANTITY) {
     $errors[] = 'Quantity must be a whole number between 1 and ' . MAX_RFQ_QUANTITY . '.';
@@ -55,11 +62,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (!$errors) {
     $stmt = $pdo->prepare(
       "INSERT INTO rfq_requests
-        (requested_by, request_title, machine_size, laser_watts, tube_type, quantity, required_features, additional_notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        (requested_by, contact_name, company_name, contact_email, contact_phone,
+         request_title, machine_size, laser_watts, tube_type, quantity, required_features, additional_notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $stmt->execute([
       (int)current_user_id(),
+      $fields['contact_name']  === '' ? null : $fields['contact_name'],
+      $fields['company_name']  === '' ? null : $fields['company_name'],
+      $fields['contact_email'] === '' ? null : $fields['contact_email'],
+      $fields['contact_phone'] === '' ? null : $fields['contact_phone'],
       $fields['request_title'],
       $fields['machine_size'],
       $fields['laser_watts'],
@@ -72,13 +84,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $_SESSION['rfq_form_csrf'] = bin2hex(random_bytes(24));
     $success = 'RFQ request submitted. You can now track quotes in RFQ Tracker.';
     $fields = [
-      'request_title' => '',
-      'machine_size' => '',
-      'laser_watts' => '',
-      'tube_type' => '',
-      'quantity' => '1',
+      'contact_name'    => '',
+      'company_name'    => '',
+      'contact_email'   => '',
+      'contact_phone'   => '',
+      'request_title'   => '',
+      'machine_size'    => '',
+      'laser_watts'     => '',
+      'tube_type'       => '',
+      'quantity'        => '1',
       'required_features' => '',
-      'additional_notes' => '',
+      'additional_notes'  => '',
     ];
   }
 }
@@ -109,6 +125,37 @@ render_header('RFQ Request Form');
 
 <form method="post" class="card" novalidate>
   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_form_csrf']) ?>" />
+
+  <h2 style="margin-top:0; margin-bottom:12px; font-size:1rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted, #6b7280);">Company / Contact Information</h2>
+  <div class="form-grid">
+    <div>
+      <label>Contact Name</label>
+      <input type="text" name="contact_name" maxlength="255"
+             value="<?= h($fields['contact_name']) ?>"
+             placeholder="e.g. Jane Smith" />
+    </div>
+    <div>
+      <label>Company Name</label>
+      <input type="text" name="company_name" maxlength="255"
+             value="<?= h($fields['company_name']) ?>"
+             placeholder="e.g. Acme Laser Co." />
+    </div>
+    <div>
+      <label>Contact Email</label>
+      <input type="email" name="contact_email" maxlength="255"
+             value="<?= h($fields['contact_email']) ?>"
+             placeholder="e.g. jane@acme.com" />
+    </div>
+    <div>
+      <label>Contact Phone</label>
+      <input type="text" name="contact_phone" maxlength="100"
+             value="<?= h($fields['contact_phone']) ?>"
+             placeholder="e.g. +1 (555) 000-1234" />
+    </div>
+  </div>
+
+  <hr style="margin:20px 0; border:none; border-top:1px solid var(--border, #e5e7eb);" />
+  <h2 style="margin-top:0; margin-bottom:12px; font-size:1rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted, #6b7280);">Machine Specifications</h2>
 
   <div class="form-grid">
     <div class="full">
