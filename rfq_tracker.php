@@ -50,27 +50,75 @@ function format_shipping_details(?string $origin, ?string $method): string {
 }
 
 function build_rfq_email_text(array $rfq): string {
+  $sep  = str_repeat('=', 60);
+  $sep2 = str_repeat('-', 60);
+  $date = date('F j, Y', strtotime((string)$rfq['created_at']));
+
+  $contact_name  = trim((string)($rfq['contact_name']  ?? ''));
+  $company_name  = trim((string)($rfq['company_name']  ?? ''));
+  $contact_email = trim((string)($rfq['contact_email'] ?? ''));
+  $contact_phone = trim((string)($rfq['contact_phone'] ?? ''));
+  $requested_by  = trim((string)($rfq['requested_by_username'] ?? 'Unknown'));
+
   $lines = [
-    'RFQ #' . (int)$rfq['id'] . ': ' . trim((string)$rfq['request_title']),
+    $sep,
+    'REQUEST FOR QUOTATION (RFQ)',
+    $sep,
     '',
-    'Machine Size: ' . trim((string)$rfq['machine_size']),
-    'Laser Watts: ' . trim((string)$rfq['laser_watts']),
-    'Tube Type: ' . trim((string)$rfq['tube_type']),
-    'Quantity: ' . (int)$rfq['quantity'],
-    'Status: ' . trim((string)$rfq['request_status']),
-    'Requested By: ' . trim((string)($rfq['requested_by_username'] ?? 'Unknown')),
-    'Created: ' . trim((string)$rfq['created_at']),
+    'RFQ #:        ' . (int)$rfq['id'],
+    'Date:         ' . $date,
+    'Status:       ' . ucfirst(str_replace('_', ' ', trim((string)$rfq['request_status']))),
     '',
-    'Required Features:',
-    trim((string)$rfq['required_features']),
+    $sep2,
+    'FROM:',
+    $sep2,
   ];
+
+  if ($company_name !== '') {
+    $lines[] = 'Company:      ' . $company_name;
+  }
+  if ($contact_name !== '') {
+    $lines[] = 'Contact:      ' . $contact_name;
+  } else {
+    $lines[] = 'Submitted By: ' . $requested_by;
+  }
+  if ($contact_email !== '') {
+    $lines[] = 'Email:        ' . $contact_email;
+  }
+  if ($contact_phone !== '') {
+    $lines[] = 'Phone:        ' . $contact_phone;
+  }
+
+  $lines = array_merge($lines, [
+    '',
+    $sep2,
+    'MACHINE SPECIFICATIONS:',
+    $sep2,
+    'Title:        ' . trim((string)$rfq['request_title']),
+    'Machine Size: ' . trim((string)$rfq['machine_size']),
+    'Laser Watts:  ' . trim((string)$rfq['laser_watts']),
+    'Tube Type:    ' . trim((string)$rfq['tube_type']),
+    'Quantity:     ' . (int)$rfq['quantity'],
+    '',
+    $sep2,
+    'REQUIRED FEATURES:',
+    $sep2,
+    trim((string)$rfq['required_features']),
+  ]);
 
   $additional_notes = trim((string)($rfq['additional_notes'] ?? ''));
   if ($additional_notes !== '') {
     $lines[] = '';
-    $lines[] = 'Additional Notes:';
+    $lines[] = $sep2;
+    $lines[] = 'ADDITIONAL NOTES:';
+    $lines[] = $sep2;
     $lines[] = $additional_notes;
   }
+
+  $lines[] = '';
+  $lines[] = $sep;
+  $lines[] = 'Please reply with your best quotation at your earliest convenience.';
+  $lines[] = $sep;
 
   return implode("\n", $lines);
 }
@@ -473,13 +521,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
     } elseif ($action === 'edit_rfq') {
       $rfq_id = (int)($_POST['rfq_id'] ?? 0);
-      $request_title = trim((string)($_POST['request_title'] ?? ''));
-      $machine_size = trim((string)($_POST['machine_size'] ?? ''));
-      $laser_watts = trim((string)($_POST['laser_watts'] ?? ''));
-      $tube_type = trim((string)($_POST['tube_type'] ?? ''));
-      $quantity_raw = trim((string)($_POST['quantity'] ?? ''));
+      $contact_name     = trim((string)($_POST['contact_name']    ?? ''));
+      $company_name     = trim((string)($_POST['company_name']    ?? ''));
+      $contact_email    = trim((string)($_POST['contact_email']   ?? ''));
+      $contact_phone    = trim((string)($_POST['contact_phone']   ?? ''));
+      $request_title    = trim((string)($_POST['request_title']   ?? ''));
+      $machine_size     = trim((string)($_POST['machine_size']    ?? ''));
+      $laser_watts      = trim((string)($_POST['laser_watts']     ?? ''));
+      $tube_type        = trim((string)($_POST['tube_type']       ?? ''));
+      $quantity_raw     = trim((string)($_POST['quantity']        ?? ''));
       $required_features = trim((string)($_POST['required_features'] ?? ''));
-      $additional_notes = trim((string)($_POST['additional_notes'] ?? ''));
+      $additional_notes  = trim((string)($_POST['additional_notes']  ?? ''));
 
       if ($rfq_id <= 0) $errors[] = 'Invalid RFQ request.';
       if ($request_title === '') $errors[] = 'Request title is required.';
@@ -487,6 +539,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($laser_watts === '') $errors[] = 'Laser watts is required.';
       if ($tube_type === '') $errors[] = 'Tube type is required.';
       if ($required_features === '') $errors[] = 'Required features are required.';
+      if ($contact_email !== '' && !filter_var($contact_email, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = 'Contact email must be a valid email address.';
+      }
       if (!ctype_digit($quantity_raw) || (int)$quantity_raw < 1 || (int)$quantity_raw > MAX_RFQ_QUANTITY) {
         $errors[] = 'Quantity must be a whole number between 1 and ' . MAX_RFQ_QUANTITY . '.';
       }
@@ -500,11 +555,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (!$errors) {
         $upd = $pdo->prepare(
           "UPDATE rfq_requests SET
+            contact_name = ?, company_name = ?, contact_email = ?, contact_phone = ?,
             request_title = ?, machine_size = ?, laser_watts = ?, tube_type = ?,
             quantity = ?, required_features = ?, additional_notes = ?
            WHERE id = ?"
         );
         $upd->execute([
+          $contact_name  === '' ? null : $contact_name,
+          $company_name  === '' ? null : $company_name,
+          $contact_email === '' ? null : $contact_email,
+          $contact_phone === '' ? null : $contact_phone,
           $request_title,
           $machine_size,
           $laser_watts,
@@ -659,7 +719,8 @@ if ($selected_rfq_id > 0) {
 
 if ($edit_rfq_id > 0) {
   $er = $pdo->prepare(
-    "SELECT id, request_title, machine_size, laser_watts, tube_type, quantity, required_features, additional_notes
+    "SELECT id, contact_name, company_name, contact_email, contact_phone,
+            request_title, machine_size, laser_watts, tube_type, quantity, required_features, additional_notes
      FROM rfq_requests WHERE id = ? LIMIT 1"
   );
   $er->execute([$edit_rfq_id]);
@@ -670,6 +731,7 @@ if ($rfq_text_id > 0) {
   $txt = $pdo->prepare(
     "SELECT r.id, r.request_title, r.machine_size, r.laser_watts, r.tube_type, r.quantity,
             r.required_features, r.additional_notes, r.request_status, r.created_at,
+            r.contact_name, r.company_name, r.contact_email, r.contact_phone,
             u.username AS requested_by_username
      FROM rfq_requests r
      LEFT JOIN users u ON u.id = r.requested_by
@@ -715,6 +777,35 @@ render_header('RFQ Tracker');
     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
     <input type="hidden" name="action" value="edit_rfq" />
     <input type="hidden" name="rfq_id" value="<?= (int)$editing_rfq['id'] ?>" />
+
+    <div class="full" style="margin-bottom:4px;">
+      <strong style="font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted,#6b7280);">Company / Contact Information</strong>
+    </div>
+    <div>
+      <label>Contact Name</label>
+      <input type="text" name="contact_name" maxlength="255"
+             value="<?= h((string)($editing_rfq['contact_name'] ?? '')) ?>" />
+    </div>
+    <div>
+      <label>Company Name</label>
+      <input type="text" name="company_name" maxlength="255"
+             value="<?= h((string)($editing_rfq['company_name'] ?? '')) ?>" />
+    </div>
+    <div>
+      <label>Contact Email</label>
+      <input type="email" name="contact_email" maxlength="255"
+             value="<?= h((string)($editing_rfq['contact_email'] ?? '')) ?>" />
+    </div>
+    <div>
+      <label>Contact Phone</label>
+      <input type="text" name="contact_phone" maxlength="100"
+             value="<?= h((string)($editing_rfq['contact_phone'] ?? '')) ?>" />
+    </div>
+
+    <div class="full"><hr style="margin:4px 0 8px; border:none; border-top:1px solid var(--border,#e5e7eb);" /></div>
+    <div class="full" style="margin-bottom:4px;">
+      <strong style="font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted,#6b7280);">Machine Specifications</strong>
+    </div>
 
     <div class="full">
       <label>RFQ Title <span style="color:var(--d)">*</span></label>

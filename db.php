@@ -347,3 +347,19 @@ foreach ([
     }
   }
 }
+
+// Add company/contact header columns to rfq_requests if they do not exist yet
+foreach ([
+  "ALTER TABLE rfq_requests ADD COLUMN contact_name  VARCHAR(255) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN company_name  VARCHAR(255) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN contact_email VARCHAR(255) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN contact_phone VARCHAR(100)  NULL",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    if ($e->getCode() !== '42S21') {
+      throw $e;
+    }
+  }
+}
