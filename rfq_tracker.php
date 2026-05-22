@@ -80,7 +80,7 @@ function build_rfq_email_text(array $rfq): string {
   if ($contact_name !== '') {
     $lines[] = 'Contact:      ' . $contact_name;
   } else {
-    $lines[] = 'Submitted By: ' . $requested_by;
+    $lines[] = 'Requested By: ' . $requested_by;
   }
   if ($contact_email !== '') {
     $lines[] = 'Email:        ' . $contact_email;
