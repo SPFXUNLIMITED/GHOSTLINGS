@@ -1,7 +1,13 @@
 :root { --b:#e5e7eb; --t:#111827; --m:#6b7280; --p:#2563eb; --d:#dc2626; }
 * { box-sizing: border-box; }
 body { font-family: system-ui, Arial, sans-serif; color: var(--t); background:#f9fafb; margin:0; }
-.container { max-width: 980px; margin: 24px auto; padding: 0 16px; }
+.container { width: min(100% - 32px, 980px); margin: 24px auto; padding: 0 16px; }
+
+@media (min-width: 1200px) {
+  .container {
+    width: min(100% - 48px, 1320px);
+  }
+}
 .topbar {
   display: flex;
   justify-content: space-between;
