@@ -798,8 +798,10 @@ render_header('RFQ Tracker');
     function copyRfqEmailText() {
       const text = document.getElementById('rfq_email_text').value;
       const status = document.getElementById('rfq_copy_status');
-      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
-        status.textContent = 'Failed to copy to clipboard. Your browser may not support this feature. Please select the text and copy manually.';
+      const copyFailedMessage = 'Failed to copy to clipboard. Your browser may not support this feature. Please select the text and copy manually.';
+      const canUseClipboard = !!(navigator.clipboard && typeof navigator.clipboard.writeText === 'function');
+      if (!canUseClipboard) {
+        status.textContent = copyFailedMessage;
         setTimeout(function() {
           status.textContent = '';
         }, 5000);
@@ -811,7 +813,7 @@ render_header('RFQ Tracker');
           status.textContent = '';
         }, 3000);
       }, function() {
-        status.textContent = 'Failed to copy to clipboard. Your browser may not support this feature. Please select the text and copy manually.';
+        status.textContent = copyFailedMessage;
         setTimeout(function() {
           status.textContent = '';
         }, 5000);
