@@ -788,7 +788,7 @@ render_header('RFQ Tracker');
       Copy this text and paste it into your email.
     </p>
     <label for="rfq_email_text">Email content</label>
-    <textarea id="rfq_email_text" rows="16" readonly><?= h($rfq_email_text) ?></textarea>
+    <textarea id="rfq_email_text" rows="16" readonly aria-readonly="true"><?= h($rfq_email_text) ?></textarea>
     <div class="row" style="margin-top:8px;">
       <button type="button" class="btn" onclick="copyRfqEmailText()">Copy Text</button>
       <span id="rfq_copy_status" class="muted" aria-live="polite"></span>
@@ -798,13 +798,20 @@ render_header('RFQ Tracker');
     function copyRfqEmailText() {
       const text = document.getElementById('rfq_email_text').value;
       const status = document.getElementById('rfq_copy_status');
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+        status.textContent = 'Failed to copy to clipboard. Your browser may not support this feature. Please select the text and copy manually.';
+        setTimeout(function() {
+          status.textContent = '';
+        }, 5000);
+        return;
+      }
       navigator.clipboard.writeText(text).then(function() {
         status.textContent = 'Copied to clipboard.';
         setTimeout(function() {
           status.textContent = '';
         }, 3000);
       }, function() {
-        status.textContent = 'Copy failed. Please select the text and copy manually.';
+        status.textContent = 'Failed to copy to clipboard. Your browser may not support this feature. Please select the text and copy manually.';
         setTimeout(function() {
           status.textContent = '';
         }, 5000);
