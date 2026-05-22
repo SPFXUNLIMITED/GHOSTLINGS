@@ -2,6 +2,12 @@
 * { box-sizing: border-box; }
 body { font-family: system-ui, Arial, sans-serif; color: var(--t); background:#f9fafb; margin:0; }
 .container { max-width: 980px; margin: 24px auto; padding: 0 16px; }
+
+@media (min-width: 1200px) {
+  .container {
+    max-width: 1320px;
+  }
+}
 .topbar {
   display: flex;
   justify-content: space-between;
