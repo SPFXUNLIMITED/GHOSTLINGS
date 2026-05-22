@@ -787,11 +787,11 @@ render_header('RFQ Tracker');
     <p class="muted" style="margin-top:0;">
       Copy this text and paste it into your email.
     </p>
-    <label for="rfq_email_text">Email content</label>
-    <textarea id="rfq_email_text" rows="16" readonly><?= h($rfq_email_text) ?></textarea>
+    <label id="rfq_email_text_label" for="rfq_email_text">Email content</label>
+    <textarea id="rfq_email_text" rows="16" readonly aria-labelledby="rfq_email_text_label"><?= h($rfq_email_text) ?></textarea>
     <div class="row" style="margin-top:8px;">
       <button type="button" class="btn" onclick="copyRfqEmailText()">Copy Text</button>
-      <span id="rfq_copy_status" class="muted" aria-live="polite"></span>
+      <span id="rfq_copy_status" class="muted" role="status" aria-live="polite"></span>
     </div>
   </div>
   <script>
