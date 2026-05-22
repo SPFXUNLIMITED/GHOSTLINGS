@@ -4,6 +4,7 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_rfq_access();
 
+const MAX_RFQ_QUANTITY = 1000;
 const MAX_LEAD_TIME_DAYS = 3650;
 const MAX_QUOTE_UPLOAD_BYTES = 26214400; // 25 MB
 
