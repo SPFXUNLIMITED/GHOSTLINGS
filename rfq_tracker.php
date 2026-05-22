@@ -711,6 +711,7 @@ render_header('RFQ Tracker');
 <?php endif; ?>
 
 <div class="card">
+  <form method="get" class="row" style="align-items:flex-end;">
     <div style="flex:1 1 300px;">
       <label>Search RFQs</label>
       <input type="text" name="q" value="<?= h($search) ?>"
