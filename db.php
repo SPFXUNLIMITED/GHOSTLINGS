@@ -348,6 +348,25 @@ foreach ([
   }
 }
 
+// Create rfq_canned_responses table for RFQ form quick-fill buttons
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS rfq_canned_responses (
+    slot       TINYINT UNSIGNED NOT NULL,
+    label      VARCHAR(100) NOT NULL DEFAULT '',
+    body       TEXT NOT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (slot)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// Seed 3 default slots if they do not exist yet
+$pdo->exec("
+  INSERT IGNORE INTO rfq_canned_responses (slot, label, body) VALUES
+    (1, 'Standard Request',  'Please provide pricing, lead time, and shipping cost for the specified quantity. Include warranty terms and after-sales support availability.'),
+    (2, 'Sample Order',      'We would like to order a sample unit first before committing to the full quantity. Please quote for a single unit including shipping to the US.'),
+    (3, 'Bulk Discount',     'We are interested in bulk pricing for this order. Please provide tiered pricing for 1, 5, and 10 units along with lead time for each tier.')
+");
+
 // Add company/contact header columns to rfq_requests if they do not exist yet
 foreach ([
   "ALTER TABLE rfq_requests ADD COLUMN contact_name  VARCHAR(255) NULL",
