@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'canned_responses') {
   if (!hash_equals((string)$_SESSION['admin_backend_csrf'], $csrf)) {
     $cr_errors[] = 'Security token mismatch. Please refresh and try again.';
   } else {
-    for ($i = 1; $i <= 3; $i++) {
+    for ($i = 1; $i <= 6; $i++) {
       $lbl  = trim((string)($_POST["cr_label_{$i}"] ?? ''));
       $body = trim((string)($_POST["cr_body_{$i}"] ?? ''));
       if (strlen($lbl) > CR_LABEL_MAX) {
@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'canned_responses') {
       }
     }
     if (!$cr_errors) {
-      for ($i = 1; $i <= 3; $i++) {
+      for ($i = 1; $i <= 6; $i++) {
         $lbl  = trim((string)($_POST["cr_label_{$i}"] ?? ''));
         $body = trim((string)($_POST["cr_body_{$i}"] ?? ''));
         $pdo->prepare(
@@ -52,12 +52,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'canned_responses') {
 $canned = [];
 if ($section === 'canned_responses') {
   $rows = $pdo->query(
-    "SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN (1,2,3) ORDER BY slot"
+    "SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN (1,2,3,4,5,6) ORDER BY slot"
   )->fetchAll();
   foreach ($rows as $r) {
     $canned[(int)$r['slot']] = $r;
   }
-  for ($i = 1; $i <= 3; $i++) {
+  for ($i = 1; $i <= 6; $i++) {
     if (!isset($canned[$i])) {
       $canned[$i] = ['slot' => $i, 'label' => '', 'body' => ''];
     }
@@ -89,7 +89,7 @@ render_header('Admin Backend');
       <div class="card">
         <h2 style="margin-top:0;">Canned Responses</h2>
         <p class="muted" style="margin-bottom:16px;">
-          These 3 responses appear as quick-fill buttons on the RFQ Form's Additional Notes field.
+          These responses appear as quick-fill buttons on the RFQ Form's Additional Notes field.
           Set a button label and the text it will insert.
         </p>
 
@@ -110,7 +110,7 @@ render_header('Admin Backend');
         <form method="post" action="admin_backend.php?section=canned_responses" novalidate>
           <input type="hidden" name="csrf_token" value="<?= h($_SESSION['admin_backend_csrf']) ?>" />
 
-          <?php for ($i = 1; $i <= 3; $i++): ?>
+          <?php for ($i = 1; $i <= 6; $i++): ?>
             <h3 style="margin-top:<?= $i > 1 ? '20px' : '0' ?>; margin-bottom:10px; font-size:.9rem; text-transform:uppercase; letter-spacing:.04em; color:var(--m);">
               Response <?= $i ?>
             </h3>

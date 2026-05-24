@@ -31,7 +31,7 @@ $fields = [
 
 // Load canned responses for quick-fill buttons
 $canned_responses = $pdo->query(
-  "SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN (1,2,3) AND label != '' AND body != '' ORDER BY slot"
+  "SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN (1,2,3,4,5,6) AND label != '' AND body != '' ORDER BY slot"
 )->fetchAll();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
