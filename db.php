@@ -234,6 +234,19 @@ try {
   if ($e->getCode() !== '42S21') throw $e;
 }
 
+// Add RFQ profile columns to users if they do not exist yet
+foreach ([
+  "ALTER TABLE users ADD COLUMN contact_name VARCHAR(255) NULL",
+  "ALTER TABLE users ADD COLUMN company_name VARCHAR(255) NULL",
+  "ALTER TABLE users ADD COLUMN contact_phone VARCHAR(100) NULL",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    if ($e->getCode() !== '42S21') throw $e;
+  }
+}
+
 // Sync existing admin users: set role='admin' where is_admin=1 and role='user'
 try {
   $pdo->exec("UPDATE users SET role='admin' WHERE is_admin=1 AND role='user'");

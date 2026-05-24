@@ -78,6 +78,7 @@ render_header('Admin Backend');
     <a class="menu-link <?= $section === 'overview' ? 'active' : '' ?>" href="admin_backend.php">Overview</a>
     <a class="menu-link" href="time_report.php">Time Reports</a>
     <a class="menu-link" href="users.php">Users</a>
+    <a class="menu-link" href="user_profiles.php">User Profiles</a>
     <a class="menu-link <?= $section === 'canned_responses' ? 'active' : '' ?>" href="admin_backend.php?section=canned_responses">Canned Responses</a>
   </div>
 
@@ -139,6 +140,7 @@ render_header('Admin Backend');
         <div class="row" style="gap:10px; flex-wrap:wrap;">
           <a class="btn" href="time_report.php">Time Reports</a>
           <a class="btn" href="users.php">Users</a>
+          <a class="btn" href="user_profiles.php">User Profiles</a>
           <a class="btn" href="admin_backend.php?section=canned_responses">Canned Responses</a>
         </div>
       </div>
