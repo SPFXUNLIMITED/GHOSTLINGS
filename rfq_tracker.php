@@ -36,6 +36,8 @@ $success = '';
 $selected_rfq_id = 0;
 $edit_quote_id = 0;
 $edit_rfq_id = 0;
+$add_quote_post = null;
+$edit_quote_post = null;
 
 function format_shipping_details(?string $origin, ?string $method): string {
   $origin = trim((string)$origin);
@@ -221,11 +223,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $dt = DateTime::createFromFormat('Y-m-d', $received_on);
         if (!$dt || $dt->format('Y-m-d') !== $received_on) {
           $errors[] = 'Received date must be in YYYY-MM-DD format.';
-        } else {
-          $today = new DateTime('today');
-          if ($dt > $today) {
-            $errors[] = 'Received date cannot be in the future.';
-          }
+        } elseif ($dt->format('Y-m-d') > date('Y-m-d')) {
+          $errors[] = 'Received date cannot be in the future.';
         }
       }
       if (strlen($notes) > 5000) {
@@ -342,6 +341,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           }
         }
       }
+      if ($errors) {
+        if ($rfq_id > 0) {
+          $selected_rfq_id = $rfq_id;
+        }
+        $add_quote_post = [
+          'supplier_name'   => $supplier_name,
+          'quote_amount'    => $quote_amount_raw,
+          'currency'        => $currency,
+          'lead_time_days'  => $lead_time_days_raw,
+          'shipping_cost'   => $shipping_cost_raw,
+          'shipping_origin' => $shipping_origin,
+          'shipping_method' => $shipping_method,
+          'quote_status'    => $quote_status,
+          'received_on'     => $received_on,
+          'notes'           => $notes,
+        ];
+      }
     } elseif ($action === 'edit_quote') {
       $quote_id = (int)($_POST['quote_id'] ?? 0);
       $rfq_id = (int)($_POST['rfq_id'] ?? 0);
@@ -381,11 +397,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $dt = DateTime::createFromFormat('Y-m-d', $received_on);
         if (!$dt || $dt->format('Y-m-d') !== $received_on) {
           $errors[] = 'Received date must be in YYYY-MM-DD format.';
-        } else {
-          $today = new DateTime('today');
-          if ($dt > $today) {
-            $errors[] = 'Received date cannot be in the future.';
-          }
+        } elseif ($dt->format('Y-m-d') > date('Y-m-d')) {
+          $errors[] = 'Received date cannot be in the future.';
         }
       }
       if (strlen($notes) > 5000) {
@@ -518,6 +531,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       } else {
         $selected_rfq_id = $rfq_id;
         $edit_quote_id = $quote_id;
+      }
+      if ($errors) {
+        $edit_quote_post = [
+          'supplier_name'   => $supplier_name,
+          'quote_amount'    => $quote_amount_raw,
+          'currency'        => $currency,
+          'lead_time_days'  => $lead_time_days_raw !== '' ? $lead_time_days_raw : null,
+          'shipping_cost'   => $shipping_cost_raw !== '' ? $shipping_cost_raw : null,
+          'shipping_origin' => $shipping_origin !== '' ? $shipping_origin : null,
+          'shipping_method' => $shipping_method !== '' ? $shipping_method : null,
+          'quote_status'    => $quote_status,
+          'received_on'     => $received_on !== '' ? $received_on : null,
+          'notes'           => $notes !== '' ? $notes : null,
+        ];
       }
     } elseif ($action === 'edit_rfq') {
       $rfq_id = (int)($_POST['rfq_id'] ?? 0);
@@ -712,6 +739,9 @@ if ($selected_rfq_id > 0) {
           $editing_quote = $q;
           break;
         }
+      }
+      if ($editing_quote !== null && $edit_quote_post !== null) {
+        $editing_quote = array_merge($editing_quote, $edit_quote_post);
       }
     }
   }
@@ -1101,48 +1131,56 @@ render_header('RFQ Tracker');
 
         <div>
           <label>Supplier Name <span style="color:var(--d)">*</span></label>
-          <input type="text" name="supplier_name" maxlength="255" required placeholder="e.g. ABC Laser Systems" />
+          <input type="text" name="supplier_name" maxlength="255" required placeholder="e.g. ABC Laser Systems"
+                 value="<?= h($add_quote_post['supplier_name'] ?? '') ?>" />
         </div>
         <div>
           <label>Quote Amount <span style="color:var(--d)">*</span></label>
-          <input type="number" name="quote_amount" min="0" step="0.01" required placeholder="e.g. 10800.00" />
+          <input type="number" name="quote_amount" min="0" step="0.01" required placeholder="e.g. 10800.00"
+                 value="<?= h($add_quote_post['quote_amount'] ?? '') ?>" />
         </div>
         <div>
           <label>Currency <span style="color:var(--d)">*</span></label>
-          <input type="text" name="currency" maxlength="3" required value="USD" />
+          <input type="text" name="currency" maxlength="3" required
+                 value="<?= h($add_quote_post['currency'] ?? 'USD') ?>" />
         </div>
         <div>
           <label>Lead Time (days)</label>
-          <input type="number" name="lead_time_days" min="0" max="<?= MAX_LEAD_TIME_DAYS ?>" placeholder="e.g. 35" />
+          <input type="number" name="lead_time_days" min="0" max="<?= MAX_LEAD_TIME_DAYS ?>" placeholder="e.g. 35"
+                 value="<?= h($add_quote_post['lead_time_days'] ?? '') ?>" />
         </div>
         <div>
           <label>Shipping Cost</label>
-          <input type="number" name="shipping_cost" min="0" step="0.01" placeholder="e.g. 1800.00" />
+          <input type="number" name="shipping_cost" min="0" step="0.01" placeholder="e.g. 1800.00"
+                 value="<?= h($add_quote_post['shipping_cost'] ?? '') ?>" />
         </div>
         <div>
           <label>Shipping Method</label>
-          <input type="text" name="shipping_method" maxlength="100" placeholder="e.g. Sea freight / Air cargo" />
+          <input type="text" name="shipping_method" maxlength="100" placeholder="e.g. Sea freight / Air cargo"
+                 value="<?= h($add_quote_post['shipping_method'] ?? '') ?>" />
         </div>
         <div>
           <label>Shipping Origin</label>
-          <input type="text" name="shipping_origin" maxlength="255" placeholder="e.g. Qingdao, China" />
+          <input type="text" name="shipping_origin" maxlength="255" placeholder="e.g. Qingdao, China"
+                 value="<?= h($add_quote_post['shipping_origin'] ?? '') ?>" />
         </div>
         <div>
           <label>Quote Status</label>
           <select name="quote_status">
             <?php foreach ($quote_statuses as $k => $label): ?>
-              <option value="<?= h($k) ?>"><?= h($label) ?></option>
+              <option value="<?= h($k) ?>" <?= ($add_quote_post['quote_status'] ?? 'received') === $k ? 'selected' : '' ?>><?= h($label) ?></option>
             <?php endforeach; ?>
           </select>
         </div>
         <div>
           <label>Quote Received On</label>
-          <input type="date" name="received_on" />
+          <input type="date" name="received_on"
+                 value="<?= h($add_quote_post['received_on'] ?? '') ?>" />
         </div>
         <div class="full">
           <label>Notes</label>
           <textarea name="notes" rows="4" maxlength="5000"
-                    placeholder="Include quote terms, included accessories, warranty, or negotiation details."></textarea>
+                    placeholder="Include quote terms, included accessories, warranty, or negotiation details."><?= h($add_quote_post['notes'] ?? '') ?></textarea>
         </div>
         <div>
           <label>Quote File</label>
