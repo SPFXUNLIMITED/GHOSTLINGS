@@ -415,3 +415,26 @@ td.col-project-wrap, th.col-project-wrap {
     animation: none;
   }
 }
+
+/* Admin two-column layout */
+.admin-layout {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.admin-left .menu-link {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.admin-left .menu-link:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .admin-layout {
+    grid-template-columns: 1fr;
+  }
+}

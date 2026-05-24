@@ -29,6 +29,11 @@ $fields = [
   'additional_notes'  => '',
 ];
 
+// Load canned responses for quick-fill buttons
+$canned_responses = $pdo->query(
+  "SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN (1,2,3) AND label != '' AND body != '' ORDER BY slot"
+)->fetchAll();
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
   if (empty($_SESSION['rfq_form_csrf']) || !hash_equals((string)$_SESSION['rfq_form_csrf'], $submitted_csrf)) {
@@ -194,6 +199,25 @@ render_header('RFQ Request Form');
     </div>
     <div class="full">
       <label>Additional Notes</label>
+      <?php if ($canned_responses): ?>
+      <div style="margin-bottom:6px; display:flex; gap:8px; flex-wrap:wrap;">
+        <?php foreach ($canned_responses as $cr): ?>
+        <button type="button" class="btn"
+                data-canned-body="<?= h($cr['body']) ?>"
+        ><?= h($cr['label']) ?></button>
+        <?php endforeach; ?>
+      </div>
+      <script>
+        (function () {
+          var notes = document.querySelector('[name=additional_notes]');
+          document.querySelectorAll('[data-canned-body]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+              notes.value = btn.getAttribute('data-canned-body');
+            });
+          });
+        })();
+      </script>
+      <?php endif; ?>
       <textarea name="additional_notes" rows="4" maxlength="5000"
                 placeholder="Any extra details about use case, preferred lead time, certification needs, etc."><?= h($fields['additional_notes']) ?></textarea>
     </div>
