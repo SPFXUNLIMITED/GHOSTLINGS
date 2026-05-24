@@ -4,6 +4,9 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_admin();
 
+const CR_LABEL_MAX = 100;
+const CR_BODY_MAX  = 2000;
+
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
 }
@@ -23,15 +26,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'canned_responses') {
     for ($i = 1; $i <= 3; $i++) {
       $lbl  = trim((string)($_POST["cr_label_{$i}"] ?? ''));
       $body = trim((string)($_POST["cr_body_{$i}"] ?? ''));
-      if (strlen($lbl) > 100)  { $cr_errors[] = "Response {$i} label must be 100 characters or fewer."; }
-      if (strlen($body) > 2000){ $cr_errors[] = "Response {$i} body must be 2000 characters or fewer."; }
+      if (strlen($lbl) > CR_LABEL_MAX) {
+        $cr_errors[] = "Response {$i} label must be " . CR_LABEL_MAX . " characters or fewer.";
+      }
+      if (strlen($body) > CR_BODY_MAX) {
+        $cr_errors[] = "Response {$i} body must be " . CR_BODY_MAX . " characters or fewer.";
+      }
     }
     if (!$cr_errors) {
       for ($i = 1; $i <= 3; $i++) {
         $lbl  = trim((string)($_POST["cr_label_{$i}"] ?? ''));
         $body = trim((string)($_POST["cr_body_{$i}"] ?? ''));
         $pdo->prepare(
-          "REPLACE INTO rfq_canned_responses (slot, label, body) VALUES (?, ?, ?)"
+          "INSERT INTO rfq_canned_responses (slot, label, body) VALUES (?, ?, ?)
+           ON DUPLICATE KEY UPDATE label = VALUES(label), body = VALUES(body)"
         )->execute([$i, $lbl, $body]);
       }
       $_SESSION['admin_backend_csrf'] = bin2hex(random_bytes(24));

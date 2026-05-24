@@ -203,10 +203,20 @@ render_header('RFQ Request Form');
       <div style="margin-bottom:6px; display:flex; gap:8px; flex-wrap:wrap;">
         <?php foreach ($canned_responses as $cr): ?>
         <button type="button" class="btn"
-                onclick="document.querySelector('[name=additional_notes]').value = <?= htmlspecialchars(json_encode($cr['body']), ENT_QUOTES, 'UTF-8') ?>"
+                data-canned-body="<?= h($cr['body']) ?>"
         ><?= h($cr['label']) ?></button>
         <?php endforeach; ?>
       </div>
+      <script>
+        (function () {
+          var notes = document.querySelector('[name=additional_notes]');
+          document.querySelectorAll('[data-canned-body]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+              notes.value = btn.getAttribute('data-canned-body');
+            });
+          });
+        })();
+      </script>
       <?php endif; ?>
       <textarea name="additional_notes" rows="4" maxlength="5000"
                 placeholder="Any extra details about use case, preferred lead time, certification needs, etc."><?= h($fields['additional_notes']) ?></textarea>
