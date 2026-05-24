@@ -372,12 +372,15 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
-// Seed 3 default slots if they do not exist yet
+// Seed 6 default slots if they do not exist yet
 $pdo->exec("
   INSERT IGNORE INTO rfq_canned_responses (slot, label, body) VALUES
     (1, 'Standard Request',  'Please provide pricing, lead time, and shipping cost for the specified quantity. Include warranty terms and after-sales support availability.'),
     (2, 'Sample Order',      'We would like to order a sample unit first before committing to the full quantity. Please quote for a single unit including shipping to the US.'),
-    (3, 'Bulk Discount',     'We are interested in bulk pricing for this order. Please provide tiered pricing for 1, 5, and 10 units along with lead time for each tier.')
+    (3, 'Bulk Discount',     'We are interested in bulk pricing for this order. Please provide tiered pricing for 1, 5, and 10 units along with lead time for each tier.'),
+    (4, 'Certification',     'Please confirm all available certifications and compliance documents for this machine model, including any region-specific requirements.'),
+    (5, 'Payment Terms',     'Please provide your accepted payment terms, deposit requirements, and any available trade assurance or payment protection options.'),
+    (6, 'Packaging Details', 'Please share packaging dimensions and gross/net weight, and confirm whether export-grade wooden crate packing is included.')
 ");
 
 // Add company/contact header columns to rfq_requests if they do not exist yet
