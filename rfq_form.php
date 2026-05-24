@@ -207,6 +207,10 @@ render_header('RFQ Request Form');
         ><?= h($cr['label']) ?></button>
         <?php endforeach; ?>
       </div>
+      <?php endif; ?>
+      <textarea name="additional_notes" rows="4" maxlength="5000"
+                placeholder="Any extra details about use case, preferred lead time, certification needs, etc."><?= h($fields['additional_notes']) ?></textarea>
+      <?php if ($canned_responses): ?>
       <script>
         (function () {
           var notes = document.querySelector('[name=additional_notes]');
@@ -218,8 +222,6 @@ render_header('RFQ Request Form');
         })();
       </script>
       <?php endif; ?>
-      <textarea name="additional_notes" rows="4" maxlength="5000"
-                placeholder="Any extra details about use case, preferred lead time, certification needs, etc."><?= h($fields['additional_notes']) ?></textarea>
     </div>
   </div>
 
