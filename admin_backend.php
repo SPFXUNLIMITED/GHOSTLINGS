@@ -14,8 +14,8 @@ render_header('Admin Backend');
 
 <div class="card">
   <div class="row" style="gap:10px; flex-wrap:wrap;">
-    <a class="btn" href="time_report.php">Time Reports</a>
-    <a class="btn" href="users.php">Users</a>
+    <a class="btn" href="time_report.php" aria-label="Open the admin time reports page">Time Reports</a>
+    <a class="btn" href="users.php" aria-label="Open the admin user management page">Users</a>
   </div>
 </div>
 
