@@ -203,8 +203,7 @@ $show_rfq_menu = $show_mod_menu;
     <a class="menu-link <?= $current === 'rfq_tracker.php' ? 'active' : '' ?>" href="rfq_tracker.php">RFQ Tracker</a>
     <?php endif; ?>
     <?php if ($show_admin_menu): ?>
-    <a class="menu-link <?= $current === 'time_report.php' ? 'active' : '' ?>" href="time_report.php">Time Reports</a>
-    <a class="menu-link <?= $current === 'users.php' ? 'active' : '' ?>" href="users.php">Users</a>
+    <a class="menu-link <?= $current === 'admin_backend.php' ? 'active' : '' ?>" href="admin_backend.php">Admin Backend</a>
     <?php endif; ?>
   </div>
 </nav>
