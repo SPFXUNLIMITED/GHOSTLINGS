@@ -34,6 +34,26 @@ $canned_responses = $pdo->query(
   "SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN (1,2,3) AND label != '' AND body != '' ORDER BY slot"
 )->fetchAll();
 
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+  $profile_stmt = $pdo->prepare(
+    "SELECT username, email, contact_name, company_name, contact_phone
+     FROM users
+     WHERE id = ?
+     LIMIT 1"
+  );
+  $profile_stmt->execute([(int)current_user_id()]);
+  $profile = $profile_stmt->fetch();
+  if ($profile) {
+    $fields['contact_name'] = trim((string)($profile['contact_name'] ?? ''));
+    if ($fields['contact_name'] === '') {
+      $fields['contact_name'] = trim((string)($profile['username'] ?? ''));
+    }
+    $fields['company_name'] = trim((string)($profile['company_name'] ?? ''));
+    $fields['contact_email'] = trim((string)($profile['email'] ?? ''));
+    $fields['contact_phone'] = trim((string)($profile['contact_phone'] ?? ''));
+  }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
   if (empty($_SESSION['rfq_form_csrf']) || !hash_equals((string)$_SESSION['rfq_form_csrf'], $submitted_csrf)) {
