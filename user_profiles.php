@@ -4,9 +4,6 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_admin();
 
-if (session_status() !== PHP_SESSION_ACTIVE) {
-  session_start();
-}
 if (empty($_SESSION['user_profiles_csrf'])) {
   $_SESSION['user_profiles_csrf'] = bin2hex(random_bytes(24));
 }
@@ -44,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $errors[] = 'Contact phone must be 100 characters or fewer.';
     }
 
-    if (!$errors && $email !== '') {
+    if (empty($errors) && $email !== '') {
       $email_check = $pdo->prepare("SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1");
       $email_check->execute([$email, $uid]);
       if ($email_check->fetch()) {
@@ -52,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
     }
 
-    if (!$errors) {
+    if (empty($errors)) {
       $upd = $pdo->prepare(
         "UPDATE users
          SET contact_name = ?, email = ?, company_name = ?, contact_phone = ?
