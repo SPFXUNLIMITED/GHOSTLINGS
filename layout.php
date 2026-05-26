@@ -51,8 +51,7 @@ function render_pagination(int $current_page, int $total, int $per_page, string 
   <?php
 }
 
-function render_doc_details(?string $details): string {
-  $details = (string)$details;
+function render_doc_details(string $details): string {
   if ($details === '') return '';
   $field_index = 0;
 
@@ -62,12 +61,12 @@ function render_doc_details(?string $details): string {
       $prefix = $matches[1] ?? '';
       $label = trim((string)($matches[2] ?? ''));
       $field_name = (string)($matches[3] ?? '');
-      if ($label === '' || $field_name === '') {
+      if ($label === '' || $field_name === '' || !preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/', $field_name)) {
         return $matches[0];
       }
 
       $field_index++;
-      $field_id = 'doc-field-' . $field_index . '-' . strtolower($field_name);
+      $field_id = 'doc_field_' . $field_index . '_' . strtolower(str_replace('-', '_', $field_name));
 
       return $prefix
         . '<div style="margin:12px 0;">'
