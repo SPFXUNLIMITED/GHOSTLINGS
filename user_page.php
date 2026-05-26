@@ -9,6 +9,9 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_login();
 
+$current_role = (string)($_SESSION['role'] ?? '');
+$is_standard_user = ($current_role !== 'admin' && $current_role !== 'moderator');
+
 // ── Profile details CSRF ──────────────────────────────────────────────────────
 if (empty($_SESSION['user_page_profile_csrf'])) {
   $_SESSION['user_page_profile_csrf'] = bin2hex(random_bytes(24));
@@ -96,32 +99,37 @@ if (!$data) {
 $has_entry = !empty($data['first_name']);
 
 // Fetch all regular users who currently have service requests ("waiting for service")
-$waiting_stmt = $pdo->query(
-  "SELECT u.id, u.email_verified,
-          le.city, le.state, le.zip_code
-   FROM users u
-   JOIN laser_entries le ON le.user_id = u.id
-   LEFT JOIN laser_entries le_newer
-     ON le_newer.user_id = le.user_id
-    AND (
-      le_newer.created_at > le.created_at
-      OR (le_newer.created_at = le.created_at AND le_newer.id > le.id)
-    )
-   WHERE u.role = 'user'
-     AND le_newer.id IS NULL
-   ORDER BY le.created_at DESC, le.id DESC"
-);
-$waiting_users = $waiting_stmt->fetchAll();
-$waiting_total = count($waiting_users);
+$waiting_users = [];
+$waiting_total = 0;
 $waiting_verified = 0;
-foreach ($waiting_users as $wu) {
-  if (!empty($wu['email_verified'])) {
-    $waiting_verified++;
+$waiting_unverified = 0;
+if ($is_standard_user) {
+  $waiting_stmt = $pdo->query(
+    "SELECT u.id, u.email_verified,
+            le.city, le.state, le.zip_code
+     FROM users u
+     JOIN laser_entries le ON le.user_id = u.id
+     LEFT JOIN laser_entries le_newer
+       ON le_newer.user_id = le.user_id
+      AND (
+        le_newer.created_at > le.created_at
+        OR (le_newer.created_at = le.created_at AND le_newer.id > le.id)
+      )
+     WHERE u.role = 'user'
+       AND le_newer.id IS NULL
+     ORDER BY le.created_at DESC, le.id DESC"
+  );
+  $waiting_users = $waiting_stmt->fetchAll();
+  $waiting_total = count($waiting_users);
+  foreach ($waiting_users as $wu) {
+    if (!empty($wu['email_verified'])) {
+      $waiting_verified++;
+    }
   }
+  $waiting_unverified = $waiting_total - $waiting_verified;
 }
-$waiting_unverified = $waiting_total - $waiting_verified;
 
-render_header('My Service Request');
+render_header('My Profile');
 ?>
 
 <!-- ── Profile details alerts ─────────────────────────────────────────────── -->
@@ -140,7 +148,7 @@ render_header('My Service Request');
 <?php endif; ?>
 
 <div class="card">
-  <h1 style="margin-top:0; margin-bottom:4px;">My Service Request</h1>
+  <h1 style="margin-top:0; margin-bottom:4px;">My Profile</h1>
   <p class="muted" style="margin:0;">Logged in as <strong><?= h($data['username']) ?></strong></p>
 </div>
 
@@ -196,12 +204,12 @@ render_header('My Service Request');
   </form>
 </div>
 
-<?php if (!$has_entry): ?>
+<?php if ($is_standard_user && !$has_entry): ?>
   <div class="card" style="text-align:center; padding:32px;">
     <p class="muted">No service request found for your account.</p>
     <a class="btn primary" href="form.php">Submit a Service Request</a>
   </div>
-<?php else: ?>
+<?php elseif ($is_standard_user): ?>
 
 <!-- ── Entry card ─────────────────────────────────────────────────────────── -->
 <div class="card">
