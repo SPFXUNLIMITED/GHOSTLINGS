@@ -401,6 +401,13 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Add profile_notes column to users if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE users ADD COLUMN profile_notes TEXT NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') throw $e;
+}
+
 // Add company/contact header columns to rfq_requests if they do not exist yet
 foreach ([
   "ALTER TABLE rfq_requests ADD COLUMN contact_name  VARCHAR(255) NULL",
