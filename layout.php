@@ -62,7 +62,7 @@ function render_doc_details(?string $details): string {
 
       $prefix = $matches[1] ?? '';
       $label = trim((string)($matches[2] ?? ''));
-      $field_name = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)($matches[3] ?? '')) ?? '';
+      $field_name = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)($matches[3] ?? ''));
       if ($label === '' || $field_name === '') {
         return $matches[0];
       }
@@ -77,7 +77,7 @@ function render_doc_details(?string $details): string {
         . '</div>';
     },
     $details
-  ) ?? $details;
+  );
 }
 
 function render_header(string $title): void {
