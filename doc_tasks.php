@@ -40,6 +40,25 @@ if (is_admin()) {
   $stmt->execute([$category_id, $uid, $uid]);
 }
 $documents = $stmt->fetchAll();
+$doc_placeholder_values = [];
+
+if ($uid) {
+  $stmt = $pdo->prepare("
+    SELECT username, contact_name, company_name, email, contact_phone
+    FROM users
+    WHERE id = ?
+    LIMIT 1
+  ");
+  $stmt->execute([$uid]);
+  $profile = $stmt->fetch() ?: [];
+  $doc_placeholder_values = [
+    'username' => trim((string)($profile['username'] ?? '')),
+    'contact_name' => trim((string)($profile['contact_name'] ?? '')),
+    'company_name' => trim((string)($profile['company_name'] ?? '')),
+    'email' => trim((string)($profile['email'] ?? '')),
+    'contact_phone' => trim((string)($profile['contact_phone'] ?? '')),
+  ];
+}
 
 render_header('Documents');
 ?>
@@ -100,7 +119,7 @@ render_header('Documents');
             <?php endif; ?>
           </td>
 
-          <td><?= render_doc_details($d['details'] ?? '') ?></td>
+          <td><?= render_doc_details($d['details'] ?? '', $doc_placeholder_values) ?></td>
           <td>
             <div class="actions">
               <a class="btn" href="doc_form.php?category_id=<?= (int)$category_id ?>&id=<?= (int)$d['id'] ?>">Edit</a>
