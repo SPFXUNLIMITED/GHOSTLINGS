@@ -61,6 +61,7 @@ function render_doc_details(string $details, array $placeholder_values = []): st
     'contact_phone' => 'Contact Phone',
     'username' => 'Username',
   ];
+  $placeholder_token_pattern = '[a-zA-Z][a-zA-Z0-9_-]*';
   $inline_field_pattern = implode('|', array_map(static fn(string $field): string => preg_quote($field, '/'), array_keys($inline_field_labels)));
   $normalized_placeholders = [];
   foreach ($placeholder_values as $key => $value) {
@@ -80,11 +81,11 @@ function render_doc_details(string $details, array $placeholder_values = []): st
   };
 
   $rendered = preg_replace_callback(
-    '/(^|[\r\n]+)([^\r\n<>()]+?)\s+text\s+input\s*\(([a-zA-Z][a-zA-Z0-9_-]*)\)(?=$|[\r\n]+)/i',
+    '/(^|[\r\n]+)([^\r\n<>()\[\]]+?)\s+text\s+input\s*(?:\[(' . $placeholder_token_pattern . ')\]|\((' . $placeholder_token_pattern . ')\))(?=$|[\r\n]+)/i',
     static function (array $matches) use (&$field_index, $resolve_placeholder_text): string {
       $prefix = $matches[1] ?? '';
       $label = trim((string)($matches[2] ?? ''));
-      $field_name = (string)($matches[3] ?? '');
+      $field_name = (string)($matches[3] ?? $matches[4] ?? '');
       if ($label === '' || $field_name === '' || !preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/', $field_name)) {
         return $matches[0];
       }
@@ -103,15 +104,12 @@ function render_doc_details(string $details, array $placeholder_values = []): st
   );
 
   return preg_replace_callback(
-    '/\((' . $inline_field_pattern . ')\)/i',
-    static function (array $matches) use (&$field_index, $resolve_placeholder_text, $inline_field_labels): string {
-      $field_name = strtolower((string)($matches[1] ?? ''));
-      $field_index++;
-      $field_id = 'doc_field_' . $field_index . '_' . $field_name;
+    '/(?:\[(' . $inline_field_pattern . ')\]|\((' . $inline_field_pattern . ')\))/i',
+    static function (array $matches) use ($resolve_placeholder_text, $inline_field_labels): string {
+      $field_name = strtolower((string)($matches[1] ?? $matches[2] ?? ''));
       $label = $inline_field_labels[$field_name] ?? $field_name;
       $placeholder = $resolve_placeholder_text($field_name, $label);
-
-      return '<input type="text" id="' . h($field_id) . '" name="' . h($field_name) . '" placeholder="' . h($placeholder) . '" style="width:100%; max-width:240px; display:inline-block; vertical-align:middle;" />';
+      return '<span>' . h($placeholder) . '</span>';
     },
     $rendered
   );
