@@ -167,6 +167,9 @@ render_header($id ? 'Edit Task' : 'New Task');
       <div class="full">
         <label>Details</label>
         <textarea id="details_editor" name="details" rows="6"><?= h($task['details'] ?? '') ?></textarea>
+        <div class="muted" style="margin-top:6px;">
+          Use square brackets for placeholders, like <code>Full Name text input [contact_name] [company_name] [email] [contact_phone] [username]</code>.
+        </div>
       </div>
     </div>
 

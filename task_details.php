@@ -59,6 +59,26 @@ if (!$task) {
   exit('Task not found');
 }
 
+$task_placeholder_values = [];
+$uid = current_user_id();
+if ($uid) {
+  $profile_stmt = $pdo->prepare("
+    SELECT username, contact_name, company_name, email, contact_phone
+    FROM users
+    WHERE id = ?
+    LIMIT 1
+  ");
+  $profile_stmt->execute([$uid]);
+  $profile = $profile_stmt->fetch() ?: [];
+  $task_placeholder_values = [
+    'username' => trim((string)($profile['username'] ?? '')),
+    'contact_name' => trim((string)($profile['contact_name'] ?? '')),
+    'company_name' => trim((string)($profile['company_name'] ?? '')),
+    'email' => trim((string)($profile['email'] ?? '')),
+    'contact_phone' => trim((string)($profile['contact_phone'] ?? '')),
+  ];
+}
+
 if (empty($_SESSION['task_mark_done_csrf'])) {
   $_SESSION['task_mark_done_csrf'] = bin2hex(random_bytes(24));
 }
@@ -144,7 +164,7 @@ render_header('Task Details');
       </tr>
       <tr>
         <th>Details</th>
-        <td><?= $task['details'] ?? '' ?></td>
+        <td><?= render_doc_details($task['details'] ?? '', $task_placeholder_values) ?></td>
       </tr>
     </tbody>
   </table>
