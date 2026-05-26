@@ -54,15 +54,14 @@ function render_pagination(int $current_page, int $total, int $per_page, string 
 function render_doc_details(?string $details): string {
   $details = (string)$details;
   if ($details === '') return '';
+  $field_index = 0;
 
   return preg_replace_callback(
     '/(^|[\r\n]+)([^\r\n<>()]+?)\s+text\s+input\s*\(([a-zA-Z][a-zA-Z0-9_-]*)\)(?=$|[\r\n]+)/i',
-    static function (array $matches): string {
-      static $field_index = 0;
-
+    static function (array $matches) use (&$field_index): string {
       $prefix = $matches[1] ?? '';
       $label = trim((string)($matches[2] ?? ''));
-      $field_name = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)($matches[3] ?? ''));
+      $field_name = (string)($matches[3] ?? '');
       if ($label === '' || $field_name === '') {
         return $matches[0];
       }
