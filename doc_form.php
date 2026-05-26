@@ -209,7 +209,7 @@ render_header($id ? 'Edit Document' : 'New Document');
         <label>Details</label>
         <textarea id="details_editor" name="details" rows="6"><?= h($doc['details'] ?? '') ?></textarea>
         <div class="muted" style="margin-top:6px;">
-          Use square brackets for placeholders, like <code>Full Name text input [contact_name]</code>.
+          Use square brackets for placeholders, like <code>Full Name text input [contact_name] [company_name] [email] [contact_phone] [username]</code>.
         </div>
       </div>
     </div>
@@ -222,16 +222,6 @@ render_header($id ? 'Edit Document' : 'New Document');
     <input type="hidden" name="category_id" value="<?= (int)$category_id ?>">
     <input type="hidden" name="id" value="<?= (int)$id ?>">
   </form>
-  <div class="card" style="margin-top:12px;">
-    <strong>Available placeholders</strong>
-    <ul style="margin:8px 0 0 18px;">
-      <li><code>[contact_name]</code></li>
-      <li><code>[company_name]</code></li>
-      <li><code>[email]</code></li>
-      <li><code>[contact_phone]</code></li>
-      <li><code>[username]</code></li>
-    </ul>
-  </div>
 
   <!-- START COMMENTS -->
   <?php if ($id): ?>
