@@ -178,9 +178,8 @@ $show_rfq_menu = $show_mod_menu;
   <div class="menubar-inner">
     <?php if (!empty($_SESSION['user_id'])): ?>
     <a class="menu-link <?= $current === 'index.php' ? 'active' : '' ?>" href="index.php">Home</a>
-    <?php if (($_SESSION['role'] ?? '') === 'user'): ?>
-    <a class="menu-link <?= $current === 'user_page.php' ? 'active' : '' ?>" href="user_page.php">My Request</a>
-    <?php else: ?>
+    <a class="menu-link <?= $current === 'user_page.php' ? 'active' : '' ?>" href="user_page.php">My Profile</a>
+    <?php if (($_SESSION['role'] ?? '') !== 'user'): ?>
     <a class="menu-link <?= $current === 'projects.php' ? 'active' : '' ?>" href="projects.php">Projects</a>
     <a class="menu-link <?= $current === 'documents.php' ? 'active' : '' ?>" href="documents.php">Documents</a>
     <a class="menu-link <?= $current === 'playbooks.php' ? 'active' : '' ?>" href="playbooks.php">Playbooks</a>
