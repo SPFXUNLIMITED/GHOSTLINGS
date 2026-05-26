@@ -9,8 +9,8 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_login();
 
-$current_role = (string)($_SESSION['role'] ?? (is_admin() ? 'admin' : 'user'));
-$is_standard_user = ($current_role === 'user');
+$current_role = (string)($_SESSION['role'] ?? '');
+$is_standard_user = ($current_role !== 'admin' && $current_role !== 'moderator');
 
 // ── Profile details CSRF ──────────────────────────────────────────────────────
 if (empty($_SESSION['user_page_profile_csrf'])) {
