@@ -383,6 +383,24 @@ $pdo->exec("
     (6, 'Packaging Details', 'Please share packaging dimensions and gross/net weight, and confirm whether export-grade wooden crate packing is included.')
 ");
 
+// Create vendors table if it does not exist yet
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS vendors (
+    id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    company_name  VARCHAR(255) NOT NULL,
+    contact_name  VARCHAR(255) NOT NULL DEFAULT '',
+    email         VARCHAR(255) NOT NULL DEFAULT '',
+    phone         VARCHAR(100) NOT NULL DEFAULT '',
+    website       VARCHAR(255) NOT NULL DEFAULT '',
+    address       VARCHAR(500) NOT NULL DEFAULT '',
+    notes         TEXT         NULL,
+    created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_vendors_company_name (company_name(191))
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 // Add company/contact header columns to rfq_requests if they do not exist yet
 foreach ([
   "ALTER TABLE rfq_requests ADD COLUMN contact_name  VARCHAR(255) NULL",

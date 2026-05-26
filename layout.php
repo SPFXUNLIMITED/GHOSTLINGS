@@ -197,6 +197,7 @@ $show_rfq_menu = $show_mod_menu;
   <div class="menubar-inner">
     <?php if ($show_mod_menu): ?>
     <a class="menu-link <?= $current === 'form_admin.php' ? 'active' : '' ?>" href="form_admin.php">Form Entries</a>
+    <a class="menu-link <?= $current === 'vendors.php' ? 'active' : '' ?>" href="vendors.php">Vendors</a>
     <?php endif; ?>
     <?php if ($show_rfq_menu): ?>
     <a class="menu-link <?= $current === 'rfq_form.php' ? 'active' : '' ?>" href="rfq_form.php">RFQ Form</a>
