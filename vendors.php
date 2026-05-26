@@ -82,6 +82,7 @@ render_header('Vendors');
           <?php endif; ?>
         </td>
         <td class="actions">
+          <a class="btn" href="vendor_details.php?id=<?= (int)$v['id'] ?>">View</a>
           <a class="btn" href="vendor_form.php?id=<?= (int)$v['id'] ?>">Edit</a>
           <?php if (is_admin()): ?>
           <form method="post" action="vendor_delete.php" style="display:inline;"
