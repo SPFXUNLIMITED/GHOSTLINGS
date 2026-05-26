@@ -63,8 +63,15 @@ render_header('Vendor Details');
       <tr>
         <th>Website</th>
         <td>
-          <?php if ($vendor['website'] !== ''): ?>
-            <a href="<?= h($vendor['website']) ?>" target="_blank" rel="noopener noreferrer"><?= h($vendor['website']) ?></a>
+          <?php
+            $website = trim((string)($vendor['website'] ?? ''));
+            $scheme = strtolower((string)parse_url($website, PHP_URL_SCHEME));
+            $is_safe_website = $website !== '' && in_array($scheme, ['http', 'https'], true);
+          ?>
+          <?php if ($is_safe_website): ?>
+            <a href="<?= h($website) ?>" target="_blank" rel="noopener noreferrer"><?= h($website) ?></a>
+          <?php elseif ($website !== ''): ?>
+            <?= h($website) ?>
           <?php else: ?>
             <span class="muted">—</span>
           <?php endif; ?>
