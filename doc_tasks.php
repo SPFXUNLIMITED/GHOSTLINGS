@@ -100,7 +100,7 @@ render_header('Documents');
             <?php endif; ?>
           </td>
 
-          <td><?= $d['details'] ?? '' ?></td>
+          <td><?= render_doc_details($d['details'] ?? '') ?></td>
           <td>
             <div class="actions">
               <a class="btn" href="doc_form.php?category_id=<?= (int)$category_id ?>&id=<?= (int)$d['id'] ?>">Edit</a>
