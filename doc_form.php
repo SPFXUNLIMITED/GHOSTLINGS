@@ -208,6 +208,9 @@ render_header($id ? 'Edit Document' : 'New Document');
       <div class="full">
         <label>Details</label>
         <textarea id="details_editor" name="details" rows="6"><?= h($doc['details'] ?? '') ?></textarea>
+        <div class="muted" style="margin-top:6px;">
+          Use a line like <code>Full Name text input (contact_name)</code> to render a text field in the document.
+        </div>
       </div>
     </div>
 

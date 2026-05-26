@@ -51,6 +51,35 @@ function render_pagination(int $current_page, int $total, int $per_page, string 
   <?php
 }
 
+function render_doc_details(?string $details): string {
+  $details = (string)$details;
+  if ($details === '') return '';
+
+  return preg_replace_callback(
+    '/(^|[\r\n]+)([^\r\n<>()]+?)\s+text\s+input\s*\(([a-zA-Z][a-zA-Z0-9_-]*)\)(?=$|[\r\n]+)/i',
+    static function (array $matches): string {
+      static $field_index = 0;
+
+      $prefix = $matches[1] ?? '';
+      $label = trim((string)($matches[2] ?? ''));
+      $field_name = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)($matches[3] ?? '')) ?? '';
+      if ($label === '' || $field_name === '') {
+        return $matches[0];
+      }
+
+      $field_index++;
+      $field_id = 'doc-field-' . $field_index . '-' . strtolower($field_name);
+
+      return $prefix
+        . '<div style="margin:12px 0;">'
+        . '<label for="' . h($field_id) . '" style="display:block; font-weight:600; margin-bottom:6px;">' . h($label) . '</label>'
+        . '<input type="text" id="' . h($field_id) . '" name="' . h($field_name) . '" placeholder="' . h($label) . '" style="width:100%; max-width:480px;" />'
+        . '</div>';
+    },
+    $details
+  ) ?? $details;
+}
+
 function render_header(string $title): void {
   if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
