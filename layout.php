@@ -51,13 +51,37 @@ function render_pagination(int $current_page, int $total, int $per_page, string 
   <?php
 }
 
-function render_doc_details(string $details): string {
+function render_doc_details(string $details, array $placeholder_values = []): string {
   if ($details === '') return '';
   $field_index = 0;
+  $inline_field_labels = [
+    'contact_name' => 'Contact Name',
+    'company_name' => 'Company Name',
+    'email' => 'Email',
+    'contact_phone' => 'Contact Phone',
+    'username' => 'Username',
+  ];
+  $inline_field_pattern = implode('|', array_map(static fn(string $field): string => preg_quote($field, '/'), array_keys($inline_field_labels)));
+  $normalized_placeholders = [];
+  foreach ($placeholder_values as $key => $value) {
+    $normalized_placeholders[strtolower((string)$key)] = trim((string)$value);
+  }
 
-  return preg_replace_callback(
+  $resolve_placeholder_text = static function (string $field_name, string $fallback = '') use ($normalized_placeholders): string {
+    $field_name = strtolower($field_name);
+    $placeholder = $normalized_placeholders[$field_name] ?? '';
+    if ($placeholder === '' && $field_name === 'contact_name') {
+      $placeholder = $normalized_placeholders['username'] ?? '';
+    }
+    if ($placeholder === '') {
+      $placeholder = $fallback;
+    }
+    return $placeholder;
+  };
+
+  $rendered = preg_replace_callback(
     '/(^|[\r\n]+)([^\r\n<>()]+?)\s+text\s+input\s*\(([a-zA-Z][a-zA-Z0-9_-]*)\)(?=$|[\r\n]+)/i',
-    static function (array $matches) use (&$field_index): string {
+    static function (array $matches) use (&$field_index, $resolve_placeholder_text): string {
       $prefix = $matches[1] ?? '';
       $label = trim((string)($matches[2] ?? ''));
       $field_name = (string)($matches[3] ?? '');
@@ -67,14 +91,29 @@ function render_doc_details(string $details): string {
 
       $field_index++;
       $field_id = 'doc_field_' . $field_index . '_' . strtolower(str_replace('-', '_', $field_name));
+      $placeholder = $resolve_placeholder_text($field_name, $label);
 
       return $prefix
         . '<div style="margin:12px 0;">'
         . '<label for="' . h($field_id) . '" style="display:block; font-weight:600; margin-bottom:6px;">' . h($label) . '</label>'
-        . '<input type="text" id="' . h($field_id) . '" name="' . h($field_name) . '" placeholder="' . h($label) . '" style="width:100%; max-width:480px;" />'
+        . '<input type="text" id="' . h($field_id) . '" name="' . h($field_name) . '" placeholder="' . h($placeholder) . '" style="width:100%; max-width:480px;" />'
         . '</div>';
     },
     $details
+  );
+
+  return preg_replace_callback(
+    '/\((' . $inline_field_pattern . ')\)/i',
+    static function (array $matches) use (&$field_index, $resolve_placeholder_text, $inline_field_labels): string {
+      $field_name = strtolower((string)($matches[1] ?? ''));
+      $field_index++;
+      $field_id = 'doc_field_' . $field_index . '_' . $field_name;
+      $label = $inline_field_labels[$field_name] ?? $field_name;
+      $placeholder = $resolve_placeholder_text($field_name, $label);
+
+      return '<input type="text" id="' . h($field_id) . '" name="' . h($field_name) . '" placeholder="' . h($placeholder) . '" style="width:100%; max-width:240px; display:inline-block; vertical-align:middle;" />';
+    },
+    $rendered
   );
 }
 
