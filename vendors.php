@@ -10,6 +10,9 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 
 $q = trim((string)($_GET['q'] ?? ''));
 
+if (empty($_SESSION['vendor_delete_csrf'])) {
+  $_SESSION['vendor_delete_csrf'] = bin2hex(random_bytes(24));
+}
 if ($q !== '') {
   $like = '%' . $q . '%';
   $stmt = $pdo->prepare("
@@ -83,6 +86,7 @@ render_header('Vendors');
           <?php if (is_admin()): ?>
           <form method="post" action="vendor_delete.php" style="display:inline;"
                 onsubmit="return confirm('Delete this vendor?');">
+            <input type="hidden" name="csrf_token" value="<?= h($_SESSION['vendor_delete_csrf']) ?>" />
             <input type="hidden" name="id" value="<?= (int)$v['id'] ?>" />
             <button type="submit" class="btn danger">Delete</button>
           </form>
