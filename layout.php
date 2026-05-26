@@ -54,6 +54,14 @@ function render_pagination(int $current_page, int $total, int $per_page, string 
 function render_doc_details(string $details, array $placeholder_values = []): string {
   if ($details === '') return '';
   $field_index = 0;
+  $inline_field_labels = [
+    'contact_name' => 'Contact Name',
+    'company_name' => 'Company Name',
+    'email' => 'Email',
+    'contact_phone' => 'Contact Phone',
+    'username' => 'Username',
+  ];
+  $inline_field_pattern = implode('|', array_map(static fn(string $field): string => preg_quote($field, '/'), array_keys($inline_field_labels)));
   $normalized_placeholders = [];
   foreach ($placeholder_values as $key => $value) {
     $normalized_placeholders[strtolower((string)$key)] = trim((string)$value);
@@ -95,12 +103,12 @@ function render_doc_details(string $details, array $placeholder_values = []): st
   );
 
   return preg_replace_callback(
-    '/\((contact_name|company_name|email|contact_phone|username)\)/i',
-    static function (array $matches) use (&$field_index, $resolve_placeholder_text): string {
+    '/\((' . $inline_field_pattern . ')\)/i',
+    static function (array $matches) use (&$field_index, $resolve_placeholder_text, $inline_field_labels): string {
       $field_name = strtolower((string)($matches[1] ?? ''));
       $field_index++;
       $field_id = 'doc_field_' . $field_index . '_' . $field_name;
-      $label = ucwords(str_replace('_', ' ', $field_name));
+      $label = $inline_field_labels[$field_name] ?? $field_name;
       $placeholder = $resolve_placeholder_text($field_name, $label);
 
       return '<input type="text" id="' . h($field_id) . '" name="' . h($field_name) . '" placeholder="' . h($placeholder) . '" style="width:100%; max-width:240px; display:inline-block; vertical-align:middle;" />';
