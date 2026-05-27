@@ -349,14 +349,26 @@ render_header($id ? 'Edit Task' : 'New Task');
 <!-- TinyMCE WYSIWYG -->
 <script src="/project/tinymce/js/tinymce/tinymce.min.js"></script>
 <script>
-  tinymce.init({
-    selector: '#details_editor, #comment_editor',
-    height: 280,
-    menubar: false,
-    plugins: 'lists link table code',
-    toolbar: 'undo redo | bold italic underline | bullist numlist | link table | removeformat | code',
-    branding: false
-  });
+  (function () {
+    if (!window.tinymce) return;
+
+    const editorIds = ['details_editor', 'comment_editor'];
+    const editorOptions = {
+      base_url: '/project/tinymce/js/tinymce',
+      suffix: '.min',
+      height: 280,
+      menubar: false,
+      plugins: 'lists link table code',
+      toolbar: 'undo redo | bold italic underline | bullist numlist | link table | removeformat | code',
+      branding: false
+    };
+
+    editorIds.forEach(function (id) {
+      const target = document.getElementById(id);
+      if (!target) return;
+      tinymce.init(Object.assign({}, editorOptions, { target: target }));
+    });
+  })();
 </script>
 
 <?php render_footer(); ?>
