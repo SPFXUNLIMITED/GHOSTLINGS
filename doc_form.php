@@ -282,7 +282,7 @@ render_header($id ? 'Edit Document' : 'New Document');
 </div>
 
 <!-- TinyMCE WYSIWYG -->
-<script src="https://cdn.tiny.cloud/1/pifs5sjkqqgawy88jx7d10zx5sxezi2ig67u4ci0exbu6hag/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+<script src="/tinymce/js/tinymce/tinymce.min.js"></script>
 <script>
   tinymce.init({
     selector: '#details_editor, #comment_editor',
