@@ -351,6 +351,11 @@ render_header($id ? 'Edit Task' : 'New Task');
 <script>
   tinymce.init({
     selector: '#details_editor, #comment_editor',
+    base_url: '/project/tinymce/js/tinymce',
+    suffix: '.min',
+    license_key: 'gpl',
+    skin_url: '/project/tinymce/js/tinymce/skins/ui/oxide',
+    content_css: '/project/tinymce/js/tinymce/skins/content/default/content.min.css',
     height: 280,
     menubar: false,
     plugins: 'lists link table code',
