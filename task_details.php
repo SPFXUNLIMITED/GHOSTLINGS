@@ -301,7 +301,7 @@ render_header('Task Details');
 </div>
 
 <!-- TinyMCE WYSIWYG -->
-<script src="https://ghostlaser.com/project/tinymce/js/tinymce/tinymce.min.js"></script>
+<script src="/project/tinymce/js/tinymce/tinymce.min.js"></script>
 <script>
   tinymce.init({
     selector: '#comment_editor',
