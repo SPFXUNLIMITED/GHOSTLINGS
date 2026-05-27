@@ -347,7 +347,7 @@ render_header($id ? 'Edit Task' : 'New Task');
 <!-- ================= -->
 
 <!-- TinyMCE WYSIWYG -->
-<script src="/tinymce/js/tinymce/tinymce.min.js"></script>
+<script src="/project/tinymce/js/tinymce/tinymce.min.js"></script>
 <script>
   tinymce.init({
     selector: '#details_editor, #comment_editor',
