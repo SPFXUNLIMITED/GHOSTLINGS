@@ -185,11 +185,11 @@ render_header($id ? 'Edit Task' : 'New Task');
 </div>
 
 <!-- TinyMCE WYSIWYG -->
-<script src="/project/tinymce/js/tinymce/tinymce.min.js"></script>
+<script src="tinymce/js/tinymce/tinymce.min.js"></script>
 <script>
   tinymce.init({
     selector: '#details_editor',
-    base_url: '/project/tinymce/js/tinymce',
+    base_url: 'tinymce/js/tinymce',
     suffix: '.min',
     license_key: 'gpl',
     content_css: 'default',
