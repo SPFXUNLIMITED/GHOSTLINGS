@@ -356,7 +356,7 @@ render_header('Project Details');
 </div>
 
 <!-- TinyMCE WYSIWYG -->
-<script src="/tinymce/js/tinymce/tinymce.min.js"></script>
+<script src="https://ghostlaser.com/project/tinymce/js/tinymce/tinymce.min.js"></script>
 <script>
   tinymce.init({
     selector: '#comment_editor',
