@@ -5,6 +5,7 @@ require __DIR__ . '/auth.php';
 require_rfq_access();
 
 const MAX_RFQ_QUANTITY = 1000;
+const REQUEST_TYPES = ['RFQ', 'Sourcing'];
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
@@ -16,6 +17,7 @@ if (empty($_SESSION['rfq_form_csrf'])) {
 $errors = [];
 $success = '';
 $fields = [
+  'request_type'    => 'RFQ',
   'contact_name'    => '',
   'company_name'    => '',
   'contact_email'   => '',
@@ -64,6 +66,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $fields[$k] = trim((string)($_POST[$k] ?? ''));
   }
 
+  if (!in_array($fields['request_type'], REQUEST_TYPES, true)) {
+    $errors[] = 'Request type must be RFQ or Sourcing.';
+  }
   if ($fields['request_title'] === '') $errors[] = 'Request title is required.';
   if ($fields['machine_size'] === '') $errors[] = 'Machine size is required.';
   if ($fields['laser_watts'] === '') $errors[] = 'Laser watts is required.';
@@ -85,6 +90,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 
   if (!$errors) {
+    $full_request_title = $fields['request_type'] . ': ' . $fields['request_title'];
+
     $stmt = $pdo->prepare(
       "INSERT INTO rfq_requests
         (requested_by, contact_name, company_name, contact_email, contact_phone,
@@ -97,7 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $fields['company_name']  === '' ? null : $fields['company_name'],
       $fields['contact_email'] === '' ? null : $fields['contact_email'],
       $fields['contact_phone'] === '' ? null : $fields['contact_phone'],
-      $fields['request_title'],
+      $full_request_title,
       $fields['machine_size'],
       $fields['laser_watts'],
       $fields['tube_type'],
@@ -107,8 +114,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ]);
 
     $_SESSION['rfq_form_csrf'] = bin2hex(random_bytes(24));
-    $success = 'RFQ request submitted. You can now track quotes in RFQ Tracker.';
+    $success = $fields['request_type'] . ' request submitted. You can now track quotes in RFQ Tracker.';
     $fields = [
+      'request_type'    => 'RFQ',
       'contact_name'    => '',
       'company_name'    => '',
       'contact_email'   => '',
@@ -124,13 +132,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 }
 
-render_header('RFQ Request Form');
+render_header('RFQ / Sourcing Request Form');
 ?>
 
 <div class="card">
-  <h1 style="margin-top:0; margin-bottom:4px;">CO2 Laser Cutter RFQ Request</h1>
+  <h1 style="margin-top:0; margin-bottom:4px;">CO2 Laser Cutter RFQ / Sourcing Requests</h1>
   <p class="muted" style="margin:0;">
-    Submit machine specs for purchasing, including size, watts, tube type, and required features.
+    Submit machine specs for either an RFQ or sourcing request, including size, watts, tube type, and required features.
   </p>
 </div>
 
@@ -180,11 +188,19 @@ render_header('RFQ Request Form');
   </div>
 
   <hr style="margin:20px 0; border:none; border-top:1px solid var(--border, #e5e7eb);" />
-  <h2 style="margin-top:0; margin-bottom:12px; font-size:1rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted, #6b7280);">Machine Specifications</h2>
+  <h2 style="margin-top:0; margin-bottom:12px; font-size:1rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted, #6b7280);">Request Details</h2>
 
   <div class="form-grid">
+    <div>
+      <label>Request Type <span style="color:var(--d)">*</span></label>
+      <select name="request_type" required>
+        <?php foreach (REQUEST_TYPES as $request_type): ?>
+          <option value="<?= h($request_type) ?>" <?= $fields['request_type'] === $request_type ? 'selected' : '' ?>><?= h($request_type) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
     <div class="full">
-      <label>RFQ Title <span style="color:var(--d)">*</span></label>
+      <label>Request Title <span style="color:var(--d)">*</span></label>
       <input type="text" name="request_title" maxlength="255" required
              value="<?= h($fields['request_title']) ?>"
              placeholder="e.g. 130W CO2 Laser Cutter for Acrylic Production" />
@@ -246,7 +262,7 @@ render_header('RFQ Request Form');
   </div>
 
   <div class="row" style="margin-top:18px;">
-    <button type="submit" class="btn primary">Submit RFQ Request</button>
+    <button type="submit" class="btn primary">Submit Request</button>
     <a class="btn" href="rfq_tracker.php">Go to RFQ Tracker</a>
   </div>
 </form>
