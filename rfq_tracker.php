@@ -944,31 +944,39 @@ render_header('RFQ Tracker');
     <input type="hidden" name="action" value="edit_rfq" />
     <input type="hidden" name="rfq_id" value="<?= (int)$editing_rfq['id'] ?>" />
 
-    <div class="full" style="margin-bottom:4px;">
-      <strong style="font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted,#6b7280);">Customer Information</strong>
+    <div id="edit_customer_information_section" class="full"
+         style="display:<?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'customer') ? 'block' : 'none' ?>;">
+      <div style="margin-bottom:4px;">
+        <strong style="font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted,#6b7280);">Customer Information</strong>
+      </div>
+      <div class="form-grid">
+        <div>
+          <label>Customer Name</label>
+          <input type="text" name="buyer_name" maxlength="255"
+                 value="<?= h((string)($editing_rfq['buyer_name'] ?? '')) ?>"
+                 <?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'customer') ? '' : 'disabled' ?> />
+        </div>
+        <div>
+          <label>Customer Company</label>
+          <input type="text" name="buyer_company" maxlength="255"
+                 value="<?= h((string)($editing_rfq['buyer_company'] ?? '')) ?>"
+                 <?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'customer') ? '' : 'disabled' ?> />
+        </div>
+        <div>
+          <label>Customer Email</label>
+          <input type="email" name="buyer_email" maxlength="255"
+                 value="<?= h((string)($editing_rfq['buyer_email'] ?? '')) ?>"
+                 <?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'customer') ? '' : 'disabled' ?> />
+        </div>
+        <div>
+          <label>Customer Phone</label>
+          <input type="text" name="buyer_phone" maxlength="100"
+                 value="<?= h((string)($editing_rfq['buyer_phone'] ?? '')) ?>"
+                 <?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'customer') ? '' : 'disabled' ?> />
+        </div>
+      </div>
+      <div class="full"><hr style="margin:4px 0 8px; border:none; border-top:1px solid var(--border,#e5e7eb);" /></div>
     </div>
-    <div>
-      <label>Customer Name</label>
-      <input type="text" name="buyer_name" maxlength="255"
-             value="<?= h((string)($editing_rfq['buyer_name'] ?? '')) ?>" />
-    </div>
-    <div>
-      <label>Customer Company</label>
-      <input type="text" name="buyer_company" maxlength="255"
-             value="<?= h((string)($editing_rfq['buyer_company'] ?? '')) ?>" />
-    </div>
-    <div>
-      <label>Customer Email</label>
-      <input type="email" name="buyer_email" maxlength="255"
-             value="<?= h((string)($editing_rfq['buyer_email'] ?? '')) ?>" />
-    </div>
-    <div>
-      <label>Customer Phone</label>
-      <input type="text" name="buyer_phone" maxlength="100"
-             value="<?= h((string)($editing_rfq['buyer_phone'] ?? '')) ?>" />
-    </div>
-
-    <div class="full"><hr style="margin:4px 0 8px; border:none; border-top:1px solid var(--border,#e5e7eb);" /></div>
     <div class="full" style="margin-bottom:4px;">
       <strong style="font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted,#6b7280);">Request Details</strong>
     </div>
@@ -982,7 +990,7 @@ render_header('RFQ Tracker');
     </div>
     <div class="full">
       <label>Acquisition Purpose <span style="color:var(--d)">*</span></label>
-      <select name="acquisition_purpose" required>
+      <select name="acquisition_purpose" id="edit_acquisition_purpose" required>
         <option value="customer" <?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'customer') ? 'selected' : '' ?>>Customer Request</option>
         <option value="internal" <?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'internal') ? 'selected' : '' ?>>Internal Use (Inventory / Repairs)</option>
       </select>
@@ -1044,8 +1052,22 @@ render_header('RFQ Tracker');
     if (!categoryField) return;
     var form = categoryField.closest('form');
     if (!form) return;
+    var acquisitionField = document.getElementById('edit_acquisition_purpose');
+    var customerInfoSection = document.getElementById('edit_customer_information_section');
+    var customerInfoInputs = customerInfoSection ? customerInfoSection.querySelectorAll('input') : [];
     var machineFields = form.querySelectorAll('.machine-only');
     var partsFields = form.querySelectorAll('.parts-only');
+    if (acquisitionField && customerInfoSection) {
+      function toggleCustomerInfo() {
+        var showCustomerInfo = acquisitionField.value === 'customer';
+        customerInfoSection.style.display = showCustomerInfo ? 'block' : 'none';
+        customerInfoInputs.forEach(function (input) {
+          input.disabled = !showCustomerInfo;
+        });
+      }
+      acquisitionField.addEventListener('change', toggleCustomerInfo);
+      toggleCustomerInfo();
+    }
     function toggleSections() {
       var isParts = categoryField.value === 'parts';
       machineFields.forEach(function (el) { el.style.display = isParts ? 'none' : ''; });
