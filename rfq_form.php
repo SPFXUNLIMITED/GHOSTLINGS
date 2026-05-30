@@ -373,7 +373,7 @@ render_header($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ 
 
   <div class="row" style="margin-top:18px;">
     <button type="submit" class="btn primary">Submit Request</button>
-    <a class="btn" href="<?= $fields['request_category'] === 'parts' ? 'rfq_form.php?request_category=machine' : 'rfq_parts_form.php' ?>">
+    <a class="btn" href="<?= $fields['request_category'] === 'parts' ? 'rfq_form.php?request_category=machine' : 'rfq_form.php?request_category=parts' ?>">
       <?= $fields['request_category'] === 'parts' ? 'Switch to Machine RFQ Form' : 'Switch to Parts RFQ Form' ?>
     </a>
     <a class="btn" href="rfq_tracker.php">Go to RFQ Tracker</a>
