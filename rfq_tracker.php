@@ -1080,7 +1080,7 @@ render_header('RFQ Tracker');
       <button type="submit" class="btn primary">Filter</button>
       <a class="btn" href="rfq_tracker.php">Clear</a>
       <a class="btn" href="rfq_form.php">New RFQ</a>
-      <a class="btn" href="rfq_parts_form.php">New Parts RFQ</a>
+      <a class="btn" href="rfq_form.php?request_category=parts">New Parts RFQ</a>
     </div>
   </form>
 </div>

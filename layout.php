@@ -349,7 +349,6 @@ $show_rfq_menu = $show_mod_menu;
     <?php render_menu_dropdown('RFQ & Sourcing', [
       ['href' => 'vendors.php', 'file' => 'vendors.php', 'label' => 'Vendors', 'visible' => true],
       ['href' => 'rfq_form.php', 'file' => 'rfq_form.php', 'label' => 'RFQ Form', 'visible' => $show_rfq_menu],
-      ['href' => 'rfq_parts_form.php', 'file' => 'rfq_parts_form.php', 'label' => 'Parts RFQ Form', 'visible' => $show_rfq_menu],
       ['href' => 'rfq_tracker.php', 'file' => 'rfq_tracker.php', 'label' => 'RFQ Tracker', 'visible' => $show_rfq_menu],
     ], $current); ?>
     <?php endif; ?>
