@@ -21,7 +21,7 @@ $quote_statuses = [
   'rejected' => 'Rejected',
 ];
 
-function format_shipping_details_for_rfq(?string $origin, ?string $method): string {
+function format_shipping_details(?string $origin, ?string $method): string {
   $origin = trim((string)$origin);
   $method = trim((string)$method);
   if ($origin === '' && $method === '') {
@@ -216,14 +216,20 @@ render_header('RFQ Details');
         <?php foreach ($quotes as $q): ?>
           <tr>
             <td><?= h((string)$q['supplier_name']) ?></td>
-            <td><?= h((string)$q['currency']) ?> <?= h(number_format((float)$q['quote_amount'], 2)) ?></td>
+            <td>
+              <?php if ($q['quote_amount'] !== null): ?>
+                <?= h((string)$q['currency']) ?> <?= h(number_format((float)$q['quote_amount'], 2)) ?>
+              <?php else: ?>
+                —
+              <?php endif; ?>
+            </td>
             <td><?= $q['lead_time_days'] !== null ? h((string)$q['lead_time_days']) . ' days' : '—' ?></td>
             <td>
               <?= $q['shipping_cost'] !== null ? h(number_format((float)$q['shipping_cost'], 2)) : '—' ?><br>
-              <span class="muted"><?= h(format_shipping_details_for_rfq($q['shipping_origin'] ?? null, $q['shipping_method'] ?? null)) ?></span>
+              <span class="muted"><?= h(format_shipping_details($q['shipping_origin'], $q['shipping_method'])) ?></span>
             </td>
             <td><?= h($quote_statuses[$q['quote_status']] ?? (string)$q['quote_status']) ?></td>
-            <td><?= h((string)($q['received_on'] ?? '')) ?></td>
+            <td><?= !empty($q['received_on']) ? h((string)$q['received_on']) : '—' ?></td>
             <td>
               <?php if (!empty($q['quote_file_stored_name'])): ?>
                 <a class="btn" href="rfq_quote_file.php?quote_id=<?= (int)$q['id'] ?>" target="_blank" rel="noopener noreferrer">Open</a>
