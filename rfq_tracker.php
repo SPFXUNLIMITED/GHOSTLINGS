@@ -207,14 +207,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $msrp_raw = trim((string)($_POST['msrp'] ?? ''));
       $map_price_raw = trim((string)($_POST['map_price'] ?? ''));
       $moq_20_price_raw = trim((string)($_POST['moq_20_price'] ?? ''));
-      $moq_20_margin_msrp_raw = trim((string)($_POST['moq_20_margin_msrp'] ?? ''));
-      $moq_20_margin_map_raw = trim((string)($_POST['moq_20_margin_map'] ?? ''));
       $moq_10_price_raw = trim((string)($_POST['moq_10_price'] ?? ''));
-      $moq_10_margin_msrp_raw = trim((string)($_POST['moq_10_margin_msrp'] ?? ''));
-      $moq_10_margin_map_raw = trim((string)($_POST['moq_10_margin_map'] ?? ''));
       $drop_ship_price_raw = trim((string)($_POST['drop_ship_price'] ?? ''));
-      $drop_ship_margin_msrp_raw = trim((string)($_POST['drop_ship_margin_msrp'] ?? ''));
-      $drop_ship_margin_map_raw = trim((string)($_POST['drop_ship_margin_map'] ?? ''));
       $quote_amount_raw = trim((string)($_POST['quote_amount'] ?? ''));
       $currency = strtoupper(trim((string)($_POST['currency'] ?? 'USD')));
       $lead_time_days_raw = trim((string)($_POST['lead_time_days'] ?? ''));
@@ -240,29 +234,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($moq_20_price_raw !== '' && (!is_numeric($moq_20_price_raw) || (float)$moq_20_price_raw < 0)) {
         $errors[] = 'MOQ 20 must be a non-negative number.';
       }
-      if ($moq_20_margin_msrp_raw !== '' && !is_numeric($moq_20_margin_msrp_raw)) {
-        $errors[] = 'MOQ 20 dealer margin on MSRP must be a number.';
-      }
-      if ($moq_20_margin_map_raw !== '' && !is_numeric($moq_20_margin_map_raw)) {
-        $errors[] = 'MOQ 20 dealer margin on MAP must be a number.';
-      }
       if ($moq_10_price_raw !== '' && (!is_numeric($moq_10_price_raw) || (float)$moq_10_price_raw < 0)) {
         $errors[] = 'MOQ 10 must be a non-negative number.';
       }
-      if ($moq_10_margin_msrp_raw !== '' && !is_numeric($moq_10_margin_msrp_raw)) {
-        $errors[] = 'MOQ 10 dealer margin on MSRP must be a number.';
-      }
-      if ($moq_10_margin_map_raw !== '' && !is_numeric($moq_10_margin_map_raw)) {
-        $errors[] = 'MOQ 10 dealer margin on MAP must be a number.';
-      }
       if ($drop_ship_price_raw !== '' && (!is_numeric($drop_ship_price_raw) || (float)$drop_ship_price_raw < 0)) {
         $errors[] = 'Drop Ship must be a non-negative number.';
-      }
-      if ($drop_ship_margin_msrp_raw !== '' && !is_numeric($drop_ship_margin_msrp_raw)) {
-        $errors[] = 'Drop Ship dealer margin on MSRP must be a number.';
-      }
-      if ($drop_ship_margin_map_raw !== '' && !is_numeric($drop_ship_margin_map_raw)) {
-        $errors[] = 'Drop Ship dealer margin on MAP must be a number.';
       }
       if ($quote_amount_raw === '' || !is_numeric($quote_amount_raw) || (float)$quote_amount_raw < 0) {
         $errors[] = 'Quote amount must be a non-negative number.';
@@ -388,14 +364,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $msrp_raw === '' ? null : (float)$msrp_raw,
             $map_price_raw === '' ? null : (float)$map_price_raw,
             $moq_20_price_raw === '' ? null : (float)$moq_20_price_raw,
-            $moq_20_margin_msrp_raw === '' ? null : (float)$moq_20_margin_msrp_raw,
-            $moq_20_margin_map_raw === '' ? null : (float)$moq_20_margin_map_raw,
+            null,
+            null,
             $moq_10_price_raw === '' ? null : (float)$moq_10_price_raw,
-            $moq_10_margin_msrp_raw === '' ? null : (float)$moq_10_margin_msrp_raw,
-            $moq_10_margin_map_raw === '' ? null : (float)$moq_10_margin_map_raw,
+            null,
+            null,
             $drop_ship_price_raw === '' ? null : (float)$drop_ship_price_raw,
-            $drop_ship_margin_msrp_raw === '' ? null : (float)$drop_ship_margin_msrp_raw,
-            $drop_ship_margin_map_raw === '' ? null : (float)$drop_ship_margin_map_raw,
+            null,
+            null,
             (float)$quote_amount_raw,
             $currency,
             $lead_time_days_raw === '' ? null : (int)$lead_time_days_raw,
@@ -427,14 +403,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           'msrp'            => $msrp_raw,
           'map_price'       => $map_price_raw,
           'moq_20_price'    => $moq_20_price_raw,
-          'moq_20_margin_msrp' => $moq_20_margin_msrp_raw,
-          'moq_20_margin_map' => $moq_20_margin_map_raw,
           'moq_10_price'    => $moq_10_price_raw,
-          'moq_10_margin_msrp' => $moq_10_margin_msrp_raw,
-          'moq_10_margin_map' => $moq_10_margin_map_raw,
           'drop_ship_price' => $drop_ship_price_raw,
-          'drop_ship_margin_msrp' => $drop_ship_margin_msrp_raw,
-          'drop_ship_margin_map' => $drop_ship_margin_map_raw,
           'quote_amount'    => $quote_amount_raw,
           'currency'        => $currency,
           'lead_time_days'  => $lead_time_days_raw,
@@ -455,14 +425,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $msrp_raw = trim((string)($_POST['msrp'] ?? ''));
       $map_price_raw = trim((string)($_POST['map_price'] ?? ''));
       $moq_20_price_raw = trim((string)($_POST['moq_20_price'] ?? ''));
-      $moq_20_margin_msrp_raw = trim((string)($_POST['moq_20_margin_msrp'] ?? ''));
-      $moq_20_margin_map_raw = trim((string)($_POST['moq_20_margin_map'] ?? ''));
       $moq_10_price_raw = trim((string)($_POST['moq_10_price'] ?? ''));
-      $moq_10_margin_msrp_raw = trim((string)($_POST['moq_10_margin_msrp'] ?? ''));
-      $moq_10_margin_map_raw = trim((string)($_POST['moq_10_margin_map'] ?? ''));
       $drop_ship_price_raw = trim((string)($_POST['drop_ship_price'] ?? ''));
-      $drop_ship_margin_msrp_raw = trim((string)($_POST['drop_ship_margin_msrp'] ?? ''));
-      $drop_ship_margin_map_raw = trim((string)($_POST['drop_ship_margin_map'] ?? ''));
       $quote_amount_raw = trim((string)($_POST['quote_amount'] ?? ''));
       $currency = strtoupper(trim((string)($_POST['currency'] ?? 'USD')));
       $lead_time_days_raw = trim((string)($_POST['lead_time_days'] ?? ''));
@@ -490,29 +454,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($moq_20_price_raw !== '' && (!is_numeric($moq_20_price_raw) || (float)$moq_20_price_raw < 0)) {
         $errors[] = 'MOQ 20 must be a non-negative number.';
       }
-      if ($moq_20_margin_msrp_raw !== '' && !is_numeric($moq_20_margin_msrp_raw)) {
-        $errors[] = 'MOQ 20 dealer margin on MSRP must be a number.';
-      }
-      if ($moq_20_margin_map_raw !== '' && !is_numeric($moq_20_margin_map_raw)) {
-        $errors[] = 'MOQ 20 dealer margin on MAP must be a number.';
-      }
       if ($moq_10_price_raw !== '' && (!is_numeric($moq_10_price_raw) || (float)$moq_10_price_raw < 0)) {
         $errors[] = 'MOQ 10 must be a non-negative number.';
       }
-      if ($moq_10_margin_msrp_raw !== '' && !is_numeric($moq_10_margin_msrp_raw)) {
-        $errors[] = 'MOQ 10 dealer margin on MSRP must be a number.';
-      }
-      if ($moq_10_margin_map_raw !== '' && !is_numeric($moq_10_margin_map_raw)) {
-        $errors[] = 'MOQ 10 dealer margin on MAP must be a number.';
-      }
       if ($drop_ship_price_raw !== '' && (!is_numeric($drop_ship_price_raw) || (float)$drop_ship_price_raw < 0)) {
         $errors[] = 'Drop Ship must be a non-negative number.';
-      }
-      if ($drop_ship_margin_msrp_raw !== '' && !is_numeric($drop_ship_margin_msrp_raw)) {
-        $errors[] = 'Drop Ship dealer margin on MSRP must be a number.';
-      }
-      if ($drop_ship_margin_map_raw !== '' && !is_numeric($drop_ship_margin_map_raw)) {
-        $errors[] = 'Drop Ship dealer margin on MAP must be a number.';
       }
       if ($quote_amount_raw === '' || !is_numeric($quote_amount_raw) || (float)$quote_amount_raw < 0) {
         $errors[] = 'Quote amount must be a non-negative number.';
@@ -640,14 +586,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $msrp_raw === '' ? null : (float)$msrp_raw,
               $map_price_raw === '' ? null : (float)$map_price_raw,
               $moq_20_price_raw === '' ? null : (float)$moq_20_price_raw,
-              $moq_20_margin_msrp_raw === '' ? null : (float)$moq_20_margin_msrp_raw,
-              $moq_20_margin_map_raw === '' ? null : (float)$moq_20_margin_map_raw,
+              null,
+              null,
               $moq_10_price_raw === '' ? null : (float)$moq_10_price_raw,
-              $moq_10_margin_msrp_raw === '' ? null : (float)$moq_10_margin_msrp_raw,
-              $moq_10_margin_map_raw === '' ? null : (float)$moq_10_margin_map_raw,
+              null,
+              null,
               $drop_ship_price_raw === '' ? null : (float)$drop_ship_price_raw,
-              $drop_ship_margin_msrp_raw === '' ? null : (float)$drop_ship_margin_msrp_raw,
-              $drop_ship_margin_map_raw === '' ? null : (float)$drop_ship_margin_map_raw,
+              null,
+              null,
               (float)$quote_amount_raw,
               $currency,
               $lead_time_days_raw === '' ? null : (int)$lead_time_days_raw,
@@ -692,14 +638,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           'msrp'            => $msrp_raw,
           'map_price'       => $map_price_raw,
           'moq_20_price'    => $moq_20_price_raw,
-          'moq_20_margin_msrp' => $moq_20_margin_msrp_raw,
-          'moq_20_margin_map' => $moq_20_margin_map_raw,
           'moq_10_price'    => $moq_10_price_raw,
-          'moq_10_margin_msrp' => $moq_10_margin_msrp_raw,
-          'moq_10_margin_map' => $moq_10_margin_map_raw,
           'drop_ship_price' => $drop_ship_price_raw,
-          'drop_ship_margin_msrp' => $drop_ship_margin_msrp_raw,
-          'drop_ship_margin_map' => $drop_ship_margin_map_raw,
           'quote_amount'    => $quote_amount_raw,
           'currency'        => $currency,
           'lead_time_days'  => $lead_time_days_raw !== '' ? $lead_time_days_raw : null,
@@ -1277,44 +1217,14 @@ render_header('RFQ Tracker');
                  value="<?= $editing_quote['moq_20_price'] !== null ? h((string)$editing_quote['moq_20_price']) : '' ?>" />
         </div>
         <div>
-          <label>MOQ 20 Dealer Margin on MSRP (%)</label>
-          <input type="number" name="moq_20_margin_msrp" step="0.01"
-                 value="<?= $editing_quote['moq_20_margin_msrp'] !== null ? h((string)$editing_quote['moq_20_margin_msrp']) : '' ?>" />
-        </div>
-        <div>
-          <label>MOQ 20 Dealer Margin on MAP (%)</label>
-          <input type="number" name="moq_20_margin_map" step="0.01"
-                 value="<?= $editing_quote['moq_20_margin_map'] !== null ? h((string)$editing_quote['moq_20_margin_map']) : '' ?>" />
-        </div>
-        <div>
           <label>MOQ 10</label>
           <input type="number" name="moq_10_price" min="0" step="0.01"
                  value="<?= $editing_quote['moq_10_price'] !== null ? h((string)$editing_quote['moq_10_price']) : '' ?>" />
         </div>
         <div>
-          <label>MOQ 10 Dealer Margin on MSRP (%)</label>
-          <input type="number" name="moq_10_margin_msrp" step="0.01"
-                 value="<?= $editing_quote['moq_10_margin_msrp'] !== null ? h((string)$editing_quote['moq_10_margin_msrp']) : '' ?>" />
-        </div>
-        <div>
-          <label>MOQ 10 Dealer Margin on MAP (%)</label>
-          <input type="number" name="moq_10_margin_map" step="0.01"
-                 value="<?= $editing_quote['moq_10_margin_map'] !== null ? h((string)$editing_quote['moq_10_margin_map']) : '' ?>" />
-        </div>
-        <div>
           <label>Drop Ship</label>
           <input type="number" name="drop_ship_price" min="0" step="0.01"
                  value="<?= $editing_quote['drop_ship_price'] !== null ? h((string)$editing_quote['drop_ship_price']) : '' ?>" />
-        </div>
-        <div>
-          <label>Drop Ship Dealer Margin on MSRP (%)</label>
-          <input type="number" name="drop_ship_margin_msrp" step="0.01"
-                 value="<?= $editing_quote['drop_ship_margin_msrp'] !== null ? h((string)$editing_quote['drop_ship_margin_msrp']) : '' ?>" />
-        </div>
-        <div>
-          <label>Drop Ship Dealer Margin on MAP (%)</label>
-          <input type="number" name="drop_ship_margin_map" step="0.01"
-                 value="<?= $editing_quote['drop_ship_margin_map'] !== null ? h((string)$editing_quote['drop_ship_margin_map']) : '' ?>" />
         </div>
         <div>
           <label>Quote Amount <span style="color:var(--d)">*</span></label>
@@ -1424,44 +1334,14 @@ render_header('RFQ Tracker');
                  value="<?= h($add_quote_post['moq_20_price'] ?? '') ?>" />
         </div>
         <div>
-          <label>MOQ 20 Dealer Margin on MSRP (%)</label>
-          <input type="number" name="moq_20_margin_msrp" step="0.01" placeholder="e.g. 26.92"
-                 value="<?= h($add_quote_post['moq_20_margin_msrp'] ?? '') ?>" />
-        </div>
-        <div>
-          <label>MOQ 20 Dealer Margin on MAP (%)</label>
-          <input type="number" name="moq_20_margin_map" step="0.01" placeholder="e.g. 20.83"
-                 value="<?= h($add_quote_post['moq_20_margin_map'] ?? '') ?>" />
-        </div>
-        <div>
           <label>MOQ 10</label>
           <input type="number" name="moq_10_price" min="0" step="0.01" placeholder="e.g. 9800.00"
                  value="<?= h($add_quote_post['moq_10_price'] ?? '') ?>" />
         </div>
         <div>
-          <label>MOQ 10 Dealer Margin on MSRP (%)</label>
-          <input type="number" name="moq_10_margin_msrp" step="0.01" placeholder="e.g. 24.62"
-                 value="<?= h($add_quote_post['moq_10_margin_msrp'] ?? '') ?>" />
-        </div>
-        <div>
-          <label>MOQ 10 Dealer Margin on MAP (%)</label>
-          <input type="number" name="moq_10_margin_map" step="0.01" placeholder="e.g. 18.33"
-                 value="<?= h($add_quote_post['moq_10_margin_map'] ?? '') ?>" />
-        </div>
-        <div>
           <label>Drop Ship</label>
           <input type="number" name="drop_ship_price" min="0" step="0.01" placeholder="e.g. 10200.00"
                  value="<?= h($add_quote_post['drop_ship_price'] ?? '') ?>" />
-        </div>
-        <div>
-          <label>Drop Ship Dealer Margin on MSRP (%)</label>
-          <input type="number" name="drop_ship_margin_msrp" step="0.01" placeholder="e.g. 21.54"
-                 value="<?= h($add_quote_post['drop_ship_margin_msrp'] ?? '') ?>" />
-        </div>
-        <div>
-          <label>Drop Ship Dealer Margin on MAP (%)</label>
-          <input type="number" name="drop_ship_margin_map" step="0.01" placeholder="e.g. 15.00"
-                 value="<?= h($add_quote_post['drop_ship_margin_map'] ?? '') ?>" />
         </div>
         <div>
           <label>Quote Amount <span style="color:var(--d)">*</span></label>
