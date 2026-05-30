@@ -31,6 +31,17 @@ $status_labels = [
 $errors = [];
 $success = '';
 
+function excerpt_text(string $text, int $limit): string {
+  $text = trim($text);
+  if ($limit <= 0 || $text === '') return '';
+  if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+    if (mb_strlen($text, 'UTF-8') <= $limit) return $text;
+    return rtrim(mb_substr($text, 0, $limit, 'UTF-8')) . '…';
+  }
+  if (strlen($text) <= $limit) return $text;
+  return rtrim(substr($text, 0, $limit)) . '…';
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $csrf = (string)($_POST['csrf_token'] ?? '');
   if (!hash_equals((string)$_SESSION['app_request_tracker_csrf'], $csrf)) {
@@ -133,11 +144,11 @@ render_header('App Request Tracker');
             <td><?= h($priority_labels[$row['priority']] ?? $row['priority']) ?></td>
             <td style="max-width:220px; white-space:normal;"><?= h($row['request_title']) ?></td>
             <td style="max-width:300px; white-space:normal;">
-              <?= nl2br(h(mb_strimwidth((string)$row['request_details'], 0, 180, '…'))) ?>
+              <?= nl2br(h(excerpt_text((string)$row['request_details'], 180))) ?>
             </td>
             <td><?= h($status_labels[$row['status']] ?? $row['status']) ?></td>
             <td style="max-width:240px; white-space:normal;">
-              <?= nl2br(h(mb_strimwidth((string)($row['admin_notes'] ?? ''), 0, 160, '…'))) ?>
+              <?= nl2br(h(excerpt_text((string)($row['admin_notes'] ?? ''), 160))) ?>
             </td>
             <td class="muted" style="white-space:nowrap;"><?= h($row['created_at']) ?></td>
             <td class="muted" style="white-space:nowrap;"><?= h($row['updated_at']) ?></td>
