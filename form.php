@@ -312,26 +312,6 @@ render_header('Service Request Form');
   </p>
 </div>
 
-<div class="card">
-  <h2 style="margin-top:0;">Service Request Map</h2>
-  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:10px; margin-bottom:12px;">
-    <div style="border:1px solid var(--b); border-radius:8px; padding:10px 12px;">
-      <p class="muted" style="margin:0 0 4px;">Total Waiting Users</p>
-      <strong style="font-size:20px;"><?= (int)$waiting_total ?></strong>
-    </div>
-    <div style="border:1px solid var(--b); border-radius:8px; padding:10px 12px;">
-      <p class="muted" style="margin:0 0 4px;">Verified Users</p>
-      <strong style="font-size:20px;"><?= (int)$waiting_verified ?></strong>
-    </div>
-    <div style="border:1px solid var(--b); border-radius:8px; padding:10px 12px;">
-      <p class="muted" style="margin:0 0 4px;">Pending Verification</p>
-      <strong style="font-size:20px;"><?= (int)$waiting_unverified ?></strong>
-    </div>
-  </div>
-  <p class="muted" id="serviceMapStats" style="margin:0 0 12px;">Loading map pins…</p>
-  <div id="serviceRequestMap" style="height:400px; border-radius:8px; border:1px solid var(--b);"></div>
-</div>
-
 <?php if ($success): ?>
   <div class="card" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; text-align:center; padding:32px;">
     <h2 style="margin-top:0;">✅ Request Submitted!</h2>
@@ -447,6 +427,26 @@ render_header('Service Request Form');
     </div>
   </form>
 <?php endif; ?>
+
+<div class="card">
+  <h2 style="margin-top:0;">Service Request Map</h2>
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:10px; margin-bottom:12px;">
+    <div style="border:1px solid var(--b); border-radius:8px; padding:10px 12px;">
+      <p class="muted" style="margin:0 0 4px;">Total Waiting Users</p>
+      <strong style="font-size:20px;"><?= (int)$waiting_total ?></strong>
+    </div>
+    <div style="border:1px solid var(--b); border-radius:8px; padding:10px 12px;">
+      <p class="muted" style="margin:0 0 4px;">Verified Users</p>
+      <strong style="font-size:20px;"><?= (int)$waiting_verified ?></strong>
+    </div>
+    <div style="border:1px solid var(--b); border-radius:8px; padding:10px 12px;">
+      <p class="muted" style="margin:0 0 4px;">Pending Verification</p>
+      <strong style="font-size:20px;"><?= (int)$waiting_unverified ?></strong>
+    </div>
+  </div>
+  <p class="muted" id="serviceMapStats" style="margin:0 0 12px;">Loading map pins…</p>
+  <div id="serviceRequestMap" style="height:400px; border-radius:8px; border:1px solid var(--b);"></div>
+</div>
 
 <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
