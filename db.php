@@ -302,10 +302,13 @@ $pdo->exec("
   CREATE TABLE IF NOT EXISTS rfq_requests (
     id                 INT UNSIGNED NOT NULL AUTO_INCREMENT,
     requested_by       INT UNSIGNED NOT NULL,
+    request_category   ENUM('machine','parts') NOT NULL DEFAULT 'machine',
     request_title      VARCHAR(255) NOT NULL,
     machine_size       VARCHAR(100) NOT NULL,
     laser_watts        VARCHAR(50)  NOT NULL,
     tube_type          VARCHAR(100) NOT NULL,
+    part_category      VARCHAR(100) NULL,
+    part_specs         TEXT         NULL,
     quantity           INT UNSIGNED NOT NULL DEFAULT 1,
     required_features  TEXT         NOT NULL,
     additional_notes   TEXT         NULL,
@@ -318,6 +321,21 @@ $pdo->exec("
     KEY idx_rfq_requests_created_at (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+// Add RFQ request category and parts fields if they do not exist yet
+foreach ([
+  "ALTER TABLE rfq_requests ADD COLUMN request_category ENUM('machine','parts') NOT NULL DEFAULT 'machine' AFTER requested_by",
+  "ALTER TABLE rfq_requests ADD COLUMN part_category VARCHAR(100) NULL AFTER tube_type",
+  "ALTER TABLE rfq_requests ADD COLUMN part_specs TEXT NULL AFTER part_category",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    if ($e->getCode() !== '42S21') {
+      throw $e;
+    }
+  }
+}
 
 // Create rfq_quotes table for quote, lead time, and shipping tracking
 $pdo->exec("

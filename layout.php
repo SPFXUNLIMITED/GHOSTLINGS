@@ -264,6 +264,7 @@ $show_rfq_menu = $show_mod_menu;
     <?php endif; ?>
     <?php if ($show_rfq_menu): ?>
     <a class="menu-link <?= $current === 'rfq_form.php' ? 'active' : '' ?>" href="rfq_form.php">RFQ Form</a>
+    <a class="menu-link <?= $current === 'rfq_parts_form.php' ? 'active' : '' ?>" href="rfq_parts_form.php">Parts RFQ Form</a>
     <a class="menu-link <?= $current === 'rfq_tracker.php' ? 'active' : '' ?>" href="rfq_tracker.php">RFQ Tracker</a>
     <?php endif; ?>
     <?php if ($show_admin_menu): ?>
