@@ -13,12 +13,12 @@ $proj_offset = ($proj_page - 1) * $per_page;
 $task_offset = ($task_page - 1) * $per_page;
 
 if (is_admin()) {
-  $proj_total = (int)$pdo->query("SELECT COUNT(*) FROM projects WHERE playbook = 0 AND archived = 0")->fetchColumn();
+  $proj_total = (int)$pdo->query("SELECT COUNT(*) FROM projects WHERE playbook = 0 AND is_sop_category = 0 AND archived = 0")->fetchColumn();
 
   $stmt = $pdo->prepare("
     SELECT id, name, description, created_at, bumped_at, priority
     FROM projects
-    WHERE playbook = 0 AND archived = 0
+    WHERE playbook = 0 AND is_sop_category = 0 AND archived = 0
     ORDER BY GREATEST(created_at, COALESCE(bumped_at, '1970-01-01')) DESC, id DESC
     LIMIT :limit OFFSET :offset
   ");
@@ -31,7 +31,7 @@ if (is_admin()) {
     SELECT COUNT(*)
     FROM tasks t
     JOIN projects p ON p.id = t.project_id
-    WHERE p.playbook = 0 AND p.archived = 0
+    WHERE p.playbook = 0 AND p.is_sop_category = 0 AND p.archived = 0
   ")->fetchColumn();
 
   $stmt = $pdo->prepare("
@@ -40,7 +40,7 @@ if (is_admin()) {
       p.name AS project_name
     FROM tasks t
     JOIN projects p ON p.id = t.project_id
-    WHERE p.playbook = 0 AND p.archived = 0
+    WHERE p.playbook = 0 AND p.is_sop_category = 0 AND p.archived = 0
     ORDER BY t.created_at DESC, t.id DESC
     LIMIT :limit OFFSET :offset
   ");
@@ -55,7 +55,7 @@ if (is_admin()) {
     SELECT COUNT(DISTINCT pr.id)
     FROM projects pr
     LEFT JOIN tasks t ON t.project_id = pr.id
-    WHERE pr.playbook = 0 AND pr.archived = 0
+    WHERE pr.playbook = 0 AND pr.is_sop_category = 0 AND pr.archived = 0
       AND (pr.owner_id = ? OR (t.assigned_to = ? AND t.assigned_to IS NOT NULL))
   ");
   $stmt->execute([$uid, $uid]);
@@ -65,7 +65,7 @@ if (is_admin()) {
     SELECT DISTINCT pr.id, pr.name, pr.description, pr.created_at, pr.bumped_at, pr.priority
     FROM projects pr
     LEFT JOIN tasks t ON t.project_id = pr.id
-    WHERE pr.playbook = 0 AND pr.archived = 0
+    WHERE pr.playbook = 0 AND pr.is_sop_category = 0 AND pr.archived = 0
       AND (pr.owner_id = ? OR (t.assigned_to = ? AND t.assigned_to IS NOT NULL))
     ORDER BY GREATEST(pr.created_at, COALESCE(pr.bumped_at, '1970-01-01')) DESC, pr.id DESC
     LIMIT ? OFFSET ?
@@ -81,7 +81,7 @@ if (is_admin()) {
     SELECT COUNT(*)
     FROM tasks t
     JOIN projects p ON p.id = t.project_id
-    WHERE p.playbook = 0 AND p.archived = 0
+    WHERE p.playbook = 0 AND p.is_sop_category = 0 AND p.archived = 0
       AND t.assigned_to = ?
   ");
   $stmt->execute([$uid]);
@@ -93,7 +93,7 @@ if (is_admin()) {
       p.name AS project_name
     FROM tasks t
     JOIN projects p ON p.id = t.project_id
-    WHERE p.playbook = 0 AND p.archived = 0
+    WHERE p.playbook = 0 AND p.is_sop_category = 0 AND p.archived = 0
       AND t.assigned_to = ?
     ORDER BY t.created_at DESC, t.id DESC
     LIMIT ? OFFSET ?
