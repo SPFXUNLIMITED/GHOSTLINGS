@@ -85,7 +85,7 @@ render_header('Bug Reporting');
 <div class="card">
   <h1 style="margin-top:0; margin-bottom:4px;">Bug Reporting</h1>
   <p class="muted" style="margin:0;">
-    Use this form to report bugs.
+    Use this form for bug reporting and related software requests.
   </p>
 </div>
 
