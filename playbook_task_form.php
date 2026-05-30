@@ -325,7 +325,7 @@ render_header($id ? 'Edit Task' : 'New Task');
             </div>
 
             <!-- Comment body (trusted users: rendered as HTML) -->
-            <div><?= $c['body'] ?></div>
+            <div><?= nl2br(h((string)($c['body'] ?? ''))) ?></div>
           </div>
         <?php endforeach; ?>
       <?php endif; ?>

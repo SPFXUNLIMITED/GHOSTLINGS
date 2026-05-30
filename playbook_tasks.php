@@ -24,6 +24,7 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([$project_id]);
 $tasks = $stmt->fetchAll();
+$table_column_count = 7;
 
 render_header('Playbook Tasks');
 ?>
@@ -57,7 +58,7 @@ render_header('Playbook Tasks');
     </thead>
     <tbody>
       <?php if (!$tasks): ?>
-        <tr><td colspan="7" class="muted">No tasks yet.</td></tr>
+        <tr><td colspan="<?= (int)$table_column_count ?>" class="muted">No tasks yet.</td></tr>
       <?php endif; ?>
 
       <?php foreach ($tasks as $t): ?>

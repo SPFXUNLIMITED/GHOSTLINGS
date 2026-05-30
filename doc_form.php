@@ -311,7 +311,7 @@ render_header($id ? 'Edit Document' : 'New Document');
             </div>
 
             <!-- TRUSTED USERS: render comment HTML -->
-            <div><?= $c['body'] ?? '' ?></div>
+            <div><?= nl2br(h((string)($c['body'] ?? ''))) ?></div>
           </div>
         <?php endforeach; ?>
       <?php endif; ?>

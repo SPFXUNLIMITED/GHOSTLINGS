@@ -33,7 +33,11 @@ $return_locations = [
   'playbook_tasks' => "playbook_tasks.php?project_id={$project_id}",
   'project_details' => "project_details.php?id={$project_id}",
 ];
-$location = $return_locations[$return_to] ?? ($project['playbook'] ? $return_locations['playbook_tasks'] : $return_locations['tasks']);
+$default_return = !empty($project['playbook']) ? 'playbook_tasks' : 'tasks';
+if (!isset($return_locations[$return_to])) {
+  $return_to = $default_return;
+}
+$location = $return_locations[$return_to];
 
 header("Location: {$location}");
 exit;
