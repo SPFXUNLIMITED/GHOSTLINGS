@@ -120,10 +120,16 @@ render_header('Quote Details');
         <th>Attachment</th>
         <td>
           <?php if (!empty($quote['quote_file_stored_name'])): ?>
-            <a class="btn" href="rfq_quote_file.php?quote_id=<?= (int)$quote['id'] ?>" target="_blank" rel="noopener noreferrer">Open Attachment</a>
-            <?php if (!empty($quote['quote_file_original_name'])): ?>
-              <div class="muted" style="margin-top:6px; font-size:12px;"><?= h((string)$quote['quote_file_original_name']) ?></div>
-            <?php endif; ?>
+            <?php
+              $attachment_url = 'rfq_quote_file.php?quote_id=' . (int)$quote['id'];
+              $preview_url = $attachment_url . '&inline=1';
+            ?>
+            <?= render_attachment_preview(
+              $attachment_url,
+              (string)($quote['quote_file_original_name'] ?? 'Attachment'),
+              (string)($quote['quote_file_mime_type'] ?? ''),
+              $preview_url
+            ) ?>
           <?php else: ?>
             <span class="muted">—</span>
           <?php endif; ?>

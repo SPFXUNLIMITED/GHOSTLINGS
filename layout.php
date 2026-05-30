@@ -25,6 +25,56 @@ function parse_date_mdY(?string $mdy): string {
   return $dt->format('Y-m-d');
 }
 
+function is_image_attachment_mime(?string $mime): bool {
+  return is_string($mime) && preg_match('#^image/(png|jpe?g|gif|webp)$#i', $mime);
+}
+
+function attachment_icon_emoji(?string $file_name, ?string $mime): string {
+  $mime = strtolower(trim((string)$mime));
+  $file_name = strtolower(trim((string)$file_name));
+  $ext = pathinfo($file_name, PATHINFO_EXTENSION);
+
+  if (strpos($mime, 'pdf') !== false || $ext === 'pdf') return '📕';
+  if (strpos($mime, 'word') !== false || in_array($ext, ['doc', 'docx'], true)) return '📘';
+  if (strpos($mime, 'excel') !== false || in_array($ext, ['xls', 'xlsx', 'csv'], true)) return '📗';
+  if (strpos($mime, 'zip') !== false || in_array($ext, ['zip', 'rar', '7z', 'gz', 'tar'], true)) return '🗜️';
+  if (strpos($mime, 'audio/') === 0 || in_array($ext, ['mp3', 'wav', 'ogg'], true)) return '🎵';
+  if (strpos($mime, 'video/') === 0 || in_array($ext, ['mp4', 'mov', 'avi', 'webm'], true)) return '🎞️';
+  if (is_image_attachment_mime($mime) || in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp'], true)) return '🖼️';
+  if (strpos($mime, 'text/') === 0 || in_array($ext, ['txt', 'md', 'log'], true)) return '📝';
+  return '📄';
+}
+
+function render_attachment_preview(?string $file_url, ?string $display_name, ?string $mime_type = null, ?string $preview_url = null): string {
+  $file_url = trim((string)$file_url);
+  if ($file_url === '') {
+    return '<span class="muted">—</span>';
+  }
+
+  $display_name = trim((string)$display_name);
+  if ($display_name === '') $display_name = 'Attachment';
+
+  $mime_type = trim((string)$mime_type);
+  $is_image = is_image_attachment_mime($mime_type);
+  $icon = attachment_icon_emoji($display_name, $mime_type);
+  $preview_src = trim((string)($preview_url ?? $file_url));
+
+  $out = '<div style="display:flex; align-items:center; gap:8px;">';
+  if ($is_image) {
+    $out .= '<a href="' . h($file_url) . '" target="_blank" rel="noopener noreferrer">'
+      . '<img src="' . h($preview_src) . '" alt="' . h($display_name) . '"'
+      . ' style="width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid rgba(0,0,0,.12); display:block;" />'
+      . '</a>';
+  } else {
+    $out .= '<span aria-hidden="true" style="font-size:20px; line-height:1;">' . h($icon) . '</span>';
+  }
+  $out .= '<a href="' . h($file_url) . '" target="_blank" rel="noopener noreferrer"'
+    . ' style="font-size:12px; line-height:1.3; word-break:break-word;">' . h($display_name) . '</a>'
+    . '</div>';
+
+  return $out;
+}
+
 function render_pagination(int $current_page, int $total, int $per_page, string $page_param): void {
   $total_pages = max(1, (int)ceil($total / $per_page));
   if ($total_pages <= 1) return;
@@ -252,7 +302,7 @@ $show_rfq_menu = $show_mod_menu;
     <a class="menu-link <?= $current === 'time_clock.php' ? 'active' : '' ?>" href="time_clock.php">Time Clock</a>
     <?php endif; ?>
     <?php endif; ?>
-	<a class="menu-link <?= $current === 'form.php' ? 'active' : '' ?>" href="form.php">Service Request Form</a>
+    <a class="menu-link <?= $current === 'form.php' ? 'active' : '' ?>" href="form.php">Service Request Form</a>
   </div>
 </nav>
 

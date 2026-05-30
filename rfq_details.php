@@ -289,15 +289,19 @@ render_header('RFQ Details');
               <?php
                 $file_name = (string)($q['quote_file_stored_name'] ?? '');
                 $file_url = '';
+                $preview_url = '';
                 if ($file_name !== '' && is_safe_stored_upload_name($file_name)) {
                   $file_url = 'rfq_quote_file.php?quote_id=' . (int)$q['id'];
+                  $preview_url = $file_url . '&inline=1';
                 }
               ?>
               <?php if ($file_url !== ''): ?>
-                <a class="btn" href="<?= h($file_url) ?>" target="_blank" rel="noopener noreferrer">Open</a><br>
-                <span class="muted" style="font-size:12px;">
-                  <?= h((string)($q['quote_file_original_name'] ?? 'Attachment')) ?>
-                </span>
+                <?= render_attachment_preview(
+                  $file_url,
+                  (string)($q['quote_file_original_name'] ?? 'Attachment'),
+                  (string)($q['quote_file_mime_type'] ?? ''),
+                  $preview_url
+                ) ?>
               <?php else: ?>
                 —
               <?php endif; ?>
