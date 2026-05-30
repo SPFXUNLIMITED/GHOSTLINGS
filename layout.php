@@ -334,6 +334,7 @@ $show_rfq_menu = $show_mod_menu;
     <?php render_menu_dropdown('Projects', [
       ['href' => 'projects.php', 'file' => 'projects.php', 'label' => 'Projects', 'visible' => true],
       ['href' => 'documents.php', 'file' => 'documents.php', 'label' => 'Documents', 'visible' => true],
+      ['href' => 'sops.php', 'file' => 'sops.php', 'label' => 'SOP', 'visible' => true],
       ['href' => 'playbooks.php', 'file' => 'playbooks.php', 'label' => 'Playbooks', 'visible' => true],
       ['href' => 'archives.php', 'file' => 'archives.php', 'label' => 'Archives', 'visible' => true],
     ], $current); ?>

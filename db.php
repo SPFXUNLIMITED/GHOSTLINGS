@@ -114,6 +114,15 @@ try {
   }
 }
 
+// Add is_sop_category column to projects if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE projects ADD COLUMN is_sop_category TINYINT(1) NOT NULL DEFAULT 0");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
 // Create task_comments table if it does not exist yet
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS task_comments (
