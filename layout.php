@@ -378,7 +378,7 @@ $show_rfq_menu = $show_mod_menu;
 
     dropdowns.forEach((dropdown) => {
       dropdown.addEventListener('toggle', function () {
-        if (dropdown.open) {
+        if (dropdown.hasAttribute('open')) {
           closeAll(dropdown);
         }
       });
