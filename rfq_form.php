@@ -145,8 +145,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $stmt = $pdo->prepare(
       "INSERT INTO rfq_requests
-        (requested_by, request_category, contact_name, company_name, contact_email, contact_phone, buyer_name, buyer_company, buyer_email, buyer_phone,
-         request_title, machine_size, laser_watts, tube_type, part_category, part_specs, quantity, required_features, additional_notes)
+        (
+          requested_by, request_category, contact_name, company_name, contact_email, contact_phone,
+          buyer_name, buyer_company, buyer_email, buyer_phone,
+          request_title, machine_size, laser_watts, tube_type, part_category, part_specs,
+          quantity, required_features, additional_notes
+        )
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $stmt->execute([
