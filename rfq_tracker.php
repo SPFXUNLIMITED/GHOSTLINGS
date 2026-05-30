@@ -1188,7 +1188,7 @@ render_header('RFQ Tracker');
         </div>
         <div>
           <label>Shipping Method</label>
-          <input type="text" name="shipping_method" maxlength="100" placeholder="e.g. Sea freight / Air cargo"
+          <input type="text" name="shipping_method" maxlength="100" placeholder="e.g. DDP / FOB / EXW"
                  value="<?= h($add_quote_post['shipping_method'] ?? '') ?>" />
         </div>
         <div>
