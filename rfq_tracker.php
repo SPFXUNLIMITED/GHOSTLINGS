@@ -676,6 +676,7 @@ if ($edit_rfq_id <= 0) {
   $edit_rfq_id = max(0, (int)($_GET['edit_rfq_id'] ?? 0));
 }
 $rfq_text_id = max(0, (int)($_GET['rfq_text_id'] ?? 0));
+$add_quote_id = max(0, (int)($_GET['add_quote_id'] ?? 0));
 
 $where_parts = [];
 $params = [];
@@ -718,6 +719,7 @@ $quotes = [];
 $editing_quote = null;
 $editing_rfq = null;
 $rfq_email_text = '';
+$show_add_quote_form = false;
 if ($selected_rfq_id > 0) {
   $sel = $pdo->prepare("SELECT id, request_title FROM rfq_requests WHERE id = ? LIMIT 1");
   $sel->execute([$selected_rfq_id]);
@@ -744,6 +746,9 @@ if ($selected_rfq_id > 0) {
         $editing_quote = array_merge($editing_quote, $edit_quote_post);
       }
     }
+
+    $show_add_quote_form = $add_quote_post !== null
+      || ($add_quote_id > 0 && $add_quote_id === $selected_rfq_id);
   }
 }
 
@@ -945,95 +950,97 @@ render_header('RFQ Tracker');
   </script>
 <?php endif; ?>
 
-<div class="card">
-  <div class="table-wrap" style="overflow-x:auto;">
-    <table class="table-auto" style="min-width:1100px;">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>RFQ</th>
-          <th>Specs</th>
-          <th>Features</th>
-          <th>Quotes</th>
-          <th>Status</th>
-          <th>Requested By</th>
-          <th>Created</th>
-          <th class="col-actions">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php if (!$rfqs): ?>
-          <tr><td colspan="9" class="muted">No RFQ requests found.</td></tr>
-        <?php endif; ?>
-        <?php foreach ($rfqs as $r): ?>
+<?php if (!$selected_rfq): ?>
+  <div class="card">
+    <div class="table-wrap" style="overflow-x:auto;">
+      <table class="table-auto" style="min-width:1100px;">
+        <thead>
           <tr>
-            <td class="muted"><?= (int)$r['id'] ?></td>
-            <td>
-              <strong><?= h($r['request_title']) ?></strong><br>
-              <span class="muted">Qty: <?= (int)$r['quantity'] ?></span>
-            </td>
-            <td>
-              Size: <?= h($r['machine_size']) ?><br>
-              Watts: <?= h($r['laser_watts']) ?><br>
-              Tube: <?= h($r['tube_type']) ?>
-            </td>
-            <td style="max-width:260px; white-space:normal;">
-              <?= nl2br(h(mb_strimwidth((string)$r['required_features'], 0, 180, '…'))) ?>
-            </td>
-            <td>
-              <span class="badge"><?= (int)$r['quote_count'] ?> quote(s)</span><br>
-              <span class="muted">
-                Best quote:
-                <?php if ($r['lowest_quote_amount'] !== null): ?>
-                  <?= h(number_format((float)$r['lowest_quote_amount'], 2)) ?>
-                <?php else: ?>
-                  —
-                <?php endif; ?>
-                <br>
-                Best lead: <?= $r['best_lead_time_days'] !== null ? h((string)$r['best_lead_time_days']) . ' days' : '—' ?><br>
-                Lowest ship:
-                <?php if ($r['lowest_shipping_cost'] !== null): ?>
-                  <?= h(number_format((float)$r['lowest_shipping_cost'], 2)) ?>
-                <?php else: ?>
-                  —
-                <?php endif; ?>
-                <br>
-                Currencies in quotes: <?= h((string)($r['quote_currencies'] ?: '—')) ?>
-              </span>
-            </td>
-            <td>
-              <form method="post" class="row" style="gap:6px; align-items:center;">
-                <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
-                <input type="hidden" name="action" value="update_request_status" />
-                <input type="hidden" name="rfq_id" value="<?= (int)$r['id'] ?>" />
-                <select name="request_status" style="min-width:150px;">
-                  <?php foreach ($request_statuses as $k => $label): ?>
-                    <option value="<?= h($k) ?>" <?= $r['request_status'] === $k ? 'selected' : '' ?>><?= h($label) ?></option>
-                  <?php endforeach; ?>
-                </select>
-                <button type="submit" class="btn">Save</button>
-              </form>
-            </td>
-            <td><?= h($r['requested_by_username'] ?? 'Unknown') ?></td>
-            <td class="muted" style="white-space:nowrap;"><?= h($r['created_at']) ?></td>
-            <td class="col-actions">
-              <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$r['id'] ?>">Quotes</a>
-              <a class="btn" href="rfq_tracker.php?rfq_text_id=<?= (int)$r['id'] ?>">Email Text</a>
-              <a class="btn" href="rfq_tracker.php?edit_rfq_id=<?= (int)$r['id'] ?>">Edit</a>
-              <form method="post" style="display:inline;"
-                    onsubmit="return confirm('Delete this RFQ and all its quotes? This cannot be undone.');">
-                <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
-                <input type="hidden" name="action" value="delete_rfq" />
-                <input type="hidden" name="rfq_id" value="<?= (int)$r['id'] ?>" />
-                <button type="submit" class="btn" style="color:#b91c1c;">Delete</button>
-              </form>
-            </td>
+            <th>#</th>
+            <th>RFQ</th>
+            <th>Specs</th>
+            <th>Features</th>
+            <th>Quotes</th>
+            <th>Status</th>
+            <th>Requested By</th>
+            <th>Created</th>
+            <th class="col-actions">Actions</th>
           </tr>
-        <?php endforeach; ?>
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          <?php if (!$rfqs): ?>
+            <tr><td colspan="9" class="muted">No RFQ requests found.</td></tr>
+          <?php endif; ?>
+          <?php foreach ($rfqs as $r): ?>
+            <tr>
+              <td class="muted"><?= (int)$r['id'] ?></td>
+              <td>
+                <strong><?= h($r['request_title']) ?></strong><br>
+                <span class="muted">Qty: <?= (int)$r['quantity'] ?></span>
+              </td>
+              <td>
+                Size: <?= h($r['machine_size']) ?><br>
+                Watts: <?= h($r['laser_watts']) ?><br>
+                Tube: <?= h($r['tube_type']) ?>
+              </td>
+              <td style="max-width:260px; white-space:normal;">
+                <?= nl2br(h(mb_strimwidth((string)$r['required_features'], 0, 180, '…'))) ?>
+              </td>
+              <td>
+                <span class="badge"><?= (int)$r['quote_count'] ?> quote(s)</span><br>
+                <span class="muted">
+                  Best quote:
+                  <?php if ($r['lowest_quote_amount'] !== null): ?>
+                    <?= h(number_format((float)$r['lowest_quote_amount'], 2)) ?>
+                  <?php else: ?>
+                    —
+                  <?php endif; ?>
+                  <br>
+                  Best lead: <?= $r['best_lead_time_days'] !== null ? h((string)$r['best_lead_time_days']) . ' days' : '—' ?><br>
+                  Lowest ship:
+                  <?php if ($r['lowest_shipping_cost'] !== null): ?>
+                    <?= h(number_format((float)$r['lowest_shipping_cost'], 2)) ?>
+                  <?php else: ?>
+                    —
+                  <?php endif; ?>
+                  <br>
+                  Currencies in quotes: <?= h((string)($r['quote_currencies'] ?: '—')) ?>
+                </span>
+              </td>
+              <td>
+                <form method="post" class="row" style="gap:6px; align-items:center;">
+                  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
+                  <input type="hidden" name="action" value="update_request_status" />
+                  <input type="hidden" name="rfq_id" value="<?= (int)$r['id'] ?>" />
+                  <select name="request_status" style="min-width:150px;">
+                    <?php foreach ($request_statuses as $k => $label): ?>
+                      <option value="<?= h($k) ?>" <?= $r['request_status'] === $k ? 'selected' : '' ?>><?= h($label) ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                  <button type="submit" class="btn">Save</button>
+                </form>
+              </td>
+              <td><?= h($r['requested_by_username'] ?? 'Unknown') ?></td>
+              <td class="muted" style="white-space:nowrap;"><?= h($r['created_at']) ?></td>
+              <td class="col-actions">
+                <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$r['id'] ?>">Quotes</a>
+                <a class="btn" href="rfq_tracker.php?rfq_text_id=<?= (int)$r['id'] ?>">Email Text</a>
+                <a class="btn" href="rfq_tracker.php?edit_rfq_id=<?= (int)$r['id'] ?>">Edit</a>
+                <form method="post" style="display:inline;"
+                      onsubmit="return confirm('Delete this RFQ and all its quotes? This cannot be undone.');">
+                  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
+                  <input type="hidden" name="action" value="delete_rfq" />
+                  <input type="hidden" name="rfq_id" value="<?= (int)$r['id'] ?>" />
+                  <button type="submit" class="btn" style="color:#b91c1c;">Delete</button>
+                </form>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
   </div>
-</div>
+<?php endif; ?>
 
 <?php if ($selected_rfq): ?>
   <div class="card">
@@ -1122,7 +1129,7 @@ render_header('RFQ Tracker');
           <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>">Cancel</a>
         </div>
       </form>
-    <?php else: ?>
+    <?php elseif ($show_add_quote_form): ?>
       <h3 style="margin-top:0; margin-bottom:12px;">Add Quote</h3>
       <form method="post" class="form-grid" enctype="multipart/form-data" novalidate>
         <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
@@ -1189,8 +1196,13 @@ render_header('RFQ Tracker');
         </div>
         <div class="full row" style="margin-top:8px;">
           <button type="submit" class="btn primary">Add Quote</button>
+          <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>">Cancel</a>
         </div>
       </form>
+    <?php else: ?>
+      <div class="row" style="margin-bottom:14px;">
+        <a class="btn primary" href="rfq_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>&add_quote_id=<?= (int)$selected_rfq['id'] ?>">Add Quote</a>
+      </div>
     <?php endif; ?>
 
     <div class="table-wrap" style="overflow-x:auto; margin-top:14px;">
