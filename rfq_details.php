@@ -4,6 +4,10 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_rfq_access();
 
+if (empty($_SESSION['rfq_tracker_csrf'])) {
+  $_SESSION['rfq_tracker_csrf'] = bin2hex(random_bytes(24));
+}
+
 $request_statuses = [
   'draft' => 'Draft',
   'sourcing' => 'Sourcing',
@@ -17,6 +21,8 @@ function is_safe_stored_upload_name(string $name): bool {
   return (bool)preg_match('/^[a-zA-Z0-9._-]+$/', $name);
 }
 
+$errors = [];
+$success = '';
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($id <= 0) {
   header('Location: rfq_tracker.php');
@@ -40,6 +46,40 @@ if (!$rfq) {
   echo '<div class="card"><p class="muted">RFQ request not found.</p><a class="btn" href="rfq_tracker.php">← Back to RFQ Tracker</a></div>';
   render_footer();
   exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
+  if (empty($_SESSION['rfq_tracker_csrf']) || !hash_equals((string)$_SESSION['rfq_tracker_csrf'], $submitted_csrf)) {
+    $errors[] = 'Security token mismatch. Please refresh and try again.';
+  } else {
+    $action = (string)($_POST['action'] ?? '');
+    if ($action === 'delete_quote') {
+      $quote_id = (int)($_POST['quote_id'] ?? 0);
+      $rfq_id = (int)($_POST['rfq_id'] ?? 0);
+      if ($quote_id <= 0 || $rfq_id !== (int)$rfq['id']) {
+        $errors[] = 'Invalid quote or RFQ.';
+      } else {
+        $quote_stmt = $pdo->prepare("SELECT quote_file_stored_name FROM rfq_quotes WHERE id = ? AND rfq_request_id = ? LIMIT 1");
+        $quote_stmt->execute([$quote_id, $rfq_id]);
+        $del_quote = $quote_stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$del_quote) {
+          $errors[] = 'Quote not found.';
+        } else {
+          $stored = (string)($del_quote['quote_file_stored_name'] ?? '');
+          if ($stored !== '' && is_safe_stored_upload_name($stored)) {
+            $old_path = __DIR__ . '/uploads/' . $stored;
+            if (is_file($old_path)) {
+              @unlink($old_path);
+            }
+          }
+          $delete_stmt = $pdo->prepare("DELETE FROM rfq_quotes WHERE id = ? AND rfq_request_id = ?");
+          $delete_stmt->execute([$quote_id, $rfq_id]);
+          $success = 'Quote deleted successfully.';
+        }
+      }
+    }
+  }
 }
 
 $qstmt = $pdo->prepare(
@@ -85,6 +125,17 @@ $quote_currencies = $currencies ? implode(', ', array_keys($currencies)) : '—'
 
 render_header('RFQ Details');
 ?>
+
+<?php if ($errors): ?>
+  <div class="card">
+    <?php foreach ($errors as $e): ?>
+      <div class="notice error"><?= h($e) ?></div>
+    <?php endforeach; ?>
+  </div>
+<?php endif; ?>
+<?php if ($success): ?>
+  <div class="card"><div class="notice success"><?= h($success) ?></div></div>
+<?php endif; ?>
 
 <div class="card">
   <div class="row" style="justify-content:space-between; align-items:center;">
@@ -225,6 +276,13 @@ render_header('RFQ Details');
             <td class="col-actions">
               <a class="btn" href="rfq_quote_details.php?rfq_id=<?= (int)$rfq['id'] ?>&quote_id=<?= (int)$q['id'] ?>">View</a>
               <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$rfq['id'] ?>&edit_quote_id=<?= (int)$q['id'] ?>">Edit</a>
+              <form method="post" style="display:inline;" onsubmit="return confirm('Delete this quote? This cannot be undone.');">
+                <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
+                <input type="hidden" name="action" value="delete_quote" />
+                <input type="hidden" name="rfq_id" value="<?= (int)$rfq['id'] ?>" />
+                <input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>" />
+                <button type="submit" class="btn" style="color:#b91c1c;">Delete</button>
+              </form>
             </td>
           </tr>
         <?php endforeach; ?>
