@@ -658,10 +658,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'edit_rfq') {
       $rfq_id = (int)($_POST['rfq_id'] ?? 0);
       $request_category = strtolower(trim((string)($_POST['request_category'] ?? 'machine')));
-      $contact_name     = trim((string)($_POST['contact_name']    ?? ''));
-      $company_name     = trim((string)($_POST['company_name']    ?? ''));
-      $contact_email    = trim((string)($_POST['contact_email']   ?? ''));
-      $contact_phone    = trim((string)($_POST['contact_phone']   ?? ''));
+      $buyer_name       = trim((string)($_POST['buyer_name']       ?? ''));
+      $buyer_company    = trim((string)($_POST['buyer_company']    ?? ''));
+      $buyer_email      = trim((string)($_POST['buyer_email']      ?? ''));
+      $buyer_phone      = trim((string)($_POST['buyer_phone']      ?? ''));
       $request_title    = trim((string)($_POST['request_title']   ?? ''));
       $machine_size     = trim((string)($_POST['machine_size']    ?? ''));
       $laser_watts      = trim((string)($_POST['laser_watts']     ?? ''));
@@ -686,8 +686,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($tube_type === '') $errors[] = 'Tube type is required for machine requests.';
         if ($required_features === '') $errors[] = 'Required features are required for machine requests.';
       }
-      if ($contact_email !== '' && !filter_var($contact_email, FILTER_VALIDATE_EMAIL)) {
-        $errors[] = 'Contact email must be a valid email address.';
+      if ($buyer_email !== '' && !filter_var($buyer_email, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = 'Buyer / End User email must be a valid email address.';
       }
       if (!ctype_digit($quantity_raw) || (int)$quantity_raw < 1 || (int)$quantity_raw > MAX_RFQ_QUANTITY) {
         $errors[] = 'Quantity must be a whole number between 1 and ' . MAX_RFQ_QUANTITY . '.';
@@ -708,16 +708,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (!$errors) {
         $upd = $pdo->prepare(
           "UPDATE rfq_requests SET
-            contact_name = ?, company_name = ?, contact_email = ?, contact_phone = ?,
+            buyer_name = ?, buyer_company = ?, buyer_email = ?, buyer_phone = ?,
             request_category = ?, request_title = ?, machine_size = ?, laser_watts = ?, tube_type = ?,
             part_category = ?, part_specs = ?, quantity = ?, required_features = ?, additional_notes = ?
            WHERE id = ?"
         );
         $upd->execute([
-          $contact_name  === '' ? null : $contact_name,
-          $company_name  === '' ? null : $company_name,
-          $contact_email === '' ? null : $contact_email,
-          $contact_phone === '' ? null : $contact_phone,
+          $buyer_name    === '' ? null : $buyer_name,
+          $buyer_company === '' ? null : $buyer_company,
+          $buyer_email   === '' ? null : $buyer_email,
+          $buyer_phone   === '' ? null : $buyer_phone,
           $request_category,
           $request_title,
           $request_category === 'machine' ? $machine_size : null,
@@ -884,6 +884,7 @@ if ($selected_rfq_id > 0) {
 if ($edit_rfq_id > 0) {
   $er = $pdo->prepare(
     "SELECT id, contact_name, company_name, contact_email, contact_phone,
+            buyer_name, buyer_company, buyer_email, buyer_phone,
             request_category, request_title, machine_size, laser_watts, tube_type, part_category, part_specs, quantity, required_features, additional_notes
      FROM rfq_requests WHERE id = ? LIMIT 1"
   );
@@ -943,27 +944,27 @@ render_header('RFQ Tracker');
     <input type="hidden" name="rfq_id" value="<?= (int)$editing_rfq['id'] ?>" />
 
     <div class="full" style="margin-bottom:4px;">
-      <strong style="font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted,#6b7280);">Company / Contact Information</strong>
+      <strong style="font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted,#6b7280);">Buyer / End User Information</strong>
     </div>
     <div>
-      <label>Contact Name</label>
-      <input type="text" name="contact_name" maxlength="255"
-             value="<?= h((string)($editing_rfq['contact_name'] ?? '')) ?>" />
+      <label>Buyer / End User Name</label>
+      <input type="text" name="buyer_name" maxlength="255"
+             value="<?= h((string)($editing_rfq['buyer_name'] ?? '')) ?>" />
     </div>
     <div>
-      <label>Company Name</label>
-      <input type="text" name="company_name" maxlength="255"
-             value="<?= h((string)($editing_rfq['company_name'] ?? '')) ?>" />
+      <label>Buyer / End User Company</label>
+      <input type="text" name="buyer_company" maxlength="255"
+             value="<?= h((string)($editing_rfq['buyer_company'] ?? '')) ?>" />
     </div>
     <div>
-      <label>Contact Email</label>
-      <input type="email" name="contact_email" maxlength="255"
-             value="<?= h((string)($editing_rfq['contact_email'] ?? '')) ?>" />
+      <label>Buyer / End User Email</label>
+      <input type="email" name="buyer_email" maxlength="255"
+             value="<?= h((string)($editing_rfq['buyer_email'] ?? '')) ?>" />
     </div>
     <div>
-      <label>Contact Phone</label>
-      <input type="text" name="contact_phone" maxlength="100"
-             value="<?= h((string)($editing_rfq['contact_phone'] ?? '')) ?>" />
+      <label>Buyer / End User Phone</label>
+      <input type="text" name="buyer_phone" maxlength="100"
+             value="<?= h((string)($editing_rfq['buyer_phone'] ?? '')) ?>" />
     </div>
 
     <div class="full"><hr style="margin:4px 0 8px; border:none; border-top:1px solid var(--border,#e5e7eb);" /></div>
