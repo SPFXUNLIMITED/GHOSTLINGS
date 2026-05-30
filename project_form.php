@@ -27,10 +27,10 @@ if ($id) {
   $stmt->execute([$id]);
   $project = $stmt->fetch();
   if (!$project) { http_response_code(404); exit('Project not found'); }
-  if (!empty($project['is_doc_category'])) {
-    $project['app_category'] = 'document';
-  } elseif (!empty($project['is_sop_category'])) {
+  if (!empty($project['is_sop_category'])) {
     $project['app_category'] = 'sop';
+  } elseif (!empty($project['is_doc_category'])) {
+    $project['app_category'] = 'document';
   } elseif (!empty($project['playbook'])) {
     $project['app_category'] = 'playbook';
   } else {

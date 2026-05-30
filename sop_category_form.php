@@ -27,10 +27,10 @@ if ($id) {
   $stmt->execute([$id]);
   $category = $stmt->fetch();
   if (!$category) { http_response_code(404); exit('SOP category not found'); }
-  if (!empty($category['is_doc_category'])) {
-    $category['app_category'] = 'document';
-  } elseif (!empty($category['is_sop_category'])) {
+  if (!empty($category['is_sop_category'])) {
     $category['app_category'] = 'sop';
+  } elseif (!empty($category['is_doc_category'])) {
+    $category['app_category'] = 'document';
   } elseif (!empty($category['playbook'])) {
     $category['app_category'] = 'playbook';
   } else {

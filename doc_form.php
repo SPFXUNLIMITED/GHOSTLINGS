@@ -99,14 +99,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['add_comment']) && !i
   }
   $new_category_id = (int)($_POST['target_category_id'] ?? $category_id);
   $selected_category = null;
-  foreach ($category_options[$app_category] as $opt) {
-    if ((int)$opt['id'] === $new_category_id) {
-      $selected_category = $opt;
-      break;
+  if (!$errors) {
+    foreach ($category_options[$app_category] as $opt) {
+      if ((int)$opt['id'] === $new_category_id) {
+        $selected_category = $opt;
+        break;
+      }
     }
-  }
-  if (!$selected_category) {
-    $errors[] = "Selected category not found.";
+    if (!$selected_category) {
+      $errors[] = "Selected category not found.";
+    }
   }
 
   $title      = trim($_POST['title'] ?? '');
@@ -363,7 +365,7 @@ render_header($id ? 'Edit Document' : 'New Document');
         const optionEl = document.createElement('option');
         optionEl.value = String(opt.id);
         optionEl.textContent = opt.name;
-        if (optionEl.value === previousValue) {
+        if (String(optionEl.value) === String(previousValue)) {
           optionEl.selected = true;
         }
         targetSelect.appendChild(optionEl);
@@ -371,6 +373,7 @@ render_header($id ? 'Edit Document' : 'New Document');
     };
 
     categorySelect.addEventListener('change', renderOptions);
+    renderOptions();
   })();
 </script>
 

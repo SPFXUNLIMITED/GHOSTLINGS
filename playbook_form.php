@@ -27,10 +27,10 @@ if ($id) {
   $stmt->execute([$id]);
   $playbook = $stmt->fetch();
   if (!$playbook) { http_response_code(404); exit('Playbook not found'); }
-  if (!empty($playbook['is_doc_category'])) {
-    $playbook['app_category'] = 'document';
-  } elseif (!empty($playbook['is_sop_category'])) {
+  if (!empty($playbook['is_sop_category'])) {
     $playbook['app_category'] = 'sop';
+  } elseif (!empty($playbook['is_doc_category'])) {
+    $playbook['app_category'] = 'document';
   } elseif (!empty($playbook['playbook'])) {
     $playbook['app_category'] = 'playbook';
   } else {
