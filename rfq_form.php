@@ -238,29 +238,6 @@ render_header($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ 
   <p class="muted" style="margin-top:0; margin-bottom:16px;">
     Company and contact details are pulled from your <a href="user_page.php">profile</a>.
   </p>
-  <h2 style="margin-top:0; margin-bottom:12px; font-size:1rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted, #6b7280);">Customer Information</h2>
-  <div class="form-grid" style="margin-bottom:12px;">
-    <div>
-      <label>Customer Name</label>
-      <input type="text" name="buyer_name" maxlength="255"
-             value="<?= h($fields['buyer_name']) ?>" />
-    </div>
-    <div>
-      <label>Customer Company</label>
-      <input type="text" name="buyer_company" maxlength="255"
-             value="<?= h($fields['buyer_company']) ?>" />
-    </div>
-    <div>
-      <label>Customer Email</label>
-      <input type="email" name="buyer_email" maxlength="255"
-             value="<?= h($fields['buyer_email']) ?>" />
-    </div>
-    <div>
-      <label>Customer Phone</label>
-      <input type="text" name="buyer_phone" maxlength="100"
-             value="<?= h($fields['buyer_phone']) ?>" />
-    </div>
-  </div>
   <h2 style="margin-top:0; margin-bottom:12px; font-size:1rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted, #6b7280);">Request Details</h2>
 
   <div class="form-grid">
@@ -287,11 +264,40 @@ render_header($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ 
     </div>
     <div>
       <label>Acquisition Purpose <span style="color:var(--d)">*</span></label>
-      <select name="acquisition_purpose" required>
+      <select name="acquisition_purpose" id="acquisition_purpose" required>
         <option value="customer" <?= $fields['acquisition_purpose'] === 'customer' ? 'selected' : '' ?>>Customer Request</option>
         <option value="internal" <?= $fields['acquisition_purpose'] === 'internal' ? 'selected' : '' ?>>Internal Use (Inventory / Repairs)</option>
       </select>
     </div>
+  </div>
+
+  <div id="customer_information_section" style="margin-top:12px; display:<?= $fields['acquisition_purpose'] === 'customer' ? 'block' : 'none' ?>;">
+    <h2 style="margin-top:0; margin-bottom:12px; font-size:1rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted, #6b7280);">Customer Information</h2>
+    <div class="form-grid" style="margin-bottom:12px;">
+      <div>
+        <label>Customer Name</label>
+        <input type="text" name="buyer_name" maxlength="255"
+               value="<?= h($fields['buyer_name']) ?>" <?= $fields['acquisition_purpose'] === 'customer' ? '' : 'disabled' ?> />
+      </div>
+      <div>
+        <label>Customer Company</label>
+        <input type="text" name="buyer_company" maxlength="255"
+               value="<?= h($fields['buyer_company']) ?>" <?= $fields['acquisition_purpose'] === 'customer' ? '' : 'disabled' ?> />
+      </div>
+      <div>
+        <label>Customer Email</label>
+        <input type="email" name="buyer_email" maxlength="255"
+               value="<?= h($fields['buyer_email']) ?>" <?= $fields['acquisition_purpose'] === 'customer' ? '' : 'disabled' ?> />
+      </div>
+      <div>
+        <label>Customer Phone</label>
+        <input type="text" name="buyer_phone" maxlength="100"
+               value="<?= h($fields['buyer_phone']) ?>" <?= $fields['acquisition_purpose'] === 'customer' ? '' : 'disabled' ?> />
+      </div>
+    </div>
+  </div>
+
+  <div class="form-grid">
     <div class="full">
       <label>Request Title <span style="color:var(--d)">*</span></label>
       <input type="text" name="request_title" maxlength="255" required
@@ -377,6 +383,20 @@ render_header($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ 
 <script>
   (function () {
     var categoryField = document.getElementById('request_category');
+    var acquisitionField = document.getElementById('acquisition_purpose');
+    var customerInfoSection = document.getElementById('customer_information_section');
+    var customerInfoInputs = customerInfoSection ? customerInfoSection.querySelectorAll('input') : [];
+    if (acquisitionField && customerInfoSection) {
+      function toggleCustomerInfo() {
+        var showCustomerInfo = acquisitionField.value === 'customer';
+        customerInfoSection.style.display = showCustomerInfo ? 'block' : 'none';
+        customerInfoInputs.forEach(function (input) {
+          input.disabled = !showCustomerInfo;
+        });
+      }
+      acquisitionField.addEventListener('change', toggleCustomerInfo);
+      toggleCustomerInfo();
+    }
     if (!categoryField) return;
     var machineFields = document.querySelectorAll('.machine-only');
     var partsFields = document.querySelectorAll('.parts-only');
