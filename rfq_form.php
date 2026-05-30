@@ -139,13 +139,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $fields['contact_email'] === '' ? null : $fields['contact_email'],
       $fields['contact_phone'] === '' ? null : $fields['contact_phone'],
       $full_request_title,
-      $fields['request_category'] === 'machine' ? $fields['machine_size'] : '',
-      $fields['request_category'] === 'machine' ? $fields['laser_watts'] : '',
-      $fields['request_category'] === 'machine' ? $fields['tube_type'] : '',
+      $fields['request_category'] === 'machine' ? $fields['machine_size'] : null,
+      $fields['request_category'] === 'machine' ? $fields['laser_watts'] : null,
+      $fields['request_category'] === 'machine' ? $fields['tube_type'] : null,
       $fields['request_category'] === 'parts' ? $fields['part_category'] : null,
       $fields['request_category'] === 'parts' ? $fields['part_specs'] : null,
       (int)$fields['quantity'],
-      $fields['request_category'] === 'machine' ? $fields['required_features'] : '',
+      $fields['request_category'] === 'machine' ? $fields['required_features'] : null,
       $fields['additional_notes'] === '' ? null : $fields['additional_notes'],
     ]);
 
@@ -259,25 +259,25 @@ render_header($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ 
     </div>
     <div class="machine-only">
       <label>Machine Size <span style="color:var(--d)">*</span></label>
-      <input type="text" name="machine_size" maxlength="100"
+      <input type="text" name="machine_size" maxlength="100" data-required-on="machine"
              value="<?= h($fields['machine_size']) ?>"
              placeholder="e.g. 1300x900mm bed" />
     </div>
     <div class="machine-only">
       <label>Laser Watts <span style="color:var(--d)">*</span></label>
-      <input type="text" name="laser_watts" maxlength="50"
+      <input type="text" name="laser_watts" maxlength="50" data-required-on="machine"
              value="<?= h($fields['laser_watts']) ?>"
              placeholder="e.g. 100W / 130W / 150W" />
     </div>
     <div class="machine-only">
       <label>Tube Type <span style="color:var(--d)">*</span></label>
-      <input type="text" name="tube_type" maxlength="100"
+      <input type="text" name="tube_type" maxlength="100" data-required-on="machine"
              value="<?= h($fields['tube_type']) ?>"
              placeholder="e.g. RECI W6, Yongli A8" />
     </div>
     <div class="parts-only">
       <label>Part Category <span style="color:var(--d)">*</span></label>
-      <input type="text" name="part_category" maxlength="100"
+      <input type="text" name="part_category" maxlength="100" data-required-on="parts"
              value="<?= h($fields['part_category']) ?>"
              placeholder="e.g. Chiller, Blower, Laser Tube, Lens Set" />
     </div>
@@ -288,12 +288,12 @@ render_header($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ 
     </div>
     <div class="full machine-only">
       <label>Required Features <span style="color:var(--d)">*</span></label>
-      <textarea name="required_features" rows="5" maxlength="5000"
+      <textarea name="required_features" rows="5" maxlength="5000" data-required-on="machine"
                placeholder="List required machine features: chiller type, autofocus, rotary, software support, etc."><?= h($fields['required_features']) ?></textarea>
     </div>
     <div class="full parts-only">
       <label>Part Specs <span style="color:var(--d)">*</span></label>
-      <textarea name="part_specs" rows="5" maxlength="5000"
+      <textarea name="part_specs" rows="5" maxlength="5000" data-required-on="parts"
                placeholder="List brand/model compatibility, voltage, dimensions, connector type, and any other required part specs."><?= h($fields['part_specs']) ?></textarea>
     </div>
     <div class="full">
@@ -326,7 +326,7 @@ render_header($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ 
 
   <div class="row" style="margin-top:18px;">
     <button type="submit" class="btn primary">Submit Request</button>
-    <a class="btn" href="<?= $fields['request_category'] === 'parts' ? 'rfq_form.php' : 'rfq_parts_form.php' ?>">
+    <a class="btn" href="<?= $fields['request_category'] === 'parts' ? 'rfq_form.php?request_category=machine' : 'rfq_parts_form.php' ?>">
       <?= $fields['request_category'] === 'parts' ? 'Switch to Machine RFQ Form' : 'Switch to Parts RFQ Form' ?>
     </a>
     <a class="btn" href="rfq_tracker.php">Go to RFQ Tracker</a>
@@ -343,6 +343,9 @@ render_header($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ 
       var isParts = categoryField.value === 'parts';
       machineFields.forEach(function (el) { el.style.display = isParts ? 'none' : ''; });
       partsFields.forEach(function (el) { el.style.display = isParts ? '' : 'none'; });
+      document.querySelectorAll('[data-required-on]').forEach(function (input) {
+        input.required = input.getAttribute('data-required-on') === categoryField.value;
+      });
     }
     categoryField.addEventListener('change', toggleSections);
     toggleSections();

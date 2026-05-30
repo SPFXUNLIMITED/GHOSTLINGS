@@ -103,7 +103,7 @@ function build_rfq_email_text(array $rfq): string {
   ]);
 
   if ($is_parts_request) {
-    $lines[] = 'Part Category:' . ' ' . trim((string)($rfq['part_category'] ?? ''));
+    $lines[] = 'Part Category: ' . trim((string)($rfq['part_category'] ?? ''));
     $lines[] = '';
     $lines[] = $sep2;
     $lines[] = 'PART SPECS:';
@@ -651,13 +651,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $contact_phone === '' ? null : $contact_phone,
           $request_category,
           $request_title,
-          $request_category === 'machine' ? $machine_size : '',
-          $request_category === 'machine' ? $laser_watts : '',
-          $request_category === 'machine' ? $tube_type : '',
+          $request_category === 'machine' ? $machine_size : null,
+          $request_category === 'machine' ? $laser_watts : null,
+          $request_category === 'machine' ? $tube_type : null,
           $request_category === 'parts' ? $part_category : null,
           $request_category === 'parts' ? $part_specs : null,
           (int)$quantity_raw,
-          $request_category === 'machine' ? $required_features : '',
+          $request_category === 'machine' ? $required_features : null,
           $additional_notes === '' ? null : $additional_notes,
           $rfq_id,
         ]);
@@ -916,22 +916,22 @@ render_header('RFQ Tracker');
     </div>
     <div class="machine-only">
       <label>Machine Size <span style="color:var(--d)">*</span></label>
-      <input type="text" name="machine_size" maxlength="100"
+      <input type="text" name="machine_size" maxlength="100" data-required-on="machine"
              value="<?= h($editing_rfq['machine_size']) ?>" />
     </div>
     <div class="machine-only">
       <label>Laser Watts <span style="color:var(--d)">*</span></label>
-      <input type="text" name="laser_watts" maxlength="50"
+      <input type="text" name="laser_watts" maxlength="50" data-required-on="machine"
              value="<?= h($editing_rfq['laser_watts']) ?>" />
     </div>
     <div class="machine-only">
       <label>Tube Type <span style="color:var(--d)">*</span></label>
-      <input type="text" name="tube_type" maxlength="100"
+      <input type="text" name="tube_type" maxlength="100" data-required-on="machine"
              value="<?= h($editing_rfq['tube_type']) ?>" />
     </div>
     <div class="parts-only">
       <label>Part Category <span style="color:var(--d)">*</span></label>
-      <input type="text" name="part_category" maxlength="100"
+      <input type="text" name="part_category" maxlength="100" data-required-on="parts"
              value="<?= h((string)($editing_rfq['part_category'] ?? '')) ?>" />
     </div>
     <div>
@@ -941,11 +941,11 @@ render_header('RFQ Tracker');
     </div>
     <div class="full machine-only">
       <label>Required Features <span style="color:var(--d)">*</span></label>
-      <textarea name="required_features" rows="5" maxlength="5000"><?= h($editing_rfq['required_features']) ?></textarea>
+      <textarea name="required_features" rows="5" maxlength="5000" data-required-on="machine"><?= h($editing_rfq['required_features']) ?></textarea>
     </div>
     <div class="full parts-only">
       <label>Part Specs <span style="color:var(--d)">*</span></label>
-      <textarea name="part_specs" rows="5" maxlength="5000"><?= h((string)($editing_rfq['part_specs'] ?? '')) ?></textarea>
+      <textarea name="part_specs" rows="5" maxlength="5000" data-required-on="parts"><?= h((string)($editing_rfq['part_specs'] ?? '')) ?></textarea>
     </div>
     <div class="full">
       <label>Additional Notes</label>
@@ -972,6 +972,9 @@ render_header('RFQ Tracker');
       var isParts = categoryField.value === 'parts';
       machineFields.forEach(function (el) { el.style.display = isParts ? 'none' : ''; });
       partsFields.forEach(function (el) { el.style.display = isParts ? '' : 'none'; });
+      form.querySelectorAll('[data-required-on]').forEach(function (input) {
+        input.required = input.getAttribute('data-required-on') === categoryField.value;
+      });
     }
     categoryField.addEventListener('change', toggleSections);
     toggleSections();
@@ -1257,7 +1260,7 @@ render_header('RFQ Tracker');
         </div>
         <div>
           <label>Shipping Method</label>
-          <input type="text" name="shipping_method" maxlength="100" placeholder="e.g. Sea freight / Air cargo"
+          <input type="text" name="shipping_method" maxlength="100" placeholder="e.g. DDP Sea freight / FOB Air cargo"
                  value="<?= h($add_quote_post['shipping_method'] ?? '') ?>" />
         </div>
         <div>
