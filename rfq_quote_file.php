@@ -1,5 +1,6 @@
 <?php
 require __DIR__ . '/db.php';
+require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_rfq_access();
 
@@ -50,10 +51,15 @@ $mime = trim((string)($quote['quote_file_mime_type'] ?? ''));
 if ($mime === '') {
   $mime = 'application/octet-stream';
 }
+$inline = isset($_GET['inline']) && $_GET['inline'] === '1' && is_image_attachment_mime($mime);
 
 header('Content-Type: ' . $mime);
 header('X-Content-Type-Options: nosniff');
 header('Content-Length: ' . (string)filesize($path));
-header('Content-Disposition: attachment; filename*=UTF-8\'\'' . rawurlencode($download_name));
+if ($inline) {
+  header('Content-Disposition: inline; filename*=UTF-8\'\'' . rawurlencode($download_name));
+} else {
+  header('Content-Disposition: attachment; filename*=UTF-8\'\'' . rawurlencode($download_name));
+}
 readfile($path);
 exit;
