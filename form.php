@@ -68,6 +68,41 @@ $us_states = [
   'WV'=>'West Virginia','WI'=>'Wisconsin','WY'=>'Wyoming','DC'=>'District of Columbia',
 ];
 
+// Waiting-user map data (latest entry per user)
+$waiting_users = [];
+$waiting_total = 0;
+$waiting_verified = 0;
+$waiting_unverified = 0;
+try {
+  $waiting_stmt = $pdo->query(
+    "SELECT u.id, u.email_verified, le.city, le.state, le.zip_code
+     FROM users u
+     JOIN laser_entries le ON le.user_id = u.id
+     LEFT JOIN laser_entries le_newer
+       ON le_newer.user_id = le.user_id
+      AND (
+        le_newer.created_at > le.created_at
+        OR (le_newer.created_at = le.created_at AND le_newer.id > le.id)
+      )
+     WHERE u.role = 'user'
+       AND le_newer.id IS NULL
+     ORDER BY le.created_at DESC, le.id DESC"
+  );
+  $waiting_users = $waiting_stmt->fetchAll();
+  $waiting_total = count($waiting_users);
+  foreach ($waiting_users as $wu) {
+    if (!empty($wu['email_verified'])) {
+      $waiting_verified++;
+    }
+  }
+  $waiting_unverified = $waiting_total - $waiting_verified;
+} catch (\Throwable $ex) {
+  $waiting_users = [];
+  $waiting_total = 0;
+  $waiting_verified = 0;
+  $waiting_unverified = 0;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   // ── CSRF check ────────────────────────────────────────────────────────────
   $submitted_csrf = $_POST['csrf_token'] ?? '';
@@ -277,6 +312,26 @@ render_header('Service Request Form');
   </p>
 </div>
 
+<div class="card">
+  <h2 style="margin-top:0;">Service Request Map</h2>
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:10px; margin-bottom:12px;">
+    <div style="border:1px solid var(--b); border-radius:8px; padding:10px 12px;">
+      <p class="muted" style="margin:0 0 4px;">Total Waiting Users</p>
+      <strong style="font-size:20px;"><?= (int)$waiting_total ?></strong>
+    </div>
+    <div style="border:1px solid var(--b); border-radius:8px; padding:10px 12px;">
+      <p class="muted" style="margin:0 0 4px;">Verified Users</p>
+      <strong style="font-size:20px;"><?= (int)$waiting_verified ?></strong>
+    </div>
+    <div style="border:1px solid var(--b); border-radius:8px; padding:10px 12px;">
+      <p class="muted" style="margin:0 0 4px;">Pending Verification</p>
+      <strong style="font-size:20px;"><?= (int)$waiting_unverified ?></strong>
+    </div>
+  </div>
+  <p class="muted" id="serviceMapStats" style="margin:0 0 12px;">Loading map pins…</p>
+  <div id="serviceRequestMap" style="height:400px; border-radius:8px; border:1px solid var(--b);"></div>
+</div>
+
 <?php if ($success): ?>
   <div class="card" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; text-align:center; padding:32px;">
     <h2 style="margin-top:0;">✅ Request Submitted!</h2>
@@ -394,4 +449,94 @@ render_header('Service Request Form');
 <?php endif; ?>
 
 <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+(function () {
+  var waitingUsers = <?= json_encode($waiting_users, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?> || [];
+  var statsEl = document.getElementById('serviceMapStats');
+  var mapEl = document.getElementById('serviceRequestMap');
+  if (!mapEl) return;
+
+  var map = L.map('serviceRequestMap').setView([39.5, -98.35], 4);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+
+  function esc(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  if (!waitingUsers.length) {
+    if (statsEl) statsEl.textContent = 'No waiting users found.';
+    return;
+  }
+
+  var grouped = {};
+  waitingUsers.forEach(function (u) {
+    var key = JSON.stringify([u.zip_code || '', u.city || '', u.state || '']);
+    if (!grouped[key]) {
+      grouped[key] = { city: u.city || '', state: u.state || '', zip_code: u.zip_code || '', users: [] };
+    }
+    grouped[key].users.push(u);
+  });
+
+  var locations = Object.keys(grouped).map(function (k) { return grouped[k]; });
+  var bounds = L.latLngBounds();
+  var mappedUsers = 0;
+  var NOMINATIM_RATE_LIMIT_MS = 1100;
+
+  function geocodeLocation(loc) {
+    var query = encodeURIComponent((loc.zip_code || '') + ' ' + (loc.city || '') + ', ' + (loc.state || '') + ', United States');
+    return fetch('https://nominatim.openstreetmap.org/search?q=' + query + '&format=json&limit=1', {
+      headers: { 'Accept-Language': 'en-US,en' }
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (results) {
+        if (!results || !results.length) return;
+        var lat = parseFloat(results[0].lat);
+        var lon = parseFloat(results[0].lon);
+        if (!isFinite(lat) || !isFinite(lon)) return;
+
+        mappedUsers += loc.users.length;
+        bounds.extend([lat, lon]);
+        L.marker([lat, lon]).addTo(map).bindPopup(
+          '<strong>' + esc(loc.city) + ', ' + esc(loc.state) + ' ' + esc(loc.zip_code) + '</strong><br>' +
+          'Users waiting here: <strong>' + loc.users.length + '</strong>'
+        );
+      })
+      .catch(function () {});
+  }
+
+  function finishMap() {
+    if (mappedUsers > 0) {
+      map.fitBounds(bounds.pad(0.2), { maxZoom: 10 });
+      if (statsEl) statsEl.textContent = 'Showing ' + mappedUsers + ' of ' + waitingUsers.length + ' waiting users on the map.';
+    } else if (statsEl) {
+      statsEl.textContent = 'Could not geocode waiting-user locations; showing US overview.';
+    }
+  }
+
+  function processLocationAt(index) {
+    if (index >= locations.length) {
+      finishMap();
+      return;
+    }
+    geocodeLocation(locations[index]).finally(function () {
+      setTimeout(function () { processLocationAt(index + 1); }, NOMINATIM_RATE_LIMIT_MS);
+    });
+  }
+
+  if (statsEl) statsEl.textContent = 'Geocoding ' + locations.length + ' location(s) for ' + waitingUsers.length + ' waiting users...';
+  processLocationAt(0);
+})();
+</script>
 <?php render_footer(); ?>
