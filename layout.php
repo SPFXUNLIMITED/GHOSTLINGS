@@ -187,7 +187,7 @@ function render_menu_dropdown(string $label, array $items, string $current): voi
     }
   }
   ?>
-  <details class="menu-dropdown"<?= $is_active ? ' open' : '' ?>>
+  <details class="menu-dropdown">
     <summary class="menu-link menu-dropdown-toggle <?= $is_active ? 'active' : '' ?>"><?= h($label) ?></summary>
     <div class="menu-dropdown-menu">
       <?php foreach ($visible_items as $item): ?>
@@ -358,6 +358,46 @@ $show_rfq_menu = $show_mod_menu;
     <?php endif; ?>
   </div>
 </nav>
+
+<script>
+  (function () {
+    const dropdowns = Array.from(document.querySelectorAll('details.menu-dropdown'));
+    if (!dropdowns.length) return;
+
+    function closeDropdown(dropdown) {
+      dropdown.removeAttribute('open');
+    }
+
+    function closeAll(except) {
+      dropdowns.forEach((dropdown) => {
+        if (dropdown !== except) {
+          closeDropdown(dropdown);
+        }
+      });
+    }
+
+    dropdowns.forEach((dropdown) => {
+      dropdown.addEventListener('toggle', function () {
+        if (dropdown.hasAttribute('open')) {
+          closeAll(dropdown);
+        }
+      });
+
+      dropdown.addEventListener('focusout', function (event) {
+        const next = event.relatedTarget;
+        if (!next || !dropdown.contains(next)) {
+          closeDropdown(dropdown);
+        }
+      });
+    });
+
+    document.addEventListener('click', function (event) {
+      if (!event.target.closest('details.menu-dropdown')) {
+        closeAll();
+      }
+    });
+  })();
+</script>
 
 
 
