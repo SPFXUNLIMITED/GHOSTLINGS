@@ -971,7 +971,9 @@ render_header('RFQ Tracker');
               <td class="muted"><?= (int)$r['id'] ?></td>
               <td>
                 <strong><?= h($r['request_title']) ?></strong><br>
-                <span class="muted">Qty: <?= (int)$r['quantity'] ?></span>
+                <span class="muted">
+                  Qty: <?= (int)$r['quantity'] ?> · Quotes: <?= (int)$r['quote_count'] ?>
+                </span>
               </td>
               <td>
                 <form method="post" class="row" style="gap:6px; align-items:center;">
