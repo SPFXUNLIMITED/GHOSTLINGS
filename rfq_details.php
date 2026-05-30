@@ -13,24 +13,8 @@ $request_statuses = [
   'closed' => 'Closed',
 ];
 
-$quote_statuses = [
-  'received' => 'Received',
-  'under_review' => 'Under Review',
-  'negotiating' => 'Negotiating',
-  'accepted' => 'Accepted',
-  'rejected' => 'Rejected',
-];
-
-function format_shipping_details(?string $origin, ?string $method): string {
-  $origin = trim((string)$origin);
-  $method = trim((string)$method);
-  if ($origin === '' && $method === '') {
-    return '—';
-  }
-  if ($origin !== '' && $method !== '') {
-    return $origin . ' • ' . $method;
-  }
-  return $origin !== '' ? $origin : $method;
+function is_safe_stored_upload_name(string $name): bool {
+  return (bool)preg_match('/^[a-zA-Z0-9._-]+$/', $name);
 }
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -195,23 +179,20 @@ render_header('RFQ Details');
 
 <div class="card">
   <h2 style="margin-top:0;">Supplier Quotes</h2>
-  <div class="table-wrap" style="overflow-x:auto;">
-    <table class="table-auto" style="min-width:980px;">
+  <div class="table-wrap" style="overflow-x:auto; margin-top:14px;">
+    <table class="table-auto" style="min-width:760px;">
       <thead>
         <tr>
           <th>Supplier</th>
           <th>Quote</th>
-          <th>Lead Time</th>
-          <th>Shipping</th>
-          <th>Status</th>
-          <th>Received</th>
           <th>Attachment</th>
           <th>Added By</th>
+          <th class="col-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
         <?php if (!$quotes): ?>
-          <tr><td colspan="8" class="muted">No quotes added yet for this RFQ.</td></tr>
+          <tr><td colspan="5" class="muted">No quotes added yet for this RFQ.</td></tr>
         <?php endif; ?>
         <?php foreach ($quotes as $q): ?>
           <tr>
@@ -223,21 +204,28 @@ render_header('RFQ Details');
                 —
               <?php endif; ?>
             </td>
-            <td><?= $q['lead_time_days'] !== null ? h((string)$q['lead_time_days']) . ' days' : '—' ?></td>
             <td>
-              <?= $q['shipping_cost'] !== null ? h(number_format((float)$q['shipping_cost'], 2)) : '—' ?><br>
-              <span class="muted"><?= h(format_shipping_details($q['shipping_origin'], $q['shipping_method'])) ?></span>
-            </td>
-            <td><?= h($quote_statuses[$q['quote_status']] ?? (string)$q['quote_status']) ?></td>
-            <td><?= !empty($q['received_on']) ? h((string)$q['received_on']) : '—' ?></td>
-            <td>
-              <?php if (!empty($q['quote_file_stored_name'])): ?>
-                <a class="btn" href="rfq_quote_file.php?quote_id=<?= (int)$q['id'] ?>" target="_blank" rel="noopener noreferrer">Open</a>
+              <?php
+                $file_name = (string)($q['quote_file_stored_name'] ?? '');
+                $file_url = '';
+                if ($file_name !== '' && is_safe_stored_upload_name($file_name)) {
+                  $file_url = 'rfq_quote_file.php?quote_id=' . (int)$q['id'];
+                }
+              ?>
+              <?php if ($file_url !== ''): ?>
+                <a class="btn" href="<?= h($file_url) ?>" target="_blank" rel="noopener noreferrer">Open</a><br>
+                <span class="muted" style="font-size:12px;">
+                  <?= h((string)($q['quote_file_original_name'] ?? 'Attachment')) ?>
+                </span>
               <?php else: ?>
                 —
               <?php endif; ?>
             </td>
             <td class="muted"><?= h((string)($q['created_by_username'] ?? 'Unknown')) ?></td>
+            <td class="col-actions">
+              <a class="btn" href="rfq_quote_details.php?rfq_id=<?= (int)$rfq['id'] ?>&quote_id=<?= (int)$q['id'] ?>">View</a>
+              <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$rfq['id'] ?>&edit_quote_id=<?= (int)$q['id'] ?>">Edit</a>
+            </td>
           </tr>
         <?php endforeach; ?>
       </tbody>
