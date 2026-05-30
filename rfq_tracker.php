@@ -883,8 +883,7 @@ if ($selected_rfq_id > 0) {
 
 if ($edit_rfq_id > 0) {
   $er = $pdo->prepare(
-    "SELECT id, contact_name, company_name, contact_email, contact_phone,
-            buyer_name, buyer_company, buyer_email, buyer_phone,
+    "SELECT id, buyer_name, buyer_company, buyer_email, buyer_phone,
             request_category, request_title, machine_size, laser_watts, tube_type, part_category, part_specs, quantity, required_features, additional_notes
      FROM rfq_requests WHERE id = ? LIMIT 1"
   );
