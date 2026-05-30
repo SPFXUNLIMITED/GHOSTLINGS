@@ -8,10 +8,10 @@ require_login();
 $project_id = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
 if (!$project_id) { header('Location: playbooks.php'); exit; }
 
-$stmt = $pdo->prepare("SELECT id, name FROM projects WHERE id = ?");
+$stmt = $pdo->prepare("SELECT id, name FROM projects WHERE id = ? AND playbook = 1");
 $stmt->execute([$project_id]);
 $project = $stmt->fetch();
-if (!$project) { http_response_code(404); exit('Project not found'); }
+if (!$project) { http_response_code(404); exit('Playbook not found'); }
 
 $stmt = $pdo->prepare("
   SELECT t.*, COUNT(u.id) AS upload_count, usr.username AS assigned_username
@@ -20,7 +20,7 @@ $stmt = $pdo->prepare("
   LEFT JOIN users usr ON usr.id = t.assigned_to
   WHERE t.project_id = ?
   GROUP BY t.id
-  ORDER BY t.id DESC
+  ORDER BY FIELD(t.priority, 'critical', 'high', 'medium', 'low'), FIELD(t.status, 'todo', 'doing', 'done')
 ");
 $stmt->execute([$project_id]);
 $tasks = $stmt->fetchAll();
@@ -47,6 +47,9 @@ render_header('Playbook Tasks');
         <th style="width:18%;">
           <button type="button" class="linklike" data-sort-col="title" data-sort-type="text" aria-label="Sort by title">Title</button>
         </th>
+        <th>Status</th>
+        <th>Priority</th>
+        <th>Due</th>
         <th>Assigned To</th>
         <th>Details</th>
         <th style="width:160px;">Actions</th>
@@ -54,7 +57,7 @@ render_header('Playbook Tasks');
     </thead>
     <tbody>
       <?php if (!$tasks): ?>
-        <tr><td colspan="4" class="muted">No tasks yet.</td></tr>
+        <tr><td colspan="7" class="muted">No tasks yet.</td></tr>
       <?php endif; ?>
 
       <?php foreach ($tasks as $t): ?>
@@ -64,6 +67,15 @@ render_header('Playbook Tasks');
             <strong><?= h($t['title']) ?></strong><br>
             <?php $count = (int)($t['upload_count'] ?? 0); ?>
             <a class="muted" href="task_uploads.php?task_id=<?= (int)$t['id'] ?>">Files (<?= $count ?>)</a>
+          </td>
+          <td><span class="badge <?= h($t['status']) ?>"><?= h($t['status']) ?></span></td>
+          <td><span class="badge priority-<?= h($t['priority'] ?? 'medium') ?>"><?= h(ucfirst($t['priority'] ?? 'medium')) ?></span></td>
+          <td>
+            <?php if (!empty($t['due_date'])): ?>
+              <?= h(fmt_date_mdY($t['due_date'])) ?>
+            <?php else: ?>
+              <span class="muted">—</span>
+            <?php endif; ?>
           </td>
           <td>
             <?php if (!empty($t['assigned_username'])): ?>
@@ -77,7 +89,7 @@ render_header('Playbook Tasks');
             <div class="actions">
               <a class="btn" href="playbook_task_form.php?project_id=<?= (int)$project_id ?>&id=<?= (int)$t['id'] ?>">Edit</a>
               <a class="btn danger"
-                 href="task_delete.php?project_id=<?= (int)$project_id ?>&id=<?= (int)$t['id'] ?>"
+                 href="task_delete.php?project_id=<?= (int)$project_id ?>&id=<?= (int)$t['id'] ?>&return_to=playbook_tasks"
                  onclick="return confirm('Delete this task?');">
                 Delete
               </a>

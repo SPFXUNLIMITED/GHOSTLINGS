@@ -310,7 +310,7 @@ render_header($id ? 'Edit SOP Page' : 'New SOP Page');
               </form>
             </div>
 
-            <div><?= nl2br(h($c['body'] ?? '')) ?></div>
+            <div><?= $c['body'] ?? '' ?></div>
           </div>
         <?php endforeach; ?>
       <?php endif; ?>
@@ -337,7 +337,7 @@ render_header($id ? 'Edit SOP Page' : 'New SOP Page');
 <script src="/project/tinymce/js/tinymce/tinymce.min.js"></script>
 <script>
   tinymce.init({
-    selector: '#details_editor',
+    selector: '#details_editor, #comment_editor',
     base_url: '/project/tinymce/js/tinymce',
     suffix: '.min',
     license_key: 'gpl',

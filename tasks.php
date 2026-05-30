@@ -106,7 +106,7 @@ render_header('Tasks');
             <div class="actions">
               <a class="btn" href="task_form.php?project_id=<?= (int)$project_id ?>&id=<?= (int)$t['id'] ?>">Edit</a>
               <a class="btn danger"
-                 href="task_delete.php?project_id=<?= (int)$project_id ?>&id=<?= (int)$t['id'] ?>"
+                 href="task_delete.php?project_id=<?= (int)$project_id ?>&id=<?= (int)$t['id'] ?>&return_to=tasks"
                  onclick="return confirm('Delete this task?');">
                 Delete
               </a>
