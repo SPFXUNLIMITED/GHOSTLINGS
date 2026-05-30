@@ -243,6 +243,7 @@ $show_rfq_menu = $show_mod_menu;
     <?php if (!empty($_SESSION['user_id'])): ?>
     <a class="menu-link <?= $current === 'index.php' ? 'active' : '' ?>" href="index.php">Home</a>
     <a class="menu-link <?= $current === 'user_page.php' ? 'active' : '' ?>" href="user_page.php">My Profile</a>
+    <a class="menu-link <?= $current === 'app_request_form.php' ? 'active' : '' ?>" href="app_request_form.php">App Requests</a>
     <?php if (($_SESSION['role'] ?? '') !== 'user'): ?>
     <a class="menu-link <?= $current === 'projects.php' ? 'active' : '' ?>" href="projects.php">Projects</a>
     <a class="menu-link <?= $current === 'documents.php' ? 'active' : '' ?>" href="documents.php">Documents</a>
@@ -260,6 +261,7 @@ $show_rfq_menu = $show_mod_menu;
   <div class="menubar-inner">
     <?php if ($show_mod_menu): ?>
     <a class="menu-link <?= $current === 'form_admin.php' ? 'active' : '' ?>" href="form_admin.php">Form Entries</a>
+    <a class="menu-link <?= $current === 'app_request_tracker.php' ? 'active' : '' ?>" href="app_request_tracker.php">Request Tracker</a>
     <a class="menu-link <?= $current === 'vendors.php' ? 'active' : '' ?>" href="vendors.php">Vendors</a>
     <?php endif; ?>
     <?php if ($show_rfq_menu): ?>
