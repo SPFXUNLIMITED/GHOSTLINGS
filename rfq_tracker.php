@@ -190,6 +190,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'add_quote') {
       $rfq_id = (int)($_POST['rfq_id'] ?? 0);
       $supplier_name = trim((string)($_POST['supplier_name'] ?? ''));
+      $model_name = trim((string)($_POST['model_name'] ?? ''));
+      $sku = trim((string)($_POST['sku'] ?? ''));
+      $msrp_raw = trim((string)($_POST['msrp'] ?? ''));
       $quote_amount_raw = trim((string)($_POST['quote_amount'] ?? ''));
       $currency = strtoupper(trim((string)($_POST['currency'] ?? 'USD')));
       $lead_time_days_raw = trim((string)($_POST['lead_time_days'] ?? ''));
@@ -204,6 +207,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       if ($rfq_id <= 0) $errors[] = 'Invalid RFQ request selected.';
       if ($supplier_name === '') $errors[] = 'Supplier name is required.';
+      if (strlen($model_name) > 255) $errors[] = 'Model name must be 255 characters or fewer.';
+      if (strlen($sku) > 100) $errors[] = 'SKU must be 100 characters or fewer.';
+      if ($msrp_raw !== '' && (!is_numeric($msrp_raw) || (float)$msrp_raw < 0)) {
+        $errors[] = 'MSRP must be a non-negative number.';
+      }
       if ($quote_amount_raw === '' || !is_numeric($quote_amount_raw) || (float)$quote_amount_raw < 0) {
         $errors[] = 'Quote amount must be a non-negative number.';
       }
@@ -313,14 +321,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           } else {
           $ins = $pdo->prepare(
             "INSERT INTO rfq_quotes
-              (rfq_request_id, supplier_name, quote_amount, currency, lead_time_days, shipping_cost,
+              (rfq_request_id, supplier_name, model_name, sku, msrp, quote_amount, currency, lead_time_days, shipping_cost,
                shipping_origin, shipping_method, quote_status, received_on, notes, created_by,
                quote_file_original_name, quote_file_stored_name, quote_file_mime_type, quote_file_size_bytes)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
           );
           $ins->execute([
             $rfq_id,
             $supplier_name,
+            $model_name === '' ? null : $model_name,
+            $sku === '' ? null : $sku,
+            $msrp_raw === '' ? null : (float)$msrp_raw,
             (float)$quote_amount_raw,
             $currency,
             $lead_time_days_raw === '' ? null : (int)$lead_time_days_raw,
@@ -347,6 +358,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $add_quote_post = [
           'supplier_name'   => $supplier_name,
+          'model_name'      => $model_name,
+          'sku'             => $sku,
+          'msrp'            => $msrp_raw,
           'quote_amount'    => $quote_amount_raw,
           'currency'        => $currency,
           'lead_time_days'  => $lead_time_days_raw,
@@ -362,6 +376,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $quote_id = (int)($_POST['quote_id'] ?? 0);
       $rfq_id = (int)($_POST['rfq_id'] ?? 0);
       $supplier_name = trim((string)($_POST['supplier_name'] ?? ''));
+      $model_name = trim((string)($_POST['model_name'] ?? ''));
+      $sku = trim((string)($_POST['sku'] ?? ''));
+      $msrp_raw = trim((string)($_POST['msrp'] ?? ''));
       $quote_amount_raw = trim((string)($_POST['quote_amount'] ?? ''));
       $currency = strtoupper(trim((string)($_POST['currency'] ?? 'USD')));
       $lead_time_days_raw = trim((string)($_POST['lead_time_days'] ?? ''));
@@ -378,6 +395,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($quote_id <= 0) $errors[] = 'Invalid quote.';
       if ($rfq_id <= 0) $errors[] = 'Invalid RFQ request.';
       if ($supplier_name === '') $errors[] = 'Supplier name is required.';
+      if (strlen($model_name) > 255) $errors[] = 'Model name must be 255 characters or fewer.';
+      if (strlen($sku) > 100) $errors[] = 'SKU must be 100 characters or fewer.';
+      if ($msrp_raw !== '' && (!is_numeric($msrp_raw) || (float)$msrp_raw < 0)) {
+        $errors[] = 'MSRP must be a non-negative number.';
+      }
       if ($quote_amount_raw === '' || !is_numeric($quote_amount_raw) || (float)$quote_amount_raw < 0) {
         $errors[] = 'Quote amount must be a non-negative number.';
       }
@@ -487,7 +509,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           if (!$errors) {
             $upd = $pdo->prepare(
               "UPDATE rfq_quotes SET
-                supplier_name = ?, quote_amount = ?, currency = ?, lead_time_days = ?,
+                supplier_name = ?, model_name = ?, sku = ?, msrp = ?, quote_amount = ?, currency = ?, lead_time_days = ?,
                 shipping_cost = ?, shipping_origin = ?, shipping_method = ?, quote_status = ?,
                 received_on = ?, notes = ?,
                 quote_file_original_name = ?, quote_file_stored_name = ?,
@@ -496,6 +518,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
             $upd->execute([
               $supplier_name,
+              $model_name === '' ? null : $model_name,
+              $sku === '' ? null : $sku,
+              $msrp_raw === '' ? null : (float)$msrp_raw,
               (float)$quote_amount_raw,
               $currency,
               $lead_time_days_raw === '' ? null : (int)$lead_time_days_raw,
@@ -535,6 +560,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($errors) {
         $edit_quote_post = [
           'supplier_name'   => $supplier_name,
+          'model_name'      => $model_name,
+          'sku'             => $sku,
+          'msrp'            => $msrp_raw,
           'quote_amount'    => $quote_amount_raw,
           'currency'        => $currency,
           'lead_time_days'  => $lead_time_days_raw !== '' ? $lead_time_days_raw : null,
@@ -1027,6 +1055,21 @@ render_header('RFQ Tracker');
                  value="<?= h($editing_quote['supplier_name']) ?>" />
         </div>
         <div>
+          <label>Model Name</label>
+          <input type="text" name="model_name" maxlength="255"
+                 value="<?= h((string)($editing_quote['model_name'] ?? '')) ?>" />
+        </div>
+        <div>
+          <label>SKU</label>
+          <input type="text" name="sku" maxlength="100"
+                 value="<?= h((string)($editing_quote['sku'] ?? '')) ?>" />
+        </div>
+        <div>
+          <label>MSRP</label>
+          <input type="number" name="msrp" min="0" step="0.01"
+                 value="<?= $editing_quote['msrp'] !== null ? h((string)$editing_quote['msrp']) : '' ?>" />
+        </div>
+        <div>
           <label>Quote Amount <span style="color:var(--d)">*</span></label>
           <input type="number" name="quote_amount" min="0" step="0.01" required
                  value="<?= h((string)$editing_quote['quote_amount']) ?>" />
@@ -1109,6 +1152,21 @@ render_header('RFQ Tracker');
                  value="<?= h($add_quote_post['supplier_name'] ?? '') ?>" />
         </div>
         <div>
+          <label>Model Name</label>
+          <input type="text" name="model_name" maxlength="255" placeholder="e.g. GL-1325 Pro"
+                 value="<?= h($add_quote_post['model_name'] ?? '') ?>" />
+        </div>
+        <div>
+          <label>SKU</label>
+          <input type="text" name="sku" maxlength="100" placeholder="e.g. GL-1325-PRO"
+                 value="<?= h($add_quote_post['sku'] ?? '') ?>" />
+        </div>
+        <div>
+          <label>MSRP</label>
+          <input type="number" name="msrp" min="0" step="0.01" placeholder="e.g. 12999.00"
+                 value="<?= h($add_quote_post['msrp'] ?? '') ?>" />
+        </div>
+        <div>
           <label>Quote Amount <span style="color:var(--d)">*</span></label>
           <input type="number" name="quote_amount" min="0" step="0.01" required placeholder="e.g. 10800.00"
                  value="<?= h($add_quote_post['quote_amount'] ?? '') ?>" />
@@ -1189,7 +1247,18 @@ render_header('RFQ Tracker');
           <?php endif; ?>
           <?php foreach ($quotes as $q): ?>
             <tr>
-              <td><?= h($q['supplier_name']) ?></td>
+              <td>
+                <div><?= h($q['supplier_name']) ?></div>
+                <?php if (!empty($q['model_name'])): ?>
+                  <div class="muted" style="font-size:12px;">Model: <?= h((string)$q['model_name']) ?></div>
+                <?php endif; ?>
+                <?php if (!empty($q['sku'])): ?>
+                  <div class="muted" style="font-size:12px;">SKU: <?= h((string)$q['sku']) ?></div>
+                <?php endif; ?>
+                <?php if ($q['msrp'] !== null): ?>
+                  <div class="muted" style="font-size:12px;">MSRP: <?= h((string)$q['currency']) ?> <?= h(number_format((float)$q['msrp'], 2)) ?></div>
+                <?php endif; ?>
+              </td>
               <td>
                 <?= h($q['currency']) ?> <?= h(number_format((float)$q['quote_amount'], 2)) ?>
               </td>

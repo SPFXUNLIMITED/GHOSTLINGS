@@ -325,6 +325,9 @@ $pdo->exec("
     id                 INT UNSIGNED NOT NULL AUTO_INCREMENT,
     rfq_request_id     INT UNSIGNED NOT NULL,
     supplier_name      VARCHAR(255) NOT NULL,
+    model_name         VARCHAR(255) NULL,
+    sku                VARCHAR(100) NULL,
+    msrp               DECIMAL(12,2) NULL,
     quote_amount       DECIMAL(12,2) NOT NULL DEFAULT 0,
     currency           CHAR(3) NOT NULL DEFAULT 'USD',
     lead_time_days     INT UNSIGNED NULL,
@@ -346,6 +349,9 @@ $pdo->exec("
 
 // Add RFQ quote file metadata columns if they do not exist yet
 foreach ([
+  "ALTER TABLE rfq_quotes ADD COLUMN model_name VARCHAR(255) NULL",
+  "ALTER TABLE rfq_quotes ADD COLUMN sku VARCHAR(100) NULL",
+  "ALTER TABLE rfq_quotes ADD COLUMN msrp DECIMAL(12,2) NULL",
   "ALTER TABLE rfq_quotes ADD COLUMN quote_file_original_name VARCHAR(255) NULL",
   "ALTER TABLE rfq_quotes ADD COLUMN quote_file_stored_name VARCHAR(255) NULL",
   "ALTER TABLE rfq_quotes ADD COLUMN quote_file_mime_type VARCHAR(191) NULL",

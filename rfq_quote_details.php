@@ -77,6 +77,18 @@ render_header('Quote Details');
         <td><?= h((string)$quote['supplier_name']) ?></td>
       </tr>
       <tr>
+        <th>Model Name</th>
+        <td><?= !empty($quote['model_name']) ? h((string)$quote['model_name']) : '<span class="muted">—</span>' ?></td>
+      </tr>
+      <tr>
+        <th>SKU</th>
+        <td><?= !empty($quote['sku']) ? h((string)$quote['sku']) : '<span class="muted">—</span>' ?></td>
+      </tr>
+      <tr>
+        <th>MSRP</th>
+        <td><?= $quote['msrp'] !== null ? h((string)$quote['currency']) . ' ' . h(number_format((float)$quote['msrp'], 2)) : '<span class="muted">—</span>' ?></td>
+      </tr>
+      <tr>
         <th>Quote Amount</th>
         <td><?= h((string)$quote['currency']) ?> <?= h(number_format((float)$quote['quote_amount'], 2)) ?></td>
       </tr>
