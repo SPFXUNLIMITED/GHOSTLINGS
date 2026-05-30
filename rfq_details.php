@@ -60,9 +60,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($quote_id <= 0 || $rfq_id !== (int)$rfq['id']) {
         $errors[] = 'Invalid quote or RFQ.';
       } else {
-        $row = $pdo->prepare("SELECT quote_file_stored_name FROM rfq_quotes WHERE id = ? AND rfq_request_id = ? LIMIT 1");
-        $row->execute([$quote_id, $rfq_id]);
-        $del_quote = $row->fetch(PDO::FETCH_ASSOC);
+        $quote_stmt = $pdo->prepare("SELECT quote_file_stored_name FROM rfq_quotes WHERE id = ? AND rfq_request_id = ? LIMIT 1");
+        $quote_stmt->execute([$quote_id, $rfq_id]);
+        $del_quote = $quote_stmt->fetch(PDO::FETCH_ASSOC);
         if (!$del_quote) {
           $errors[] = 'Quote not found.';
         } else {
@@ -73,8 +73,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               @unlink($old_path);
             }
           }
-          $pdo->prepare("DELETE FROM rfq_quotes WHERE id = ? AND rfq_request_id = ?")->execute([$quote_id, $rfq_id]);
-          $success = 'Quote deleted successfully.';
+          $delete_stmt = $pdo->prepare("DELETE FROM rfq_quotes WHERE id = ? AND rfq_request_id = ?");
+          $delete_stmt->execute([$quote_id, $rfq_id]);
+          if ($delete_stmt->rowCount() > 0) {
+            $success = 'Quote deleted successfully.';
+          } else {
+            $errors[] = 'Quote could not be deleted. Please try again.';
+          }
         }
       }
     }
