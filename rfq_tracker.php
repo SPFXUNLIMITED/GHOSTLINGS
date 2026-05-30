@@ -23,6 +23,15 @@ $request_statuses = [
   'ordered' => 'Ordered',
   'closed' => 'Closed',
 ];
+// Stage level badges: [label, background-color, text-color]
+$stage_badges = [
+  'draft'           => ['Low',      '#e2e8f0', '#475569'],
+  'sourcing'        => ['Moderate', '#fef9c3', '#854d0e'],
+  'quotes_received' => ['Moderate', '#fef9c3', '#854d0e'],
+  'shortlisted'     => ['High',     '#ffedd5', '#9a3412'],
+  'ordered'         => ['Critical', '#fee2e2', '#991b1b'],
+  'closed'          => ['Closed',   '#f1f5f9', '#64748b'],
+];
 $quote_statuses = [
   'received' => 'Received',
   'under_review' => 'Under Review',
@@ -1148,7 +1157,11 @@ render_header('RFQ Tracker');
             <tr>
               <td class="muted"><?= (int)$r['id'] ?></td>
               <td>
-                <strong><?= h($r['request_title']) ?></strong><br>
+                <?php
+                  $sb = $stage_badges[$r['request_status']] ?? ['Unknown', '#e2e8f0', '#475569'];
+                ?>
+                <strong><?= h($r['request_title']) ?></strong>
+                <span style="display:inline-block; margin-left:6px; padding:2px 8px; border-radius:12px; font-size:0.72em; font-weight:600; letter-spacing:0.04em; background:<?= $sb[1] ?>; color:<?= $sb[2] ?>; vertical-align:middle;"><?= h($sb[0]) ?></span><br>
                 <span class="muted">
                   <?= ($r['request_category'] ?? 'machine') === 'parts' ? 'Parts' : 'Machine' ?> · Qty: <?= (int)$r['quantity'] ?> · Quotes: <?= (int)$r['quote_count'] ?>
                 </span>
