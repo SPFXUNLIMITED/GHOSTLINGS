@@ -64,6 +64,18 @@ if (!$quote) {
   exit;
 }
 
+// Calculate MOQ 20 dealer margins from MSRP/MAP when both values are available
+$msrp        = isset($quote['msrp'])        && $quote['msrp']        !== null ? (float)$quote['msrp']        : null;
+$map_price   = isset($quote['map_price'])   && $quote['map_price']   !== null ? (float)$quote['map_price']   : null;
+$moq_20_price = isset($quote['moq_20_price']) && $quote['moq_20_price'] !== null ? (float)$quote['moq_20_price'] : null;
+
+if ($msrp !== null && $msrp != 0 && $moq_20_price !== null) {
+  $quote['moq_20_margin_msrp'] = (($msrp - $moq_20_price) / $msrp) * 100;
+}
+if ($map_price !== null && $map_price != 0 && $moq_20_price !== null) {
+  $quote['moq_20_margin_map'] = (($map_price - $moq_20_price) / $map_price) * 100;
+}
+
 render_header('Quote Details');
 ?>
 
