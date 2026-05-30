@@ -953,6 +953,24 @@ render_header('RFQ Tracker');
     <input type="hidden" name="action" value="edit_rfq" />
     <input type="hidden" name="rfq_id" value="<?= (int)$editing_rfq['id'] ?>" />
 
+    <div class="full" style="margin-bottom:4px;">
+      <strong style="font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted,#6b7280);">Request Details</strong>
+    </div>
+
+    <div class="full">
+      <label>Request Category <span style="color:var(--d)">*</span></label>
+      <select name="request_category" id="edit_request_category" required>
+        <option value="machine" <?= (($editing_rfq['request_category'] ?? 'machine') === 'machine') ? 'selected' : '' ?>>Machine</option>
+        <option value="parts" <?= (($editing_rfq['request_category'] ?? 'machine') === 'parts') ? 'selected' : '' ?>>Parts</option>
+      </select>
+    </div>
+    <div class="full">
+      <label>Acquisition Purpose <span style="color:var(--d)">*</span></label>
+      <select name="acquisition_purpose" id="edit_acquisition_purpose" required>
+        <option value="customer" <?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'customer') ? 'selected' : '' ?>>Customer Request</option>
+        <option value="internal" <?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'internal') ? 'selected' : '' ?>>Internal Use (Inventory / Repairs)</option>
+      </select>
+    </div>
     <div id="edit_customer_information_section" class="full"
          style="display:<?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'customer') ? 'block' : 'none' ?>;">
       <div style="margin-bottom:4px;">
@@ -985,24 +1003,6 @@ render_header('RFQ Tracker');
         </div>
       </div>
       <div class="full"><hr style="margin:4px 0 8px; border:none; border-top:1px solid var(--border,#e5e7eb);" /></div>
-    </div>
-    <div class="full" style="margin-bottom:4px;">
-      <strong style="font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted,#6b7280);">Request Details</strong>
-    </div>
-
-    <div class="full">
-      <label>Request Category <span style="color:var(--d)">*</span></label>
-      <select name="request_category" id="edit_request_category" required>
-        <option value="machine" <?= (($editing_rfq['request_category'] ?? 'machine') === 'machine') ? 'selected' : '' ?>>Machine</option>
-        <option value="parts" <?= (($editing_rfq['request_category'] ?? 'machine') === 'parts') ? 'selected' : '' ?>>Parts</option>
-      </select>
-    </div>
-    <div class="full">
-      <label>Acquisition Purpose <span style="color:var(--d)">*</span></label>
-      <select name="acquisition_purpose" id="edit_acquisition_purpose" required>
-        <option value="customer" <?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'customer') ? 'selected' : '' ?>>Customer Request</option>
-        <option value="internal" <?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'internal') ? 'selected' : '' ?>>Internal Use (Inventory / Repairs)</option>
-      </select>
     </div>
     <div class="full">
       <label>RFQ Title <span style="color:var(--d)">*</span></label>
