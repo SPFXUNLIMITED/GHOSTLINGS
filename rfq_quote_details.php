@@ -77,12 +77,18 @@ if (!$quote) {
   exit;
 }
 
-// Calculate MOQ 20 dealer margins from MSRP/MAP when both values are available
+// Calculate dealer margins from MSRP/MAP when both values are available
 $msrp        = isset($quote['msrp'])        && $quote['msrp']        !== null ? (float)$quote['msrp']        : null;
 $map_price   = isset($quote['map_price'])   && $quote['map_price']   !== null ? (float)$quote['map_price']   : null;
 $moq_20_price = isset($quote['moq_20_price']) && $quote['moq_20_price'] !== null ? (float)$quote['moq_20_price'] : null;
+$moq_10_price = isset($quote['moq_10_price']) && $quote['moq_10_price'] !== null ? (float)$quote['moq_10_price'] : null;
+$drop_ship_price = isset($quote['drop_ship_price']) && $quote['drop_ship_price'] !== null ? (float)$quote['drop_ship_price'] : null;
 $moq_20_margin_msrp_amount = null;
 $moq_20_margin_map_amount = null;
+$moq_10_margin_msrp_amount = null;
+$moq_10_margin_map_amount = null;
+$drop_ship_margin_msrp_amount = null;
+$drop_ship_margin_map_amount = null;
 
 if ($msrp !== null && $msrp != 0 && $moq_20_price !== null) {
   $quote['moq_20_margin_msrp'] = (($msrp - $moq_20_price) / $msrp) * 100;
@@ -91,6 +97,22 @@ if ($msrp !== null && $msrp != 0 && $moq_20_price !== null) {
 if ($map_price !== null && $map_price != 0 && $moq_20_price !== null) {
   $quote['moq_20_margin_map'] = (($map_price - $moq_20_price) / $map_price) * 100;
   $moq_20_margin_map_amount = $map_price - $moq_20_price;
+}
+if ($msrp !== null && $msrp != 0 && $moq_10_price !== null) {
+  $quote['moq_10_margin_msrp'] = (($msrp - $moq_10_price) / $msrp) * 100;
+  $moq_10_margin_msrp_amount = $msrp - $moq_10_price;
+}
+if ($map_price !== null && $map_price != 0 && $moq_10_price !== null) {
+  $quote['moq_10_margin_map'] = (($map_price - $moq_10_price) / $map_price) * 100;
+  $moq_10_margin_map_amount = $map_price - $moq_10_price;
+}
+if ($msrp !== null && $msrp != 0 && $drop_ship_price !== null) {
+  $quote['drop_ship_margin_msrp'] = (($msrp - $drop_ship_price) / $msrp) * 100;
+  $drop_ship_margin_msrp_amount = $msrp - $drop_ship_price;
+}
+if ($map_price !== null && $map_price != 0 && $drop_ship_price !== null) {
+  $quote['drop_ship_margin_map'] = (($map_price - $drop_ship_price) / $map_price) * 100;
+  $drop_ship_margin_map_amount = $map_price - $drop_ship_price;
 }
 
 render_header('Quote Details');
@@ -151,11 +173,11 @@ render_header('Quote Details');
       </tr>
       <tr>
         <th>MOQ 10 Dealer Margin on MSRP</th>
-        <td><?= format_quote_percent($quote['moq_10_margin_msrp']) ?></td>
+        <td><?= format_quote_percent_with_amount($quote['moq_10_margin_msrp'], $moq_10_margin_msrp_amount) ?></td>
       </tr>
       <tr>
         <th>MOQ 10 Dealer Margin on MAP</th>
-        <td><?= format_quote_percent($quote['moq_10_margin_map']) ?></td>
+        <td><?= format_quote_percent_with_amount($quote['moq_10_margin_map'], $moq_10_margin_map_amount) ?></td>
       </tr>
       <tr>
         <th>Drop Ship</th>
@@ -163,11 +185,11 @@ render_header('Quote Details');
       </tr>
       <tr>
         <th>Drop Ship Dealer Margin on MSRP</th>
-        <td><?= format_quote_percent($quote['drop_ship_margin_msrp']) ?></td>
+        <td><?= format_quote_percent_with_amount($quote['drop_ship_margin_msrp'], $drop_ship_margin_msrp_amount) ?></td>
       </tr>
       <tr>
         <th>Drop Ship Dealer Margin on MAP</th>
-        <td><?= format_quote_percent($quote['drop_ship_margin_map']) ?></td>
+        <td><?= format_quote_percent_with_amount($quote['drop_ship_margin_map'], $drop_ship_margin_map_amount) ?></td>
       </tr>
       <tr>
         <th>Quote Amount</th>
