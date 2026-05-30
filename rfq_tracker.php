@@ -4,7 +4,6 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_rfq_access();
 
-const MAX_RFQ_QUANTITY = 1000;
 const MAX_LEAD_TIME_DAYS = 3650;
 const MAX_QUOTE_UPLOAD_BYTES = 26214400; // 25 MB
 
@@ -44,7 +43,6 @@ $errors = [];
 $success = '';
 $selected_rfq_id = 0;
 $edit_quote_id = 0;
-$edit_rfq_id = 0;
 $add_quote_post = null;
 $edit_quote_post = null;
 
@@ -664,92 +662,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           'notes'           => $notes !== '' ? $notes : null,
         ];
       }
-    } elseif ($action === 'edit_rfq') {
-      $rfq_id = (int)($_POST['rfq_id'] ?? 0);
-      $request_category = strtolower(trim((string)($_POST['request_category'] ?? 'machine')));
-      $acquisition_purpose = strtolower(trim((string)($_POST['acquisition_purpose'] ?? 'customer')));
-      $buyer_name       = trim((string)($_POST['buyer_name']       ?? ''));
-      $buyer_company    = trim((string)($_POST['buyer_company']    ?? ''));
-      $buyer_email      = trim((string)($_POST['buyer_email']      ?? ''));
-      $buyer_phone      = trim((string)($_POST['buyer_phone']      ?? ''));
-      $request_title    = trim((string)($_POST['request_title']   ?? ''));
-      $machine_size     = trim((string)($_POST['machine_size']    ?? ''));
-      $laser_watts      = trim((string)($_POST['laser_watts']     ?? ''));
-      $tube_type        = trim((string)($_POST['tube_type']       ?? ''));
-      $part_category    = trim((string)($_POST['part_category']   ?? ''));
-      $part_specs       = trim((string)($_POST['part_specs']      ?? ''));
-      $quantity_raw     = trim((string)($_POST['quantity']        ?? ''));
-      $required_features = trim((string)($_POST['required_features'] ?? ''));
-      $additional_notes  = trim((string)($_POST['additional_notes']  ?? ''));
-
-      if ($rfq_id <= 0) $errors[] = 'Invalid RFQ request.';
-      if (!in_array($request_category, ['machine', 'parts'], true)) {
-        $errors[] = 'Request category must be Machine or Parts.';
-      }
-      if (!in_array($acquisition_purpose, ['customer', 'internal'], true)) {
-        $errors[] = 'Acquisition purpose must be Customer Request or Internal Use.';
-      }
-      if ($request_title === '') $errors[] = 'Request title is required.';
-      if ($request_category === 'parts') {
-        if ($part_category === '') $errors[] = 'Part category is required for parts requests.';
-        if ($part_specs === '') $errors[] = 'Part specs are required for parts requests.';
-      } else {
-        if ($machine_size === '') $errors[] = 'Machine size is required for machine requests.';
-        if ($laser_watts === '') $errors[] = 'Laser watts is required for machine requests.';
-        if ($tube_type === '') $errors[] = 'Tube type is required for machine requests.';
-        if ($required_features === '') $errors[] = 'Required features are required for machine requests.';
-      }
-      if ($buyer_email !== '' && !filter_var($buyer_email, FILTER_VALIDATE_EMAIL)) {
-        $errors[] = 'Customer email must be a valid email address.';
-      }
-      if (!ctype_digit($quantity_raw) || (int)$quantity_raw < 1 || (int)$quantity_raw > MAX_RFQ_QUANTITY) {
-        $errors[] = 'Quantity must be a whole number between 1 and ' . MAX_RFQ_QUANTITY . '.';
-      }
-      if (strlen($required_features) > 5000) {
-        $errors[] = 'Required features must be 5000 characters or fewer.';
-      }
-      if (strlen($part_specs) > 5000) {
-        $errors[] = 'Part specs must be 5000 characters or fewer.';
-      }
-      if (strlen($part_category) > 100) {
-        $errors[] = 'Part category must be 100 characters or fewer.';
-      }
-      if (strlen($additional_notes) > 5000) {
-        $errors[] = 'Additional notes must be 5000 characters or fewer.';
-      }
-
-      if (!$errors) {
-        $upd = $pdo->prepare(
-          "UPDATE rfq_requests SET
-            buyer_name = ?, buyer_company = ?, buyer_email = ?, buyer_phone = ?,
-            request_category = ?, acquisition_purpose = ?, request_title = ?, machine_size = ?, laser_watts = ?, tube_type = ?,
-            part_category = ?, part_specs = ?, quantity = ?, required_features = ?, additional_notes = ?
-           WHERE id = ?"
-        );
-        $upd->execute([
-          $buyer_name    === '' ? null : $buyer_name,
-          $buyer_company === '' ? null : $buyer_company,
-          $buyer_email   === '' ? null : $buyer_email,
-          $buyer_phone   === '' ? null : $buyer_phone,
-          $request_category,
-          $acquisition_purpose,
-          $request_title,
-          $request_category === 'machine' ? $machine_size : null,
-          $request_category === 'machine' ? $laser_watts : null,
-          $request_category === 'machine' ? $tube_type : null,
-          $request_category === 'parts' ? $part_category : null,
-          $request_category === 'parts' ? $part_specs : null,
-          (int)$quantity_raw,
-          $request_category === 'machine' ? $required_features : null,
-          $additional_notes === '' ? null : $additional_notes,
-          $rfq_id,
-        ]);
-        $_SESSION['flash_message'] = 'RFQ request updated successfully.';
-        header('Location: rfq_details.php?id=' . $rfq_id);
-        exit;
-      } else {
-        $edit_rfq_id = $rfq_id;
-      }
     } elseif ($action === 'delete_rfq') {
       $rfq_id = (int)($_POST['rfq_id'] ?? 0);
       if ($rfq_id <= 0) {
@@ -812,9 +724,6 @@ if ($selected_rfq_id <= 0) {
 if ($edit_quote_id <= 0) {
   $edit_quote_id = max(0, (int)($_GET['edit_quote_id'] ?? 0));
 }
-if ($edit_rfq_id <= 0) {
-  $edit_rfq_id = max(0, (int)($_GET['edit_rfq_id'] ?? 0));
-}
 $rfq_text_id = max(0, (int)($_GET['rfq_text_id'] ?? 0));
 $add_quote_id = max(0, (int)($_GET['add_quote_id'] ?? 0));
 
@@ -857,7 +766,6 @@ $rfqs = $stmt->fetchAll();
 $selected_rfq = null;
 $quotes = [];
 $editing_quote = null;
-$editing_rfq = null;
 $rfq_email_text = '';
 $show_add_quote_form = false;
 if ($selected_rfq_id > 0) {
@@ -890,16 +798,6 @@ if ($selected_rfq_id > 0) {
     $show_add_quote_form = $add_quote_post !== null
       || ($add_quote_id > 0 && $add_quote_id === $selected_rfq_id);
   }
-}
-
-if ($edit_rfq_id > 0) {
-  $er = $pdo->prepare(
-    "SELECT id, buyer_name, buyer_company, buyer_email, buyer_phone,
-            acquisition_purpose, request_category, request_title, machine_size, laser_watts, tube_type, part_category, part_specs, quantity, required_features, additional_notes
-     FROM rfq_requests WHERE id = ? LIMIT 1"
-  );
-  $er->execute([$edit_rfq_id]);
-  $editing_rfq = $er->fetch() ?: null;
 }
 
 if ($rfq_text_id > 0) {
@@ -943,152 +841,6 @@ render_header('RFQ Tracker');
   <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">
     <?= h($success) ?>
   </div>
-<?php endif; ?>
-
-<?php if ($editing_rfq): ?>
-<div class="card">
-  <h2 style="margin-top:0; margin-bottom:12px;">Edit RFQ #<?= (int)$editing_rfq['id'] ?></h2>
-  <form method="post" class="form-grid" novalidate>
-    <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
-    <input type="hidden" name="action" value="edit_rfq" />
-    <input type="hidden" name="rfq_id" value="<?= (int)$editing_rfq['id'] ?>" />
-
-    <div id="edit_customer_information_section" class="full"
-         style="display:<?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'customer') ? 'block' : 'none' ?>;">
-      <div style="margin-bottom:4px;">
-        <strong style="font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted,#6b7280);">Customer Information</strong>
-      </div>
-      <div class="form-grid">
-        <div>
-          <label>Customer Name</label>
-          <input type="text" name="buyer_name" maxlength="255"
-                 value="<?= h((string)($editing_rfq['buyer_name'] ?? '')) ?>"
-                 <?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'customer') ? '' : 'disabled' ?> />
-        </div>
-        <div>
-          <label>Customer Company</label>
-          <input type="text" name="buyer_company" maxlength="255"
-                 value="<?= h((string)($editing_rfq['buyer_company'] ?? '')) ?>"
-                 <?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'customer') ? '' : 'disabled' ?> />
-        </div>
-        <div>
-          <label>Customer Email</label>
-          <input type="email" name="buyer_email" maxlength="255"
-                 value="<?= h((string)($editing_rfq['buyer_email'] ?? '')) ?>"
-                 <?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'customer') ? '' : 'disabled' ?> />
-        </div>
-        <div>
-          <label>Customer Phone</label>
-          <input type="text" name="buyer_phone" maxlength="100"
-                 value="<?= h((string)($editing_rfq['buyer_phone'] ?? '')) ?>"
-                 <?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'customer') ? '' : 'disabled' ?> />
-        </div>
-      </div>
-      <div class="full"><hr style="margin:4px 0 8px; border:none; border-top:1px solid var(--border,#e5e7eb);" /></div>
-    </div>
-    <div class="full" style="margin-bottom:4px;">
-      <strong style="font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted,#6b7280);">Request Details</strong>
-    </div>
-
-    <div class="full">
-      <label>Request Category <span style="color:var(--d)">*</span></label>
-      <select name="request_category" id="edit_request_category" required>
-        <option value="machine" <?= (($editing_rfq['request_category'] ?? 'machine') === 'machine') ? 'selected' : '' ?>>Machine</option>
-        <option value="parts" <?= (($editing_rfq['request_category'] ?? 'machine') === 'parts') ? 'selected' : '' ?>>Parts</option>
-      </select>
-    </div>
-    <div class="full">
-      <label>Acquisition Purpose <span style="color:var(--d)">*</span></label>
-      <select name="acquisition_purpose" id="edit_acquisition_purpose" required>
-        <option value="customer" <?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'customer') ? 'selected' : '' ?>>Customer Request</option>
-        <option value="internal" <?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'internal') ? 'selected' : '' ?>>Internal Use (Inventory / Repairs)</option>
-      </select>
-    </div>
-    <div class="full">
-      <label>RFQ Title <span style="color:var(--d)">*</span></label>
-      <input type="text" name="request_title" maxlength="255" required
-             value="<?= h($editing_rfq['request_title']) ?>" />
-    </div>
-    <div class="machine-only">
-      <label>Machine Size <span style="color:var(--d)">*</span></label>
-      <input type="text" name="machine_size" maxlength="100" data-required-on="machine"
-             value="<?= h($editing_rfq['machine_size']) ?>" />
-    </div>
-    <div class="machine-only">
-      <label>Laser Watts <span style="color:var(--d)">*</span></label>
-      <input type="text" name="laser_watts" maxlength="50" data-required-on="machine"
-             value="<?= h($editing_rfq['laser_watts']) ?>" />
-    </div>
-    <div class="machine-only">
-      <label>Tube Type <span style="color:var(--d)">*</span></label>
-      <input type="text" name="tube_type" maxlength="100" data-required-on="machine"
-             value="<?= h($editing_rfq['tube_type']) ?>" />
-    </div>
-    <div class="parts-only">
-      <label>Part Category <span style="color:var(--d)">*</span></label>
-      <input type="text" name="part_category" maxlength="100" data-required-on="parts"
-             value="<?= h((string)($editing_rfq['part_category'] ?? '')) ?>" />
-    </div>
-    <div>
-      <label>Quantity <span style="color:var(--d)">*</span></label>
-      <input type="number" name="quantity" min="1" max="<?= MAX_RFQ_QUANTITY ?>" required
-             value="<?= h((string)$editing_rfq['quantity']) ?>" />
-    </div>
-    <div class="full machine-only">
-      <label>Required Features <span style="color:var(--d)">*</span></label>
-      <textarea name="required_features" rows="5" maxlength="5000" data-required-on="machine"><?= h($editing_rfq['required_features']) ?></textarea>
-    </div>
-    <div class="full parts-only">
-      <label>Part Specs <span style="color:var(--d)">*</span></label>
-      <textarea name="part_specs" rows="5" maxlength="5000" data-required-on="parts"><?= h((string)($editing_rfq['part_specs'] ?? '')) ?></textarea>
-    </div>
-    <div class="full">
-      <label>Additional Notes</label>
-      <textarea name="additional_notes" rows="4" maxlength="5000"><?= h((string)($editing_rfq['additional_notes'] ?? '')) ?></textarea>
-    </div>
-    <div class="full row" style="margin-top:8px;">
-      <button type="submit" class="btn primary">Save Changes</button>
-      <a class="btn" href="rfq_tracker.php">Cancel</a>
-    </div>
-  </form>
-</div>
-<?php endif; ?>
-
-<?php if ($editing_rfq): ?>
-<script>
-  (function () {
-    var categoryField = document.getElementById('edit_request_category');
-    if (!categoryField) return;
-    var form = categoryField.closest('form');
-    if (!form) return;
-    var acquisitionField = document.getElementById('edit_acquisition_purpose');
-    var customerInfoSection = document.getElementById('edit_customer_information_section');
-    var customerInfoInputs = customerInfoSection ? customerInfoSection.querySelectorAll('input') : [];
-    var machineFields = form.querySelectorAll('.machine-only');
-    var partsFields = form.querySelectorAll('.parts-only');
-    if (acquisitionField && customerInfoSection) {
-      function toggleCustomerInfo() {
-        var showCustomerInfo = acquisitionField.value === 'customer';
-        customerInfoSection.style.display = showCustomerInfo ? 'block' : 'none';
-        customerInfoInputs.forEach(function (input) {
-          input.disabled = !showCustomerInfo;
-        });
-      }
-      acquisitionField.addEventListener('change', toggleCustomerInfo);
-      toggleCustomerInfo();
-    }
-    function toggleSections() {
-      var isParts = categoryField.value === 'parts';
-      machineFields.forEach(function (el) { el.style.display = isParts ? 'none' : ''; });
-      partsFields.forEach(function (el) { el.style.display = isParts ? '' : 'none'; });
-      form.querySelectorAll('[data-required-on]').forEach(function (input) {
-        input.required = input.getAttribute('data-required-on') === categoryField.value;
-      });
-    }
-    categoryField.addEventListener('change', toggleSections);
-    toggleSections();
-  })();
-</script>
 <?php endif; ?>
 
 <div class="card">
@@ -1205,7 +957,7 @@ render_header('RFQ Tracker');
                 <a class="btn" href="rfq_details.php?id=<?= (int)$r['id'] ?>">View</a>
                 <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$r['id'] ?>">Quotes</a>
                 <a class="btn" href="rfq_tracker.php?rfq_text_id=<?= (int)$r['id'] ?>">Email Text</a>
-                <a class="btn" href="rfq_tracker.php?edit_rfq_id=<?= (int)$r['id'] ?>">Edit</a>
+                <a class="btn" href="rfq_form.php?edit_rfq_id=<?= (int)$r['id'] ?>">Edit</a>
                 <form method="post" style="display:inline;"
                       onsubmit="return confirm('Delete this RFQ and all its quotes? This cannot be undone.');">
                   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
