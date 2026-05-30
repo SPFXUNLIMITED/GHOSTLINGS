@@ -165,6 +165,39 @@ function render_doc_details(string $details, array $placeholder_values = []): st
   );
 }
 
+function render_menu_dropdown(string $label, array $items, string $current): void {
+  $visible_items = array_values(array_filter($items, static fn(array $item): bool => !empty($item['visible'])));
+  if (!$visible_items) {
+    return;
+  }
+
+  if (count($visible_items) === 1) {
+    $item = $visible_items[0];
+    ?>
+    <a class="menu-link <?= $current === $item['file'] ? 'active' : '' ?>" href="<?= h($item['href']) ?>"><?= h($item['label']) ?></a>
+    <?php
+    return;
+  }
+
+  $is_active = false;
+  foreach ($visible_items as $item) {
+    if ($current === $item['file']) {
+      $is_active = true;
+      break;
+    }
+  }
+  ?>
+  <details class="menu-dropdown"<?= $is_active ? ' open' : '' ?>>
+    <summary class="menu-link menu-dropdown-toggle <?= $is_active ? 'active' : '' ?>"><?= h($label) ?></summary>
+    <div class="menu-dropdown-menu">
+      <?php foreach ($visible_items as $item): ?>
+      <a class="menu-dropdown-item <?= $current === $item['file'] ? 'active' : '' ?>" href="<?= h($item['href']) ?>"><?= h($item['label']) ?></a>
+      <?php endforeach; ?>
+    </div>
+  </details>
+  <?php
+}
+
 function render_header(string $title): void {
   if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
@@ -295,14 +328,19 @@ $show_rfq_menu = $show_mod_menu;
     <a class="menu-link <?= $current === 'user_page.php' ? 'active' : '' ?>" href="user_page.php">My Profile</a>
     <a class="menu-link <?= $current === 'app_request_form.php' ? 'active' : '' ?>" href="app_request_form.php">App Requests</a>
     <?php if (($_SESSION['role'] ?? '') !== 'user'): ?>
-    <a class="menu-link <?= $current === 'projects.php' ? 'active' : '' ?>" href="projects.php">Projects</a>
-    <a class="menu-link <?= $current === 'documents.php' ? 'active' : '' ?>" href="documents.php">Documents</a>
-    <a class="menu-link <?= $current === 'playbooks.php' ? 'active' : '' ?>" href="playbooks.php">Playbooks</a>
-    <a class="menu-link <?= $current === 'archives.php' ? 'active' : '' ?>" href="archives.php">Archives</a>
+    <?php render_menu_dropdown('Projects', [
+      ['href' => 'projects.php', 'file' => 'projects.php', 'label' => 'Projects', 'visible' => true],
+      ['href' => 'documents.php', 'file' => 'documents.php', 'label' => 'Documents', 'visible' => true],
+      ['href' => 'playbooks.php', 'file' => 'playbooks.php', 'label' => 'Playbooks', 'visible' => true],
+      ['href' => 'archives.php', 'file' => 'archives.php', 'label' => 'Archives', 'visible' => true],
+    ], $current); ?>
     <a class="menu-link <?= $current === 'time_clock.php' ? 'active' : '' ?>" href="time_clock.php">Time Clock</a>
     <?php endif; ?>
     <?php endif; ?>
-    <a class="menu-link <?= $current === 'form.php' ? 'active' : '' ?>" href="form.php">Service Request Form</a>
+    <?php render_menu_dropdown('Service Requests', [
+      ['href' => 'form.php', 'file' => 'form.php', 'label' => 'Service Request Form', 'visible' => true],
+      ['href' => 'form_admin.php', 'file' => 'form_admin.php', 'label' => 'Form Entries', 'visible' => $show_mod_menu],
+    ], $current); ?>
   </div>
 </nav>
 
@@ -310,14 +348,13 @@ $show_rfq_menu = $show_mod_menu;
 <nav class="menubar card">
   <div class="menubar-inner">
     <?php if ($show_mod_menu): ?>
-    <a class="menu-link <?= $current === 'form_admin.php' ? 'active' : '' ?>" href="form_admin.php">Form Entries</a>
-    <a class="menu-link <?= $current === 'app_request_tracker.php' ? 'active' : '' ?>" href="app_request_tracker.php">Request Tracker</a>
-    <a class="menu-link <?= $current === 'vendors.php' ? 'active' : '' ?>" href="vendors.php">Vendors</a>
-    <?php endif; ?>
-    <?php if ($show_rfq_menu): ?>
-    <a class="menu-link <?= $current === 'rfq_form.php' ? 'active' : '' ?>" href="rfq_form.php">RFQ Form</a>
-    <a class="menu-link <?= $current === 'rfq_parts_form.php' ? 'active' : '' ?>" href="rfq_parts_form.php">Parts RFQ Form</a>
-    <a class="menu-link <?= $current === 'rfq_tracker.php' ? 'active' : '' ?>" href="rfq_tracker.php">RFQ Tracker</a>
+    <?php render_menu_dropdown('Request Management', [
+      ['href' => 'app_request_tracker.php', 'file' => 'app_request_tracker.php', 'label' => 'Request Tracker', 'visible' => true],
+      ['href' => 'vendors.php', 'file' => 'vendors.php', 'label' => 'Vendors', 'visible' => true],
+      ['href' => 'rfq_form.php', 'file' => 'rfq_form.php', 'label' => 'RFQ Form', 'visible' => $show_rfq_menu],
+      ['href' => 'rfq_parts_form.php', 'file' => 'rfq_parts_form.php', 'label' => 'Parts RFQ Form', 'visible' => $show_rfq_menu],
+      ['href' => 'rfq_tracker.php', 'file' => 'rfq_tracker.php', 'label' => 'RFQ Tracker', 'visible' => $show_rfq_menu],
+    ], $current); ?>
     <?php endif; ?>
     <?php if ($show_admin_menu): ?>
     <a class="menu-link <?= $current === 'admin_backend.php' ? 'active' : '' ?>" href="admin_backend.php">Admin Backend</a>
