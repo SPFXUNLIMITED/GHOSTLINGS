@@ -297,6 +297,45 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Create app_requests table for user bug/software change/feature requests
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS app_requests (
+    id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    requested_by    INT UNSIGNED NOT NULL,
+    request_type    ENUM('bug','software_change','feature_request') NOT NULL,
+    request_title   VARCHAR(255) NOT NULL,
+    request_details TEXT NOT NULL,
+    priority        ENUM('low','medium','high') NOT NULL DEFAULT 'medium',
+    status          ENUM('new','in_review','planned','completed','declined') NOT NULL DEFAULT 'new',
+    admin_notes     TEXT NULL,
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_app_requests_requested_by (requested_by),
+    KEY idx_app_requests_status (status),
+    KEY idx_app_requests_created_at (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// Add foreign key on app_requests.requested_by for existing databases created before this constraint
+$fk_check = $pdo->prepare("
+  SELECT COUNT(*)
+  FROM information_schema.TABLE_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'app_requests'
+    AND CONSTRAINT_NAME = 'fk_app_requests_requested_by'
+    AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+");
+$fk_check->execute();
+if ((int)$fk_check->fetchColumn() === 0) {
+  $pdo->exec("
+    ALTER TABLE app_requests
+    ADD CONSTRAINT fk_app_requests_requested_by
+    FOREIGN KEY (requested_by) REFERENCES users(id)
+    ON DELETE CASCADE
+  ");
+}
+
 // Create rfq_requests table for CO2 laser cutter procurement requests
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS rfq_requests (
