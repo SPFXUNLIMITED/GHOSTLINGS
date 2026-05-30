@@ -257,8 +257,7 @@ render_header($id ? 'Edit SOP Page' : 'New SOP Page');
               </form>
             </div>
 
-            <!-- TRUSTED USERS: render comment HTML -->
-            <div><?= $c['body'] ?? '' ?></div>
+            <div><?= nl2br(h($c['body'] ?? '')) ?></div>
           </div>
         <?php endforeach; ?>
       <?php endif; ?>
