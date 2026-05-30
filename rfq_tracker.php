@@ -619,8 +619,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               }
             }
 
-            $success = 'Quote updated successfully.';
-            $selected_rfq_id = $rfq_id;
+            $redirect_query = http_build_query([
+              'rfq_id' => (int)$rfq_id,
+              'quote_id' => (int)$quote_id,
+            ]);
+            header('Location: rfq_quote_details.php?' . $redirect_query);
+            exit;
           } else {
             $selected_rfq_id = $rfq_id;
             $edit_quote_id = $quote_id;
