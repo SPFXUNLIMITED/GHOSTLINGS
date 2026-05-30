@@ -730,12 +730,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $additional_notes === '' ? null : $additional_notes,
           $rfq_id,
         ]);
-        if ($upd->rowCount() > 0) {
-          $success = 'RFQ request updated successfully.';
-        } else {
-          $errors[] = 'RFQ not found or no changes made.';
-          $edit_rfq_id = $rfq_id;
-        }
+        $_SESSION['flash_message'] = 'RFQ request updated successfully.';
+        header('Location: rfq_details.php?id=' . $rfq_id);
+        exit;
       } else {
         $edit_rfq_id = $rfq_id;
       }
