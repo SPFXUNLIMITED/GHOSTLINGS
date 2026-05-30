@@ -187,6 +187,10 @@ render_header('RFQ Details');
         <td><?= $is_parts_request ? 'Parts' : 'Machine' ?></td>
       </tr>
       <tr>
+        <th>Acquisition Purpose</th>
+        <td><?= (($rfq['acquisition_purpose'] ?? 'customer') === 'internal') ? 'Internal Use (Inventory / Repairs)' : 'Customer Request' ?></td>
+      </tr>
+      <tr>
         <th>Contact Phone</th>
         <td><?= $rfq['contact_phone'] !== null && $rfq['contact_phone'] !== '' ? h($rfq['contact_phone']) : '<span class="muted">—</span>' ?></td>
       </tr>

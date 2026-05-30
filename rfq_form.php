@@ -32,6 +32,7 @@ $is_parts_entrypoint = $forced_request_category === 'parts';
 $fields = [
   'request_category'=> $forced_request_category ?? 'machine',
   'request_type'    => 'RFQ',
+  'acquisition_purpose' => 'customer',
   'contact_name'    => '',
   'company_name'    => '',
   'contact_email'   => '',
@@ -106,6 +107,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (!in_array($fields['request_category'], REQUEST_CATEGORIES, true)) {
     $errors[] = 'Request category must be Machine or Parts.';
   }
+  if (!in_array($fields['acquisition_purpose'], ['customer', 'internal'], true)) {
+    $errors[] = 'Acquisition purpose must be Customer Request or Internal Use.';
+  }
   if ($fields['request_title'] === '') $errors[] = 'Request title is required.';
   if ($fields['request_category'] === 'machine') {
     if ($fields['machine_size'] === '') $errors[] = 'Machine size is required for machine requests.';
@@ -146,16 +150,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt = $pdo->prepare(
       "INSERT INTO rfq_requests
         (
-          requested_by, request_category, contact_name, company_name, contact_email, contact_phone,
+          requested_by, request_category, acquisition_purpose, contact_name, company_name, contact_email, contact_phone,
           buyer_name, buyer_company, buyer_email, buyer_phone,
           request_title, machine_size, laser_watts, tube_type, part_category, part_specs,
           quantity, required_features, additional_notes
         )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $stmt->execute([
       (int)current_user_id(),
       $fields['request_category'],
+      $fields['acquisition_purpose'],
       $fields['contact_name']  === '' ? null : $fields['contact_name'],
       $fields['company_name']  === '' ? null : $fields['company_name'],
       $fields['contact_email'] === '' ? null : $fields['contact_email'],
@@ -180,6 +185,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $fields = [
       'request_category'=> $forced_request_category ?? 'machine',
       'request_type'    => 'RFQ',
+      'acquisition_purpose' => 'customer',
       'contact_name'    => '',
       'company_name'    => '',
       'contact_email'   => '',
@@ -277,6 +283,13 @@ render_header($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ 
         <?php foreach (REQUEST_TYPES as $request_type): ?>
           <option value="<?= h($request_type) ?>" <?= $fields['request_type'] === $request_type ? 'selected' : '' ?>><?= h($request_type) ?></option>
         <?php endforeach; ?>
+      </select>
+    </div>
+    <div>
+      <label>Acquisition Purpose <span style="color:var(--d)">*</span></label>
+      <select name="acquisition_purpose" required>
+        <option value="customer" <?= $fields['acquisition_purpose'] === 'customer' ? 'selected' : '' ?>>Customer Request</option>
+        <option value="internal" <?= $fields['acquisition_purpose'] === 'internal' ? 'selected' : '' ?>>Internal Use (Inventory / Repairs)</option>
       </select>
     </div>
     <div class="full">

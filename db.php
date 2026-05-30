@@ -533,3 +533,12 @@ foreach ([
     }
   }
 }
+
+// Add acquisition_purpose column to rfq_requests if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE rfq_requests ADD COLUMN acquisition_purpose ENUM('customer','internal') NOT NULL DEFAULT 'customer'");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
