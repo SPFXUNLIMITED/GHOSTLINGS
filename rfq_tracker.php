@@ -560,9 +560,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($errors) {
         $edit_quote_post = [
           'supplier_name'   => $supplier_name,
-          'model_name'      => $model_name !== '' ? $model_name : null,
-          'sku'             => $sku !== '' ? $sku : null,
-          'msrp'            => $msrp_raw !== '' ? $msrp_raw : null,
+          'model_name'      => $model_name,
+          'sku'             => $sku,
+          'msrp'            => $msrp_raw,
           'quote_amount'    => $quote_amount_raw,
           'currency'        => $currency,
           'lead_time_days'  => $lead_time_days_raw !== '' ? $lead_time_days_raw : null,
