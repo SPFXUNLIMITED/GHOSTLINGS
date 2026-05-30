@@ -658,6 +658,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'edit_rfq') {
       $rfq_id = (int)($_POST['rfq_id'] ?? 0);
       $request_category = strtolower(trim((string)($_POST['request_category'] ?? 'machine')));
+      $acquisition_purpose = strtolower(trim((string)($_POST['acquisition_purpose'] ?? 'customer')));
       $buyer_name       = trim((string)($_POST['buyer_name']       ?? ''));
       $buyer_company    = trim((string)($_POST['buyer_company']    ?? ''));
       $buyer_email      = trim((string)($_POST['buyer_email']      ?? ''));
@@ -675,6 +676,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($rfq_id <= 0) $errors[] = 'Invalid RFQ request.';
       if (!in_array($request_category, ['machine', 'parts'], true)) {
         $errors[] = 'Request category must be Machine or Parts.';
+      }
+      if (!in_array($acquisition_purpose, ['customer', 'internal'], true)) {
+        $errors[] = 'Acquisition purpose must be Customer Request or Internal Use.';
       }
       if ($request_title === '') $errors[] = 'Request title is required.';
       if ($request_category === 'parts') {
@@ -709,7 +713,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $upd = $pdo->prepare(
           "UPDATE rfq_requests SET
             buyer_name = ?, buyer_company = ?, buyer_email = ?, buyer_phone = ?,
-            request_category = ?, request_title = ?, machine_size = ?, laser_watts = ?, tube_type = ?,
+            request_category = ?, acquisition_purpose = ?, request_title = ?, machine_size = ?, laser_watts = ?, tube_type = ?,
             part_category = ?, part_specs = ?, quantity = ?, required_features = ?, additional_notes = ?
            WHERE id = ?"
         );
@@ -719,6 +723,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $buyer_email   === '' ? null : $buyer_email,
           $buyer_phone   === '' ? null : $buyer_phone,
           $request_category,
+          $acquisition_purpose,
           $request_title,
           $request_category === 'machine' ? $machine_size : null,
           $request_category === 'machine' ? $laser_watts : null,
@@ -881,7 +886,7 @@ if ($selected_rfq_id > 0) {
 if ($edit_rfq_id > 0) {
   $er = $pdo->prepare(
     "SELECT id, buyer_name, buyer_company, buyer_email, buyer_phone,
-            request_category, request_title, machine_size, laser_watts, tube_type, part_category, part_specs, quantity, required_features, additional_notes
+            acquisition_purpose, request_category, request_title, machine_size, laser_watts, tube_type, part_category, part_specs, quantity, required_features, additional_notes
      FROM rfq_requests WHERE id = ? LIMIT 1"
   );
   $er->execute([$edit_rfq_id]);
@@ -973,6 +978,13 @@ render_header('RFQ Tracker');
       <select name="request_category" id="edit_request_category" required>
         <option value="machine" <?= (($editing_rfq['request_category'] ?? 'machine') === 'machine') ? 'selected' : '' ?>>Machine</option>
         <option value="parts" <?= (($editing_rfq['request_category'] ?? 'machine') === 'parts') ? 'selected' : '' ?>>Parts</option>
+      </select>
+    </div>
+    <div class="full">
+      <label>Acquisition Purpose <span style="color:var(--d)">*</span></label>
+      <select name="acquisition_purpose" required>
+        <option value="customer" <?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'customer') ? 'selected' : '' ?>>Customer Request</option>
+        <option value="internal" <?= (($editing_rfq['acquisition_purpose'] ?? 'customer') === 'internal') ? 'selected' : '' ?>>Internal Use (Inventory / Repairs)</option>
       </select>
     </div>
     <div class="full">
