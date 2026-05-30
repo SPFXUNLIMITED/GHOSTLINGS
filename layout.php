@@ -276,7 +276,10 @@ $show_rfq_menu = $show_mod_menu;
     <?php if (!empty($_SESSION['user_id'])): ?>
     <a class="menu-link <?= $current === 'index.php' ? 'active' : '' ?>" href="index.php">Home</a>
     <a class="menu-link <?= $current === 'user_page.php' ? 'active' : '' ?>" href="user_page.php">My Profile</a>
-    <a class="menu-link <?= $current === 'app_request_form.php' ? 'active' : '' ?>" href="app_request_form.php">App Requests</a>
+    <?php render_menu_dropdown('App Requests', [
+      ['href' => 'app_request_form.php', 'file' => 'app_request_form.php', 'label' => 'App Request Form', 'visible' => true],
+      ['href' => 'app_request_tracker.php', 'file' => 'app_request_tracker.php', 'label' => 'Request Tracker', 'visible' => $show_mod_menu],
+    ], $current); ?>
     <?php if (($_SESSION['role'] ?? '') !== 'user'): ?>
     <?php render_menu_dropdown('Projects', [
       ['href' => 'projects.php', 'file' => 'projects.php', 'label' => 'Projects', 'visible' => true],
@@ -299,7 +302,6 @@ $show_rfq_menu = $show_mod_menu;
   <div class="menubar-inner">
     <?php if ($show_mod_menu): ?>
     <?php render_menu_dropdown('Request Management', [
-      ['href' => 'app_request_tracker.php', 'file' => 'app_request_tracker.php', 'label' => 'Request Tracker', 'visible' => true],
       ['href' => 'vendors.php', 'file' => 'vendors.php', 'label' => 'Vendors', 'visible' => true],
       ['href' => 'rfq_form.php', 'file' => 'rfq_form.php', 'label' => 'RFQ Form', 'visible' => $show_rfq_menu],
       ['href' => 'rfq_parts_form.php', 'file' => 'rfq_parts_form.php', 'label' => 'Parts RFQ Form', 'visible' => $show_rfq_menu],
