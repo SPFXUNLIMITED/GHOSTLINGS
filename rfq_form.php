@@ -212,7 +212,7 @@ render_header($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ 
 ?>
 
 <div class="card">
-  <h1 style="margin-top:0; margin-bottom:4px;"><?= $is_parts_entrypoint ? 'CO2 Laser Parts RFQ / Sourcing Requests' : 'CO2 Laser Cutter RFQ / Sourcing Requests' ?></h1>
+  <h1 style="margin-top:0; margin-bottom:4px;"><?= $is_parts_entrypoint ? 'CO2 Laser Parts RFQ / Sourcing Requests' : 'RFQ / Sourcing Requests' ?></h1>
   <p class="muted" style="margin:0;">
     Submit either machine RFQs or parts sourcing requests (chillers, blowers, laser tubes, and more) in one workflow.
   </p>
