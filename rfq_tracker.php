@@ -1023,6 +1023,7 @@ render_header('RFQ Tracker');
               <td><?= h($r['requested_by_username'] ?? 'Unknown') ?></td>
               <td class="muted" style="white-space:nowrap;"><?= h($r['created_at']) ?></td>
               <td class="col-actions">
+                <a class="btn" href="rfq_details.php?id=<?= (int)$r['id'] ?>">View</a>
                 <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$r['id'] ?>">Quotes</a>
                 <a class="btn" href="rfq_tracker.php?rfq_text_id=<?= (int)$r['id'] ?>">Email Text</a>
                 <a class="btn" href="rfq_tracker.php?edit_rfq_id=<?= (int)$r['id'] ?>">Edit</a>
