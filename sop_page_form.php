@@ -10,10 +10,19 @@ $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
 
 if (!$category_id) { header('Location: sops.php'); exit; }
 
+$app_categories = [
+  'document' => 'Document',
+  'sop' => 'SOP Page',
+];
+$category_options = [
+  'document' => $pdo->query("SELECT id, name FROM projects WHERE is_doc_category = 1 AND archived = 0 ORDER BY name")->fetchAll(),
+  'sop' => $pdo->query("SELECT id, name FROM projects WHERE is_sop_category = 1 AND archived = 0 ORDER BY name")->fetchAll(),
+];
+
 $all_users = $pdo->query("SELECT id, username FROM users ORDER BY username")->fetchAll();
 
 $errors = [];
-$doc = ['project_id' => $category_id, 'title' => '', 'details' => '', 'status' => 'todo', 'due_date' => '', 'priority' => 'medium', 'assigned_to' => null];
+$doc = ['project_id' => $category_id, 'title' => '', 'details' => '', 'status' => 'todo', 'due_date' => '', 'priority' => 'medium', 'assigned_to' => null, 'app_category' => 'sop'];
 
 if (!$id) {
   $doc['project_id'] = $category_id;
@@ -32,6 +41,7 @@ if ($id) {
 
   $id = (int)$doc['id'];
   $doc['project_id'] = (int)$doc['project_id'];
+  $doc['app_category'] = 'sop';
   $category_id = $doc['project_id'];
 
   $stmt = $pdo->prepare("SELECT id, name FROM projects WHERE id = ? AND is_sop_category = 1");
@@ -82,7 +92,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment'])) {
 // SOP page save: normal create/update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['add_comment']) && !isset($_POST['delete_comment'])) {
 
-  $new_category_id = $category_id;
+  $app_category = $_POST['app_category'] ?? ($doc['app_category'] ?? 'sop');
+  if (!isset($category_options[$app_category])) {
+    $errors[] = "Invalid application category.";
+    $app_category = 'sop';
+  }
+  $new_category_id = (int)($_POST['target_category_id'] ?? $category_id);
+  $selected_category = null;
+  if (!$errors) {
+    foreach ($category_options[$app_category] as $opt) {
+      if ((int)$opt['id'] === $new_category_id) {
+        $selected_category = $opt;
+        break;
+      }
+    }
+    if (!$selected_category) {
+      $errors[] = "Selected category not found.";
+    }
+  }
 
   $title      = trim($_POST['title'] ?? '');
   $details    = trim($_POST['details'] ?? '');
@@ -107,7 +134,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['add_comment']) && !i
       $stmt = $pdo->prepare("INSERT INTO tasks (project_id, title, details, status, due_date, priority, assigned_to) VALUES (?, ?, ?, ?, ?, ?, ?)");
       $stmt->execute([$new_category_id, $title, $details ?: null, $status, $due, $priority, $assigned_to]);
     }
-    header("Location: sop_pages.php?category_id={$new_category_id}");
+    if ($app_category === 'document') {
+      header("Location: doc_tasks.php?category_id={$new_category_id}");
+    } else {
+      header("Location: sop_pages.php?category_id={$new_category_id}");
+    }
     exit;
   }
 
@@ -118,12 +149,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['add_comment']) && !i
   $doc['priority']   = $priority;
   $doc['project_id'] = $new_category_id;
   $doc['assigned_to'] = $assigned_to;
+  $doc['app_category'] = $app_category;
 
   $category_id = $new_category_id;
-  $stmt = $pdo->prepare("SELECT id, name FROM projects WHERE id = ? AND is_sop_category = 1");
-  $stmt->execute([$category_id]);
-  $category = $stmt->fetch();
-  if (!$category) { $errors[] = "Selected SOP category not found."; }
+  $category = $selected_category;
 }
 
 // Load comments for display (edit mode only)
@@ -159,6 +188,30 @@ render_header($id ? 'Edit SOP Page' : 'New SOP Page');
       <div class="full">
         <label>Title</label>
         <input name="title" value="<?= h($doc['title']) ?>" />
+      </div>
+
+      <div>
+        <label>Application category</label>
+        <select name="app_category" id="app_category_select">
+          <?php foreach ($app_categories as $val => $label): ?>
+            <option value="<?= h($val) ?>" <?= (($doc['app_category'] ?? 'sop') === $val ? 'selected' : '') ?>><?= h($label) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+
+      <div>
+        <label>Category</label>
+        <select name="target_category_id" id="target_category_select">
+          <?php
+          $selected_app_category = $doc['app_category'] ?? 'sop';
+          $selected_category_id = (int)($doc['project_id'] ?? $category_id);
+          foreach (($category_options[$selected_app_category] ?? []) as $opt):
+          ?>
+            <option value="<?= (int)$opt['id'] ?>" <?= ((int)$opt['id'] === $selected_category_id) ? 'selected' : '' ?>>
+              <?= h($opt['name']) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
       </div>
 
       <div>
@@ -295,6 +348,32 @@ render_header($id ? 'Edit SOP Page' : 'New SOP Page');
     toolbar: 'undo redo | bold italic underline | bullist numlist | link table | removeformat | code',
     branding: false
   });
+
+  (function () {
+    const categoryOptions = <?= json_encode($category_options, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+    const categorySelect = document.getElementById('app_category_select');
+    const targetSelect = document.getElementById('target_category_select');
+    if (!categorySelect || !targetSelect) return;
+
+    const renderOptions = () => {
+      const selectedType = categorySelect.value;
+      const previousValue = targetSelect.value;
+      const options = Array.isArray(categoryOptions[selectedType]) ? categoryOptions[selectedType] : [];
+      targetSelect.innerHTML = '';
+      options.forEach((opt) => {
+        const optionEl = document.createElement('option');
+        optionEl.value = String(opt.id);
+        optionEl.textContent = opt.name;
+        if (String(optionEl.value) === String(previousValue)) {
+          optionEl.selected = true;
+        }
+        targetSelect.appendChild(optionEl);
+      });
+    };
+
+    categorySelect.addEventListener('change', renderOptions);
+    renderOptions();
+  })();
 </script>
 
 <?php render_footer(); ?>
