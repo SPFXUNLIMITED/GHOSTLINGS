@@ -25,8 +25,21 @@ if (!is_admin()) {
   if (!$chk->fetch()) { http_response_code(403); exit('Forbidden'); }
 }
 
-$stmt = $pdo->prepare("DELETE FROM tasks WHERE id = ? AND project_id = ?");
-$stmt->execute([$id, $category_id]);
+try {
+  $pdo->beginTransaction();
+
+  $pdo->prepare("DELETE FROM task_comments WHERE task_id = ?")->execute([$id]);
+  $pdo->prepare("DELETE FROM task_uploads WHERE task_id = ?")->execute([$id]);
+  $stmt = $pdo->prepare("DELETE FROM tasks WHERE id = ? AND project_id = ?");
+  $stmt->execute([$id, $category_id]);
+
+  $pdo->commit();
+} catch (Throwable $e) {
+  if ($pdo->inTransaction()) {
+    $pdo->rollBack();
+  }
+  throw $e;
+}
 
 header("Location: sop_pages.php?category_id={$category_id}");
 exit;
