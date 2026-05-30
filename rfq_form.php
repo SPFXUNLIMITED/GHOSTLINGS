@@ -120,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $errors[] = 'Contact email must be a valid email address.';
   }
   if ($fields['buyer_email'] !== '' && !filter_var($fields['buyer_email'], FILTER_VALIDATE_EMAIL)) {
-    $errors[] = 'Buyer / End User email must be a valid email address.';
+    $errors[] = 'Customer email must be a valid email address.';
   }
 
   if (!ctype_digit($fields['quantity']) || (int)$fields['quantity'] < 1 || (int)$fields['quantity'] > MAX_RFQ_QUANTITY) {
@@ -232,25 +232,25 @@ render_header($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ 
   <p class="muted" style="margin-top:0; margin-bottom:16px;">
     Company and contact details are pulled from your <a href="user_page.php">profile</a>.
   </p>
-  <h2 style="margin-top:0; margin-bottom:12px; font-size:1rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted, #6b7280);">Buyer / End User Information</h2>
+  <h2 style="margin-top:0; margin-bottom:12px; font-size:1rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted, #6b7280);">Customer Information</h2>
   <div class="form-grid" style="margin-bottom:12px;">
     <div>
-      <label>Buyer / End User Name</label>
+      <label>Customer Name</label>
       <input type="text" name="buyer_name" maxlength="255"
              value="<?= h($fields['buyer_name']) ?>" />
     </div>
     <div>
-      <label>Buyer / End User Company</label>
+      <label>Customer Company</label>
       <input type="text" name="buyer_company" maxlength="255"
              value="<?= h($fields['buyer_company']) ?>" />
     </div>
     <div>
-      <label>Buyer / End User Email</label>
+      <label>Customer Email</label>
       <input type="email" name="buyer_email" maxlength="255"
              value="<?= h($fields['buyer_email']) ?>" />
     </div>
     <div>
-      <label>Buyer / End User Phone</label>
+      <label>Customer Phone</label>
       <input type="text" name="buyer_phone" maxlength="100"
              value="<?= h($fields['buyer_phone']) ?>" />
     </div>

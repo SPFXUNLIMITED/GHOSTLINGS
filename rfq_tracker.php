@@ -687,7 +687,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($required_features === '') $errors[] = 'Required features are required for machine requests.';
       }
       if ($buyer_email !== '' && !filter_var($buyer_email, FILTER_VALIDATE_EMAIL)) {
-        $errors[] = 'Buyer / End User email must be a valid email address.';
+        $errors[] = 'Customer email must be a valid email address.';
       }
       if (!ctype_digit($quantity_raw) || (int)$quantity_raw < 1 || (int)$quantity_raw > MAX_RFQ_QUANTITY) {
         $errors[] = 'Quantity must be a whole number between 1 and ' . MAX_RFQ_QUANTITY . '.';
@@ -940,25 +940,25 @@ render_header('RFQ Tracker');
     <input type="hidden" name="rfq_id" value="<?= (int)$editing_rfq['id'] ?>" />
 
     <div class="full" style="margin-bottom:4px;">
-      <strong style="font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted,#6b7280);">Buyer / End User Information</strong>
+      <strong style="font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted,#6b7280);">Customer Information</strong>
     </div>
     <div>
-      <label>Buyer / End User Name</label>
+      <label>Customer Name</label>
       <input type="text" name="buyer_name" maxlength="255"
              value="<?= h((string)($editing_rfq['buyer_name'] ?? '')) ?>" />
     </div>
     <div>
-      <label>Buyer / End User Company</label>
+      <label>Customer Company</label>
       <input type="text" name="buyer_company" maxlength="255"
              value="<?= h((string)($editing_rfq['buyer_company'] ?? '')) ?>" />
     </div>
     <div>
-      <label>Buyer / End User Email</label>
+      <label>Customer Email</label>
       <input type="email" name="buyer_email" maxlength="255"
              value="<?= h((string)($editing_rfq['buyer_email'] ?? '')) ?>" />
     </div>
     <div>
-      <label>Buyer / End User Phone</label>
+      <label>Customer Phone</label>
       <input type="text" name="buyer_phone" maxlength="100"
              value="<?= h((string)($editing_rfq['buyer_phone'] ?? '')) ?>" />
     </div>
