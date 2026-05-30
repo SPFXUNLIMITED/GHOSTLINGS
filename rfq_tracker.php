@@ -91,22 +91,34 @@ function build_rfq_email_text(array $rfq): string {
     $lines[] = 'Phone:        ' . $contact_phone;
   }
 
+  $request_category = trim((string)($rfq['request_category'] ?? 'machine'));
+  $is_parts_request = $request_category === 'parts';
   $lines = array_merge($lines, [
     '',
     $sep2,
-    'MACHINE SPECIFICATIONS:',
+    $is_parts_request ? 'PARTS REQUEST DETAILS:' : 'MACHINE SPECIFICATIONS:',
     $sep2,
     'Title:        ' . trim((string)$rfq['request_title']),
-    'Machine Size: ' . trim((string)$rfq['machine_size']),
-    'Laser Watts:  ' . trim((string)$rfq['laser_watts']),
-    'Tube Type:    ' . trim((string)$rfq['tube_type']),
     'Quantity:     ' . (int)$rfq['quantity'],
-    '',
-    $sep2,
-    'REQUIRED FEATURES:',
-    $sep2,
-    trim((string)$rfq['required_features']),
   ]);
+
+  if ($is_parts_request) {
+    $lines[] = 'Part Category: ' . trim((string)($rfq['part_category'] ?? ''));
+    $lines[] = '';
+    $lines[] = $sep2;
+    $lines[] = 'PART SPECS:';
+    $lines[] = $sep2;
+    $lines[] = trim((string)($rfq['part_specs'] ?? ''));
+  } else {
+    $lines[] = 'Machine Size: ' . trim((string)$rfq['machine_size']);
+    $lines[] = 'Laser Watts:  ' . trim((string)$rfq['laser_watts']);
+    $lines[] = 'Tube Type:    ' . trim((string)$rfq['tube_type']);
+    $lines[] = '';
+    $lines[] = $sep2;
+    $lines[] = 'REQUIRED FEATURES:';
+    $lines[] = $sep2;
+    $lines[] = trim((string)$rfq['required_features']);
+  }
 
   $additional_notes = trim((string)($rfq['additional_notes'] ?? ''));
   if ($additional_notes !== '') {
@@ -576,6 +588,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
     } elseif ($action === 'edit_rfq') {
       $rfq_id = (int)($_POST['rfq_id'] ?? 0);
+      $request_category = strtolower(trim((string)($_POST['request_category'] ?? 'machine')));
       $contact_name     = trim((string)($_POST['contact_name']    ?? ''));
       $company_name     = trim((string)($_POST['company_name']    ?? ''));
       $contact_email    = trim((string)($_POST['contact_email']   ?? ''));
@@ -584,16 +597,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $machine_size     = trim((string)($_POST['machine_size']    ?? ''));
       $laser_watts      = trim((string)($_POST['laser_watts']     ?? ''));
       $tube_type        = trim((string)($_POST['tube_type']       ?? ''));
+      $part_category    = trim((string)($_POST['part_category']   ?? ''));
+      $part_specs       = trim((string)($_POST['part_specs']      ?? ''));
       $quantity_raw     = trim((string)($_POST['quantity']        ?? ''));
       $required_features = trim((string)($_POST['required_features'] ?? ''));
       $additional_notes  = trim((string)($_POST['additional_notes']  ?? ''));
 
       if ($rfq_id <= 0) $errors[] = 'Invalid RFQ request.';
+      if (!in_array($request_category, ['machine', 'parts'], true)) {
+        $errors[] = 'Request category must be Machine or Parts.';
+      }
       if ($request_title === '') $errors[] = 'Request title is required.';
-      if ($machine_size === '') $errors[] = 'Machine size is required.';
-      if ($laser_watts === '') $errors[] = 'Laser watts is required.';
-      if ($tube_type === '') $errors[] = 'Tube type is required.';
-      if ($required_features === '') $errors[] = 'Required features are required.';
+      if ($request_category === 'parts') {
+        if ($part_category === '') $errors[] = 'Part category is required for parts requests.';
+        if ($part_specs === '') $errors[] = 'Part specs are required for parts requests.';
+      } else {
+        if ($machine_size === '') $errors[] = 'Machine size is required for machine requests.';
+        if ($laser_watts === '') $errors[] = 'Laser watts is required for machine requests.';
+        if ($tube_type === '') $errors[] = 'Tube type is required for machine requests.';
+        if ($required_features === '') $errors[] = 'Required features are required for machine requests.';
+      }
       if ($contact_email !== '' && !filter_var($contact_email, FILTER_VALIDATE_EMAIL)) {
         $errors[] = 'Contact email must be a valid email address.';
       }
@@ -603,6 +626,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (strlen($required_features) > 5000) {
         $errors[] = 'Required features must be 5000 characters or fewer.';
       }
+      if (strlen($part_specs) > 5000) {
+        $errors[] = 'Part specs must be 5000 characters or fewer.';
+      }
+      if (strlen($part_category) > 100) {
+        $errors[] = 'Part category must be 100 characters or fewer.';
+      }
       if (strlen($additional_notes) > 5000) {
         $errors[] = 'Additional notes must be 5000 characters or fewer.';
       }
@@ -611,8 +640,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $upd = $pdo->prepare(
           "UPDATE rfq_requests SET
             contact_name = ?, company_name = ?, contact_email = ?, contact_phone = ?,
-            request_title = ?, machine_size = ?, laser_watts = ?, tube_type = ?,
-            quantity = ?, required_features = ?, additional_notes = ?
+            request_category = ?, request_title = ?, machine_size = ?, laser_watts = ?, tube_type = ?,
+            part_category = ?, part_specs = ?, quantity = ?, required_features = ?, additional_notes = ?
            WHERE id = ?"
         );
         $upd->execute([
@@ -620,12 +649,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $company_name  === '' ? null : $company_name,
           $contact_email === '' ? null : $contact_email,
           $contact_phone === '' ? null : $contact_phone,
+          $request_category,
           $request_title,
-          $machine_size,
-          $laser_watts,
-          $tube_type,
+          $request_category === 'machine' ? $machine_size : null,
+          $request_category === 'machine' ? $laser_watts : null,
+          $request_category === 'machine' ? $tube_type : null,
+          $request_category === 'parts' ? $part_category : null,
+          $request_category === 'parts' ? $part_specs : null,
           (int)$quantity_raw,
-          $required_features,
+          $request_category === 'machine' ? $required_features : null,
           $additional_notes === '' ? null : $additional_notes,
           $rfq_id,
         ]);
@@ -709,7 +741,7 @@ $add_quote_id = max(0, (int)($_GET['add_quote_id'] ?? 0));
 $where_parts = [];
 $params = [];
 if ($search !== '') {
-  $where_parts[] = "(r.request_title LIKE :q OR r.machine_size LIKE :q OR r.laser_watts LIKE :q OR r.tube_type LIKE :q OR r.required_features LIKE :q)";
+  $where_parts[] = "(r.request_title LIKE :q OR r.machine_size LIKE :q OR r.laser_watts LIKE :q OR r.tube_type LIKE :q OR r.part_category LIKE :q OR r.part_specs LIKE :q OR r.required_features LIKE :q)";
   $params[':q'] = '%' . $search . '%';
 }
 if ($status_filter !== '' && isset($request_statuses[$status_filter])) {
@@ -720,7 +752,7 @@ $where_sql = $where_parts ? ('WHERE ' . implode(' AND ', $where_parts)) : '';
 
 $sql = "
   SELECT
-    r.id, r.request_title, r.machine_size, r.laser_watts, r.tube_type, r.quantity,
+    r.id, r.request_category, r.request_title, r.machine_size, r.laser_watts, r.tube_type, r.part_category, r.part_specs, r.quantity,
     r.required_features, r.additional_notes, r.request_status, r.created_at, r.updated_at,
     u.username AS requested_by_username,
     COUNT(q.id) AS quote_count,
@@ -783,7 +815,7 @@ if ($selected_rfq_id > 0) {
 if ($edit_rfq_id > 0) {
   $er = $pdo->prepare(
     "SELECT id, contact_name, company_name, contact_email, contact_phone,
-            request_title, machine_size, laser_watts, tube_type, quantity, required_features, additional_notes
+            request_category, request_title, machine_size, laser_watts, tube_type, part_category, part_specs, quantity, required_features, additional_notes
      FROM rfq_requests WHERE id = ? LIMIT 1"
   );
   $er->execute([$edit_rfq_id]);
@@ -792,7 +824,7 @@ if ($edit_rfq_id > 0) {
 
 if ($rfq_text_id > 0) {
   $txt = $pdo->prepare(
-    "SELECT r.id, r.request_title, r.machine_size, r.laser_watts, r.tube_type, r.quantity,
+    "SELECT r.id, r.request_category, r.request_title, r.machine_size, r.laser_watts, r.tube_type, r.part_category, r.part_specs, r.quantity,
             r.required_features, r.additional_notes, r.request_status, r.created_at,
             r.contact_name, r.company_name, r.contact_email, r.contact_phone,
             u.username AS requested_by_username
@@ -815,7 +847,7 @@ render_header('RFQ Tracker');
 <div class="card">
   <h1 style="margin-top:0; margin-bottom:4px;">RFQ Quote Tracking</h1>
   <p class="muted" style="margin:0;">
-    Track supplier quotes, lead times, and shipping costs for CO2 laser cutter purchases.
+    Track supplier quotes, lead times, and shipping costs for machine RFQs and laser parts sourcing.
   </p>
 </div>
 
@@ -867,37 +899,53 @@ render_header('RFQ Tracker');
 
     <div class="full"><hr style="margin:4px 0 8px; border:none; border-top:1px solid var(--border,#e5e7eb);" /></div>
     <div class="full" style="margin-bottom:4px;">
-      <strong style="font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted,#6b7280);">Machine Specifications</strong>
+      <strong style="font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted,#6b7280);">Request Details</strong>
     </div>
 
+    <div class="full">
+      <label>Request Category <span style="color:var(--d)">*</span></label>
+      <select name="request_category" id="edit_request_category" required>
+        <option value="machine" <?= (($editing_rfq['request_category'] ?? 'machine') === 'machine') ? 'selected' : '' ?>>Machine</option>
+        <option value="parts" <?= (($editing_rfq['request_category'] ?? 'machine') === 'parts') ? 'selected' : '' ?>>Parts</option>
+      </select>
+    </div>
     <div class="full">
       <label>RFQ Title <span style="color:var(--d)">*</span></label>
       <input type="text" name="request_title" maxlength="255" required
              value="<?= h($editing_rfq['request_title']) ?>" />
     </div>
-    <div>
+    <div class="machine-only">
       <label>Machine Size <span style="color:var(--d)">*</span></label>
-      <input type="text" name="machine_size" maxlength="100" required
+      <input type="text" name="machine_size" maxlength="100" data-required-on="machine"
              value="<?= h($editing_rfq['machine_size']) ?>" />
     </div>
-    <div>
+    <div class="machine-only">
       <label>Laser Watts <span style="color:var(--d)">*</span></label>
-      <input type="text" name="laser_watts" maxlength="50" required
+      <input type="text" name="laser_watts" maxlength="50" data-required-on="machine"
              value="<?= h($editing_rfq['laser_watts']) ?>" />
     </div>
-    <div>
+    <div class="machine-only">
       <label>Tube Type <span style="color:var(--d)">*</span></label>
-      <input type="text" name="tube_type" maxlength="100" required
+      <input type="text" name="tube_type" maxlength="100" data-required-on="machine"
              value="<?= h($editing_rfq['tube_type']) ?>" />
+    </div>
+    <div class="parts-only">
+      <label>Part Category <span style="color:var(--d)">*</span></label>
+      <input type="text" name="part_category" maxlength="100" data-required-on="parts"
+             value="<?= h((string)($editing_rfq['part_category'] ?? '')) ?>" />
     </div>
     <div>
       <label>Quantity <span style="color:var(--d)">*</span></label>
       <input type="number" name="quantity" min="1" max="<?= MAX_RFQ_QUANTITY ?>" required
              value="<?= h((string)$editing_rfq['quantity']) ?>" />
     </div>
-    <div class="full">
+    <div class="full machine-only">
       <label>Required Features <span style="color:var(--d)">*</span></label>
-      <textarea name="required_features" rows="5" maxlength="5000" required><?= h($editing_rfq['required_features']) ?></textarea>
+      <textarea name="required_features" rows="5" maxlength="5000" data-required-on="machine"><?= h($editing_rfq['required_features']) ?></textarea>
+    </div>
+    <div class="full parts-only">
+      <label>Part Specs <span style="color:var(--d)">*</span></label>
+      <textarea name="part_specs" rows="5" maxlength="5000" data-required-on="parts"><?= h((string)($editing_rfq['part_specs'] ?? '')) ?></textarea>
     </div>
     <div class="full">
       <label>Additional Notes</label>
@@ -911,12 +959,35 @@ render_header('RFQ Tracker');
 </div>
 <?php endif; ?>
 
+<?php if ($editing_rfq): ?>
+<script>
+  (function () {
+    var categoryField = document.getElementById('edit_request_category');
+    if (!categoryField) return;
+    var form = categoryField.closest('form');
+    if (!form) return;
+    var machineFields = form.querySelectorAll('.machine-only');
+    var partsFields = form.querySelectorAll('.parts-only');
+    function toggleSections() {
+      var isParts = categoryField.value === 'parts';
+      machineFields.forEach(function (el) { el.style.display = isParts ? 'none' : ''; });
+      partsFields.forEach(function (el) { el.style.display = isParts ? '' : 'none'; });
+      form.querySelectorAll('[data-required-on]').forEach(function (input) {
+        input.required = input.getAttribute('data-required-on') === categoryField.value;
+      });
+    }
+    categoryField.addEventListener('change', toggleSections);
+    toggleSections();
+  })();
+</script>
+<?php endif; ?>
+
 <div class="card">
   <form method="get" class="row" style="align-items:flex-end;">
     <div style="flex:1 1 300px;">
       <label>Search RFQs</label>
       <input type="text" name="q" value="<?= h($search) ?>"
-             placeholder="Search title, size, watts, tube type, features..." />
+             placeholder="Search title, machine specs, part specs, or features..." />
     </div>
     <div style="width:220px;">
       <label>Status</label>
@@ -931,6 +1002,7 @@ render_header('RFQ Tracker');
       <button type="submit" class="btn primary">Filter</button>
       <a class="btn" href="rfq_tracker.php">Clear</a>
       <a class="btn" href="rfq_form.php">New RFQ</a>
+      <a class="btn" href="rfq_parts_form.php">New Parts RFQ</a>
     </div>
   </form>
 </div>
@@ -1000,7 +1072,7 @@ render_header('RFQ Tracker');
               <td>
                 <strong><?= h($r['request_title']) ?></strong><br>
                 <span class="muted">
-                  Qty: <?= (int)$r['quantity'] ?> · Quotes: <?= (int)$r['quote_count'] ?>
+                  <?= ($r['request_category'] ?? 'machine') === 'parts' ? 'Parts' : 'Machine' ?> · Qty: <?= (int)$r['quantity'] ?> · Quotes: <?= (int)$r['quote_count'] ?>
                 </span>
               </td>
               <td>

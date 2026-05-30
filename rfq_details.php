@@ -146,13 +146,14 @@ render_header('RFQ Details');
     <div class="actions">
       <a class="btn" href="rfq_tracker.php">Back to RFQ Tracker</a>
       <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$rfq['id'] ?>">Track Quotes</a>
-      <a class="btn" href="rfq_tracker.php?edit_rfq_id=<?= (int)$rfq['id'] ?>">Edit RFQ</a>
+      <a class="btn" href="rfq_tracker.php?edit_rfq_id=<?= (int)$rfq['id'] ?>">Edit Request</a>
     </div>
   </div>
 </div>
 
 <div class="card">
   <h2 style="margin-top:0;">RFQ Information</h2>
+  <?php $is_parts_request = (($rfq['request_category'] ?? 'machine') === 'parts'); ?>
   <table>
     <tbody>
       <tr>
@@ -182,29 +183,47 @@ render_header('RFQ Details');
         </td>
       </tr>
       <tr>
+        <th>Request Category</th>
+        <td><?= $is_parts_request ? 'Parts' : 'Machine' ?></td>
+      </tr>
+      <tr>
         <th>Contact Phone</th>
         <td><?= $rfq['contact_phone'] !== null && $rfq['contact_phone'] !== '' ? h($rfq['contact_phone']) : '<span class="muted">—</span>' ?></td>
       </tr>
-      <tr>
-        <th>Machine Size</th>
-        <td><?= h((string)$rfq['machine_size']) ?></td>
-      </tr>
-      <tr>
-        <th>Laser Watts</th>
-        <td><?= h((string)$rfq['laser_watts']) ?></td>
-      </tr>
-      <tr>
-        <th>Tube Type</th>
-        <td><?= h((string)$rfq['tube_type']) ?></td>
-      </tr>
+      <?php if ($is_parts_request): ?>
+        <tr>
+          <th>Part Category</th>
+          <td><?= !empty($rfq['part_category']) ? h((string)$rfq['part_category']) : '<span class="muted">—</span>' ?></td>
+        </tr>
+      <?php else: ?>
+        <tr>
+          <th>Machine Size</th>
+          <td><?= h((string)$rfq['machine_size']) ?></td>
+        </tr>
+        <tr>
+          <th>Laser Watts</th>
+          <td><?= h((string)$rfq['laser_watts']) ?></td>
+        </tr>
+        <tr>
+          <th>Tube Type</th>
+          <td><?= h((string)$rfq['tube_type']) ?></td>
+        </tr>
+      <?php endif; ?>
       <tr>
         <th>Quantity</th>
         <td><?= (int)$rfq['quantity'] ?></td>
       </tr>
-      <tr>
-        <th>Required Features</th>
-        <td><?= nl2br(h((string)$rfq['required_features'])) ?></td>
-      </tr>
+      <?php if ($is_parts_request): ?>
+        <tr>
+          <th>Part Specs</th>
+          <td><?= !empty($rfq['part_specs']) ? nl2br(h((string)$rfq['part_specs'])) : '<span class="muted">—</span>' ?></td>
+        </tr>
+      <?php else: ?>
+        <tr>
+          <th>Required Features</th>
+          <td><?= nl2br(h((string)$rfq['required_features'])) ?></td>
+        </tr>
+      <?php endif; ?>
       <tr>
         <th>Additional Notes</th>
         <td><?= !empty($rfq['additional_notes']) ? nl2br(h((string)$rfq['additional_notes'])) : '<span class="muted">—</span>' ?></td>

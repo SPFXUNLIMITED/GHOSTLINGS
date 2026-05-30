@@ -6,6 +6,7 @@ require_rfq_access();
 
 const MAX_RFQ_QUANTITY = 1000;
 const REQUEST_TYPES = ['RFQ', 'Sourcing'];
+const REQUEST_CATEGORIES = ['machine', 'parts'];
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
@@ -16,7 +17,20 @@ if (empty($_SESSION['rfq_form_csrf'])) {
 
 $errors = [];
 $success = '';
+$forced_request_category = null;
+if (isset($rfq_form_mode) && is_string($rfq_form_mode)) {
+  $mode = strtolower(trim($rfq_form_mode));
+  if (in_array($mode, REQUEST_CATEGORIES, true)) {
+    $forced_request_category = $mode;
+  }
+}
+$query_category = strtolower(trim((string)($_GET['request_category'] ?? '')));
+if ($forced_request_category === null && in_array($query_category, REQUEST_CATEGORIES, true)) {
+  $forced_request_category = $query_category;
+}
+$is_parts_entrypoint = $forced_request_category === 'parts';
 $fields = [
+  'request_category'=> $forced_request_category ?? 'machine',
   'request_type'    => 'RFQ',
   'contact_name'    => '',
   'company_name'    => '',
@@ -26,6 +40,8 @@ $fields = [
   'machine_size'    => '',
   'laser_watts'     => '',
   'tube_type'       => '',
+  'part_category'   => '',
+  'part_specs'      => '',
   'quantity'        => '1',
   'required_features' => '',
   'additional_notes'  => '',
@@ -65,15 +81,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   foreach ($fields as $k => $_) {
     $fields[$k] = trim((string)($_POST[$k] ?? ''));
   }
+  if ($forced_request_category !== null) {
+    $fields['request_category'] = $forced_request_category;
+  }
 
   if (!in_array($fields['request_type'], REQUEST_TYPES, true)) {
     $errors[] = 'Request type must be RFQ or Sourcing.';
   }
+  if (!in_array($fields['request_category'], REQUEST_CATEGORIES, true)) {
+    $errors[] = 'Request category must be Machine or Parts.';
+  }
   if ($fields['request_title'] === '') $errors[] = 'Request title is required.';
-  if ($fields['machine_size'] === '') $errors[] = 'Machine size is required.';
-  if ($fields['laser_watts'] === '') $errors[] = 'Laser watts is required.';
-  if ($fields['tube_type'] === '') $errors[] = 'Tube type is required.';
-  if ($fields['required_features'] === '') $errors[] = 'Required features are required.';
+  if ($fields['request_category'] === 'machine') {
+    if ($fields['machine_size'] === '') $errors[] = 'Machine size is required for machine requests.';
+    if ($fields['laser_watts'] === '') $errors[] = 'Laser watts is required for machine requests.';
+    if ($fields['tube_type'] === '') $errors[] = 'Tube type is required for machine requests.';
+    if ($fields['required_features'] === '') $errors[] = 'Required features are required for machine requests.';
+  } else {
+    if ($fields['part_category'] === '') $errors[] = 'Part category is required for parts requests.';
+    if ($fields['part_specs'] === '') $errors[] = 'Part specs are required for parts requests.';
+  }
   if ($fields['contact_email'] !== '' && !filter_var($fields['contact_email'], FILTER_VALIDATE_EMAIL)) {
     $errors[] = 'Contact email must be a valid email address.';
   }
@@ -85,6 +112,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (strlen($fields['required_features']) > 5000) {
     $errors[] = 'Required features must be 5000 characters or fewer.';
   }
+  if (strlen($fields['part_specs']) > 5000) {
+    $errors[] = 'Part specs must be 5000 characters or fewer.';
+  }
+  if (strlen($fields['part_category']) > 100) {
+    $errors[] = 'Part category must be 100 characters or fewer.';
+  }
   if (strlen($fields['additional_notes']) > 5000) {
     $errors[] = 'Additional notes must be 5000 characters or fewer.';
   }
@@ -94,28 +127,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $stmt = $pdo->prepare(
       "INSERT INTO rfq_requests
-        (requested_by, contact_name, company_name, contact_email, contact_phone,
-         request_title, machine_size, laser_watts, tube_type, quantity, required_features, additional_notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        (requested_by, request_category, contact_name, company_name, contact_email, contact_phone,
+         request_title, machine_size, laser_watts, tube_type, part_category, part_specs, quantity, required_features, additional_notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $stmt->execute([
       (int)current_user_id(),
+      $fields['request_category'],
       $fields['contact_name']  === '' ? null : $fields['contact_name'],
       $fields['company_name']  === '' ? null : $fields['company_name'],
       $fields['contact_email'] === '' ? null : $fields['contact_email'],
       $fields['contact_phone'] === '' ? null : $fields['contact_phone'],
       $full_request_title,
-      $fields['machine_size'],
-      $fields['laser_watts'],
-      $fields['tube_type'],
+      $fields['request_category'] === 'machine' ? $fields['machine_size'] : null,
+      $fields['request_category'] === 'machine' ? $fields['laser_watts'] : null,
+      $fields['request_category'] === 'machine' ? $fields['tube_type'] : null,
+      $fields['request_category'] === 'parts' ? $fields['part_category'] : null,
+      $fields['request_category'] === 'parts' ? $fields['part_specs'] : null,
       (int)$fields['quantity'],
-      $fields['required_features'],
+      $fields['request_category'] === 'machine' ? $fields['required_features'] : null,
       $fields['additional_notes'] === '' ? null : $fields['additional_notes'],
     ]);
 
     $_SESSION['rfq_form_csrf'] = bin2hex(random_bytes(24));
     $success = $fields['request_type'] . ' request submitted. You can now track quotes in RFQ Tracker.';
     $fields = [
+      'request_category'=> $forced_request_category ?? 'machine',
       'request_type'    => 'RFQ',
       'contact_name'    => '',
       'company_name'    => '',
@@ -125,6 +162,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       'machine_size'    => '',
       'laser_watts'     => '',
       'tube_type'       => '',
+      'part_category'   => '',
+      'part_specs'      => '',
       'quantity'        => '1',
       'required_features' => '',
       'additional_notes'  => '',
@@ -132,13 +171,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 }
 
-render_header('RFQ / Sourcing Request Form');
+render_header($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ / Sourcing Request Form');
 ?>
 
 <div class="card">
-  <h1 style="margin-top:0; margin-bottom:4px;">CO2 Laser Cutter RFQ / Sourcing Requests</h1>
+  <h1 style="margin-top:0; margin-bottom:4px;"><?= $is_parts_entrypoint ? 'CO2 Laser Parts RFQ / Sourcing Requests' : 'CO2 Laser Cutter RFQ / Sourcing Requests' ?></h1>
   <p class="muted" style="margin:0;">
-    Submit machine specs for either an RFQ or sourcing request, including size, watts, tube type, and required features.
+    Submit either machine RFQs or parts sourcing requests (chillers, blowers, laser tubes, and more) in one workflow.
   </p>
 </div>
 
@@ -192,6 +231,19 @@ render_header('RFQ / Sourcing Request Form');
 
   <div class="form-grid">
     <div>
+      <?php if ($forced_request_category !== null): ?>
+        <label>Request Category</label>
+        <input type="hidden" id="request_category" name="request_category" value="<?= h($fields['request_category']) ?>" />
+        <input type="text" value="<?= $fields['request_category'] === 'parts' ? 'Parts' : 'Machine' ?>" disabled />
+      <?php else: ?>
+        <label>Request Category <span style="color:var(--d)">*</span></label>
+        <select name="request_category" id="request_category" required>
+          <option value="machine" <?= $fields['request_category'] === 'machine' ? 'selected' : '' ?>>Machine</option>
+          <option value="parts" <?= $fields['request_category'] === 'parts' ? 'selected' : '' ?>>Parts</option>
+        </select>
+      <?php endif; ?>
+    </div>
+    <div>
       <label>Request Type <span style="color:var(--d)">*</span></label>
       <select name="request_type" required>
         <?php foreach (REQUEST_TYPES as $request_type): ?>
@@ -205,33 +257,44 @@ render_header('RFQ / Sourcing Request Form');
              value="<?= h($fields['request_title']) ?>"
              placeholder="e.g. 130W CO2 Laser Cutter for Acrylic Production" />
     </div>
-    <div>
+    <div class="machine-only">
       <label>Machine Size <span style="color:var(--d)">*</span></label>
-      <input type="text" name="machine_size" maxlength="100" required
+      <input type="text" name="machine_size" maxlength="100" data-required-on="machine"
              value="<?= h($fields['machine_size']) ?>"
              placeholder="e.g. 1300x900mm bed" />
     </div>
-    <div>
+    <div class="machine-only">
       <label>Laser Watts <span style="color:var(--d)">*</span></label>
-      <input type="text" name="laser_watts" maxlength="50" required
+      <input type="text" name="laser_watts" maxlength="50" data-required-on="machine"
              value="<?= h($fields['laser_watts']) ?>"
              placeholder="e.g. 100W / 130W / 150W" />
     </div>
-    <div>
+    <div class="machine-only">
       <label>Tube Type <span style="color:var(--d)">*</span></label>
-      <input type="text" name="tube_type" maxlength="100" required
+      <input type="text" name="tube_type" maxlength="100" data-required-on="machine"
              value="<?= h($fields['tube_type']) ?>"
              placeholder="e.g. RECI W6, Yongli A8" />
+    </div>
+    <div class="parts-only">
+      <label>Part Category <span style="color:var(--d)">*</span></label>
+      <input type="text" name="part_category" maxlength="100" data-required-on="parts"
+             value="<?= h($fields['part_category']) ?>"
+             placeholder="e.g. Chiller, Blower, Laser Tube, Lens Set" />
     </div>
     <div>
       <label>Quantity <span style="color:var(--d)">*</span></label>
       <input type="number" name="quantity" min="1" max="<?= MAX_RFQ_QUANTITY ?>" required
              value="<?= h($fields['quantity']) ?>" />
     </div>
-    <div class="full">
+    <div class="full machine-only">
       <label>Required Features <span style="color:var(--d)">*</span></label>
-      <textarea name="required_features" rows="5" maxlength="5000" required
-                placeholder="List required machine features: chiller type, autofocus, rotary, software support, etc."><?= h($fields['required_features']) ?></textarea>
+      <textarea name="required_features" rows="5" maxlength="5000" data-required-on="machine"
+               placeholder="List required machine features: chiller type, autofocus, rotary, software support, etc."><?= h($fields['required_features']) ?></textarea>
+    </div>
+    <div class="full parts-only">
+      <label>Part Specs <span style="color:var(--d)">*</span></label>
+      <textarea name="part_specs" rows="5" maxlength="5000" data-required-on="parts"
+               placeholder="List brand/model compatibility, voltage, dimensions, connector type, and any other required part specs."><?= h($fields['part_specs']) ?></textarea>
     </div>
     <div class="full">
       <label>Additional Notes</label>
@@ -263,8 +326,30 @@ render_header('RFQ / Sourcing Request Form');
 
   <div class="row" style="margin-top:18px;">
     <button type="submit" class="btn primary">Submit Request</button>
+    <a class="btn" href="<?= $fields['request_category'] === 'parts' ? 'rfq_form.php?request_category=machine' : 'rfq_parts_form.php' ?>">
+      <?= $fields['request_category'] === 'parts' ? 'Switch to Machine RFQ Form' : 'Switch to Parts RFQ Form' ?>
+    </a>
     <a class="btn" href="rfq_tracker.php">Go to RFQ Tracker</a>
   </div>
 </form>
+
+<script>
+  (function () {
+    var categoryField = document.getElementById('request_category');
+    if (!categoryField) return;
+    var machineFields = document.querySelectorAll('.machine-only');
+    var partsFields = document.querySelectorAll('.parts-only');
+    function toggleSections() {
+      var isParts = categoryField.value === 'parts';
+      machineFields.forEach(function (el) { el.style.display = isParts ? 'none' : ''; });
+      partsFields.forEach(function (el) { el.style.display = isParts ? '' : 'none'; });
+      document.querySelectorAll('[data-required-on]').forEach(function (input) {
+        input.required = input.getAttribute('data-required-on') === categoryField.value;
+      });
+    }
+    categoryField.addEventListener('change', toggleSections);
+    toggleSections();
+  })();
+</script>
 
 <?php render_footer(); ?>
