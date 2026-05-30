@@ -36,6 +36,10 @@ $fields = [
   'company_name'    => '',
   'contact_email'   => '',
   'contact_phone'   => '',
+  'buyer_name'      => '',
+  'buyer_company'   => '',
+  'buyer_email'     => '',
+  'buyer_phone'     => '',
   'request_title'   => '',
   'machine_size'    => '',
   'laser_watts'     => '',
@@ -115,6 +119,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if ($fields['contact_email'] !== '' && !filter_var($fields['contact_email'], FILTER_VALIDATE_EMAIL)) {
     $errors[] = 'Contact email must be a valid email address.';
   }
+  if ($fields['buyer_email'] !== '' && !filter_var($fields['buyer_email'], FILTER_VALIDATE_EMAIL)) {
+    $errors[] = 'Buyer / End User email must be a valid email address.';
+  }
 
   if (!ctype_digit($fields['quantity']) || (int)$fields['quantity'] < 1 || (int)$fields['quantity'] > MAX_RFQ_QUANTITY) {
     $errors[] = 'Quantity must be a whole number between 1 and ' . MAX_RFQ_QUANTITY . '.';
@@ -138,9 +145,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $stmt = $pdo->prepare(
       "INSERT INTO rfq_requests
-        (requested_by, request_category, contact_name, company_name, contact_email, contact_phone,
+        (requested_by, request_category, contact_name, company_name, contact_email, contact_phone, buyer_name, buyer_company, buyer_email, buyer_phone,
          request_title, machine_size, laser_watts, tube_type, part_category, part_specs, quantity, required_features, additional_notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $stmt->execute([
       (int)current_user_id(),
@@ -149,6 +156,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $fields['company_name']  === '' ? null : $fields['company_name'],
       $fields['contact_email'] === '' ? null : $fields['contact_email'],
       $fields['contact_phone'] === '' ? null : $fields['contact_phone'],
+      $fields['buyer_name']    === '' ? null : $fields['buyer_name'],
+      $fields['buyer_company'] === '' ? null : $fields['buyer_company'],
+      $fields['buyer_email']   === '' ? null : $fields['buyer_email'],
+      $fields['buyer_phone']   === '' ? null : $fields['buyer_phone'],
       $full_request_title,
       $fields['request_category'] === 'machine' ? $fields['machine_size'] : null,
       $fields['request_category'] === 'machine' ? $fields['laser_watts'] : null,
@@ -169,6 +180,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       'company_name'    => '',
       'contact_email'   => '',
       'contact_phone'   => '',
+      'buyer_name'      => '',
+      'buyer_company'   => '',
+      'buyer_email'     => '',
+      'buyer_phone'     => '',
       'request_title'   => '',
       'machine_size'    => '',
       'laser_watts'     => '',
@@ -213,6 +228,29 @@ render_header($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ 
   <p class="muted" style="margin-top:0; margin-bottom:16px;">
     Company and contact details are pulled from your <a href="user_page.php">profile</a>.
   </p>
+  <h2 style="margin-top:0; margin-bottom:12px; font-size:1rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted, #6b7280);">Buyer / End User Information</h2>
+  <div class="form-grid" style="margin-bottom:12px;">
+    <div>
+      <label>Buyer / End User Name</label>
+      <input type="text" name="buyer_name" maxlength="255"
+             value="<?= h($fields['buyer_name']) ?>" />
+    </div>
+    <div>
+      <label>Buyer / End User Company</label>
+      <input type="text" name="buyer_company" maxlength="255"
+             value="<?= h($fields['buyer_company']) ?>" />
+    </div>
+    <div>
+      <label>Buyer / End User Email</label>
+      <input type="email" name="buyer_email" maxlength="255"
+             value="<?= h($fields['buyer_email']) ?>" />
+    </div>
+    <div>
+      <label>Buyer / End User Phone</label>
+      <input type="text" name="buyer_phone" maxlength="100"
+             value="<?= h($fields['buyer_phone']) ?>" />
+    </div>
+  </div>
   <h2 style="margin-top:0; margin-bottom:12px; font-size:1rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted, #6b7280);">Request Details</h2>
 
   <div class="form-grid">
