@@ -109,7 +109,7 @@ render_header('SOP');
 <div class="card">
   <div class="row" style="justify-content:space-between; align-items:center;">
     <h1 style="margin:0;">SOP</h1>
-    <a class="btn primary" href="sop_category_form.php">+ New SOP Category</a>
+    <a class="btn primary" href="sop_category_form.php">+ New SOP</a>
   </div>
   <p class="muted">Create SOP categories, then manage SOP pages inside each category.</p>
 </div>
