@@ -17,7 +17,7 @@ if (empty($_SESSION['rfq_form_csrf'])) {
 
 $errors = [];
 $success = '';
-$edit_rfq_id = max(0, (int)($_GET['edit_rfq_id'] ?? $_POST['edit_rfq_id'] ?? 0));
+$edit_rfq_id = max(0, (int)(($_SERVER['REQUEST_METHOD'] === 'POST') ? ($_POST['edit_rfq_id'] ?? 0) : ($_GET['edit_rfq_id'] ?? 0)));
 $is_edit_mode = $edit_rfq_id > 0;
 $forced_request_category = null;
 if (isset($rfq_form_mode) && is_string($rfq_form_mode)) {
@@ -27,7 +27,7 @@ if (isset($rfq_form_mode) && is_string($rfq_form_mode)) {
   }
 }
 $query_category = strtolower(trim((string)($_GET['request_category'] ?? '')));
-if (!$is_edit_mode && $forced_request_category === null && in_array($query_category, REQUEST_CATEGORIES, true)) {
+if ($forced_request_category === null && !$is_edit_mode && in_array($query_category, REQUEST_CATEGORIES, true)) {
   $forced_request_category = $query_category;
 }
 $is_parts_entrypoint = $forced_request_category === 'parts';
@@ -130,8 +130,6 @@ if ($is_edit_mode && $_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $edit_rfq_id = max(0, (int)($_POST['edit_rfq_id'] ?? 0));
-  $is_edit_mode = $edit_rfq_id > 0;
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
   if (empty($_SESSION['rfq_form_csrf']) || !hash_equals((string)$_SESSION['rfq_form_csrf'], $submitted_csrf)) {
     $errors[] = 'Security token mismatch. Please refresh and try again.';
