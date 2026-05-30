@@ -17,6 +17,8 @@ if (empty($_SESSION['rfq_form_csrf'])) {
 
 $errors = [];
 $success = '';
+$edit_rfq_id = max(0, (int)($_GET['edit_rfq_id'] ?? $_POST['edit_rfq_id'] ?? 0));
+$is_edit_mode = $edit_rfq_id > 0;
 $forced_request_category = null;
 if (isset($rfq_form_mode) && is_string($rfq_form_mode)) {
   $mode = strtolower(trim($rfq_form_mode));
@@ -25,10 +27,18 @@ if (isset($rfq_form_mode) && is_string($rfq_form_mode)) {
   }
 }
 $query_category = strtolower(trim((string)($_GET['request_category'] ?? '')));
-if ($forced_request_category === null && in_array($query_category, REQUEST_CATEGORIES, true)) {
+if (!$is_edit_mode && $forced_request_category === null && in_array($query_category, REQUEST_CATEGORIES, true)) {
   $forced_request_category = $query_category;
 }
 $is_parts_entrypoint = $forced_request_category === 'parts';
+
+function split_request_title_with_type(string $stored_title): array {
+  $stored_title = trim($stored_title);
+  if (preg_match('/^(RFQ|Sourcing)\s*:\s*(.+)$/i', $stored_title, $m)) {
+    return [ucfirst(strtolower($m[1])), trim($m[2])];
+  }
+  return ['RFQ', $stored_title];
+}
 $fields = [
   'request_category'=> $forced_request_category ?? 'machine',
   'request_type'    => 'RFQ',
@@ -84,7 +94,44 @@ if (current_user_id() !== null) {
 }
 $fields = array_merge($fields, $profile_contact_fields);
 
+if ($is_edit_mode && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+  $edit_stmt = $pdo->prepare(
+    "SELECT id, request_category, acquisition_purpose, buyer_name, buyer_company, buyer_email, buyer_phone,
+            request_title, machine_size, laser_watts, tube_type, part_category, part_specs, quantity, required_features, additional_notes
+     FROM rfq_requests
+     WHERE id = ?
+     LIMIT 1"
+  );
+  $edit_stmt->execute([$edit_rfq_id]);
+  $editing_rfq = $edit_stmt->fetch();
+  if (!$editing_rfq) {
+    $errors[] = 'RFQ not found.';
+    $is_edit_mode = false;
+    $edit_rfq_id = 0;
+  } else {
+    [$parsed_request_type, $parsed_request_title] = split_request_title_with_type((string)($editing_rfq['request_title'] ?? ''));
+    $fields['request_type'] = in_array($parsed_request_type, REQUEST_TYPES, true) ? $parsed_request_type : 'RFQ';
+    $fields['request_category'] = (string)($editing_rfq['request_category'] ?? 'machine');
+    $fields['acquisition_purpose'] = (string)($editing_rfq['acquisition_purpose'] ?? 'customer');
+    $fields['buyer_name'] = (string)($editing_rfq['buyer_name'] ?? '');
+    $fields['buyer_company'] = (string)($editing_rfq['buyer_company'] ?? '');
+    $fields['buyer_email'] = (string)($editing_rfq['buyer_email'] ?? '');
+    $fields['buyer_phone'] = (string)($editing_rfq['buyer_phone'] ?? '');
+    $fields['request_title'] = $parsed_request_title;
+    $fields['machine_size'] = (string)($editing_rfq['machine_size'] ?? '');
+    $fields['laser_watts'] = (string)($editing_rfq['laser_watts'] ?? '');
+    $fields['tube_type'] = (string)($editing_rfq['tube_type'] ?? '');
+    $fields['part_category'] = (string)($editing_rfq['part_category'] ?? '');
+    $fields['part_specs'] = (string)($editing_rfq['part_specs'] ?? '');
+    $fields['quantity'] = (string)($editing_rfq['quantity'] ?? '1');
+    $fields['required_features'] = (string)($editing_rfq['required_features'] ?? '');
+    $fields['additional_notes'] = (string)($editing_rfq['additional_notes'] ?? '');
+  }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  $edit_rfq_id = max(0, (int)($_POST['edit_rfq_id'] ?? 0));
+  $is_edit_mode = $edit_rfq_id > 0;
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
   if (empty($_SESSION['rfq_form_csrf']) || !hash_equals((string)$_SESSION['rfq_form_csrf'], $submitted_csrf)) {
     $errors[] = 'Security token mismatch. Please refresh and try again.';
@@ -130,6 +177,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (!ctype_digit($fields['quantity']) || (int)$fields['quantity'] < 1 || (int)$fields['quantity'] > MAX_RFQ_QUANTITY) {
     $errors[] = 'Quantity must be a whole number between 1 and ' . MAX_RFQ_QUANTITY . '.';
   }
+  if ($is_edit_mode) {
+    $exists_stmt = $pdo->prepare("SELECT id FROM rfq_requests WHERE id = ? LIMIT 1");
+    $exists_stmt->execute([$edit_rfq_id]);
+    if (!$exists_stmt->fetch()) {
+      $errors[] = 'RFQ not found.';
+    }
+  }
 
   if (strlen($fields['required_features']) > 5000) {
     $errors[] = 'Required features must be 5000 characters or fewer.';
@@ -146,75 +200,108 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   if (!$errors) {
     $full_request_title = $fields['request_type'] . ': ' . $fields['request_title'];
+    if ($is_edit_mode) {
+      $stmt = $pdo->prepare(
+        "UPDATE rfq_requests SET
+          request_category = ?, acquisition_purpose = ?, buyer_name = ?, buyer_company = ?, buyer_email = ?, buyer_phone = ?,
+          request_title = ?, machine_size = ?, laser_watts = ?, tube_type = ?, part_category = ?, part_specs = ?,
+          quantity = ?, required_features = ?, additional_notes = ?
+         WHERE id = ?"
+      );
+      $stmt->execute([
+        $fields['request_category'],
+        $fields['acquisition_purpose'],
+        $fields['buyer_name']    === '' ? null : $fields['buyer_name'],
+        $fields['buyer_company'] === '' ? null : $fields['buyer_company'],
+        $fields['buyer_email']   === '' ? null : $fields['buyer_email'],
+        $fields['buyer_phone']   === '' ? null : $fields['buyer_phone'],
+        $full_request_title,
+        $fields['request_category'] === 'machine' ? $fields['machine_size'] : null,
+        $fields['request_category'] === 'machine' ? $fields['laser_watts'] : null,
+        $fields['request_category'] === 'machine' ? $fields['tube_type'] : null,
+        $fields['request_category'] === 'parts' ? $fields['part_category'] : null,
+        $fields['request_category'] === 'parts' ? $fields['part_specs'] : null,
+        (int)$fields['quantity'],
+        $fields['request_category'] === 'machine' ? $fields['required_features'] : null,
+        $fields['additional_notes'] === '' ? null : $fields['additional_notes'],
+        $edit_rfq_id,
+      ]);
+      header('Location: rfq_details.php?id=' . $edit_rfq_id);
+      exit;
+    } else {
+      $stmt = $pdo->prepare(
+        "INSERT INTO rfq_requests
+          (
+            requested_by, request_category, acquisition_purpose, contact_name, company_name, contact_email, contact_phone,
+            buyer_name, buyer_company, buyer_email, buyer_phone,
+            request_title, machine_size, laser_watts, tube_type, part_category, part_specs,
+            quantity, required_features, additional_notes
+          )
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      );
+      $stmt->execute([
+        (int)current_user_id(),
+        $fields['request_category'],
+        $fields['acquisition_purpose'],
+        $fields['contact_name']  === '' ? null : $fields['contact_name'],
+        $fields['company_name']  === '' ? null : $fields['company_name'],
+        $fields['contact_email'] === '' ? null : $fields['contact_email'],
+        $fields['contact_phone'] === '' ? null : $fields['contact_phone'],
+        $fields['buyer_name']    === '' ? null : $fields['buyer_name'],
+        $fields['buyer_company'] === '' ? null : $fields['buyer_company'],
+        $fields['buyer_email']   === '' ? null : $fields['buyer_email'],
+        $fields['buyer_phone']   === '' ? null : $fields['buyer_phone'],
+        $full_request_title,
+        $fields['request_category'] === 'machine' ? $fields['machine_size'] : null,
+        $fields['request_category'] === 'machine' ? $fields['laser_watts'] : null,
+        $fields['request_category'] === 'machine' ? $fields['tube_type'] : null,
+        $fields['request_category'] === 'parts' ? $fields['part_category'] : null,
+        $fields['request_category'] === 'parts' ? $fields['part_specs'] : null,
+        (int)$fields['quantity'],
+        $fields['request_category'] === 'machine' ? $fields['required_features'] : null,
+        $fields['additional_notes'] === '' ? null : $fields['additional_notes'],
+      ]);
 
-    $stmt = $pdo->prepare(
-      "INSERT INTO rfq_requests
-        (
-          requested_by, request_category, acquisition_purpose, contact_name, company_name, contact_email, contact_phone,
-          buyer_name, buyer_company, buyer_email, buyer_phone,
-          request_title, machine_size, laser_watts, tube_type, part_category, part_specs,
-          quantity, required_features, additional_notes
-        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    );
-    $stmt->execute([
-      (int)current_user_id(),
-      $fields['request_category'],
-      $fields['acquisition_purpose'],
-      $fields['contact_name']  === '' ? null : $fields['contact_name'],
-      $fields['company_name']  === '' ? null : $fields['company_name'],
-      $fields['contact_email'] === '' ? null : $fields['contact_email'],
-      $fields['contact_phone'] === '' ? null : $fields['contact_phone'],
-      $fields['buyer_name']    === '' ? null : $fields['buyer_name'],
-      $fields['buyer_company'] === '' ? null : $fields['buyer_company'],
-      $fields['buyer_email']   === '' ? null : $fields['buyer_email'],
-      $fields['buyer_phone']   === '' ? null : $fields['buyer_phone'],
-      $full_request_title,
-      $fields['request_category'] === 'machine' ? $fields['machine_size'] : null,
-      $fields['request_category'] === 'machine' ? $fields['laser_watts'] : null,
-      $fields['request_category'] === 'machine' ? $fields['tube_type'] : null,
-      $fields['request_category'] === 'parts' ? $fields['part_category'] : null,
-      $fields['request_category'] === 'parts' ? $fields['part_specs'] : null,
-      (int)$fields['quantity'],
-      $fields['request_category'] === 'machine' ? $fields['required_features'] : null,
-      $fields['additional_notes'] === '' ? null : $fields['additional_notes'],
-    ]);
-
-    $_SESSION['rfq_form_csrf'] = bin2hex(random_bytes(24));
-    $success = $fields['request_type'] . ' request submitted. You can now track quotes in RFQ Tracker.';
-    $fields = [
-      'request_category'=> $forced_request_category ?? 'machine',
-      'request_type'    => 'RFQ',
-      'acquisition_purpose' => 'customer',
-      'contact_name'    => '',
-      'company_name'    => '',
-      'contact_email'   => '',
-      'contact_phone'   => '',
-      'buyer_name'      => '',
-      'buyer_company'   => '',
-      'buyer_email'     => '',
-      'buyer_phone'     => '',
-      'request_title'   => '',
-      'machine_size'    => '',
-      'laser_watts'     => '',
-      'tube_type'       => '',
-      'part_category'   => '',
-      'part_specs'      => '',
-      'quantity'        => '1',
-      'required_features' => '',
-      'additional_notes'  => '',
-    ];
-    $fields = array_merge($fields, $profile_contact_fields);
+      $_SESSION['rfq_form_csrf'] = bin2hex(random_bytes(24));
+      $success = $fields['request_type'] . ' request submitted. You can now track quotes in RFQ Tracker.';
+      $fields = [
+        'request_category'=> $forced_request_category ?? 'machine',
+        'request_type'    => 'RFQ',
+        'acquisition_purpose' => 'customer',
+        'contact_name'    => '',
+        'company_name'    => '',
+        'contact_email'   => '',
+        'contact_phone'   => '',
+        'buyer_name'      => '',
+        'buyer_company'   => '',
+        'buyer_email'     => '',
+        'buyer_phone'     => '',
+        'request_title'   => '',
+        'machine_size'    => '',
+        'laser_watts'     => '',
+        'tube_type'       => '',
+        'part_category'   => '',
+        'part_specs'      => '',
+        'quantity'        => '1',
+        'required_features' => '',
+        'additional_notes'  => '',
+      ];
+      $fields = array_merge($fields, $profile_contact_fields);
+    }
   }
 }
 
-render_header($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ / Sourcing Request Form');
+render_header($is_edit_mode ? ('Edit RFQ #' . $edit_rfq_id) : ($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ / Sourcing Request Form'));
 ?>
 
 <div class="card">
-  <h1 style="margin-top:0; margin-bottom:4px;"><?= $is_parts_entrypoint ? 'CO2 Laser Parts RFQ / Sourcing Requests' : 'RFQ / Sourcing Requests' ?></h1>
+  <h1 style="margin-top:0; margin-bottom:4px;">
+    <?= $is_edit_mode ? ('Edit RFQ Request #' . (int)$edit_rfq_id) : ($is_parts_entrypoint ? 'CO2 Laser Parts RFQ / Sourcing Requests' : 'RFQ / Sourcing Requests') ?>
+  </h1>
   <p class="muted" style="margin:0;">
-    Submit either machine RFQs or parts sourcing requests (chillers, blowers, laser tubes, and more) in one workflow.
+    <?= $is_edit_mode
+      ? 'Update this RFQ request using the same form used for new RFQs.'
+      : 'Submit either machine RFQs or parts sourcing requests (chillers, blowers, laser tubes, and more) in one workflow.' ?>
   </p>
 </div>
 
@@ -234,6 +321,9 @@ render_header($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ 
 
 <form method="post" class="card" novalidate>
   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_form_csrf']) ?>" />
+  <?php if ($is_edit_mode): ?>
+    <input type="hidden" name="edit_rfq_id" value="<?= (int)$edit_rfq_id ?>" />
+  <?php endif; ?>
 
   <p class="muted" style="margin-top:0; margin-bottom:16px;">
     Company and contact details are pulled from your <a href="user_page.php">profile</a>.
@@ -372,10 +462,12 @@ render_header($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ 
   </div>
 
   <div class="row" style="margin-top:18px;">
-    <button type="submit" class="btn primary">Submit Request</button>
+    <button type="submit" class="btn primary"><?= $is_edit_mode ? 'Save Changes' : 'Submit Request' ?></button>
+    <?php if (!$is_edit_mode): ?>
     <a class="btn" href="<?= $fields['request_category'] === 'parts' ? 'rfq_form.php?request_category=machine' : 'rfq_form.php?request_category=parts' ?>">
       <?= $fields['request_category'] === 'parts' ? 'Switch to Machine RFQ Form' : 'Switch to Parts RFQ Form' ?>
     </a>
+    <?php endif; ?>
     <a class="btn" href="rfq_tracker.php">Go to RFQ Tracker</a>
   </div>
 </form>
