@@ -326,9 +326,9 @@ $show_rfq_menu = $show_mod_menu;
     <?php if (!empty($_SESSION['user_id'])): ?>
     <a class="menu-link <?= $current === 'index.php' ? 'active' : '' ?>" href="index.php">Home</a>
     <a class="menu-link <?= $current === 'user_page.php' ? 'active' : '' ?>" href="user_page.php">My Profile</a>
-    <?php render_menu_dropdown('App Requests', [
-      ['href' => 'app_request_form.php', 'file' => 'app_request_form.php', 'label' => 'App Request Form', 'visible' => true],
-      ['href' => 'app_request_tracker.php', 'file' => 'app_request_tracker.php', 'label' => 'Request Tracker', 'visible' => $show_mod_menu],
+    <?php render_menu_dropdown('Bug Reporting', [
+      ['href' => 'app_request_form.php', 'file' => 'app_request_form.php', 'label' => 'Bug Reporting', 'visible' => true],
+      ['href' => 'app_request_tracker.php', 'file' => 'app_request_tracker.php', 'label' => 'Bug Tracker', 'visible' => $show_mod_menu],
     ], $current); ?>
     <?php if (($_SESSION['role'] ?? '') !== 'user'): ?>
     <?php render_menu_dropdown('Projects', [

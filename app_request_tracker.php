@@ -87,12 +87,12 @@ $rows = $pdo->query(
    ORDER BY ar.created_at DESC, ar.id DESC"
 )->fetchAll();
 
-render_header('App Request Tracker');
+render_header('Bug Tracker');
 ?>
 
 <div class="card">
-  <h1 style="margin-top:0; margin-bottom:4px;">App Request Tracker</h1>
-  <p class="muted" style="margin:0;">Review and triage user-submitted app requests.</p>
+  <h1 style="margin-top:0; margin-bottom:4px;">Bug Tracker</h1>
+  <p class="muted" style="margin:0;">Review and triage user-submitted bug reports.</p>
 </div>
 
 <?php if ($errors): ?>
