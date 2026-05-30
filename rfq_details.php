@@ -75,11 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           }
           $delete_stmt = $pdo->prepare("DELETE FROM rfq_quotes WHERE id = ? AND rfq_request_id = ?");
           $delete_stmt->execute([$quote_id, $rfq_id]);
-          if ($delete_stmt->rowCount() > 0) {
-            $success = 'Quote deleted successfully.';
-          } else {
-            $errors[] = 'Quote could not be deleted. Please try again.';
-          }
+          $success = 'Quote deleted successfully.';
         }
       }
     }
