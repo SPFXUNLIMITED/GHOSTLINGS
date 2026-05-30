@@ -9,8 +9,8 @@ $errors = [];
 $app_categories = [
   'project' => 'Project',
   'playbook' => 'Playbook',
-  'document' => 'Document Category',
-  'sop' => 'SOP Category',
+  'document' => 'Document',
+  'sop' => 'SOP',
 ];
 $app_redirects = [
   'project' => 'projects.php',
@@ -113,7 +113,7 @@ render_header($id ? 'Edit Category' : 'New Category');
     <label>Description</label>
     <textarea name="description" rows="5"><?= h($category['description'] ?? '') ?></textarea>
 
-    <label>Application category</label>
+    <label>Application</label>
     <select name="app_category">
       <?php foreach ($app_categories as $val => $label): ?>
         <option value="<?= h($val) ?>" <?= (($category['app_category'] ?? 'document') === $val) ? 'selected' : '' ?>><?= h($label) ?></option>

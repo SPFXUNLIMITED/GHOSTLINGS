@@ -191,7 +191,7 @@ render_header($id ? 'Edit Document' : 'New Document');
       </div>
 
       <div>
-        <label>Application category</label>
+        <label>Application</label>
         <select name="app_category" id="app_category_select">
           <?php foreach ($app_categories as $val => $label): ?>
             <option value="<?= h($val) ?>" <?= (($doc['app_category'] ?? 'document') === $val ? 'selected' : '') ?>><?= h($label) ?></option>
