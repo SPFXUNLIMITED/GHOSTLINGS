@@ -517,3 +517,19 @@ foreach ([
     }
   }
 }
+
+// Add buyer/end-user columns to rfq_requests for internal sourcing tracking
+foreach ([
+  "ALTER TABLE rfq_requests ADD COLUMN buyer_name    VARCHAR(255) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN buyer_company VARCHAR(255) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN buyer_email   VARCHAR(255) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN buyer_phone   VARCHAR(100)  NULL",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    if ($e->getCode() !== '42S21') {
+      throw $e;
+    }
+  }
+}
