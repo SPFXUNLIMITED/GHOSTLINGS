@@ -1277,12 +1277,12 @@ render_header('RFQ Tracker');
                  value="<?= $editing_quote['moq_20_price'] !== null ? h((string)$editing_quote['moq_20_price']) : '' ?>" />
         </div>
         <div>
-          <label>Dealer Margin on MSRP (%)</label>
+          <label>MOQ 20 Dealer Margin on MSRP (%)</label>
           <input type="number" name="moq_20_margin_msrp" step="0.01"
                  value="<?= $editing_quote['moq_20_margin_msrp'] !== null ? h((string)$editing_quote['moq_20_margin_msrp']) : '' ?>" />
         </div>
         <div>
-          <label>Dealer Margin on MAP (%)</label>
+          <label>MOQ 20 Dealer Margin on MAP (%)</label>
           <input type="number" name="moq_20_margin_map" step="0.01"
                  value="<?= $editing_quote['moq_20_margin_map'] !== null ? h((string)$editing_quote['moq_20_margin_map']) : '' ?>" />
         </div>
@@ -1292,12 +1292,12 @@ render_header('RFQ Tracker');
                  value="<?= $editing_quote['moq_10_price'] !== null ? h((string)$editing_quote['moq_10_price']) : '' ?>" />
         </div>
         <div>
-          <label>Dealer Margin on MSRP (%)</label>
+          <label>MOQ 10 Dealer Margin on MSRP (%)</label>
           <input type="number" name="moq_10_margin_msrp" step="0.01"
                  value="<?= $editing_quote['moq_10_margin_msrp'] !== null ? h((string)$editing_quote['moq_10_margin_msrp']) : '' ?>" />
         </div>
         <div>
-          <label>Dealer Margin on MAP (%)</label>
+          <label>MOQ 10 Dealer Margin on MAP (%)</label>
           <input type="number" name="moq_10_margin_map" step="0.01"
                  value="<?= $editing_quote['moq_10_margin_map'] !== null ? h((string)$editing_quote['moq_10_margin_map']) : '' ?>" />
         </div>
@@ -1307,12 +1307,12 @@ render_header('RFQ Tracker');
                  value="<?= $editing_quote['drop_ship_price'] !== null ? h((string)$editing_quote['drop_ship_price']) : '' ?>" />
         </div>
         <div>
-          <label>Dealer Margin on MSRP (%)</label>
+          <label>Drop Ship Dealer Margin on MSRP (%)</label>
           <input type="number" name="drop_ship_margin_msrp" step="0.01"
                  value="<?= $editing_quote['drop_ship_margin_msrp'] !== null ? h((string)$editing_quote['drop_ship_margin_msrp']) : '' ?>" />
         </div>
         <div>
-          <label>Dealer Margin on MAP (%)</label>
+          <label>Drop Ship Dealer Margin on MAP (%)</label>
           <input type="number" name="drop_ship_margin_map" step="0.01"
                  value="<?= $editing_quote['drop_ship_margin_map'] !== null ? h((string)$editing_quote['drop_ship_margin_map']) : '' ?>" />
         </div>
@@ -1424,12 +1424,12 @@ render_header('RFQ Tracker');
                  value="<?= h($add_quote_post['moq_20_price'] ?? '') ?>" />
         </div>
         <div>
-          <label>Dealer Margin on MSRP (%)</label>
+          <label>MOQ 20 Dealer Margin on MSRP (%)</label>
           <input type="number" name="moq_20_margin_msrp" step="0.01" placeholder="e.g. 26.92"
                  value="<?= h($add_quote_post['moq_20_margin_msrp'] ?? '') ?>" />
         </div>
         <div>
-          <label>Dealer Margin on MAP (%)</label>
+          <label>MOQ 20 Dealer Margin on MAP (%)</label>
           <input type="number" name="moq_20_margin_map" step="0.01" placeholder="e.g. 20.83"
                  value="<?= h($add_quote_post['moq_20_margin_map'] ?? '') ?>" />
         </div>
@@ -1439,12 +1439,12 @@ render_header('RFQ Tracker');
                  value="<?= h($add_quote_post['moq_10_price'] ?? '') ?>" />
         </div>
         <div>
-          <label>Dealer Margin on MSRP (%)</label>
+          <label>MOQ 10 Dealer Margin on MSRP (%)</label>
           <input type="number" name="moq_10_margin_msrp" step="0.01" placeholder="e.g. 24.62"
                  value="<?= h($add_quote_post['moq_10_margin_msrp'] ?? '') ?>" />
         </div>
         <div>
-          <label>Dealer Margin on MAP (%)</label>
+          <label>MOQ 10 Dealer Margin on MAP (%)</label>
           <input type="number" name="moq_10_margin_map" step="0.01" placeholder="e.g. 18.33"
                  value="<?= h($add_quote_post['moq_10_margin_map'] ?? '') ?>" />
         </div>
@@ -1454,12 +1454,12 @@ render_header('RFQ Tracker');
                  value="<?= h($add_quote_post['drop_ship_price'] ?? '') ?>" />
         </div>
         <div>
-          <label>Dealer Margin on MSRP (%)</label>
+          <label>Drop Ship Dealer Margin on MSRP (%)</label>
           <input type="number" name="drop_ship_margin_msrp" step="0.01" placeholder="e.g. 21.54"
                  value="<?= h($add_quote_post['drop_ship_margin_msrp'] ?? '') ?>" />
         </div>
         <div>
-          <label>Dealer Margin on MAP (%)</label>
+          <label>Drop Ship Dealer Margin on MAP (%)</label>
           <input type="number" name="drop_ship_margin_map" step="0.01" placeholder="e.g. 15.00"
                  value="<?= h($add_quote_post['drop_ship_margin_map'] ?? '') ?>" />
         </div>

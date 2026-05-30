@@ -109,11 +109,11 @@ render_header('Quote Details');
         <td><?= format_quote_money($quote['moq_20_price'], (string)$quote['currency']) ?></td>
       </tr>
       <tr>
-        <th>Dealer Margin on MSRP</th>
+        <th>MOQ 20 Dealer Margin on MSRP</th>
         <td><?= format_quote_percent($quote['moq_20_margin_msrp']) ?></td>
       </tr>
       <tr>
-        <th>Dealer Margin on MAP</th>
+        <th>MOQ 20 Dealer Margin on MAP</th>
         <td><?= format_quote_percent($quote['moq_20_margin_map']) ?></td>
       </tr>
       <tr>
@@ -121,11 +121,11 @@ render_header('Quote Details');
         <td><?= format_quote_money($quote['moq_10_price'], (string)$quote['currency']) ?></td>
       </tr>
       <tr>
-        <th>Dealer Margin on MSRP</th>
+        <th>MOQ 10 Dealer Margin on MSRP</th>
         <td><?= format_quote_percent($quote['moq_10_margin_msrp']) ?></td>
       </tr>
       <tr>
-        <th>Dealer Margin on MAP</th>
+        <th>MOQ 10 Dealer Margin on MAP</th>
         <td><?= format_quote_percent($quote['moq_10_margin_map']) ?></td>
       </tr>
       <tr>
@@ -133,11 +133,11 @@ render_header('Quote Details');
         <td><?= format_quote_money($quote['drop_ship_price'], (string)$quote['currency']) ?></td>
       </tr>
       <tr>
-        <th>Dealer Margin on MSRP</th>
+        <th>Drop Ship Dealer Margin on MSRP</th>
         <td><?= format_quote_percent($quote['drop_ship_margin_msrp']) ?></td>
       </tr>
       <tr>
-        <th>Dealer Margin on MAP</th>
+        <th>Drop Ship Dealer Margin on MAP</th>
         <td><?= format_quote_percent($quote['drop_ship_margin_map']) ?></td>
       </tr>
       <tr>
