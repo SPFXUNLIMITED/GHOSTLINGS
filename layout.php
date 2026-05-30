@@ -252,7 +252,7 @@ $show_rfq_menu = $show_mod_menu;
     <a class="menu-link <?= $current === 'time_clock.php' ? 'active' : '' ?>" href="time_clock.php">Time Clock</a>
     <?php endif; ?>
     <?php endif; ?>
-	<a class="menu-link <?= $current === 'form.php' ? 'active' : '' ?>" href="form.php">Form</a>
+	<a class="menu-link <?= $current === 'form.php' ? 'active' : '' ?>" href="form.php">Service Request Form</a>
   </div>
 </nav>
 
