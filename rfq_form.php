@@ -444,6 +444,9 @@ render_header($is_edit_mode ? ('Edit RFQ #' . $edit_rfq_id) : ($is_parts_entrypo
       <?php endif; ?>
       <textarea name="additional_notes" rows="4" maxlength="5000"
                 placeholder="Any extra details about use case, preferred lead time, certification needs, etc."><?= h($fields['additional_notes']) ?></textarea>
+      <div class="muted" style="margin-top:6px;">
+        Available placeholders: <code>[contact_name]</code> <code>[company_name]</code> <code>[email]</code> <code>[contact_phone]</code> <code>[username]</code>.
+      </div>
       <?php if ($canned_responses): ?>
       <script>
         (function () {

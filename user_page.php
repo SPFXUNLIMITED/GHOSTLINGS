@@ -156,6 +156,9 @@ render_header('My Profile');
 <div class="card">
   <h2 style="margin-top:0;">My Profile Details</h2>
   <p class="muted">Update your contact information used across the site.</p>
+  <p class="muted" style="margin-top:6px;">
+    Available placeholders: <code>[contact_name]</code> <code>[company_name]</code> <code>[email]</code> <code>[contact_phone]</code> <code>[username]</code>.
+  </p>
   <form method="post" style="max-width:540px;">
     <input type="hidden" name="action" value="update_profile">
     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['user_page_profile_csrf']) ?>">
@@ -193,6 +196,9 @@ render_header('My Profile');
         <label>Additional Notes</label>
         <textarea name="profile_notes" rows="4"
                   placeholder="Any additional details about yourself or your business…"><?= h((string)($data['profile_notes'] ?? '')) ?></textarea>
+        <div class="muted" style="margin-top:6px;">
+          Available placeholders: <code>[contact_name]</code> <code>[company_name]</code> <code>[email]</code> <code>[contact_phone]</code> <code>[username]</code>.
+        </div>
       </div>
 
       <div class="full">
