@@ -271,7 +271,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $subject      = 'Verify your email – Ghostlings Laser Support';
             $name_display = h($fields['first_name']) . ' ' . h($fields['last_name']);
             $body = "Hello {$fields['first_name']},\r\n\r\n"
-                  . "Thank you for submitting your laser machine service request.\r\n\r\n"
+                  . "Thank you for submitting your laser machine customer service request.\r\n\r\n"
                   . "Your login credentials:\r\n"
                   . "  Email:    {$fields['email']}\r\n"
                   . "  Password: {$plain_password}\r\n\r\n"
@@ -301,13 +301,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 }
 
-render_header('Service Request Form');
+render_header('Customer Service Request Form');
 ?>
 
 <div class="card">
-  <h1 style="margin-top:0; margin-bottom:4px;">Laser Machine Service Request</h1>
+  <h1 style="margin-top:0; margin-bottom:4px;">Laser Machine Customer Service Request</h1>
   <p class="muted" style="margin:0;">
-    Fill out the form below to submit a service request. You will receive a verification
+    Fill out the form below to submit a customer service request. You will receive a verification
     email with your login credentials.
   </p>
 </div>
@@ -316,7 +316,7 @@ render_header('Service Request Form');
   <div class="card" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; text-align:center; padding:32px;">
     <h2 style="margin-top:0;">✅ Request Submitted!</h2>
     <p>
-      Thank you! We have received your service request. An email has been sent to
+      Thank you! We have received your customer service request. An email has been sent to
       <strong><?= h($fields['email']) ?></strong> with your login credentials and a
       verification link.
     </p>
@@ -422,14 +422,14 @@ render_header('Service Request Form');
     </div>
 
     <div class="row" style="margin-top:18px;">
-      <button type="submit" class="btn primary">Submit Service Request</button>
+      <button type="submit" class="btn primary">Submit Customer Service Request</button>
       <a class="btn" href="login.php">Already registered? Log in</a>
     </div>
   </form>
 <?php endif; ?>
 
 <div class="card">
-  <h2 style="margin-top:0;">Service Request Map</h2>
+  <h2 style="margin-top:0;">Customer Service Request Map</h2>
   <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:10px; margin-bottom:12px;">
     <div style="border:1px solid var(--b); border-radius:8px; padding:10px 12px;">
       <p class="muted" style="margin:0 0 4px;">Total Waiting Users</p>

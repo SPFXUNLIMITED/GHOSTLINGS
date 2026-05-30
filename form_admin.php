@@ -96,7 +96,7 @@ render_header('Form Entries – Admin');
 ?>
 
 <div class="card">
-  <h1 style="margin-top:0; margin-bottom:4px;">Laser Service Request Entries</h1>
+  <h1 style="margin-top:0; margin-bottom:4px;">Laser Customer Service Request Entries</h1>
   <p class="muted" style="margin:0;">Total entries: <strong><?= $total ?></strong></p>
 </div>
 

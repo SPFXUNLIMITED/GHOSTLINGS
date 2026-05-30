@@ -206,14 +206,14 @@ render_header('My Profile');
 
 <?php if ($is_standard_user && !$has_entry): ?>
   <div class="card" style="text-align:center; padding:32px;">
-    <p class="muted">No service request found for your account.</p>
-    <a class="btn primary" href="form.php">Submit a Service Request</a>
+    <p class="muted">No customer service request found for your account.</p>
+    <a class="btn primary" href="form.php">Submit a Customer Service Request</a>
   </div>
 <?php elseif ($is_standard_user): ?>
 
 <!-- ── Entry card ─────────────────────────────────────────────────────────── -->
 <div class="card">
-  <h2 style="margin-top:0;">Your Service Request</h2>
+  <h2 style="margin-top:0;">Your Customer Service Request</h2>
   <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap:16px; margin-bottom:16px;">
 
     <div>
