@@ -46,13 +46,19 @@ $fields = [
   'required_features' => '',
   'additional_notes'  => '',
 ];
+$profile_contact_fields = [
+  'contact_name'  => '',
+  'company_name'  => '',
+  'contact_email' => '',
+  'contact_phone' => '',
+];
 
 // Load canned responses for quick-fill buttons
 $canned_responses = $pdo->query(
   "SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN (1,2,3,4,5,6) AND label != '' AND body != '' ORDER BY slot"
 )->fetchAll();
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+if (current_user_id() !== null) {
   $profile_stmt = $pdo->prepare(
     "SELECT username, email, contact_name, company_name, contact_phone
      FROM users
@@ -62,15 +68,16 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   $profile_stmt->execute([(int)current_user_id()]);
   $profile = $profile_stmt->fetch();
   if ($profile) {
-    $fields['contact_name'] = trim((string)($profile['contact_name'] ?? ''));
-    if ($fields['contact_name'] === '') {
-      $fields['contact_name'] = trim((string)($profile['username'] ?? ''));
+    $profile_contact_fields['contact_name'] = trim((string)($profile['contact_name'] ?? ''));
+    if ($profile_contact_fields['contact_name'] === '') {
+      $profile_contact_fields['contact_name'] = trim((string)($profile['username'] ?? ''));
     }
-    $fields['company_name'] = trim((string)($profile['company_name'] ?? ''));
-    $fields['contact_email'] = trim((string)($profile['email'] ?? ''));
-    $fields['contact_phone'] = trim((string)($profile['contact_phone'] ?? ''));
+    $profile_contact_fields['company_name'] = trim((string)($profile['company_name'] ?? ''));
+    $profile_contact_fields['contact_email'] = trim((string)($profile['email'] ?? ''));
+    $profile_contact_fields['contact_phone'] = trim((string)($profile['contact_phone'] ?? ''));
   }
 }
+$fields = array_merge($fields, $profile_contact_fields);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
@@ -79,8 +86,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 
   foreach ($fields as $k => $_) {
+    if (array_key_exists($k, $profile_contact_fields)) {
+      continue;
+    }
     $fields[$k] = trim((string)($_POST[$k] ?? ''));
   }
+  $fields = array_merge($fields, $profile_contact_fields);
   if ($forced_request_category !== null) {
     $fields['request_category'] = $forced_request_category;
   }
@@ -168,6 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       'required_features' => '',
       'additional_notes'  => '',
     ];
+    $fields = array_merge($fields, $profile_contact_fields);
   }
 }
 
@@ -198,35 +210,9 @@ render_header($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ 
 <form method="post" class="card" novalidate>
   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_form_csrf']) ?>" />
 
-  <h2 style="margin-top:0; margin-bottom:12px; font-size:1rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted, #6b7280);">Company / Contact Information</h2>
-  <div class="form-grid">
-    <div>
-      <label>Contact Name</label>
-      <input type="text" name="contact_name" maxlength="255"
-             value="<?= h($fields['contact_name']) ?>"
-             placeholder="e.g. Jane Smith" />
-    </div>
-    <div>
-      <label>Company Name</label>
-      <input type="text" name="company_name" maxlength="255"
-             value="<?= h($fields['company_name']) ?>"
-             placeholder="e.g. Acme Laser Co." />
-    </div>
-    <div>
-      <label>Contact Email</label>
-      <input type="email" name="contact_email" maxlength="255"
-             value="<?= h($fields['contact_email']) ?>"
-             placeholder="e.g. jane@acme.com" />
-    </div>
-    <div>
-      <label>Contact Phone</label>
-      <input type="text" name="contact_phone" maxlength="100"
-             value="<?= h($fields['contact_phone']) ?>"
-             placeholder="e.g. +1 (555) 000-1234" />
-    </div>
-  </div>
-
-  <hr style="margin:20px 0; border:none; border-top:1px solid var(--border, #e5e7eb);" />
+  <p class="muted" style="margin-top:0; margin-bottom:16px;">
+    Company and contact details are pulled from your <a href="user_page.php">profile</a>.
+  </p>
   <h2 style="margin-top:0; margin-bottom:12px; font-size:1rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted, #6b7280);">Request Details</h2>
 
   <div class="form-grid">
