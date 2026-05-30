@@ -953,23 +953,18 @@ render_header('RFQ Tracker');
 <?php if (!$selected_rfq): ?>
   <div class="card">
     <div class="table-wrap" style="overflow-x:auto;">
-      <table class="table-auto" style="min-width:1100px;">
+      <table class="table-auto" style="min-width:720px;">
         <thead>
           <tr>
             <th>#</th>
             <th>RFQ</th>
-            <th>Specs</th>
-            <th>Features</th>
-            <th>Quotes</th>
             <th>Status</th>
-            <th>Requested By</th>
-            <th>Created</th>
             <th class="col-actions">Actions</th>
           </tr>
         </thead>
         <tbody>
           <?php if (!$rfqs): ?>
-            <tr><td colspan="9" class="muted">No RFQ requests found.</td></tr>
+            <tr><td colspan="4" class="muted">No RFQ requests found.</td></tr>
           <?php endif; ?>
           <?php foreach ($rfqs as $r): ?>
             <tr>
@@ -977,35 +972,6 @@ render_header('RFQ Tracker');
               <td>
                 <strong><?= h($r['request_title']) ?></strong><br>
                 <span class="muted">Qty: <?= (int)$r['quantity'] ?></span>
-              </td>
-              <td>
-                Size: <?= h($r['machine_size']) ?><br>
-                Watts: <?= h($r['laser_watts']) ?><br>
-                Tube: <?= h($r['tube_type']) ?>
-              </td>
-              <td style="max-width:260px; white-space:normal;">
-                <?= nl2br(h(mb_strimwidth((string)$r['required_features'], 0, 180, '…'))) ?>
-              </td>
-              <td>
-                <span class="badge"><?= (int)$r['quote_count'] ?> quote(s)</span><br>
-                <span class="muted">
-                  Best quote:
-                  <?php if ($r['lowest_quote_amount'] !== null): ?>
-                    <?= h(number_format((float)$r['lowest_quote_amount'], 2)) ?>
-                  <?php else: ?>
-                    —
-                  <?php endif; ?>
-                  <br>
-                  Best lead: <?= $r['best_lead_time_days'] !== null ? h((string)$r['best_lead_time_days']) . ' days' : '—' ?><br>
-                  Lowest ship:
-                  <?php if ($r['lowest_shipping_cost'] !== null): ?>
-                    <?= h(number_format((float)$r['lowest_shipping_cost'], 2)) ?>
-                  <?php else: ?>
-                    —
-                  <?php endif; ?>
-                  <br>
-                  Currencies in quotes: <?= h((string)($r['quote_currencies'] ?: '—')) ?>
-                </span>
               </td>
               <td>
                 <form method="post" class="row" style="gap:6px; align-items:center;">
@@ -1020,8 +986,6 @@ render_header('RFQ Tracker');
                   <button type="submit" class="btn">Save</button>
                 </form>
               </td>
-              <td><?= h($r['requested_by_username'] ?? 'Unknown') ?></td>
-              <td class="muted" style="white-space:nowrap;"><?= h($r['created_at']) ?></td>
               <td class="col-actions">
                 <a class="btn" href="rfq_details.php?id=<?= (int)$r['id'] ?>">View</a>
                 <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$r['id'] ?>">Quotes</a>
