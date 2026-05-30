@@ -24,7 +24,7 @@ if (!$all_projects) { http_response_code(500); exit('No playbooks exist'); }
 $all_users = $pdo->query("SELECT id, username FROM users ORDER BY username")->fetchAll();
 
 $errors = [];
-$task = ['project_id' => $project_id, 'title' => '', 'details' => '', 'status' => 'todo', 'due_date' => '', 'assigned_to' => null];
+$task = ['project_id' => $project_id, 'title' => '', 'details' => '', 'status' => 'todo', 'due_date' => '', 'priority' => 'medium', 'assigned_to' => null];
 
 if ($id) {
   $stmt = $pdo->prepare("SELECT * FROM tasks WHERE id = ?");
@@ -99,6 +99,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['add_comment']) && !i
   $details = trim($_POST['details'] ?? '');
   $status = $_POST['status'] ?? 'todo';
   $due_date = trim($_POST['due_date'] ?? ''); // must be YYYY-MM-DD for <input type="date">
+  $priority = $_POST['priority'] ?? 'medium';
+  if (!in_array($priority, ['low','medium','high','critical'], true)) $priority = 'medium';
   $assigned_to = isset($_POST['assigned_to']) && (int)$_POST['assigned_to'] > 0 ? (int)$_POST['assigned_to'] : null;
 
   if ($title === '') $errors[] = "Title is required.";
@@ -111,11 +113,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['add_comment']) && !i
     $due = ($due_date === '') ? null : $due_date;
 
     if ($id) {
-      $stmt = $pdo->prepare("UPDATE tasks SET project_id=?, title=?, details=?, status=?, due_date=?, assigned_to=? WHERE id=?");
-      $stmt->execute([$new_project_id, $title, $details ?: null, $status, $due, $assigned_to, $id]);
+      $stmt = $pdo->prepare("UPDATE tasks SET project_id=?, title=?, details=?, status=?, due_date=?, priority=?, assigned_to=? WHERE id=?");
+      $stmt->execute([$new_project_id, $title, $details ?: null, $status, $due, $priority, $assigned_to, $id]);
     } else {
-      $stmt = $pdo->prepare("INSERT INTO tasks (project_id, title, details, status, due_date, assigned_to) VALUES (?, ?, ?, ?, ?, ?)");
-      $stmt->execute([$new_project_id, $title, $details ?: null, $status, $due, $assigned_to]);
+      $stmt = $pdo->prepare("INSERT INTO tasks (project_id, title, details, status, due_date, priority, assigned_to) VALUES (?, ?, ?, ?, ?, ?, ?)");
+      $stmt->execute([$new_project_id, $title, $details ?: null, $status, $due, $priority, $assigned_to]);
     }
 
     header("Location: playbook_tasks.php?project_id={$new_project_id}");
@@ -126,6 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['add_comment']) && !i
   $task['details'] = $details;
   $task['status'] = $status;
   $task['due_date'] = $due_date;
+  $task['priority'] = $priority;
   $task['project_id'] = $new_project_id;
   $task['assigned_to'] = $assigned_to;
 
@@ -212,6 +215,15 @@ render_header($id ? 'Edit Task' : 'New Task');
         <select name="status">
           <?php foreach (['todo','doing','done'] as $s): ?>
             <option value="<?= h($s) ?>" <?= ($task['status']===$s?'selected':'') ?>><?= h($s) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+
+      <div>
+        <label>Priority</label>
+        <select name="priority">
+          <?php foreach (['low' => 'Low', 'medium' => 'Medium', 'high' => 'High', 'critical' => 'Critical'] as $val => $label): ?>
+            <option value="<?= h($val) ?>" <?= (($task['priority'] ?? 'medium') === $val) ? 'selected' : '' ?>><?= h($label) ?></option>
           <?php endforeach; ?>
         </select>
       </div>
@@ -313,7 +325,7 @@ render_header($id ? 'Edit Task' : 'New Task');
             </div>
 
             <!-- Comment body (trusted users: rendered as HTML) -->
-            <div><?= $c['body'] ?></div>
+            <div><?= nl2br(h((string)($c['body'] ?? ''))) ?></div>
           </div>
         <?php endforeach; ?>
       <?php endif; ?>

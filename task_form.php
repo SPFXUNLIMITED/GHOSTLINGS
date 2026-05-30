@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['add_comment']) && !i
       $stmt = $pdo->prepare("INSERT INTO tasks (project_id, title, details, status, due_date, priority, assigned_to) VALUES (?, ?, ?, ?, ?, ?, ?)");
       $stmt->execute([$new_project_id, $title, $details ?: null, $status, $due, $priority, $assigned_to]);
     }
-    header("Location: project_details.php?id={$new_project_id}");
+    header("Location: tasks.php?project_id={$new_project_id}");
     exit;
   }
 

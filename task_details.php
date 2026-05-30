@@ -123,7 +123,7 @@ render_header('Task Details');
         <button class="btn primary" type="submit" name="mark_done" value="1">Mark Done</button>
       </form>
       <?php endif; ?>
-      <a class="btn danger" href="task_delete.php?project_id=<?= (int)$task['project_id'] ?>&id=<?= (int)$task['id'] ?>" onclick="return confirm('Delete this task?');">Delete</a>
+      <a class="btn danger" href="task_delete.php?project_id=<?= (int)$task['project_id'] ?>&id=<?= (int)$task['id'] ?>&return_to=project_details" onclick="return confirm('Delete this task?');">Delete</a>
       <a class="btn" href="#task-files">Upload Files</a>
     </div>
   </div>
