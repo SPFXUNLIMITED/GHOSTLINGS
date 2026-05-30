@@ -36,6 +36,19 @@ function format_quote_percent($value): string {
     : '<span class="muted">—</span>';
 }
 
+function format_quote_percent_with_amount($percent, $amount): string {
+  if ($percent === null) {
+    return '<span class="muted">—</span>';
+  }
+
+  $formatted = h(number_format((float)$percent, 2)) . '%';
+  if ($amount !== null) {
+    $formatted .= ' (USD $' . h(number_format((float)$amount, 2)) . ')';
+  }
+
+  return $formatted;
+}
+
 $rfq_id = isset($_GET['rfq_id']) ? (int)$_GET['rfq_id'] : 0;
 $quote_id = isset($_GET['quote_id']) ? (int)$_GET['quote_id'] : 0;
 if ($rfq_id <= 0 || $quote_id <= 0) {
@@ -68,12 +81,16 @@ if (!$quote) {
 $msrp        = isset($quote['msrp'])        && $quote['msrp']        !== null ? (float)$quote['msrp']        : null;
 $map_price   = isset($quote['map_price'])   && $quote['map_price']   !== null ? (float)$quote['map_price']   : null;
 $moq_20_price = isset($quote['moq_20_price']) && $quote['moq_20_price'] !== null ? (float)$quote['moq_20_price'] : null;
+$moq_20_margin_msrp_amount = null;
+$moq_20_margin_map_amount = null;
 
 if ($msrp !== null && $msrp != 0 && $moq_20_price !== null) {
   $quote['moq_20_margin_msrp'] = (($msrp - $moq_20_price) / $msrp) * 100;
+  $moq_20_margin_msrp_amount = $msrp - $moq_20_price;
 }
 if ($map_price !== null && $map_price != 0 && $moq_20_price !== null) {
   $quote['moq_20_margin_map'] = (($map_price - $moq_20_price) / $map_price) * 100;
+  $moq_20_margin_map_amount = $map_price - $moq_20_price;
 }
 
 render_header('Quote Details');
@@ -122,11 +139,11 @@ render_header('Quote Details');
       </tr>
       <tr>
         <th>MOQ 20 Dealer Margin on MSRP</th>
-        <td><?= format_quote_percent($quote['moq_20_margin_msrp']) ?></td>
+        <td><?= format_quote_percent_with_amount($quote['moq_20_margin_msrp'], $moq_20_margin_msrp_amount) ?></td>
       </tr>
       <tr>
         <th>MOQ 20 Dealer Margin on MAP</th>
-        <td><?= format_quote_percent($quote['moq_20_margin_map']) ?></td>
+        <td><?= format_quote_percent_with_amount($quote['moq_20_margin_map'], $moq_20_margin_map_amount) ?></td>
       </tr>
       <tr>
         <th>MOQ 10</th>
