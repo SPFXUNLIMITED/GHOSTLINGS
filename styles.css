@@ -158,6 +158,10 @@ label { display:block; margin: 10px 0 6px; font-size: 14px; color: var(--m); }
   align-items: center;
 }
 
+.menu-spacer {
+  margin-left: auto;
+}
+
 .menu-link {
   display: inline-block;
   padding: 6px 10px;
@@ -240,6 +244,10 @@ label { display:block; margin: 10px 0 6px; font-size: 14px; color: var(--m); }
 }
 
 @media (max-width: 720px) {
+  .menu-spacer {
+    display: none;
+  }
+
   .menu-dropdown {
     width: 100%;
   }

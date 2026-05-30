@@ -344,13 +344,8 @@ $show_rfq_menu = $show_mod_menu;
       ['href' => 'form.php', 'file' => 'form.php', 'label' => 'Service Request Form', 'visible' => true],
       ['href' => 'form_admin.php', 'file' => 'form_admin.php', 'label' => 'Form Entries', 'visible' => $show_mod_menu],
     ], $current); ?>
-  </div>
-</nav>
-
-<?php if ($show_mod_menu || $show_admin_menu): ?>
-<nav class="menubar card">
-  <div class="menubar-inner">
     <?php if ($show_mod_menu): ?>
+    <span class="menu-spacer" aria-hidden="true"></span>
     <?php render_menu_dropdown('Request Management', [
       ['href' => 'vendors.php', 'file' => 'vendors.php', 'label' => 'Vendors', 'visible' => true],
       ['href' => 'rfq_form.php', 'file' => 'rfq_form.php', 'label' => 'RFQ Form', 'visible' => $show_rfq_menu],
@@ -363,7 +358,6 @@ $show_rfq_menu = $show_mod_menu;
     <?php endif; ?>
   </div>
 </nav>
-<?php endif; ?>
 
 
 
