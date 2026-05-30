@@ -247,7 +247,18 @@ render_header('RFQ Details');
         <?php endif; ?>
         <?php foreach ($quotes as $q): ?>
           <tr>
-            <td><?= h((string)$q['supplier_name']) ?></td>
+            <td>
+              <div><?= h((string)$q['supplier_name']) ?></div>
+              <?php if (!empty($q['model_name'])): ?>
+                <div class="muted" style="font-size:12px;">Model: <?= h((string)$q['model_name']) ?></div>
+              <?php endif; ?>
+              <?php if (!empty($q['sku'])): ?>
+                <div class="muted" style="font-size:12px;">SKU: <?= h((string)$q['sku']) ?></div>
+              <?php endif; ?>
+              <?php if ($q['msrp'] !== null): ?>
+                <div class="muted" style="font-size:12px;">MSRP: <?= h((string)$q['currency']) ?> <?= h(number_format((float)$q['msrp'], 2)) ?></div>
+              <?php endif; ?>
+            </td>
             <td>
               <?php if ($q['quote_amount'] !== null): ?>
                 <?= h((string)$q['currency']) ?> <?= h(number_format((float)$q['quote_amount'], 2)) ?>
