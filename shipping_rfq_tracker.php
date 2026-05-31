@@ -44,6 +44,19 @@ $quote_status_styles = [
 
 $errors  = [];
 $success = '';
+$forwarder_options = [];
+
+try {
+  $ff_stmt = $pdo->query("SELECT company_name FROM freight_forwarders WHERE company_name <> '' ORDER BY company_name ASC");
+  if ($ff_stmt) {
+    $forwarder_options = array_values(array_unique(array_filter(
+      array_map('trim', $ff_stmt->fetchAll(PDO::FETCH_COLUMN)),
+      fn($name) => $name !== ''
+    )));
+  }
+} catch (Throwable $e) {
+  $forwarder_options = [];
+}
 
 function srfq_status_select_style(array $styles, ?string $status): string {
   [$bg, $color] = $styles[(string)$status] ?? ['#f3f4f6', '#374151'];
@@ -94,7 +107,6 @@ function build_shipping_rfq_email_text(array $rfq, array $crates): string {
     'SHIPMENT DETAILS:',
     $sep2,
     'Title:          ' . trim((string)$rfq['request_title']),
-    'Machine Model:  ' . trim((string)($rfq['machine_model'] ?? '')),
   ]);
 
   $mw = $rfq['machine_weight_kg'] !== null ? trim((string)$rfq['machine_weight_kg']) . ' kg' : '—';
@@ -180,6 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($rfq_id > 0) {
       $qf = [
         'forwarder_name'   => trim((string)($_POST['forwarder_name']   ?? '')),
+        'forwarder_other'  => trim((string)($_POST['forwarder_name_other'] ?? '')),
         'quote_amount'     => trim((string)($_POST['quote_amount']      ?? '')),
         'currency'         => strtoupper(trim((string)($_POST['currency'] ?? 'USD'))),
         'transit_time_days'=> trim((string)($_POST['transit_time_days'] ?? '')),
@@ -191,6 +204,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'received_on'      => trim((string)($_POST['received_on']       ?? '')),
         'notes'            => trim((string)($_POST['notes']             ?? '')),
       ];
+      if ($qf['forwarder_name'] === '__other__' && $qf['forwarder_other'] === '') {
+        $errors[] = 'Please enter a forwarder name when selecting Other.';
+      }
+      if ($qf['forwarder_name'] === '__other__') {
+        $qf['forwarder_name'] = $qf['forwarder_other'];
+      }
       if ($qf['forwarder_name'] === '') $errors[] = 'Forwarder name is required.';
       if (!is_numeric($qf['quote_amount']) || (float)$qf['quote_amount'] < 0) $errors[] = 'Quote amount must be a non-negative number.';
       if ($qf['transit_time_days'] !== '' && (!ctype_digit($qf['transit_time_days']) || (int)$qf['transit_time_days'] < 1)) $errors[] = 'Transit time must be a positive whole number of days (at least 1).';
@@ -230,6 +249,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($rfq_id > 0 && $qid > 0) {
       $qf = [
         'forwarder_name'   => trim((string)($_POST['forwarder_name']    ?? '')),
+        'forwarder_other'  => trim((string)($_POST['forwarder_name_other'] ?? '')),
         'quote_amount'     => trim((string)($_POST['quote_amount']       ?? '')),
         'currency'         => strtoupper(trim((string)($_POST['currency'] ?? 'USD'))),
         'transit_time_days'=> trim((string)($_POST['transit_time_days']  ?? '')),
@@ -241,6 +261,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'received_on'      => trim((string)($_POST['received_on']        ?? '')),
         'notes'            => trim((string)($_POST['notes']              ?? '')),
       ];
+      if ($qf['forwarder_name'] === '__other__' && $qf['forwarder_other'] === '') {
+        $errors[] = 'Please enter a forwarder name when selecting Other.';
+      }
+      if ($qf['forwarder_name'] === '__other__') {
+        $qf['forwarder_name'] = $qf['forwarder_other'];
+      }
       if ($qf['forwarder_name'] === '') $errors[] = 'Forwarder name is required.';
       if (!is_numeric($qf['quote_amount']) || (float)$qf['quote_amount'] < 0) $errors[] = 'Quote amount must be a non-negative number.';
       if ($qf['transit_time_days'] !== '' && (!ctype_digit($qf['transit_time_days']) || (int)$qf['transit_time_days'] < 1)) $errors[] = 'Transit time must be a positive whole number of days (at least 1).';
@@ -557,7 +583,6 @@ render_header('Shipping RFQ Tracker');
 
     <!-- RFQ Summary -->
     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr)); gap:10px; margin-bottom:18px; padding:12px; background:var(--surface-alt,#f8f9fa); border-radius:8px;">
-      <div><span class="muted" style="font-size:.8em;">Machine Model</span><br><strong><?= h($selected_rfq['machine_model']) ?></strong></div>
       <?php if ($selected_rfq['machine_weight_kg'] !== null): ?>
       <div><span class="muted" style="font-size:.8em;">Machine Weight</span><br><strong><?= h(rtrim(rtrim((string)$selected_rfq['machine_weight_kg'], '0'), '.')) ?> kg</strong></div>
       <?php endif; ?>
@@ -605,16 +630,31 @@ render_header('Shipping RFQ Tracker');
 
     <!-- Edit quote form -->
     <?php if ($editing_quote): ?>
-      <h3 style="margin-top:0; margin-bottom:12px;">Edit Quote</h3>
-      <form method="post" class="form-grid" novalidate>
+    <?php
+      $edit_forwarder_name = trim((string)($editing_quote['forwarder_name'] ?? ''));
+      $edit_forwarder_is_other = $edit_forwarder_name !== '' && !in_array($edit_forwarder_name, $forwarder_options, true);
+    ?>
+    <h3 style="margin-top:0; margin-bottom:12px;">Edit Quote</h3>
+    <form method="post" class="form-grid" novalidate>
         <input type="hidden" name="csrf_token" value="<?= h($_SESSION['srfq_tracker_csrf']) ?>" />
         <input type="hidden" name="action"   value="edit_quote" />
         <input type="hidden" name="rfq_id"   value="<?= (int)$selected_rfq['id'] ?>" />
         <input type="hidden" name="quote_id" value="<?= (int)$editing_quote['id'] ?>" />
         <div>
           <label>Freight Forwarder / Carrier <span style="color:var(--d)">*</span></label>
-          <input type="text" name="forwarder_name" maxlength="255" required
-                 value="<?= h((string)($editing_quote['forwarder_name'] ?? '')) ?>" />
+          <select name="forwarder_name" id="edit_forwarder_name" required data-forwarder-select data-other-target="edit_forwarder_name_other">
+            <option value="">Select forwarder</option>
+            <?php foreach ($forwarder_options as $forwarder_name): ?>
+              <option value="<?= h($forwarder_name) ?>" <?= !$edit_forwarder_is_other && $edit_forwarder_name === $forwarder_name ? 'selected' : '' ?>>
+                <?= h($forwarder_name) ?>
+              </option>
+            <?php endforeach; ?>
+            <option value="__other__" <?= $edit_forwarder_is_other ? 'selected' : '' ?>>Other</option>
+          </select>
+          <input type="text" name="forwarder_name_other" id="edit_forwarder_name_other" maxlength="255"
+                 placeholder="Enter freight forwarder / carrier name"
+                 value="<?= h($edit_forwarder_is_other ? $edit_forwarder_name : '') ?>"
+                 style="<?= $edit_forwarder_is_other ? '' : 'display:none;' ?>" />
         </div>
         <div>
           <label>Quote Amount <span style="color:var(--d)">*</span></label>
@@ -686,8 +726,15 @@ render_header('Shipping RFQ Tracker');
         <input type="hidden" name="rfq_id"  value="<?= (int)$selected_rfq['id'] ?>" />
         <div>
           <label>Freight Forwarder / Carrier <span style="color:var(--d)">*</span></label>
-          <input type="text" name="forwarder_name" maxlength="255" required
-                 placeholder="e.g. Flexport, Kuehne+Nagel" />
+          <select name="forwarder_name" id="add_forwarder_name" required data-forwarder-select data-other-target="add_forwarder_name_other">
+            <option value="">Select forwarder</option>
+            <?php foreach ($forwarder_options as $forwarder_name): ?>
+              <option value="<?= h($forwarder_name) ?>"><?= h($forwarder_name) ?></option>
+            <?php endforeach; ?>
+            <option value="__other__">Other</option>
+          </select>
+          <input type="text" name="forwarder_name_other" id="add_forwarder_name_other" maxlength="255"
+                 placeholder="Enter freight forwarder / carrier name" style="display:none;" />
         </div>
         <div>
           <label>Quote Amount <span style="color:var(--d)">*</span></label>
@@ -830,6 +877,19 @@ render_header('Shipping RFQ Tracker');
       sel.style.color       = color;
       sel.style.borderColor = bg;
     });
+  });
+
+  document.querySelectorAll('[data-forwarder-select]').forEach(function (sel) {
+    var targetId = sel.getAttribute('data-other-target');
+    var otherInput = targetId ? document.getElementById(targetId) : null;
+    if (!otherInput) return;
+    var sync = function () {
+      var showOther = sel.value === '__other__';
+      otherInput.style.display = showOther ? '' : 'none';
+      otherInput.required = showOther;
+    };
+    sel.addEventListener('change', sync);
+    sync();
   });
 })();
 </script>
