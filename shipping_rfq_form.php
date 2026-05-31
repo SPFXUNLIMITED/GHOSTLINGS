@@ -496,11 +496,11 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form
   }
 
   // Length converter (meter / centimeter / feet)
-  var meterInput = document.getElementById('length_meter');
-  var cmInput = document.getElementById('length_centimeter');
-  var feetInput = document.getElementById('length_feet');
-  var updatingConverter = false;
-  var METERS_TO_FEET = 3.280839895;
+  const meterInput = document.getElementById('length_meter');
+  const cmInput = document.getElementById('length_centimeter');
+  const feetInput = document.getElementById('length_feet');
+  let updatingConverter = false;
+  const METERS_TO_FEET = 3.280839895;
 
   function fmtLength(val) {
     return val.toFixed(6).replace(/\.?0+$/, '');
