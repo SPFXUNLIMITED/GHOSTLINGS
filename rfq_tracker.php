@@ -1002,16 +1002,18 @@ render_header('RFQ Tracker');
 
 <?php if ($selected_rfq): ?>
   <div class="card">
-    <div class="row" style="align-items:center; justify-content:space-between; flex-wrap:wrap; margin-bottom:14px;">
-      <a class="btn" href="rfq_tracker.php<?= $search !== '' || $status_filter !== '' ? '?' . http_build_query(array_filter(['q' => $search, 'status' => $status_filter])) : '' ?>">← All RFQs</a>
-      <div class="row">
+    <div class="page-header" style="margin-bottom:14px;">
+      <div class="page-header-body">
+        <h2>Quotes — <span class="muted" style="font-weight:400;">RFQ #<?= (int)$selected_rfq['id'] ?></span></h2>
+        <p class="muted"><?= h($selected_rfq['request_title']) ?></p>
+      </div>
+      <div class="row" style="flex-shrink:0;">
+        <a class="btn" href="rfq_tracker.php<?= $search !== '' || $status_filter !== '' ? '?' . http_build_query(array_filter(['q' => $search, 'status' => $status_filter])) : '' ?>">← All RFQs</a>
         <a class="btn" href="rfq_tracker.php?rfq_text_id=<?= (int)$selected_rfq['id'] ?>">Email Text</a>
         <a class="btn" href="rfq_form.php?edit_rfq_id=<?= (int)$selected_rfq['id'] ?>">Edit RFQ</a>
         <a class="btn" href="rfq_details.php?id=<?= (int)$selected_rfq['id'] ?>">View Details</a>
       </div>
     </div>
-    <h2 style="margin-top:0; margin-bottom:4px;">Quotes — <span style="color:var(--m); font-weight:400;">RFQ #<?= (int)$selected_rfq['id'] ?></span></h2>
-    <p class="muted" style="margin:0 0 14px;"><?= h($selected_rfq['request_title']) ?></p>
 
     <?php if ($editing_quote): ?>
       <h3 style="margin-top:0; margin-bottom:12px;">Edit Quote</h3>

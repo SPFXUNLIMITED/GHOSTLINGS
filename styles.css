@@ -550,6 +550,11 @@ tbody tr:hover td {
   margin-bottom: 14px;
 }
 
+.info-banner a {
+  color: inherit;
+  font-weight: 600;
+}
+
 /* Page header card layout (title + subtitle + optional actions) */
 .page-header {
   display: flex;

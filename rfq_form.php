@@ -327,7 +327,7 @@ render_header($is_edit_mode ? ('Edit RFQ #' . $edit_rfq_id) : ($is_parts_entrypo
   <?php endif; ?>
 
   <div class="info-banner">
-    ℹ️ Company and contact details are pre-filled from your <a href="user_page.php" style="color:inherit; font-weight:600;">profile</a>. Update your profile to change these defaults.
+    ℹ️ Company and contact details are pre-filled from your <a href="user_page.php">profile</a>. Update your profile to change these defaults.
   </div>
   <h2 class="form-section-heading">Request Details</h2>
 

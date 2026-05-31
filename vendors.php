@@ -79,7 +79,7 @@ render_header('Vendors');
         <td><?= $v['phone'] !== '' ? h($v['phone']) : '<span class="muted">—</span>' ?></td>
         <td>
           <?php if ($v['website'] !== ''): ?>
-            <?php $display_url = strlen($v['website']) > 40 ? substr($v['website'], 0, 40) . '…' : $v['website']; ?>
+            <?php $display_url = mb_strlen($v['website']) > 40 ? mb_substr($v['website'], 0, 40) . '…' : $v['website']; ?>
             <a href="<?= h($v['website']) ?>" target="_blank" rel="noopener noreferrer" title="<?= h($v['website']) ?>"><?= h($display_url) ?></a>
           <?php else: ?>
             <span class="muted">—</span>
