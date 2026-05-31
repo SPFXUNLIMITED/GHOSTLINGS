@@ -52,6 +52,22 @@ function normalize_nullable_text(string $value): ?string {
   return $value === '' ? null : $value;
 }
 
+function format_percentage_label(float $value): string {
+  return rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
+}
+
+function format_order_shipping(?string $origin, ?string $method): string {
+  $origin = trim((string)$origin);
+  $method = trim((string)$method);
+  if ($origin === '' && $method === '') {
+    return '—';
+  }
+  if ($origin !== '' && $method !== '') {
+    return h($origin . ' • ' . $method);
+  }
+  return h($origin !== '' ? $origin : $method);
+}
+
 function order_value($data, string $key, $default = '') {
   return array_key_exists($key, $data) ? $data[$key] : $default;
 }
@@ -224,7 +240,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$errors) {
       if ($order_total === null && $unit_price !== null) {
-        $order_total = round($unit_price * max($quantity, 1), 2);
+        $order_total = round($unit_price * $quantity, 2);
       }
       if ($unit_price === null && $order_total !== null && $quantity > 0) {
         $unit_price = round($order_total / $quantity, 2);
@@ -405,7 +421,7 @@ if (!$order && $source_quote) {
     'deposit_percent' => number_format(DEFAULT_DEPOSIT_PERCENT, 2, '.', ''),
     'deposit_amount' => number_format(round($prefill_total * (DEFAULT_DEPOSIT_PERCENT / 100), 2), 2, '.', ''),
     'balance_amount' => number_format(round($prefill_total * ((100 - DEFAULT_DEPOSIT_PERCENT) / 100), 2), 2, '.', ''),
-    'payment_terms' => rtrim(rtrim(number_format(DEFAULT_DEPOSIT_PERCENT, 2, '.', ''), '0'), '.') . '% deposit, ' . rtrim(rtrim(number_format(100 - DEFAULT_DEPOSIT_PERCENT, 2, '.', ''), '0'), '.') . '% balance before shipment',
+    'payment_terms' => format_percentage_label(DEFAULT_DEPOSIT_PERCENT) . '% deposit, ' . format_percentage_label(100 - DEFAULT_DEPOSIT_PERCENT) . '% balance before shipment',
     'incoterm' => '',
     'shipping_method' => (string)($source_quote['shipping_method'] ?? ''),
     'shipping_origin' => (string)($source_quote['shipping_origin'] ?? ''),
@@ -458,7 +474,7 @@ render_header('Purchase Order Form');
       <div><strong>Supplier:</strong> <?= h((string)$source_quote['supplier_name']) ?></div>
       <div><strong>Quote:</strong> <?= format_order_money($source_quote['quote_amount'], (string)$source_quote['currency']) ?></div>
       <div><strong>Lead Time:</strong> <?= $source_quote['lead_time_days'] !== null ? h((string)$source_quote['lead_time_days']) . ' days' : '—' ?></div>
-      <div><strong>Shipping:</strong> <?= format_order_field(trim((string)($source_quote['shipping_origin'] ?? '')) . ((($source_quote['shipping_origin'] ?? '') && ($source_quote['shipping_method'] ?? '')) ? ' • ' : '') . (string)($source_quote['shipping_method'] ?? '')) ?></div>
+      <div><strong>Shipping:</strong> <?= format_order_shipping($source_quote['shipping_origin'] ?? null, $source_quote['shipping_method'] ?? null) ?></div>
     </div>
   </div>
 <?php endif; ?>

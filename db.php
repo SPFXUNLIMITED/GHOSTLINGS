@@ -485,7 +485,7 @@ $pdo->exec("
     order_date               DATE NULL,
     expected_ready_date      DATE NULL,
     expected_ship_date       DATE NULL,
-    supplier_name            VARCHAR(255) NOT NULL,
+    supplier_name            VARCHAR(255) NOT NULL DEFAULT '',
     model_name               VARCHAR(255) NULL,
     sku                      VARCHAR(100) NULL,
     quantity                 INT UNSIGNED NOT NULL DEFAULT 1,
