@@ -727,3 +727,20 @@ $pdo->exec("
     '<div style=\"text-align:center;\">🔥 <strong>Limited-Time Offer!</strong> Mention this form and receive a <strong>FREE extended warranty upgrade</strong> on any new CO2 laser machine purchase. Ask our team for details!</div>'
   )
 ");
+
+// Create order_documents table for shipping/trade documents attached to purchase orders
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS order_documents (
+    id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    order_id      INT UNSIGNED NOT NULL,
+    doc_type      VARCHAR(50)  NOT NULL,
+    original_name VARCHAR(255) NOT NULL,
+    stored_name   VARCHAR(255) NOT NULL,
+    mime_type     VARCHAR(191) NULL,
+    size_bytes    BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_order_documents_order_id (order_id),
+    KEY idx_order_documents_doc_type (doc_type)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");

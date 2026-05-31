@@ -27,6 +27,14 @@ $order_statuses = [
   'cancelled' => 'Cancelled',
 ];
 $incoterm_options = ['EXW', 'FOB', 'CIF', 'CFR', 'DDP', 'DAP'];
+$doc_types = [
+  'proforma_invoice'   => ['label' => 'Proforma Invoice',     'icon' => '📋'],
+  'commercial_invoice' => ['label' => 'Commercial Invoice',   'icon' => '🧾'],
+  'packing_list'       => ['label' => 'Packing List',         'icon' => '📦'],
+  'bill_of_lading'     => ['label' => 'Bill of Lading',       'icon' => '🚢'],
+  'certificate_origin' => ['label' => 'Certificate of Origin','icon' => '🏅'],
+  'customs_documents'  => ['label' => 'Customs Documents',    'icon' => '🛃'],
+];
 $errors = [];
 $success = isset($_GET['saved']) ? 'Purchase order saved.' : '';
 
@@ -444,6 +452,19 @@ if (!$order && $source_quote) {
 }
 
 render_header('Purchase Order Form');
+
+// Load documents grouped by doc_type for existing orders
+$order_documents = [];
+if (($order['id'] ?? 0) > 0) {
+  $doc_stmt = $pdo->prepare(
+    "SELECT id, doc_type, original_name, stored_name, mime_type, size_bytes, created_at
+     FROM order_documents WHERE order_id = ? ORDER BY doc_type, created_at DESC"
+  );
+  $doc_stmt->execute([(int)$order['id']]);
+  foreach ($doc_stmt->fetchAll() as $row) {
+    $order_documents[$row['doc_type']][] = $row;
+  }
+}
 ?>
 
 <div class="card">
@@ -618,5 +639,84 @@ render_header('Purchase Order Form');
     </div>
   </form>
 </div>
+
+<?php if (($order['id'] ?? 0) > 0): ?>
+<div class="card">
+  <h2 style="margin-top:0;">Documents</h2>
+  <p class="muted" style="margin-top:0;">Upload shipping and trade documents for this purchase order. Each document type supports multiple files.</p>
+
+  <style>
+    .doc-section { border: 1px solid rgba(0,0,0,.08); border-radius:10px; overflow:hidden; margin-bottom:16px; }
+    .doc-section-header { display:flex; align-items:center; gap:10px; padding:12px 16px; background:rgba(0,0,0,.02); border-bottom:1px solid rgba(0,0,0,.06); }
+    .doc-section-header .doc-icon { font-size:24px; line-height:1; }
+    .doc-section-header .doc-label { font-weight:600; font-size:15px; }
+    .doc-section-body { padding:14px 16px; }
+    .doc-file-list { list-style:none; margin:0 0 12px 0; padding:0; display:flex; flex-direction:column; gap:8px; }
+    .doc-file-item { display:flex; align-items:center; gap:10px; padding:8px 10px; background:rgba(0,0,0,.02); border-radius:8px; }
+    .doc-file-item .doc-file-icon { font-size:20px; line-height:1; flex-shrink:0; }
+    .doc-file-item .doc-file-meta { flex:1; min-width:0; }
+    .doc-file-item .doc-file-name { font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .doc-file-item .doc-file-sub { font-size:12px; color:rgba(0,0,0,.5); margin-top:2px; }
+    .doc-upload-form { display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; }
+  </style>
+
+  <?php foreach ($doc_types as $type_key => $type_info): ?>
+    <?php $files = $order_documents[$type_key] ?? []; ?>
+    <div class="doc-section">
+      <div class="doc-section-header">
+        <span class="doc-icon"><?= $type_info['icon'] ?></span>
+        <span class="doc-label"><?= h($type_info['label']) ?></span>
+        <?php if ($files): ?>
+          <span class="muted" style="font-size:12px; margin-left:auto;"><?= count($files) ?> file<?= count($files) !== 1 ? 's' : '' ?></span>
+        <?php endif; ?>
+      </div>
+      <div class="doc-section-body">
+        <?php if ($files): ?>
+          <ul class="doc-file-list">
+            <?php foreach ($files as $f): ?>
+              <?php
+                $fext = strtolower(pathinfo($f['original_name'], PATHINFO_EXTENSION));
+                $ficon = match($fext) {
+                  'pdf'             => '📄',
+                  'doc', 'docx'     => '📝',
+                  'xls', 'xlsx'     => '📊',
+                  'jpg', 'jpeg',
+                  'png', 'gif',
+                  'webp'            => '🖼️',
+                  'zip', 'rar','7z' => '🗜️',
+                  default           => '📎',
+                };
+                $kb = number_format(((int)$f['size_bytes']) / 1024, 1);
+              ?>
+              <li class="doc-file-item">
+                <span class="doc-file-icon"><?= $ficon ?></span>
+                <div class="doc-file-meta">
+                  <div class="doc-file-name" title="<?= h($f['original_name']) ?>"><?= h($f['original_name']) ?></div>
+                  <div class="doc-file-sub"><?= h($f['mime_type'] ?? 'file') ?> · <?= $kb ?> KB · <?= h($f['created_at']) ?></div>
+                </div>
+                <a class="btn" href="uploads/<?= h($f['stored_name']) ?>" target="_blank" rel="noopener">Open</a>
+                <a class="btn danger"
+                   href="order_document_delete.php?id=<?= (int)$f['id'] ?>&order_id=<?= (int)$order['id'] ?>"
+                   onclick="return confirm('Delete this file?');">Delete</a>
+              </li>
+            <?php endforeach; ?>
+          </ul>
+        <?php else: ?>
+          <p class="muted" style="margin:0 0 12px 0; font-size:13px;">No files uploaded yet.</p>
+        <?php endif; ?>
+
+        <form action="order_document_upload.php" method="post" enctype="multipart/form-data" class="doc-upload-form">
+          <input type="hidden" name="order_id" value="<?= (int)$order['id'] ?>">
+          <input type="hidden" name="doc_type" value="<?= h($type_key) ?>">
+          <div>
+            <input type="file" name="file" required style="font-size:13px;">
+          </div>
+          <button class="btn primary" type="submit" style="white-space:nowrap;">Upload <?= h($type_info['label']) ?></button>
+        </form>
+      </div>
+    </div>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
 
 <?php render_footer(); ?>
