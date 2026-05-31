@@ -4,7 +4,7 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_rfq_access();
 
-const MAX_PRODUCTION_LEAD_TIME_DAYS = 3650;
+const MAX_PRODUCTION_LEAD_TIME_DAYS = 730;
 const DEFAULT_DEPOSIT_PERCENT = 30.00;
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -263,6 +263,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errors) {
+      $is_new_order = !$order;
+
       if ($order) {
         $update = $pdo->prepare(
           "UPDATE rfq_orders
@@ -348,8 +350,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->prepare("UPDATE rfq_orders SET po_number = ? WHERE id = ?")->execute([$generated_po_number, $saved_order_id]);
       }
 
-      $rfq_status_update = $pdo->prepare("UPDATE rfq_requests SET request_status = 'ordered' WHERE id = ? AND request_status NOT IN ('ordered', 'closed')");
-      $rfq_status_update->execute([$rfq_id]);
+      if ($is_new_order) {
+        $rfq_status_update = $pdo->prepare("UPDATE rfq_requests SET request_status = 'ordered' WHERE id = ? AND request_status NOT IN ('ordered', 'closed')");
+        $rfq_status_update->execute([$rfq_id]);
+      }
 
       header('Location: order_form.php?order_id=' . $saved_order_id . '&saved=1');
       exit;
