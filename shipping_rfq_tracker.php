@@ -193,7 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       ];
       if ($qf['forwarder_name'] === '') $errors[] = 'Forwarder name is required.';
       if (!is_numeric($qf['quote_amount']) || (float)$qf['quote_amount'] < 0) $errors[] = 'Quote amount must be a non-negative number.';
-      if ($qf['transit_time_days'] !== '' && (!ctype_digit($qf['transit_time_days']) || (int)$qf['transit_time_days'] < 1)) $errors[] = 'Transit time must be a positive whole number of days.';
+      if ($qf['transit_time_days'] !== '' && (!ctype_digit($qf['transit_time_days']) || (int)$qf['transit_time_days'] < 1)) $errors[] = 'Transit time must be a positive whole number of days (at least 1).';
       if (!array_key_exists($qf['quote_status'], $quote_statuses)) $errors[] = 'Invalid quote status.';
       if (!in_array($qf['shipment_type'], ['FCL', 'LCL'], true)) $errors[] = 'Invalid shipment type.';
       if (!$errors) {
@@ -243,7 +243,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       ];
       if ($qf['forwarder_name'] === '') $errors[] = 'Forwarder name is required.';
       if (!is_numeric($qf['quote_amount']) || (float)$qf['quote_amount'] < 0) $errors[] = 'Quote amount must be a non-negative number.';
-      if ($qf['transit_time_days'] !== '' && (!ctype_digit($qf['transit_time_days']) || (int)$qf['transit_time_days'] < 1)) $errors[] = 'Transit time must be a positive whole number.';
+      if ($qf['transit_time_days'] !== '' && (!ctype_digit($qf['transit_time_days']) || (int)$qf['transit_time_days'] < 1)) $errors[] = 'Transit time must be a positive whole number of days (at least 1).';
       if (!array_key_exists($qf['quote_status'], $quote_statuses)) $errors[] = 'Invalid quote status.';
       if (!in_array($qf['shipment_type'], ['FCL', 'LCL'], true)) $errors[] = 'Invalid shipment type.';
       if (!$errors) {
