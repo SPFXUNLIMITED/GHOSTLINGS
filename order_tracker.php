@@ -130,12 +130,226 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $orders = $stmt->fetchAll();
 
+$hero_stmt = $pdo->query("SELECT order_status FROM rfq_orders");
+$hero_rows  = $hero_stmt->fetchAll();
+$hero_total = count($hero_rows);
+$hero_active = $hero_shipped = $hero_completed = 0;
+foreach ($hero_rows as $_hr) {
+  if (in_array($_hr['order_status'], ['deposit_pending','deposit_paid','in_production','ready_to_ship'], true)) {
+    $hero_active++;
+  } elseif ($_hr['order_status'] === 'shipped') {
+    $hero_shipped++;
+  } elseif ($_hr['order_status'] === 'completed') {
+    $hero_completed++;
+  }
+}
+
 render_header('Order Tracker');
 ?>
 
-<div class="card">
-  <h1 style="margin-top:0; margin-bottom:4px;">Order Tracker</h1>
-  <p class="muted" style="margin:0;">Track purchase orders created from accepted RFQ quotes, including deposit status, logistics, and shipment milestones.</p>
+<style>
+.order-hero {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #312e81 100%);
+  border-radius: 14px;
+  padding: 44px 36px;
+  margin: 12px 0 20px;
+  color: #fff;
+}
+.order-hero::before,
+.order-hero::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.order-hero::before {
+  width: 340px; height: 340px;
+  top: -100px; right: -80px;
+  background: radial-gradient(circle, rgba(96,165,250,.22) 0%, transparent 70%);
+  animation: oh-pulse 5s ease-in-out infinite;
+}
+.order-hero::after {
+  width: 280px; height: 280px;
+  bottom: -100px; left: 30px;
+  background: radial-gradient(circle, rgba(167,139,250,.18) 0%, transparent 70%);
+  animation: oh-pulse 7s ease-in-out infinite reverse;
+}
+@keyframes oh-pulse {
+  0%,100% { transform: scale(1); }
+  50%      { transform: scale(1.12); }
+}
+.order-hero-grid-lines {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+.order-hero-inner {
+  position: relative;
+  z-index: 1;
+}
+.order-hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: rgba(147,197,253,1);
+  background: rgba(147,197,253,.12);
+  border: 1px solid rgba(147,197,253,.25);
+  border-radius: 20px;
+  padding: 3px 12px;
+  margin-bottom: 14px;
+}
+.order-hero-title {
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -.5px;
+  line-height: 1.1;
+  margin: 0 0 10px;
+}
+.order-hero-title span {
+  background: linear-gradient(90deg, #93c5fd, #c4b5fd);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.order-hero-subtitle {
+  font-size: 15px;
+  color: rgba(255,255,255,.65);
+  margin: 0 0 30px;
+  max-width: 580px;
+  line-height: 1.65;
+}
+.order-hero-stats {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+}
+.order-hero-stat {
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 10px;
+  padding: 12px 20px;
+  min-width: 110px;
+  transition: background .2s;
+}
+.order-hero-stat:hover { background: rgba(255,255,255,.13); }
+.order-hero-stat-value {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.order-hero-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: rgba(255,255,255,.52);
+}
+.order-hero-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.order-hero-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 22px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  transition: transform .13s ease, box-shadow .13s ease, background .13s ease;
+}
+.order-hero-btn:active { transform: translateY(1px); }
+.order-hero-btn.ohb-white {
+  background: #fff;
+  color: #1e3a8a;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+.order-hero-btn.ohb-white:hover {
+  background: #eff6ff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0,0,0,.3);
+}
+.order-hero-btn.ohb-ghost {
+  background: rgba(255,255,255,.1);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.25);
+}
+.order-hero-btn.ohb-ghost:hover {
+  background: rgba(255,255,255,.18);
+  transform: translateY(-2px);
+}
+.order-hero-deco {
+  position: absolute;
+  right: 40px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 110px;
+  opacity: .06;
+  user-select: none;
+  pointer-events: none;
+  line-height: 1;
+  animation: oh-float 6s ease-in-out infinite;
+}
+@keyframes oh-float {
+  0%,100% { transform: translateY(-50%); }
+  50%      { transform: translateY(calc(-50% - 10px)); }
+}
+@media (max-width: 640px) {
+  .order-hero { padding: 28px 20px; }
+  .order-hero-title { font-size: 24px; }
+  .order-hero-deco { display: none; }
+}
+</style>
+
+<div class="order-hero">
+  <div class="order-hero-grid-lines"></div>
+  <div class="order-hero-deco">📦</div>
+  <div class="order-hero-inner">
+    <div class="order-hero-eyebrow">🚚 Procurement &amp; Logistics</div>
+    <h1 class="order-hero-title">Order <span>Tracker</span></h1>
+    <p class="order-hero-subtitle">
+      Track purchase orders created from accepted RFQ quotes — monitor deposit status,
+      production milestones, logistics, and delivery in one place.
+    </p>
+    <div class="order-hero-stats">
+      <div class="order-hero-stat">
+        <div class="order-hero-stat-value"><?= (int)$hero_total ?></div>
+        <div class="order-hero-stat-label">Total Orders</div>
+      </div>
+      <div class="order-hero-stat">
+        <div class="order-hero-stat-value"><?= (int)$hero_active ?></div>
+        <div class="order-hero-stat-label">Active</div>
+      </div>
+      <div class="order-hero-stat">
+        <div class="order-hero-stat-value"><?= (int)$hero_shipped ?></div>
+        <div class="order-hero-stat-label">Shipped</div>
+      </div>
+      <div class="order-hero-stat">
+        <div class="order-hero-stat-value"><?= (int)$hero_completed ?></div>
+        <div class="order-hero-stat-label">Completed</div>
+      </div>
+    </div>
+    <div class="order-hero-actions">
+      <a href="rfq_tracker.php" class="order-hero-btn ohb-white">📋 RFQ Tracker</a>
+      <a href="order_tracker.php" class="order-hero-btn ohb-ghost">↺ View All Orders</a>
+    </div>
+  </div>
 </div>
 
 <?php if ($errors): ?>
