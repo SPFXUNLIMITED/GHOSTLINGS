@@ -122,6 +122,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $success = 'Freight forwarder added.';
       }
       $_SESSION['freight_forwarder_form_csrf'] = bin2hex(random_bytes(24));
+      header('Location: freight_forwarders.php');
+      exit;
     }
   }
 }
