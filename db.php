@@ -728,6 +728,75 @@ $pdo->exec("
   )
 ");
 
+// Create shipping_rfq_requests table for freight/shipping quote requests
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS shipping_rfq_requests (
+    id                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    requested_by        INT UNSIGNED NOT NULL,
+    request_title       VARCHAR(255) NOT NULL,
+    machine_model       VARCHAR(255) NOT NULL DEFAULT '',
+    machine_weight_kg   DECIMAL(10,2) NULL,
+    port_of_loading     VARCHAR(255) NOT NULL DEFAULT '',
+    destination_type    ENUM('port_la','door_delivery') NOT NULL DEFAULT 'port_la',
+    destination_address VARCHAR(500) NOT NULL DEFAULT '',
+    shipment_type       ENUM('FCL','LCL') NOT NULL DEFAULT 'LCL',
+    additional_notes    TEXT NULL,
+    request_status      ENUM('draft','sourcing','quotes_received','shortlisted','booked','closed') NOT NULL DEFAULT 'sourcing',
+    contact_name        VARCHAR(255) NULL,
+    company_name        VARCHAR(255) NULL,
+    contact_email       VARCHAR(255) NULL,
+    contact_phone       VARCHAR(100) NULL,
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_srfq_req_requested_by (requested_by),
+    KEY idx_srfq_req_status (request_status),
+    KEY idx_srfq_req_created_at (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// Create shipping_rfq_crates table for cargo crate line items on a shipping RFQ
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS shipping_rfq_crates (
+    id                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    shipping_rfq_id     INT UNSIGNED NOT NULL,
+    crate_label         VARCHAR(100) NOT NULL DEFAULT '',
+    length_cm           DECIMAL(10,2) NULL,
+    width_cm            DECIMAL(10,2) NULL,
+    height_cm           DECIMAL(10,2) NULL,
+    gross_weight_kg     DECIMAL(10,2) NULL,
+    quantity            INT UNSIGNED NOT NULL DEFAULT 1,
+    sort_order          INT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    KEY idx_srfq_crates_rfq_id (shipping_rfq_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// Create shipping_rfq_quotes table for freight quote responses
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS shipping_rfq_quotes (
+    id                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    shipping_rfq_id     INT UNSIGNED NOT NULL,
+    forwarder_name      VARCHAR(255) NOT NULL,
+    quote_amount        DECIMAL(12,2) NOT NULL DEFAULT 0,
+    currency            CHAR(3) NOT NULL DEFAULT 'USD',
+    transit_time_days   INT UNSIGNED NULL,
+    shipment_type       ENUM('FCL','LCL') NOT NULL DEFAULT 'LCL',
+    container_size      VARCHAR(50) NULL,
+    port_of_loading     VARCHAR(255) NULL,
+    destination         VARCHAR(255) NULL,
+    quote_status        ENUM('received','under_review','negotiating','accepted','rejected') NOT NULL DEFAULT 'received',
+    received_on         DATE NULL,
+    notes               TEXT NULL,
+    created_by          INT UNSIGNED NOT NULL,
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_srfq_quotes_rfq_id (shipping_rfq_id),
+    KEY idx_srfq_quotes_status (quote_status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 // Create order_documents table for shipping/trade documents attached to purchase orders
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS order_documents (
