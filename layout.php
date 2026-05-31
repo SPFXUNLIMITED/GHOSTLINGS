@@ -341,8 +341,8 @@ $show_rfq_menu = $show_mod_menu;
     <a class="menu-link <?= $current === 'time_clock.php' ? 'active' : '' ?>" href="time_clock.php">Time Clock</a>
     <?php endif; ?>
     <?php endif; ?>
-    <?php render_menu_dropdown('Customer Service Requests', [
-      ['href' => 'service_request_form.php', 'file' => 'service_request_form.php', 'label' => 'Customer Service Request Form', 'visible' => true],
+    <?php render_menu_dropdown('Service Requests', [
+      ['href' => 'service_request_form.php', 'file' => 'service_request_form.php', 'label' => 'Service Request Form', 'visible' => true],
       ['href' => 'form_admin.php', 'file' => 'form_admin.php', 'label' => 'Form Entries', 'visible' => $show_mod_menu],
     ], $current); ?>
     <?php render_menu_dropdown('Machine Inquiries', [
