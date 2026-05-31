@@ -132,8 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 
   // Collect scalar fields (profile contact is read-only, taken from profile)
-  $scalar_keys = ['request_title', 'machine_model', 'machine_weight_kg',
-                  'port_of_loading', 'port_of_loading_other',
+  $scalar_keys = ['machine_weight_kg', 'port_of_loading', 'port_of_loading_other',
                   'destination_type', 'destination_address', 'shipment_type', 'additional_notes'];
   foreach ($scalar_keys as $k) {
     $fields[$k] = trim((string)($_POST[$k] ?? ''));
