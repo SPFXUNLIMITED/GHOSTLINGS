@@ -16,6 +16,30 @@ $request_statuses = [
   'ordered' => 'Ordered',
   'closed' => 'Closed',
 ];
+// Stage level badges: [label, background-color, text-color]
+$stage_badges = [
+  'draft'           => ['Low',      '#e2e8f0', '#475569'],
+  'sourcing'        => ['Moderate', '#fef9c3', '#854d0e'],
+  'quotes_received' => ['Moderate', '#fef9c3', '#854d0e'],
+  'shortlisted'     => ['High',     '#ffedd5', '#9a3412'],
+  'ordered'         => ['Critical', '#fee2e2', '#991b1b'],
+  'closed'          => ['Closed',   '#f1f5f9', '#64748b'],
+];
+$quote_statuses = [
+  'received'     => 'Received',
+  'under_review' => 'Under Review',
+  'negotiating'  => 'Negotiating',
+  'accepted'     => 'Accepted',
+  'rejected'     => 'Rejected',
+];
+// Quote status badges: [label, background-color, text-color]
+$quote_badges = [
+  'received'     => ['Received',     '#dbeafe', '#1e40af'],
+  'under_review' => ['Under Review', '#fef9c3', '#854d0e'],
+  'negotiating'  => ['Negotiating',  '#ffedd5', '#9a3412'],
+  'accepted'     => ['Accepted',     '#dcfce7', '#166534'],
+  'rejected'     => ['Rejected',     '#fee2e2', '#991b1b'],
+];
 
 function is_safe_stored_upload_name(string $name): bool {
   return (bool)preg_match('/^[a-zA-Z0-9._-]+$/', $name);
@@ -77,6 +101,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $delete_stmt->execute([$quote_id, $rfq_id]);
           $success = 'Quote deleted successfully.';
         }
+      }
+    } elseif ($action === 'update_request_status') {
+      $new_status = (string)($_POST['request_status'] ?? '');
+      if (!isset($request_statuses[$new_status])) {
+        $errors[] = 'Invalid RFQ status selected.';
+      } else {
+        $stmt = $pdo->prepare("UPDATE rfq_requests SET request_status = ? WHERE id = ?");
+        $stmt->execute([$new_status, $rfq['id']]);
+        $rfq['request_status'] = $new_status;
+        $success = 'RFQ status updated.';
+      }
+    } elseif ($action === 'update_quote_status') {
+      $quote_id = (int)($_POST['quote_id'] ?? 0);
+      $new_status = (string)($_POST['quote_status'] ?? '');
+      if ($quote_id <= 0) {
+        $errors[] = 'Invalid quote.';
+      } elseif (!isset($quote_statuses[$new_status])) {
+        $errors[] = 'Invalid quote status selected.';
+      } else {
+        $stmt = $pdo->prepare("UPDATE rfq_quotes SET quote_status = ? WHERE id = ? AND rfq_request_id = ?");
+        $stmt->execute([$new_status, $quote_id, $rfq['id']]);
+        $success = 'Quote status updated.';
       }
     }
   }
@@ -158,7 +204,22 @@ render_header('RFQ Details');
     <tbody>
       <tr>
         <th style="width:220px;">Status</th>
-        <td><?= h($request_statuses[$rfq['request_status']] ?? (string)$rfq['request_status']) ?></td>
+        <td>
+          <?php
+            $sb = $stage_badges[$rfq['request_status']] ?? ['Unknown', '#e2e8f0', '#475569'];
+          ?>
+          <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:0.72em; font-weight:600; letter-spacing:0.04em; background:<?= $sb[1] ?>; color:<?= $sb[2] ?>; vertical-align:middle;"><?= h($sb[0]) ?></span>
+          <form method="post" class="row" style="gap:6px; align-items:center; margin-top:6px;">
+            <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
+            <input type="hidden" name="action" value="update_request_status" />
+            <select name="request_status" style="min-width:160px;">
+              <?php foreach ($request_statuses as $k => $label): ?>
+                <option value="<?= h($k) ?>" <?= $rfq['request_status'] === $k ? 'selected' : '' ?>><?= h($label) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <button type="submit" class="btn">Save</button>
+          </form>
+        </td>
       </tr>
       <tr>
         <th>Requested By</th>
@@ -259,6 +320,7 @@ render_header('RFQ Details');
         <tr>
           <th>Supplier</th>
           <th>Quote</th>
+          <th>Status</th>
           <th>Attachment</th>
           <th>Added By</th>
           <th class="col-actions">Actions</th>
@@ -266,7 +328,7 @@ render_header('RFQ Details');
       </thead>
       <tbody>
         <?php if (!$quotes): ?>
-          <tr><td colspan="5" class="muted">No quotes added yet for this RFQ.</td></tr>
+          <tr><td colspan="6" class="muted">No quotes added yet for this RFQ.</td></tr>
         <?php endif; ?>
         <?php foreach ($quotes as $q): ?>
           <tr>
@@ -288,6 +350,23 @@ render_header('RFQ Details');
               <?php else: ?>
                 —
               <?php endif; ?>
+            </td>
+            <td>
+              <?php
+                $qb = $quote_badges[$q['quote_status']] ?? ['Unknown', '#e2e8f0', '#475569'];
+              ?>
+              <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:0.72em; font-weight:600; letter-spacing:0.04em; background:<?= $qb[1] ?>; color:<?= $qb[2] ?>;"><?= h($qb[0]) ?></span>
+              <form method="post" class="row" style="gap:4px; align-items:center; margin-top:4px;">
+                <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
+                <input type="hidden" name="action" value="update_quote_status" />
+                <input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>" />
+                <select name="quote_status" style="min-width:120px;">
+                  <?php foreach ($quote_statuses as $k => $ql): ?>
+                    <option value="<?= h($k) ?>" <?= $q['quote_status'] === $k ? 'selected' : '' ?>><?= h($ql) ?></option>
+                  <?php endforeach; ?>
+                </select>
+                <button type="submit" class="btn">Save</button>
+              </form>
             </td>
             <td>
               <?php
