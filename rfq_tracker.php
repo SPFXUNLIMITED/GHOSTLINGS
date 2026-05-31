@@ -22,8 +22,8 @@ $request_statuses = [
   'ordered' => 'Ordered',
   'closed' => 'Closed',
 ];
-// Stage level badges: [label, background-color, text-color]
-$stage_badges = [
+// Stage level badges defaults: [label, background-color, text-color]
+$stage_badge_defaults = [
   'draft'           => ['Low',      '#e2e8f0', '#475569'],
   'sourcing'        => ['Moderate', '#fef9c3', '#854d0e'],
   'quotes_received' => ['Moderate', '#fef9c3', '#854d0e'],
@@ -31,6 +31,17 @@ $stage_badges = [
   'ordered'         => ['Critical', '#fee2e2', '#991b1b'],
   'closed'          => ['Closed',   '#f1f5f9', '#64748b'],
 ];
+// Load badge config from DB (falls back to defaults for missing rows)
+$stage_badges = $stage_badge_defaults;
+{
+  $badge_rows = $pdo->query("SELECT status_key, urgency_label, bg_color, text_color FROM rfq_stage_badges")->fetchAll();
+  foreach ($badge_rows as $br) {
+    $k = $br['status_key'];
+    if (isset($stage_badges[$k])) {
+      $stage_badges[$k] = [$br['urgency_label'], $br['bg_color'], $br['text_color']];
+    }
+  }
+}
 $quote_statuses = [
   'received' => 'Received',
   'under_review' => 'Under Review',
@@ -738,6 +749,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $selected_rfq_id = $rfq_id;
         }
       }
+    } elseif ($action === 'update_badge_config') {
+      if (!is_admin_or_moderator()) {
+        $errors[] = 'Permission denied.';
+      } else {
+        $hex_re = '/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/';
+        foreach (array_keys($stage_badges) as $sk) {
+          $label = trim((string)($_POST['badge_label_' . $sk] ?? ''));
+          $bg    = trim((string)($_POST['badge_bg_' . $sk] ?? ''));
+          $fg    = trim((string)($_POST['badge_fg_' . $sk] ?? ''));
+          if ($label === '') {
+            $errors[] = 'Badge label for "' . $sk . '" cannot be empty.';
+            continue;
+          }
+          if (!preg_match($hex_re, $bg)) {
+            $errors[] = 'Invalid background color for "' . $sk . '". Use hex format like #ffedd5.';
+            continue;
+          }
+          if (!preg_match($hex_re, $fg)) {
+            $errors[] = 'Invalid text color for "' . $sk . '". Use hex format like #9a3412.';
+            continue;
+          }
+          $stmt = $pdo->prepare(
+            "INSERT INTO rfq_stage_badges (status_key, urgency_label, bg_color, text_color)
+             VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE urgency_label = VALUES(urgency_label),
+                                     bg_color      = VALUES(bg_color),
+                                     text_color    = VALUES(text_color)"
+          );
+          $stmt->execute([$sk, $label, $bg, $fg]);
+          $stage_badges[$sk] = [$label, $bg, $fg];
+        }
+        if (!$errors) {
+          $success = 'Badge configuration saved.';
+        }
+      }
     }
   }
 }
@@ -893,6 +939,104 @@ render_header('RFQ Tracker');
     </div>
   </form>
 </div>
+
+<?php if (is_admin_or_moderator()): ?>
+<details class="card" style="margin-top:0;">
+  <summary style="cursor:pointer; font-weight:600; padding:4px 0;">⚙ Urgency Badge Configuration</summary>
+  <p class="muted" style="margin:8px 0 12px;">
+    Set the label, background color, and text color for each RFQ status urgency badge.
+    Colors must be in hex format (e.g. <code>#ffedd5</code>).
+  </p>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
+    <input type="hidden" name="action" value="update_badge_config" />
+    <div style="overflow-x:auto;">
+      <table style="width:100%; border-collapse:collapse; font-size:0.92em;">
+        <thead>
+          <tr>
+            <th style="text-align:left; padding:6px 8px; border-bottom:1px solid #e2e8f0;">Status</th>
+            <th style="text-align:left; padding:6px 8px; border-bottom:1px solid #e2e8f0;">Badge Label</th>
+            <th style="text-align:left; padding:6px 8px; border-bottom:1px solid #e2e8f0;">Background Color</th>
+            <th style="text-align:left; padding:6px 8px; border-bottom:1px solid #e2e8f0;">Text Color</th>
+            <th style="text-align:left; padding:6px 8px; border-bottom:1px solid #e2e8f0;">Preview</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($request_statuses as $sk => $slabel): ?>
+            <?php $sb = $stage_badges[$sk] ?? ['', '#e2e8f0', '#475569']; ?>
+            <tr>
+              <td style="padding:6px 8px; white-space:nowrap;"><?= h($slabel) ?></td>
+              <td style="padding:6px 8px;">
+                <input type="text" name="badge_label_<?= h($sk) ?>"
+                       value="<?= h($sb[0]) ?>"
+                       maxlength="50" required style="width:110px;"
+                       oninput="updateBadgePreview('<?= h($sk) ?>')" />
+              </td>
+              <td style="padding:6px 8px;">
+                <span style="display:inline-flex; align-items:center; gap:4px;">
+                  <input type="color" id="badge_bg_color_<?= h($sk) ?>"
+                         value="<?= h($sb[1]) ?>"
+                         oninput="document.getElementById('badge_bg_<?= h($sk) ?>').value=this.value; updateBadgePreview('<?= h($sk) ?>')"
+                         style="width:36px; height:28px; padding:1px; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer;" />
+                  <input type="text" name="badge_bg_<?= h($sk) ?>" id="badge_bg_<?= h($sk) ?>"
+                         value="<?= h($sb[1]) ?>" maxlength="20" required
+                         style="width:90px; font-family:monospace;"
+                         oninput="syncColorPicker('badge_bg_color_<?= h($sk) ?>',this.value); updateBadgePreview('<?= h($sk) ?>')" />
+                </span>
+              </td>
+              <td style="padding:6px 8px;">
+                <span style="display:inline-flex; align-items:center; gap:4px;">
+                  <input type="color" id="badge_fg_color_<?= h($sk) ?>"
+                         value="<?= h($sb[2]) ?>"
+                         oninput="document.getElementById('badge_fg_<?= h($sk) ?>').value=this.value; updateBadgePreview('<?= h($sk) ?>')"
+                         style="width:36px; height:28px; padding:1px; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer;" />
+                  <input type="text" name="badge_fg_<?= h($sk) ?>" id="badge_fg_<?= h($sk) ?>"
+                         value="<?= h($sb[2]) ?>" maxlength="20" required
+                         style="width:90px; font-family:monospace;"
+                         oninput="syncColorPicker('badge_fg_color_<?= h($sk) ?>',this.value); updateBadgePreview('<?= h($sk) ?>')" />
+                </span>
+              </td>
+              <td style="padding:6px 8px;">
+                <span id="badge_preview_<?= h($sk) ?>"
+                      style="display:inline-block; padding:2px 10px; border-radius:12px; font-size:0.75em; font-weight:600; letter-spacing:0.04em; background:<?= h($sb[1]) ?>; color:<?= h($sb[2]) ?>;">
+                  <?= h($sb[0]) ?>
+                </span>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:12px;">
+      <button type="submit" class="btn primary">Save Badge Config</button>
+    </div>
+  </form>
+</details>
+<script>
+function updateBadgePreview(sk) {
+  const label = document.querySelector('[name="badge_label_' + sk + '"]')?.value ?? '';
+  const bg    = document.getElementById('badge_bg_' + sk)?.value ?? '#e2e8f0';
+  const fg    = document.getElementById('badge_fg_' + sk)?.value ?? '#475569';
+  const el    = document.getElementById('badge_preview_' + sk);
+  if (el) {
+    el.textContent        = label;
+    el.style.background   = bg;
+    el.style.color        = fg;
+  }
+}
+function syncColorPicker(pickerId, hexVal) {
+  // Expand 3-digit shorthand (#RGB → #RRGGBB) for the color picker
+  let full = hexVal;
+  if (/^#[0-9a-fA-F]{3}$/.test(hexVal)) {
+    full = '#' + hexVal[1] + hexVal[1] + hexVal[2] + hexVal[2] + hexVal[3] + hexVal[3];
+  }
+  if (/^#[0-9a-fA-F]{6}$/.test(full)) {
+    const el = document.getElementById(pickerId);
+    if (el) el.value = full;
+  }
+}
+</script>
+<?php endif; ?>
 
 <?php if ($rfq_email_text !== ''): ?>
   <div class="card">
