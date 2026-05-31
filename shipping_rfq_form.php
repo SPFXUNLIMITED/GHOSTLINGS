@@ -502,7 +502,7 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form
   var updatingConverter = false;
 
   function fmtLength(val) {
-    return String(Number(val.toFixed(6)));
+    return val.toFixed(6).replace(/\.?0+$/, '');
   }
 
   function setConverterValues(meters) {
@@ -529,7 +529,12 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form
         return;
       }
       var num = Number(raw);
-      if (!Number.isFinite(num)) return;
+      if (!Number.isFinite(num)) {
+        updatingConverter = true;
+        clearOtherConverterInputs(input);
+        updatingConverter = false;
+        return;
+      }
 
       updatingConverter = true;
       setConverterValues(toMeters(num));
