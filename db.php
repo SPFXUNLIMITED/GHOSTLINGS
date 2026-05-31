@@ -611,3 +611,26 @@ $pdo->exec("
     '<div style=\"text-align:center;\">🔥 <strong>Limited-Time Offer!</strong> Mention this form and receive a <strong>FREE extended warranty upgrade</strong> on any new CO2 laser machine purchase. Ask our team for details!</div>'
   )
 ");
+
+// Create rfq_stage_badges table for admin-editable urgency badges
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS rfq_stage_badges (
+    status_key     VARCHAR(50)  NOT NULL,
+    urgency_label  VARCHAR(50)  NOT NULL DEFAULT '',
+    bg_color       VARCHAR(30)  NOT NULL DEFAULT '#e2e8f0',
+    text_color     VARCHAR(30)  NOT NULL DEFAULT '#475569',
+    updated_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (status_key)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// Seed default badge config if not already set
+$pdo->exec("
+  INSERT IGNORE INTO rfq_stage_badges (status_key, urgency_label, bg_color, text_color) VALUES
+    ('draft',           'Low',      '#e2e8f0', '#475569'),
+    ('sourcing',        'Moderate', '#fef9c3', '#854d0e'),
+    ('quotes_received', 'Moderate', '#fef9c3', '#854d0e'),
+    ('shortlisted',     'High',     '#ffedd5', '#9a3412'),
+    ('ordered',         'Critical', '#fee2e2', '#991b1b'),
+    ('closed',          'Closed',   '#f1f5f9', '#64748b')
+");
