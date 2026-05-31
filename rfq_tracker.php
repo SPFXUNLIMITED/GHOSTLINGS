@@ -1104,8 +1104,7 @@ function syncColorPicker(pickerId, hexVal) {
                 <?php
                   $sb = $stage_badges[$r['request_status']] ?? ['Unknown', '#e2e8f0', '#475569'];
                 ?>
-                <strong><?= h($r['request_title']) ?></strong>
-                <span style="display:inline-block; margin-left:6px; padding:2px 8px; border-radius:12px; font-size:0.72em; font-weight:600; letter-spacing:0.04em; background:<?= $sb[1] ?>; color:<?= $sb[2] ?>; vertical-align:middle;"><?= h($sb[0]) ?></span><br>
+                <strong><?= h($r['request_title']) ?></strong><br>
                 <span class="muted">
                   <?= ($r['request_category'] ?? 'machine') === 'parts' ? 'Parts' : 'Machine' ?> · Qty: <?= (int)$r['quantity'] ?> · Quotes: <?= (int)$r['quote_count'] ?> · Urgency: <?php
                     $urgency_labels = ['low' => 'Low', 'normal' => 'Normal', 'high' => 'High', 'critical' => 'Critical'];
@@ -1119,7 +1118,7 @@ function syncColorPicker(pickerId, hexVal) {
                   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
                   <input type="hidden" name="action" value="update_request_status" />
                   <input type="hidden" name="rfq_id" value="<?= (int)$r['id'] ?>" />
-                  <select name="request_status" style="min-width:150px;">
+                  <select name="request_status" style="min-width:150px; border-radius:999px; border:1px solid <?= h($sb[1]) ?>; background:<?= h($sb[1]) ?>; color:<?= h($sb[2]) ?>; font-size:0.72em; font-weight:600; letter-spacing:0.04em; padding:4px 24px 4px 10px;">
                     <?php foreach ($request_statuses as $k => $label): ?>
                       <option value="<?= h($k) ?>" <?= $r['request_status'] === $k ? 'selected' : '' ?>><?= h($label) ?></option>
                     <?php endforeach; ?>

@@ -216,11 +216,10 @@ render_header('RFQ Details');
           <?php
             $sb = $stage_badges[$rfq['request_status']] ?? ['Unknown', '#e2e8f0', '#475569'];
           ?>
-          <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:0.72em; font-weight:600; letter-spacing:0.04em; background:<?= $sb[1] ?>; color:<?= $sb[2] ?>; vertical-align:middle;"><?= h($sb[0]) ?></span>
           <form method="post" class="row" style="gap:6px; align-items:center; margin-top:6px;">
             <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
             <input type="hidden" name="action" value="update_request_status" />
-            <select name="request_status" style="min-width:160px;">
+            <select name="request_status" style="min-width:160px; border-radius:999px; border:1px solid <?= h($sb[1]) ?>; background:<?= h($sb[1]) ?>; color:<?= h($sb[2]) ?>; font-size:0.72em; font-weight:600; letter-spacing:0.04em; padding:4px 24px 4px 10px;">
               <?php foreach ($request_statuses as $k => $label): ?>
                 <option value="<?= h($k) ?>" <?= $rfq['request_status'] === $k ? 'selected' : '' ?>><?= h($label) ?></option>
               <?php endforeach; ?>
