@@ -82,9 +82,6 @@ function format_acquisition_purpose(array $rfq): string {
 
   $customer_name = trim((string)($rfq['buyer_name'] ?? ''));
   if ($customer_name === '') {
-    $customer_name = trim((string)($rfq['customer_name'] ?? ''));
-  }
-  if ($customer_name === '') {
     $customer_name = trim((string)($rfq['contact_name'] ?? ''));
   }
 
