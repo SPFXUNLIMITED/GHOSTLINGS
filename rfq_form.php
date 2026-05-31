@@ -61,6 +61,7 @@ $fields = [
   'quantity'        => '1',
   'required_features' => '',
   'additional_notes'  => '',
+  'request_status'    => 'draft',
 ];
 $profile_contact_fields = [
   'contact_name'  => '',
@@ -97,7 +98,7 @@ $fields = array_merge($fields, $profile_contact_fields);
 
 if ($is_edit_mode && $_SERVER['REQUEST_METHOD'] !== 'POST') {
   $edit_stmt = $pdo->prepare(
-    "SELECT id, request_category, acquisition_purpose, urgency, buyer_name, buyer_company, buyer_email, buyer_phone,
+    "SELECT id, request_category, acquisition_purpose, urgency, request_status, buyer_name, buyer_company, buyer_email, buyer_phone,
             request_title, machine_size, laser_watts, tube_type, part_category, part_specs, quantity, required_features, additional_notes
      FROM rfq_requests
      WHERE id = ?
@@ -115,6 +116,7 @@ if ($is_edit_mode && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     $fields['request_category'] = (string)($editing_rfq['request_category'] ?? 'machine');
     $fields['acquisition_purpose'] = (string)($editing_rfq['acquisition_purpose'] ?? 'customer');
     $fields['urgency'] = (string)($editing_rfq['urgency'] ?? 'normal');
+    $fields['request_status'] = (string)($editing_rfq['request_status'] ?? 'draft');
     $fields['buyer_name'] = (string)($editing_rfq['buyer_name'] ?? '');
     $fields['buyer_company'] = (string)($editing_rfq['buyer_company'] ?? '');
     $fields['buyer_email'] = (string)($editing_rfq['buyer_email'] ?? '');
@@ -159,6 +161,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
   if (!in_array($fields['urgency'], ['low', 'normal', 'high', 'critical'], true)) {
     $errors[] = 'Urgency must be Low, Normal, High, or Critical.';
+  }
+  if ($is_edit_mode && !in_array($fields['request_status'], ['draft', 'sourcing', 'quotes_received', 'shortlisted', 'ordered', 'closed'], true)) {
+    $errors[] = 'Invalid RFQ status selected.';
   }
   if ($fields['request_title'] === '') $errors[] = 'Request title is required.';
   if ($fields['request_category'] === 'machine') {
@@ -206,7 +211,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($is_edit_mode) {
       $stmt = $pdo->prepare(
         "UPDATE rfq_requests SET
-          request_category = ?, acquisition_purpose = ?, urgency = ?, buyer_name = ?, buyer_company = ?, buyer_email = ?, buyer_phone = ?,
+          request_category = ?, acquisition_purpose = ?, urgency = ?, request_status = ?, buyer_name = ?, buyer_company = ?, buyer_email = ?, buyer_phone = ?,
           request_title = ?, machine_size = ?, laser_watts = ?, tube_type = ?, part_category = ?, part_specs = ?,
           quantity = ?, required_features = ?, additional_notes = ?
          WHERE id = ?"
@@ -215,6 +220,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fields['request_category'],
         $fields['acquisition_purpose'],
         $fields['urgency'],
+        $fields['request_status'],
         $fields['buyer_name']    === '' ? null : $fields['buyer_name'],
         $fields['buyer_company'] === '' ? null : $fields['buyer_company'],
         $fields['buyer_email']   === '' ? null : $fields['buyer_email'],
@@ -377,6 +383,19 @@ render_header($is_edit_mode ? ('Edit RFQ #' . $edit_rfq_id) : ($is_parts_entrypo
         <option value="critical" <?= $fields['urgency'] === 'critical' ? 'selected' : '' ?>>Critical</option>
       </select>
     </div>
+    <?php if ($is_edit_mode): ?>
+    <div>
+      <label>RFQ Status <span style="color:var(--d)">*</span></label>
+      <select name="request_status" required>
+        <option value="draft"           <?= $fields['request_status'] === 'draft'           ? 'selected' : '' ?>>Draft</option>
+        <option value="sourcing"        <?= $fields['request_status'] === 'sourcing'        ? 'selected' : '' ?>>Sourcing</option>
+        <option value="quotes_received" <?= $fields['request_status'] === 'quotes_received' ? 'selected' : '' ?>>Quotes Received</option>
+        <option value="shortlisted"     <?= $fields['request_status'] === 'shortlisted'     ? 'selected' : '' ?>>Shortlisted</option>
+        <option value="ordered"         <?= $fields['request_status'] === 'ordered'         ? 'selected' : '' ?>>Ordered</option>
+        <option value="closed"          <?= $fields['request_status'] === 'closed'          ? 'selected' : '' ?>>Closed</option>
+      </select>
+    </div>
+    <?php endif; ?>
   </div>
 
   <div id="customer_information_section" style="margin-top:12px; display:<?= $fields['acquisition_purpose'] === 'customer' ? 'block' : 'none' ?>;">
