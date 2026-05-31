@@ -500,6 +500,7 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form
   var cmInput = document.getElementById('length_centimeter');
   var feetInput = document.getElementById('length_feet');
   var updatingConverter = false;
+  var METERS_TO_FEET = 3.280839895;
 
   function fmtLength(val) {
     return val.toFixed(6).replace(/\.?0+$/, '');
@@ -508,7 +509,7 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form
   function setConverterValues(meters) {
     meterInput.value = fmtLength(meters);
     cmInput.value = fmtLength(meters * 100);
-    feetInput.value = fmtLength(meters * 3.280839895);
+    feetInput.value = fmtLength(meters * METERS_TO_FEET);
   }
 
   function clearOtherConverterInputs(source) {
@@ -545,7 +546,7 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form
   if (meterInput && cmInput && feetInput) {
     bindLengthConverter(meterInput, function (v) { return v; });
     bindLengthConverter(cmInput, function (v) { return v / 100; });
-    bindLengthConverter(feetInput, function (v) { return v / 3.280839895; });
+    bindLengthConverter(feetInput, function (v) { return v / METERS_TO_FEET; });
   }
 
   // Dynamic crate row addition/removal
