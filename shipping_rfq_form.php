@@ -503,14 +503,14 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form
   const DECIMAL_PRECISION = 6;
   const METERS_TO_FEET = 3.280839895;
 
-  function fmtLength(val) {
+  function formatLengthValue(val) {
     return val.toFixed(DECIMAL_PRECISION).replace(/\.?0+$/, '');
   }
 
   function setConverterValues(meters) {
-    meterInput.value = fmtLength(meters);
-    cmInput.value = fmtLength(meters * 100);
-    feetInput.value = fmtLength(meters * METERS_TO_FEET);
+    meterInput.value = formatLengthValue(meters);
+    cmInput.value = formatLengthValue(meters * 100);
+    feetInput.value = formatLengthValue(meters * METERS_TO_FEET);
   }
 
   function clearOtherConverterInputs(source) {
@@ -523,14 +523,14 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form
     if (!input) return;
     input.addEventListener('input', function () {
       if (updatingConverter) return;
-      var raw = input.value.trim();
+      const raw = input.value.trim();
       if (raw === '') {
         updatingConverter = true;
         clearOtherConverterInputs(input);
         updatingConverter = false;
         return;
       }
-      var num = Number(raw);
+      const num = Number(raw);
       if (!Number.isFinite(num) || num < 0) {
         updatingConverter = true;
         clearOtherConverterInputs(input);
@@ -544,8 +544,10 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form
     });
   }
 
+  function identityValue(v) { return v; }
+
   if (meterInput && cmInput && feetInput) {
-    bindLengthConverter(meterInput, function (v) { return v; });
+    bindLengthConverter(meterInput, identityValue);
     bindLengthConverter(cmInput, function (v) { return v / 100; });
     bindLengthConverter(feetInput, function (v) { return v / METERS_TO_FEET; });
   }
