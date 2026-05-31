@@ -50,6 +50,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $errors[] = 'Order not found or already set to that status.';
         }
       }
+    } elseif ($action === 'delete_order') {
+      $order_id = (int)($_POST['order_id'] ?? 0);
+      if ($order_id <= 0) {
+        $errors[] = 'Invalid order.';
+      } else {
+        try {
+          $doc_stmt = $pdo->prepare("SELECT stored_name FROM order_documents WHERE order_id = ?");
+          $doc_stmt->execute([$order_id]);
+          $documents = $doc_stmt->fetchAll();
+
+          $pdo->beginTransaction();
+
+          $delete_docs_stmt = $pdo->prepare("DELETE FROM order_documents WHERE order_id = ?");
+          $delete_docs_stmt->execute([$order_id]);
+
+          $delete_order_stmt = $pdo->prepare("DELETE FROM rfq_orders WHERE id = ?");
+          $delete_order_stmt->execute([$order_id]);
+
+          if ($delete_order_stmt->rowCount() <= 0) {
+            $pdo->rollBack();
+            $errors[] = 'Order not found.';
+          } else {
+            $pdo->commit();
+            foreach ($documents as $document) {
+              $stored_name = (string)($document['stored_name'] ?? '');
+              if ($stored_name === '') {
+                continue;
+              }
+              $path = __DIR__ . '/uploads/' . $stored_name;
+              if (is_file($path)) {
+                @unlink($path);
+              }
+            }
+            $success = 'Order deleted.';
+          }
+        } catch (Throwable $e) {
+          if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+          }
+          $errors[] = 'Unable to delete order right now. Please try again.';
+        }
+      }
     }
   }
 }
@@ -193,6 +235,12 @@ render_header('Order Tracker');
             <td class="col-actions">
               <a class="btn" href="order_form.php?order_id=<?= (int)$order['id'] ?>">Edit</a>
               <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$order['rfq_request_id'] ?>">RFQ</a>
+              <form method="post" style="display:inline;" onsubmit="return confirm('Delete this order? This cannot be undone.');">
+                <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_order_tracker_csrf']) ?>">
+                <input type="hidden" name="action" value="delete_order">
+                <input type="hidden" name="order_id" value="<?= (int)$order['id'] ?>">
+                <button type="submit" class="btn danger">Delete</button>
+              </form>
             </td>
           </tr>
         <?php endforeach; ?>
