@@ -4,6 +4,9 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_rfq_access();
 
+const MAX_PRODUCTION_LEAD_TIME_DAYS = 3650;
+const DEFAULT_DEPOSIT_PERCENT = 30.00;
+
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
 }
@@ -125,6 +128,14 @@ if (!$order && $source_quote && $source_quote['quote_status'] !== 'accepted') {
   exit;
 }
 
+if (!$order && $source_quote && (string)($source_quote['request_status'] ?? '') === 'closed') {
+  http_response_code(400);
+  render_header('RFQ Closed');
+  echo '<div class="card"><p class="muted">Closed RFQs cannot be converted into new purchase orders.</p><a class="btn" href="rfq_tracker.php?rfq_id=' . (int)$rfq_id . '">← Back to RFQ Quotes</a></div>';
+  render_footer();
+  exit;
+}
+
 if (!$order && !$source_quote) {
   header('Location: order_tracker.php');
   exit;
@@ -197,8 +208,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($deposit_percent_raw !== '' && (float)$deposit_percent_raw > 100) {
       $errors[] = 'Deposit percent cannot exceed 100.';
     }
-    if ($production_lead_time_days_raw !== '' && (!ctype_digit($production_lead_time_days_raw) || (int)$production_lead_time_days_raw > 3650)) {
-      $errors[] = 'Production lead time must be a whole number of days up to 3650.';
+    if ($production_lead_time_days_raw !== '' && (!ctype_digit($production_lead_time_days_raw) || (int)$production_lead_time_days_raw > MAX_PRODUCTION_LEAD_TIME_DAYS)) {
+      $errors[] = 'Production lead time must be a whole number of days up to ' . MAX_PRODUCTION_LEAD_TIME_DAYS . '.';
     }
     if (strlen($incoterm) > 20) {
       $errors[] = 'Incoterm must be 20 characters or fewer.';
@@ -321,7 +332,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->prepare("UPDATE rfq_orders SET po_number = ? WHERE id = ?")->execute([$generated_po_number, $saved_order_id]);
       }
 
-      $pdo->prepare("UPDATE rfq_requests SET request_status = 'ordered' WHERE id = ? AND request_status <> 'closed'")->execute([$rfq_id]);
+      $rfq_status_update = $pdo->prepare("UPDATE rfq_requests SET request_status = 'ordered' WHERE id = ? AND request_status NOT IN ('ordered', 'closed')");
+      $rfq_status_update->execute([$rfq_id]);
 
       header('Location: order_form.php?order_id=' . $saved_order_id . '&saved=1');
       exit;
@@ -390,10 +402,10 @@ if (!$order && $source_quote) {
     'unit_price' => number_format($prefill_unit, 2, '.', ''),
     'order_total' => number_format($prefill_total, 2, '.', ''),
     'currency' => (string)$source_quote['currency'],
-    'deposit_percent' => '30.00',
-    'deposit_amount' => number_format(round($prefill_total * 0.3, 2), 2, '.', ''),
-    'balance_amount' => number_format(round($prefill_total * 0.7, 2), 2, '.', ''),
-    'payment_terms' => '30% deposit, 70% balance before shipment',
+    'deposit_percent' => number_format(DEFAULT_DEPOSIT_PERCENT, 2, '.', ''),
+    'deposit_amount' => number_format(round($prefill_total * (DEFAULT_DEPOSIT_PERCENT / 100), 2), 2, '.', ''),
+    'balance_amount' => number_format(round($prefill_total * ((100 - DEFAULT_DEPOSIT_PERCENT) / 100), 2), 2, '.', ''),
+    'payment_terms' => rtrim(rtrim(number_format(DEFAULT_DEPOSIT_PERCENT, 2, '.', ''), '0'), '.') . '% deposit, ' . rtrim(rtrim(number_format(100 - DEFAULT_DEPOSIT_PERCENT, 2, '.', ''), '0'), '.') . '% balance before shipment',
     'incoterm' => '',
     'shipping_method' => (string)($source_quote['shipping_method'] ?? ''),
     'shipping_origin' => (string)($source_quote['shipping_origin'] ?? ''),
@@ -486,7 +498,7 @@ render_header('Purchase Order Form');
     </div>
     <div>
       <label>Production Lead Time (days)</label>
-      <input type="number" name="production_lead_time_days" min="0" max="3650" value="<?= h((string)order_value($order, 'production_lead_time_days', '')) ?>">
+      <input type="number" name="production_lead_time_days" min="0" max="<?= MAX_PRODUCTION_LEAD_TIME_DAYS ?>" value="<?= h((string)order_value($order, 'production_lead_time_days', '')) ?>">
     </div>
     <div>
       <label>Supplier Name <span style="color:var(--d)">*</span></label>
