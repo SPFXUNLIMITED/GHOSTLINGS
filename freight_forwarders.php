@@ -50,7 +50,7 @@ render_header('Freight Forwarders');
   </div>
   <div class="freight-hero-actions">
     <a class="btn primary" href="freight_forwarder_form.php">+ Add Freight Forwarder</a>
-    <a class="btn" href="#forwarder-search" aria-label="Jump to freight forwarder search form">Find a Partner</a>
+    <a class="btn" href="#forwarder-search-input">Find a Partner</a>
   </div>
 </div>
 
