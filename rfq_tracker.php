@@ -77,6 +77,30 @@ function get_status_select_style(array $status_styles, ?string $status): string 
   return 'background:' . $background . '; color:' . $color . '; border-color:' . $background . '; font-weight:600;';
 }
 
+function format_acquisition_purpose(array $rfq): string {
+  $purpose = strtolower(trim((string)($rfq['acquisition_purpose'] ?? '')));
+
+  $customer_name = trim((string)($rfq['buyer_name'] ?? ''));
+  if ($customer_name === '') {
+    $customer_name = trim((string)($rfq['customer_name'] ?? ''));
+  }
+  if ($customer_name === '') {
+    $customer_name = trim((string)($rfq['contact_name'] ?? ''));
+  }
+
+  if ($purpose === 'customer' || $purpose === 'customer request') {
+    return $customer_name !== '' ? ('Customer Request: ' . $customer_name) : 'Customer Request';
+  }
+  if ($purpose === 'internal' || $purpose === 'internal use') {
+    return 'Internal Use';
+  }
+  if ($purpose === '') {
+    return 'N/A';
+  }
+
+  return ucwords(str_replace('_', ' ', $purpose));
+}
+
 function build_rfq_email_text(array $rfq): string {
   $sep  = str_repeat('=', 60);
   $sep2 = str_repeat('-', 60);
@@ -96,6 +120,7 @@ function build_rfq_email_text(array $rfq): string {
     'RFQ #:        ' . (int)$rfq['id'],
     'Date:         ' . $date,
     'Status:       ' . ucfirst(str_replace('_', ' ', trim((string)$rfq['request_status']))),
+    'Acquisition:  ' . format_acquisition_purpose($rfq),
     '',
     $sep2,
     'FROM:',
@@ -779,7 +804,7 @@ $where_sql = $where_parts ? ('WHERE ' . implode(' AND ', $where_parts)) : '';
 $sql = "
   SELECT
     r.id, r.request_category, r.request_title, r.machine_size, r.laser_watts, r.tube_type, r.part_category, r.part_specs, r.quantity,
-    r.required_features, r.additional_notes, r.request_status, r.urgency, r.created_at, r.updated_at,
+    r.required_features, r.additional_notes, r.request_status, r.urgency, r.acquisition_purpose, r.buyer_name, r.contact_name, r.created_at, r.updated_at,
     u.username AS requested_by_username,
     COUNT(q.id) AS quote_count,
     MIN(q.quote_amount) AS lowest_quote_amount,
@@ -862,7 +887,7 @@ if ($selected_rfq_id > 0) {
 if ($rfq_text_id > 0) {
   $txt = $pdo->prepare(
     "SELECT r.id, r.request_category, r.request_title, r.machine_size, r.laser_watts, r.tube_type, r.part_category, r.part_specs, r.quantity,
-            r.required_features, r.additional_notes, r.request_status, r.created_at,
+            r.required_features, r.additional_notes, r.request_status, r.acquisition_purpose, r.buyer_name, r.created_at,
             r.contact_name, r.company_name, r.contact_email, r.contact_phone,
             u.username AS requested_by_username
      FROM rfq_requests r
@@ -1037,6 +1062,7 @@ render_header('RFQ Tracker');
                     $ub = $urgency_badges[$urgency_val] ?? [ucfirst($urgency_val), '#e2e8f0', '#334155'];
                   ?>
                   <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:0.72em; font-weight:600; letter-spacing:0.04em; background:<?= h($ub[1]) ?>; color:<?= h($ub[2]) ?>;"><?= h($ub[0]) ?></span>
+                  · Acquisition: <?= h(format_acquisition_purpose($r)) ?>
                 </span>
               </td>
               <td>
