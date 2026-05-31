@@ -7,6 +7,7 @@ require_rfq_access();
 const MAX_RFQ_QUANTITY = 1000;
 const REQUEST_TYPES = ['RFQ', 'Sourcing'];
 const REQUEST_CATEGORIES = ['machine', 'parts'];
+const RFQ_STATUSES = ['draft' => 'Draft', 'sourcing' => 'Sourcing', 'quotes_received' => 'Quotes Received', 'shortlisted' => 'Shortlisted', 'ordered' => 'Ordered', 'closed' => 'Closed'];
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
@@ -162,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (!in_array($fields['urgency'], ['low', 'normal', 'high', 'critical'], true)) {
     $errors[] = 'Urgency must be Low, Normal, High, or Critical.';
   }
-  if ($is_edit_mode && !in_array($fields['request_status'], ['draft', 'sourcing', 'quotes_received', 'shortlisted', 'ordered', 'closed'], true)) {
+  if ($is_edit_mode && !array_key_exists($fields['request_status'], RFQ_STATUSES)) {
     $errors[] = 'Invalid RFQ status selected.';
   }
   if ($fields['request_title'] === '') $errors[] = 'Request title is required.';
@@ -387,12 +388,9 @@ render_header($is_edit_mode ? ('Edit RFQ #' . $edit_rfq_id) : ($is_parts_entrypo
     <div>
       <label>RFQ Status <span style="color:var(--d)">*</span></label>
       <select name="request_status" required>
-        <option value="draft"           <?= $fields['request_status'] === 'draft'           ? 'selected' : '' ?>>Draft</option>
-        <option value="sourcing"        <?= $fields['request_status'] === 'sourcing'        ? 'selected' : '' ?>>Sourcing</option>
-        <option value="quotes_received" <?= $fields['request_status'] === 'quotes_received' ? 'selected' : '' ?>>Quotes Received</option>
-        <option value="shortlisted"     <?= $fields['request_status'] === 'shortlisted'     ? 'selected' : '' ?>>Shortlisted</option>
-        <option value="ordered"         <?= $fields['request_status'] === 'ordered'         ? 'selected' : '' ?>>Ordered</option>
-        <option value="closed"          <?= $fields['request_status'] === 'closed'          ? 'selected' : '' ?>>Closed</option>
+        <?php foreach (RFQ_STATUSES as $status_key => $status_label): ?>
+          <option value="<?= h($status_key) ?>" <?= $fields['request_status'] === $status_key ? 'selected' : '' ?>><?= h($status_label) ?></option>
+        <?php endforeach; ?>
       </select>
     </div>
     <?php endif; ?>
