@@ -36,16 +36,26 @@ $forwarders = $stmt->fetchAll();
 render_header('Freight Forwarders');
 ?>
 
-<div class="card page-header">
-  <div class="page-header-body">
-    <h1>Freight Forwarders <span class="muted" style="font-size:0.7em; font-weight:400;">(<?= count($forwarders) ?>)</span></h1>
-    <p class="muted">Manage freight forwarding partners for import/export routes and logistics.</p>
+<div class="card freight-hero page-header">
+  <div class="freight-hero-glow" aria-hidden="true"></div>
+  <div class="page-header-body freight-hero-body">
+    <span class="freight-hero-tag">Global Logistics Network</span>
+    <h1>Freight Forwarders <span class="freight-hero-count">(<?= count($forwarders) ?>)</span></h1>
+    <p class="muted">Build a premium logistics bench with trusted carriers, certified operators, and route experts ready for your next shipment.</p>
+    <div class="freight-hero-stats" aria-label="Freight forwarder summary">
+      <span class="freight-hero-pill">🌍 Multi-region coverage</span>
+      <span class="freight-hero-pill">✅ Compliance-ready partners</span>
+      <span class="freight-hero-pill">⚡ Faster quote turnarounds</span>
+    </div>
   </div>
-  <a class="btn primary" href="freight_forwarder_form.php">+ Add Freight Forwarder</a>
+  <div class="freight-hero-actions">
+    <a class="btn primary" href="freight_forwarder_form.php">+ Add Freight Forwarder</a>
+    <a class="btn" href="#forwarder-search">Find a Partner</a>
+  </div>
 </div>
 
 <div class="card">
-  <form method="get" action="freight_forwarders.php" class="row" style="margin-bottom:4px;">
+  <form id="forwarder-search" method="get" action="freight_forwarders.php" class="row" style="margin-bottom:4px;">
     <input type="text" name="q" value="<?= h($q) ?>" placeholder="Search by company, route, certification, contact, email, or phone…" style="max-width:360px;" />
     <button type="submit" class="btn">Search</button>
     <?php if ($q !== ''): ?>
