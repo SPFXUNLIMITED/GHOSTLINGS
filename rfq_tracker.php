@@ -753,7 +753,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (!is_admin_or_moderator()) {
         $errors[] = 'Permission denied.';
       } else {
-        $hex_re = '/^#[0-9a-fA-F]{3,8}$/';
+        $hex_re = '/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/';
         foreach (array_keys($stage_badges) as $sk) {
           $label = trim((string)($_POST['badge_label_' . $sk] ?? ''));
           $bg    = trim((string)($_POST['badge_bg_' . $sk] ?? ''));
@@ -1025,10 +1025,14 @@ function updateBadgePreview(sk) {
   }
 }
 function syncColorPicker(pickerId, hexVal) {
-  const hex6 = /^#[0-9a-fA-F]{6}$/.test(hexVal);
-  if (hex6) {
+  // Expand 3-digit shorthand (#RGB → #RRGGBB) for the color picker
+  let full = hexVal;
+  if (/^#[0-9a-fA-F]{3}$/.test(hexVal)) {
+    full = '#' + hexVal[1] + hexVal[1] + hexVal[2] + hexVal[2] + hexVal[3] + hexVal[3];
+  }
+  if (/^#[0-9a-fA-F]{6}$/.test(full)) {
     const el = document.getElementById(pickerId);
-    if (el) el.value = hexVal;
+    if (el) el.value = full;
   }
 }
 </script>
