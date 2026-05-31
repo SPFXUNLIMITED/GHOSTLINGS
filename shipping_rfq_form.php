@@ -179,8 +179,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 
   // Validation
-  if ($fields['request_title'] === '') $errors[] = 'Request title is required.';
-  if ($fields['machine_model'] === '') $errors[] = 'Machine model is required.';
   if ($fields['machine_weight_kg'] !== '' && (!is_numeric($fields['machine_weight_kg']) || (float)$fields['machine_weight_kg'] <= 0)) {
     $errors[] = 'Machine weight must be a positive number.';
   }
