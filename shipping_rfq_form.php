@@ -356,6 +356,25 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form
     ℹ️ Contact details are pre-filled from your <a href="user_page.php">profile</a>.
   </div>
 
+  <div class="card" style="margin-bottom:14px; background:var(--surface-alt, #f8f9fa);">
+    <h2 class="form-section-heading" style="margin-top:0;">Length Converter</h2>
+    <p class="muted" style="margin-top:0;">Convert between meter, centimeter, and feet.</p>
+    <div class="form-grid">
+      <div>
+        <label for="length_meter">Meter (m)</label>
+        <input type="number" id="length_meter" min="0" step="any" placeholder="e.g. 2.2" />
+      </div>
+      <div>
+        <label for="length_centimeter">Centimeter (cm)</label>
+        <input type="number" id="length_centimeter" min="0" step="any" placeholder="e.g. 220" />
+      </div>
+      <div>
+        <label for="length_feet">Feet (ft)</label>
+        <input type="number" id="length_feet" min="0" step="any" placeholder="e.g. 7.22" />
+      </div>
+    </div>
+  </div>
+
   <h2 class="form-section-heading">Cargo Crate Details</h2>
   <p class="muted" style="margin-top:0;">Enter dimensions and weight for each crate or pallet. Click <strong>+ Add Crate</strong> to add more.</p>
 
@@ -474,6 +493,54 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form
     destSel.addEventListener('change', function () {
       doorWrap.style.display = destSel.value === 'door_delivery' ? 'block' : 'none';
     });
+  }
+
+  // Length converter (meter / centimeter / feet)
+  var meterInput = document.getElementById('length_meter');
+  var cmInput = document.getElementById('length_centimeter');
+  var feetInput = document.getElementById('length_feet');
+  var updatingConverter = false;
+
+  function fmtLength(val) {
+    return String(Number(val.toFixed(6)));
+  }
+
+  function setConverterValues(meters) {
+    meterInput.value = fmtLength(meters);
+    cmInput.value = fmtLength(meters * 100);
+    feetInput.value = fmtLength(meters * 3.280839895);
+  }
+
+  function clearOtherConverterInputs(source) {
+    if (source !== meterInput) meterInput.value = '';
+    if (source !== cmInput) cmInput.value = '';
+    if (source !== feetInput) feetInput.value = '';
+  }
+
+  function bindLengthConverter(input, toMeters) {
+    if (!input) return;
+    input.addEventListener('input', function () {
+      if (updatingConverter) return;
+      var raw = input.value.trim();
+      if (raw === '') {
+        updatingConverter = true;
+        clearOtherConverterInputs(input);
+        updatingConverter = false;
+        return;
+      }
+      var num = Number(raw);
+      if (!Number.isFinite(num)) return;
+
+      updatingConverter = true;
+      setConverterValues(toMeters(num));
+      updatingConverter = false;
+    });
+  }
+
+  if (meterInput && cmInput && feetInput) {
+    bindLengthConverter(meterInput, function (v) { return v; });
+    bindLengthConverter(cmInput, function (v) { return v / 100; });
+    bindLengthConverter(feetInput, function (v) { return v / 3.280839895; });
   }
 
   // Dynamic crate row addition/removal
