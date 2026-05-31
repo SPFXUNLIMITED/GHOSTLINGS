@@ -50,13 +50,13 @@ render_header('Freight Forwarders');
   </div>
   <div class="freight-hero-actions">
     <a class="btn primary" href="freight_forwarder_form.php">+ Add Freight Forwarder</a>
-    <a class="btn" href="#forwarder-search-input">Find a Partner</a>
+    <button type="button" class="btn" id="focus-forwarder-search">Find a Partner</button>
   </div>
 </div>
 
 <div id="forwarder-search" class="card">
   <form method="get" action="freight_forwarders.php" class="row" style="margin-bottom:4px;">
-    <input id="forwarder-search-input" type="text" name="q" value="<?= h($q) ?>" placeholder="Search by company, route, certification, contact, email, or phone…" style="max-width:360px;" />
+    <input id="forwarder-search-input" type="text" name="q" value="<?= h($q) ?>" aria-label="Search freight forwarders" placeholder="Search by company, route, certification, contact, email, or phone…" style="max-width:360px;" />
     <button type="submit" class="btn">Search</button>
     <?php if ($q !== ''): ?>
       <a class="btn" href="freight_forwarders.php">Clear</a>
@@ -105,5 +105,20 @@ render_header('Freight Forwarders');
   </table>
 </div>
 <?php endif; ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var jumpButton = document.getElementById('focus-forwarder-search');
+  var searchInput = document.getElementById('forwarder-search-input');
+  if (!jumpButton || !searchInput) return;
+
+  jumpButton.addEventListener('click', function () {
+    searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    requestAnimationFrame(function () {
+      searchInput.focus();
+    });
+  });
+});
+</script>
 
 <?php render_footer(); ?>
