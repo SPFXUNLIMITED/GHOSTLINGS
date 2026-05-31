@@ -30,15 +30,6 @@ $quote_statuses = [
   'rejected' => 'Rejected',
   'lost' => 'Lost',
 ];
-// Quote status badges: [label, background-color, text-color]
-$quote_badges = [
-  'received'     => ['Received',     '#dbeafe', '#1e40af'],
-  'under_review' => ['Under Review', '#fef9c3', '#854d0e'],
-  'negotiating'  => ['Negotiating',  '#ffedd5', '#9a3412'],
-  'accepted'     => ['Accepted',     '#dcfce7', '#166534'],
-  'rejected'     => ['Rejected',     '#fee2e2', '#991b1b'],
-  'lost'         => ['Lost',         '#e2e8f0', '#475569'],
-];
 $urgency_badges = [
   'low' => ['Low', '#ecfeff', '#155e75'],
   'normal' => ['Normal', '#e2e8f0', '#334155'],
@@ -1278,10 +1269,6 @@ render_header('RFQ Tracker');
                 <?= h($q['currency']) ?> <?= h(number_format((float)$q['quote_amount'], 2)) ?>
               </td>
               <td>
-                <?php
-                  $qb = $quote_badges[$q['quote_status']] ?? ['Unknown', '#e2e8f0', '#475569'];
-                ?>
-                <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:0.72em; font-weight:600; letter-spacing:0.04em; background:<?= $qb[1] ?>; color:<?= $qb[2] ?>;"><?= h($qb[0]) ?></span>
                 <form method="post" class="row" style="gap:4px; align-items:center; margin-top:4px;">
                   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
                   <input type="hidden" name="action" value="update_quote_status" />
