@@ -1,6 +1,6 @@
 <?php
 /**
- * form.php – Public laser-machine registration form.
+ * service_request_form.php – Public laser-machine service request form.
  * Open to the public; no login required.
  * Security: CSRF token, per-IP rate limit, single entry per email.
  */
@@ -51,6 +51,12 @@ $fields  = [
   'laser_watts'   => '',
   'laser_age'     => '',
   'laser_problem' => '',
+  'service_type'  => 'standard',
+];
+
+$service_types = [
+  'standard' => 'Standard Service',
+  'vip'      => 'VIP Service',
 ];
 
 // US states list for the dropdown
@@ -166,6 +172,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($fields['laser_age'] === '')   $errors[] = 'Machine age is required.';
         if ($fields['laser_problem'] === '') $errors[] = 'Problem description is required.';
 
+        if (!in_array($fields['service_type'], ['standard', 'vip'], true)) {
+          $errors[] = 'Please select a valid service type.';
+        }
+
         if ($fields['email'] !== '' && !filter_var($fields['email'], FILTER_VALIDATE_EMAIL)) {
           $errors[] = 'Please enter a valid email address.';
         }
@@ -238,8 +248,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ins_entry = $pdo->prepare(
               "INSERT INTO laser_entries
                  (user_id, first_name, last_name, cell_phone, city, state, zip_code,
-                  email, laser_brand, laser_model, laser_watts, laser_age, laser_problem, submission_ip)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                  email, laser_brand, laser_model, laser_watts, laser_age, laser_problem, service_type, submission_ip)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             );
             $ins_entry->execute([
               $new_user_id,
@@ -248,6 +258,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $fields['email'],
               $fields['laser_brand'], $fields['laser_model'],
               $fields['laser_watts'], $fields['laser_age'], $fields['laser_problem'],
+              $fields['service_type'],
               client_ip(),
             ]);
 
@@ -301,11 +312,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 }
 
-render_header('Customer Service Request Form');
+render_header('Service Request Form');
 ?>
 
 <div class="card">
-  <h1 style="margin-top:0; margin-bottom:4px;">Laser Machine Customer Service Request</h1>
+  <h1 style="margin-top:0; margin-bottom:4px;">Service Request Form</h1>
   <p class="muted" style="margin:0;">
     Fill out the form below to submit a customer service request. You will receive a verification
     email with your login credentials.
@@ -415,6 +426,18 @@ render_header('Customer Service Request Form');
         <textarea name="laser_problem" rows="5" required
                   maxlength="5000"><?= h($fields['laser_problem']) ?></textarea>
         <p class="muted" style="margin:4px 0 0;">Max 5000 characters.</p>
+      </div>
+      <div class="full">
+        <label>Type of Service <span style="color:var(--d)">*</span></label>
+        <div style="display:flex; gap:20px; margin-top:6px;">
+          <?php foreach ($service_types as $val => $label): ?>
+            <label style="display:flex; align-items:center; gap:6px; font-weight:normal; cursor:pointer;">
+              <input type="radio" name="service_type" value="<?= h($val) ?>"
+                     <?= $fields['service_type'] === $val ? 'checked' : '' ?> required />
+              <?= h($label) ?>
+            </label>
+          <?php endforeach; ?>
+        </div>
       </div>
       <div class="full">
         <div class="g-recaptcha" data-sitekey="<?= h($recaptcha_site_key) ?>"></div>

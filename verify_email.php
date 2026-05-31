@@ -64,7 +64,7 @@ render_header('Email Verification');
     <h1 style="margin-top:0; color:#991b1b;">Verification Failed</h1>
     <p class="alert error"><?= h($error) ?></p>
     <div class="row" style="justify-content:center; margin-top:18px;">
-      <a class="btn" href="form.php">Back to Form</a>
+      <a class="btn" href="service_request_form.php">Back to Form</a>
       <a class="btn" href="login.php">Log In</a>
     </div>
   <?php endif; ?>

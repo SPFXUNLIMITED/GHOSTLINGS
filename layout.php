@@ -342,7 +342,7 @@ $show_rfq_menu = $show_mod_menu;
     <?php endif; ?>
     <?php endif; ?>
     <?php render_menu_dropdown('Customer Service Requests', [
-      ['href' => 'form.php', 'file' => 'form.php', 'label' => 'Customer Service Request Form', 'visible' => true],
+      ['href' => 'service_request_form.php', 'file' => 'service_request_form.php', 'label' => 'Customer Service Request Form', 'visible' => true],
       ['href' => 'form_admin.php', 'file' => 'form_admin.php', 'label' => 'Form Entries', 'visible' => $show_mod_menu],
     ], $current); ?>
     <?php if ($show_mod_menu): ?>

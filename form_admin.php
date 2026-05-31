@@ -63,7 +63,7 @@ $count_sql = "SELECT COUNT(*) FROM laser_entries le $where";
 $data_sql  = "SELECT le.id AS entry_id, le.user_id, le.first_name, le.last_name,
                      le.cell_phone, le.city, le.state, le.zip_code, le.email,
                      le.laser_brand, le.laser_model, le.laser_watts, le.laser_age,
-                     le.laser_problem, le.submission_ip, le.created_at,
+                     le.laser_problem, le.service_type, le.submission_ip, le.created_at,
                      u.username, u.email_verified
               FROM laser_entries le
               JOIN users u ON u.id = le.user_id
@@ -139,6 +139,7 @@ render_header('Form Entries – Admin');
           <th>Phone</th>
           <th>Location</th>
           <th>Machine</th>
+          <th>Service Type</th>
           <th>Problem</th>
           <th>Submitted</th>
           <th>Verified</th>
@@ -149,7 +150,7 @@ render_header('Form Entries – Admin');
       </thead>
       <tbody>
         <?php if (!$entries): ?>
-          <tr><td colspan="<?= is_admin() ? 10 : 9 ?>" class="muted">No entries found.</td></tr>
+          <tr><td colspan="<?= is_admin() ? 11 : 10 ?>" class="muted">No entries found.</td></tr>
         <?php endif; ?>
         <?php foreach ($entries as $e): ?>
           <tr>
@@ -161,6 +162,13 @@ render_header('Form Entries – Admin');
             <td>
               <?= h($e['laser_brand']) ?><br>
               <span class="muted"><?= h($e['laser_model']) ?> &bull; <?= h($e['laser_watts']) ?> &bull; <?= h($e['laser_age']) ?></span>
+            </td>
+            <td>
+              <?php
+                $st_label = $e['service_type'] === 'vip' ? 'VIP Service' : 'Standard Service';
+                $st_color = $e['service_type'] === 'vip' ? 'background:#fef9c3; color:#854d0e; border-color:#fde047;' : '';
+              ?>
+              <span class="badge" style="<?= $st_color ?>"><?= h($st_label) ?></span>
             </td>
             <td style="max-width:220px; white-space:normal;">
               <span title="<?= h($e['laser_problem']) ?>">
