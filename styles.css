@@ -707,3 +707,145 @@ tbody tr:hover td {
     text-align: center;
   }
 }
+
+/* Shipping RFQ tracker hero banner */
+.shipping-rfq-hero {
+  position: relative;
+  overflow: hidden;
+  border: none;
+  background:
+    radial-gradient(circle at 15% 12%, rgba(125, 211, 252, 0.22), transparent 40%),
+    radial-gradient(circle at 88% 20%, rgba(167, 139, 250, 0.3), transparent 44%),
+    linear-gradient(132deg, #111827 0%, #0f766e 48%, #0891b2 100%);
+  color: #e2e8f0;
+  min-height: 210px;
+}
+
+.shipping-rfq-hero .muted {
+  color: rgba(226, 232, 240, 0.92);
+}
+
+.shipping-rfq-hero-glow {
+  position: absolute;
+  right: -90px;
+  top: -120px;
+  width: 320px;
+  height: 320px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
+.shipping-rfq-hero-body {
+  position: relative;
+  z-index: 1;
+  max-width: 760px;
+}
+
+.shipping-rfq-hero-tag {
+  display: inline-block;
+  margin-bottom: 9px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(226, 232, 240, 0.34);
+  background: rgba(17, 24, 39, 0.38);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+}
+
+.shipping-rfq-hero .page-header-body h1 {
+  margin-bottom: 8px;
+  color: #fff;
+}
+
+.shipping-rfq-hero-count {
+  font-size: 0.86em;
+  font-weight: 500;
+}
+
+.shipping-rfq-hero-pills {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.shipping-rfq-hero-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(226, 232, 240, 0.28);
+  background: rgba(17, 24, 39, 0.4);
+  color: #e2e8f0;
+  font-size: 0.875rem;
+}
+
+.shipping-rfq-hero-stats {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(124px, 1fr));
+  gap: 8px;
+}
+
+.shipping-rfq-hero-stat {
+  background: rgba(2, 132, 199, 0.24);
+  border: 1px solid rgba(226, 232, 240, 0.26);
+  border-radius: 12px;
+  padding: 8px 10px;
+}
+
+.shipping-rfq-hero-stat strong {
+  display: block;
+  font-size: 1.1rem;
+  color: #fff;
+  line-height: 1.2;
+}
+
+.shipping-rfq-hero-stat span {
+  display: block;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(226, 232, 240, 0.88);
+}
+
+.shipping-rfq-hero-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.shipping-rfq-hero-actions .btn {
+  border-color: rgba(226, 232, 240, 0.45);
+}
+
+.shipping-rfq-hero-actions .btn:not(.primary) {
+  background: rgba(17, 24, 39, 0.3);
+  color: #fff;
+}
+
+.shipping-rfq-hero-actions .btn.primary {
+  box-shadow: 0 12px 24px rgba(8, 145, 178, 0.3);
+}
+
+@media (max-width: 720px) {
+  .shipping-rfq-hero {
+    min-height: auto;
+  }
+
+  .shipping-rfq-hero-actions {
+    width: 100%;
+  }
+
+  .shipping-rfq-hero-actions .btn {
+    flex: 1;
+    text-align: center;
+  }
+}

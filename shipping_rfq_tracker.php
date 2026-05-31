@@ -343,6 +343,21 @@ $rfqs_stmt = $pdo->prepare(
 $rfqs_stmt->execute($where_args);
 $rfqs = $rfqs_stmt->fetchAll();
 
+$hero_total_rfqs   = count($rfqs);
+$hero_open_rfqs    = 0;
+$hero_booked_rfqs  = 0;
+$hero_quotes_total = 0;
+foreach ($rfqs as $rfq_row) {
+  $hero_status = (string)($rfq_row['request_status'] ?? 'draft');
+  if ($hero_status !== 'closed') {
+    $hero_open_rfqs++;
+  }
+  if ($hero_status === 'booked') {
+    $hero_booked_rfqs++;
+  }
+  $hero_quotes_total += (int)($rfq_row['quote_count'] ?? 0);
+}
+
 // Selected RFQ (for quotes view)
 $selected_rfq    = null;
 $rfq_crates      = [];
@@ -402,12 +417,40 @@ if ($rfq_text_id > 0) {
 render_header('Shipping RFQ Tracker');
 ?>
 
-<div class="card page-header">
-  <div class="page-header-body">
-    <h1>Shipping RFQ Tracker</h1>
-    <p class="muted">Track freight shipping quote requests for machines and cargo.</p>
+<div class="card shipping-rfq-hero page-header">
+  <div class="shipping-rfq-hero-glow" aria-hidden="true"></div>
+  <div class="page-header-body shipping-rfq-hero-body">
+    <span class="shipping-rfq-hero-tag">Ocean + Air Freight Command Center</span>
+    <h1>Shipping RFQ Tracker <span class="shipping-rfq-hero-count">(<?= (int)$hero_total_rfqs ?>)</span></h1>
+    <p class="muted">Orchestrate every shipment request, compare carrier bids faster, and keep cargo moving with confidence.</p>
+    <ul class="shipping-rfq-hero-pills" aria-label="Shipping RFQ highlights">
+      <li class="shipping-rfq-hero-pill"><span aria-hidden="true">📦</span> Live quote pipeline</li>
+      <li class="shipping-rfq-hero-pill"><span aria-hidden="true">🌍</span> Global route visibility</li>
+      <li class="shipping-rfq-hero-pill"><span aria-hidden="true">⚡</span> Faster booking decisions</li>
+    </ul>
+    <div class="shipping-rfq-hero-stats" aria-label="Shipping RFQ summary">
+      <div class="shipping-rfq-hero-stat">
+        <strong><?= (int)$hero_total_rfqs ?></strong>
+        <span>Total RFQs</span>
+      </div>
+      <div class="shipping-rfq-hero-stat">
+        <strong><?= (int)$hero_open_rfqs ?></strong>
+        <span>Open Pipeline</span>
+      </div>
+      <div class="shipping-rfq-hero-stat">
+        <strong><?= (int)$hero_booked_rfqs ?></strong>
+        <span>Booked</span>
+      </div>
+      <div class="shipping-rfq-hero-stat">
+        <strong><?= (int)$hero_quotes_total ?></strong>
+        <span>Quotes Logged</span>
+      </div>
+    </div>
   </div>
-  <a class="btn" href="shipping_rfq_form.php">+ New Shipping RFQ</a>
+  <div class="shipping-rfq-hero-actions">
+    <a class="btn primary" href="shipping_rfq_form.php">+ New Shipping RFQ</a>
+    <button type="button" class="btn" id="focus-srfq-filters">Explore Pipeline</button>
+  </div>
 </div>
 
 <?php if ($errors): ?>
@@ -431,7 +474,7 @@ render_header('Shipping RFQ Tracker');
     <?php endif; ?>
     <div style="flex:1; min-width:180px;">
       <label>Search</label>
-      <input type="text" name="q" value="<?= h($search) ?>"
+      <input type="text" id="shipping-rfq-search-input" name="q" value="<?= h($search) ?>"
              placeholder="Search title, model, or port…" />
     </div>
     <div style="width:200px;">
@@ -891,6 +934,17 @@ render_header('Shipping RFQ Tracker');
     sel.addEventListener('change', sync);
     sync();
   });
+
+  var heroJumpButton = document.getElementById('focus-srfq-filters');
+  var searchInput = document.getElementById('shipping-rfq-search-input');
+  if (heroJumpButton && searchInput) {
+    heroJumpButton.addEventListener('click', function () {
+      searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      requestAnimationFrame(function () {
+        searchInput.focus();
+      });
+    });
+  }
 })();
 </script>
 
