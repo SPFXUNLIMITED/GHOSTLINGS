@@ -22,6 +22,14 @@ $request_statuses = [
   'ordered' => 'Ordered',
   'closed' => 'Closed',
 ];
+$request_status_styles = [
+  'draft' => ['#f3f4f6', '#374151'],
+  'sourcing' => ['#dbeafe', '#1d4ed8'],
+  'quotes_received' => ['#dcfce7', '#166534'],
+  'shortlisted' => ['#fef3c7', '#92400e'],
+  'ordered' => ['#ede9fe', '#6d28d9'],
+  'closed' => ['#fee2e2', '#991b1b'],
+];
 $quote_statuses = [
   'received' => 'Received',
   'under_review' => 'Under Review',
@@ -29,6 +37,14 @@ $quote_statuses = [
   'accepted' => 'Accepted',
   'rejected' => 'Rejected',
   'lost' => 'Lost',
+];
+$quote_status_styles = [
+  'received' => ['#dcfce7', '#166534'],
+  'under_review' => ['#dbeafe', '#1d4ed8'],
+  'negotiating' => ['#fef3c7', '#92400e'],
+  'accepted' => ['#ede9fe', '#6d28d9'],
+  'rejected' => ['#fee2e2', '#991b1b'],
+  'lost' => ['#f3f4f6', '#374151'],
 ];
 $urgency_badges = [
   'low' => ['Low', '#ecfeff', '#155e75'],
@@ -54,6 +70,11 @@ function format_shipping_details(?string $origin, ?string $method): string {
     return $origin . ' • ' . $method;
   }
   return $origin !== '' ? $origin : $method;
+}
+
+function get_status_select_style(array $status_styles, ?string $status): string {
+  [$background, $color] = $status_styles[(string)$status] ?? ['#f3f4f6', '#374151'];
+  return 'background:' . $background . '; color:' . $color . '; border-color:' . $background . '; font-weight:600;';
 }
 
 function build_rfq_email_text(array $rfq): string {
@@ -838,6 +859,12 @@ if ($rfq_text_id > 0) {
 render_header('RFQ Tracker');
 ?>
 
+<style>
+  .status-select option {
+    font-weight: 600;
+  }
+</style>
+
 <div class="card">
   <h1 style="margin-top:0; margin-bottom:4px;">RFQ Quote Tracking</h1>
   <p class="muted" style="margin:0;">
@@ -962,9 +989,10 @@ render_header('RFQ Tracker');
                   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
                   <input type="hidden" name="action" value="update_request_status" />
                   <input type="hidden" name="rfq_id" value="<?= (int)$r['id'] ?>" />
-                  <select name="request_status" style="min-width:150px;">
+                  <select name="request_status" class="status-select" style="min-width:150px; <?= h(get_status_select_style($request_status_styles, (string)$r['request_status'])) ?>">
                     <?php foreach ($request_statuses as $k => $label): ?>
-                      <option value="<?= h($k) ?>" <?= $r['request_status'] === $k ? 'selected' : '' ?>><?= h($label) ?></option>
+                      <?php [$option_background, $option_color] = $request_status_styles[$k] ?? ['#f3f4f6', '#374151']; ?>
+                      <option value="<?= h($k) ?>" data-bg="<?= h($option_background) ?>" data-color="<?= h($option_color) ?>" style="background:<?= h($option_background) ?>; color:<?= h($option_color) ?>;" <?= $r['request_status'] === $k ? 'selected' : '' ?>><?= h($label) ?></option>
                     <?php endforeach; ?>
                   </select>
                   <button type="submit" class="btn">Save</button>
@@ -1086,9 +1114,10 @@ render_header('RFQ Tracker');
         </div>
         <div>
           <label>Quote Status</label>
-          <select name="quote_status">
+          <select name="quote_status" class="status-select" style="<?= h(get_status_select_style($quote_status_styles, (string)$editing_quote['quote_status'])) ?>">
             <?php foreach ($quote_statuses as $k => $label): ?>
-              <option value="<?= h($k) ?>" <?= $editing_quote['quote_status'] === $k ? 'selected' : '' ?>><?= h($label) ?></option>
+              <?php [$option_background, $option_color] = $quote_status_styles[$k] ?? ['#f3f4f6', '#374151']; ?>
+              <option value="<?= h($k) ?>" data-bg="<?= h($option_background) ?>" data-color="<?= h($option_color) ?>" style="background:<?= h($option_background) ?>; color:<?= h($option_color) ?>;" <?= $editing_quote['quote_status'] === $k ? 'selected' : '' ?>><?= h($label) ?></option>
             <?php endforeach; ?>
           </select>
         </div>
@@ -1203,9 +1232,10 @@ render_header('RFQ Tracker');
         </div>
         <div>
           <label>Quote Status</label>
-          <select name="quote_status">
+          <select name="quote_status" class="status-select" style="<?= h(get_status_select_style($quote_status_styles, (string)($add_quote_post['quote_status'] ?? 'received'))) ?>">
             <?php foreach ($quote_statuses as $k => $label): ?>
-              <option value="<?= h($k) ?>" <?= ($add_quote_post['quote_status'] ?? 'received') === $k ? 'selected' : '' ?>><?= h($label) ?></option>
+              <?php [$option_background, $option_color] = $quote_status_styles[$k] ?? ['#f3f4f6', '#374151']; ?>
+              <option value="<?= h($k) ?>" data-bg="<?= h($option_background) ?>" data-color="<?= h($option_color) ?>" style="background:<?= h($option_background) ?>; color:<?= h($option_color) ?>;" <?= ($add_quote_post['quote_status'] ?? 'received') === $k ? 'selected' : '' ?>><?= h($label) ?></option>
             <?php endforeach; ?>
           </select>
         </div>
@@ -1274,9 +1304,10 @@ render_header('RFQ Tracker');
                   <input type="hidden" name="action" value="update_quote_status" />
                   <input type="hidden" name="rfq_id" value="<?= (int)$selected_rfq['id'] ?>" />
                   <input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>" />
-                  <select name="quote_status" style="min-width:120px;">
+                  <select name="quote_status" class="status-select" style="min-width:120px; <?= h(get_status_select_style($quote_status_styles, (string)$q['quote_status'])) ?>">
                     <?php foreach ($quote_statuses as $k => $ql): ?>
-                      <option value="<?= h($k) ?>" <?= $q['quote_status'] === $k ? 'selected' : '' ?>><?= h($ql) ?></option>
+                      <?php [$option_background, $option_color] = $quote_status_styles[$k] ?? ['#f3f4f6', '#374151']; ?>
+                      <option value="<?= h($k) ?>" data-bg="<?= h($option_background) ?>" data-color="<?= h($option_color) ?>" style="background:<?= h($option_background) ?>; color:<?= h($option_color) ?>;" <?= $q['quote_status'] === $k ? 'selected' : '' ?>><?= h($ql) ?></option>
                     <?php endforeach; ?>
                   </select>
                   <button type="submit" class="btn">Save</button>
@@ -1323,5 +1354,25 @@ render_header('RFQ Tracker');
     </div>
   </div>
 <?php endif; ?>
+
+<script>
+  (function() {
+    function applyStatusSelectColors(select) {
+      if (!select || !select.options || select.selectedIndex < 0) return;
+      const option = select.options[select.selectedIndex];
+      select.style.background = option.dataset.bg || '#f3f4f6';
+      select.style.color = option.dataset.color || '#374151';
+      select.style.borderColor = option.dataset.bg || '#f3f4f6';
+      select.style.fontWeight = '600';
+    }
+
+    document.querySelectorAll('.status-select').forEach(function(select) {
+      applyStatusSelectColors(select);
+      select.addEventListener('change', function() {
+        applyStatusSelectColors(select);
+      });
+    });
+  })();
+</script>
 
 <?php render_footer(); ?>
