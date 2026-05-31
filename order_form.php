@@ -53,7 +53,8 @@ function normalize_nullable_text(string $value): ?string {
 }
 
 function format_percentage_label(float $value): string {
-  return preg_replace('/(?:\.0+|(\.\d*?)0+)$/', '$1', number_format($value, 2, '.', '')) ?: '0';
+  // Remove trailing decimal zeros so default payment terms read as 30%/70% instead of 30.00%/70.00%.
+  return rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
 }
 
 function format_order_shipping(?string $origin, ?string $method): string {
@@ -351,6 +352,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
 
       if ($is_new_order) {
+        // Only the first conversion to a purchase order should move the parent RFQ into ordered status.
         $rfq_status_update = $pdo->prepare("UPDATE rfq_requests SET request_status = 'ordered' WHERE id = ? AND request_status NOT IN ('ordered', 'closed')");
         $rfq_status_update->execute([$rfq_id]);
       }
