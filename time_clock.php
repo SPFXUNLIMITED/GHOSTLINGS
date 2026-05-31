@@ -275,9 +275,6 @@ render_header('Time Clock');
         <?php foreach ($sourcing_rfqs as $rfq): ?>
           <option value="<?= (int)$rfq['id'] ?>">RFQ #<?= (int)$rfq['id'] ?> – <?= h($rfq['request_title']) ?></option>
         <?php endforeach; ?>
-        <?php if (!$sourcing_rfqs): ?>
-          <option value="" disabled>No active sourcing RFQs</option>
-        <?php endif; ?>
       </select>
 
       <label>Note (or select a project)</label>
@@ -317,9 +314,6 @@ render_header('Time Clock');
           <?php foreach ($sourcing_rfqs as $rfq): ?>
             <option value="<?= (int)$rfq['id'] ?>">RFQ #<?= (int)$rfq['id'] ?> – <?= h($rfq['request_title']) ?></option>
           <?php endforeach; ?>
-          <?php if (!$sourcing_rfqs): ?>
-            <option value="" disabled>No active sourcing RFQs</option>
-          <?php endif; ?>
         </select>
       </div>
       <div>
