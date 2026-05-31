@@ -78,9 +78,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               if ($stored_name === '') {
                 continue;
               }
+              if (!preg_match('/^[A-Za-z0-9._-]+$/', $stored_name)) {
+                error_log('Skipped deleting order document with unsafe stored name for order #' . $order_id . ': ' . $stored_name);
+                continue;
+              }
               $path = __DIR__ . '/uploads/' . $stored_name;
-              if (is_file($path)) {
-                @unlink($path);
+              if (is_file($path) && !unlink($path)) {
+                error_log('Failed to delete order document file for order #' . $order_id . ': ' . $stored_name);
               }
             }
             $success = 'Order deleted.';
@@ -89,6 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           if ($pdo->inTransaction()) {
             $pdo->rollBack();
           }
+          error_log('Failed to delete order #' . $order_id . ': ' . $e->getMessage());
           $errors[] = 'Unable to delete order right now. Please try again.';
         }
       }
