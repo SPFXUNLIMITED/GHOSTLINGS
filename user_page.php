@@ -213,7 +213,7 @@ render_header('My Profile');
 <?php if ($is_standard_user && !$has_entry): ?>
   <div class="card" style="text-align:center; padding:32px;">
     <p class="muted">No customer service request found for your account.</p>
-    <a class="btn primary" href="form.php">Submit a Customer Service Request</a>
+    <a class="btn primary" href="service_request_form.php">Submit a Customer Service Request</a>
   </div>
 <?php elseif ($is_standard_user): ?>
 

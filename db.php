@@ -278,6 +278,7 @@ $pdo->exec("
     laser_watts         VARCHAR(50)  NOT NULL,
     laser_age           VARCHAR(50)  NOT NULL,
     laser_problem       TEXT         NOT NULL,
+    service_type        VARCHAR(20)  NOT NULL DEFAULT 'standard',
     submission_ip       VARCHAR(45)  NULL,
     created_at          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
@@ -285,6 +286,15 @@ $pdo->exec("
     KEY idx_le_email (email)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+// Add service_type column to laser_entries if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE laser_entries ADD COLUMN service_type VARCHAR(20) NOT NULL DEFAULT 'standard' AFTER laser_problem");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
 
 // Add bumped_at column to projects if it does not exist yet
 try {

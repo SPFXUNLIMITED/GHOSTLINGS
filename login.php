@@ -91,7 +91,7 @@ render_header('Login');
 
     <div class="row" style="margin-top:12px;">
       <button class="btn primary" type="submit">Sign in</button>
-      <a class="btn" href="form.php">Register via Form</a>
+      <a class="btn" href="service_request_form.php">Register via Form</a>
     </div>
   </form>
 </div>
