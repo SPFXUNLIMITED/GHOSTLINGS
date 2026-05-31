@@ -3,6 +3,23 @@ require __DIR__ . '/db.php';
 require __DIR__ . '/auth.php';
 require_rfq_access();
 
+const ORDER_DOC_MAX_BYTES = 20 * 1024 * 1024; // 20 MB
+const ORDER_DOC_ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'zip'];
+const ORDER_DOC_ALLOWED_MIMES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/csv',
+  'text/plain',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/zip',
+];
+
 $valid_doc_types = [
   'proforma_invoice',
   'commercial_invoice',
@@ -44,19 +61,27 @@ if (($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
   exit('Upload failed (code ' . (int)$f['error'] . ')');
 }
 
-$uploadsDir = __DIR__ . '/uploads';
-if (!is_dir($uploadsDir)) {
-  @mkdir($uploadsDir, 0775, true);
-}
-if (!is_dir($uploadsDir) || !is_writable($uploadsDir)) {
-  http_response_code(500);
-  exit('uploads/ directory is missing or not writable');
+$sizeBytes = (int)($f['size'] ?? 0);
+if ($sizeBytes > ORDER_DOC_MAX_BYTES) {
+  http_response_code(400);
+  exit('File exceeds maximum allowed size of ' . (ORDER_DOC_MAX_BYTES / 1024 / 1024) . ' MB');
 }
 
 $originalName = (string)($f['name'] ?? 'file');
 $tmpPath = (string)($f['tmp_name'] ?? '');
-$sizeBytes = (int)($f['size'] ?? 0);
 
+// Validate extension against whitelist
+$ext = '';
+$dot = strrpos($originalName, '.');
+if ($dot !== false) {
+  $ext = strtolower(substr($originalName, $dot + 1));
+}
+if (!in_array($ext, ORDER_DOC_ALLOWED_EXTENSIONS, true)) {
+  http_response_code(400);
+  exit('File type not allowed. Allowed types: ' . implode(', ', ORDER_DOC_ALLOWED_EXTENSIONS));
+}
+
+// Detect MIME and validate against whitelist
 $mime = null;
 if (is_file($tmpPath) && function_exists('finfo_open')) {
   $fi = finfo_open(FILEINFO_MIME_TYPE);
@@ -65,16 +90,21 @@ if (is_file($tmpPath) && function_exists('finfo_open')) {
     finfo_close($fi);
   }
 }
-
-$ext = '';
-$dot = strrpos($originalName, '.');
-if ($dot !== false) {
-  $ext = strtolower(substr($originalName, $dot + 1));
-  $ext = preg_replace('/[^a-z0-9]+/i', '', $ext);
-  if ($ext !== '') $ext = '.' . $ext;
+if ($mime !== null && !in_array($mime, ORDER_DOC_ALLOWED_MIMES, true)) {
+  http_response_code(400);
+  exit('File content type not allowed');
 }
 
-$storedName = 'od' . $order_id . '_' . bin2hex(random_bytes(16)) . $ext;
+$uploadsDir = __DIR__ . '/uploads';
+if (!is_dir($uploadsDir)) {
+  @mkdir($uploadsDir, 0755, true);
+}
+if (!is_dir($uploadsDir) || !is_writable($uploadsDir)) {
+  http_response_code(500);
+  exit('uploads/ directory is missing or not writable');
+}
+
+$storedName = 'od' . $order_id . '_' . bin2hex(random_bytes(16)) . '.' . $ext;
 $destPath = $uploadsDir . '/' . $storedName;
 
 if (!move_uploaded_file($tmpPath, $destPath)) {

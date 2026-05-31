@@ -664,7 +664,7 @@ if (($order['id'] ?? 0) > 0) {
     <?php $files = $order_documents[$type_key] ?? []; ?>
     <div class="doc-section">
       <div class="doc-section-header">
-        <span class="doc-icon"><?= $type_info['icon'] ?></span>
+        <span class="doc-icon" role="img" aria-label="<?= h($type_info['label']) ?>"><?= $type_info['icon'] ?></span>
         <span class="doc-label"><?= h($type_info['label']) ?></span>
         <?php if ($files): ?>
           <span class="muted" style="font-size:12px; margin-left:auto;"><?= count($files) ?> file<?= count($files) !== 1 ? 's' : '' ?></span>
@@ -676,25 +676,29 @@ if (($order['id'] ?? 0) > 0) {
             <?php foreach ($files as $f): ?>
               <?php
                 $fext = strtolower(pathinfo($f['original_name'], PATHINFO_EXTENSION));
-                $ficon = match($fext) {
-                  'pdf'             => '📄',
-                  'doc', 'docx'     => '📝',
-                  'xls', 'xlsx'     => '📊',
+                [$ficon, $ficon_label] = match($fext) {
+                  'pdf'                   => ['📄', 'PDF document'],
+                  'doc', 'docx'           => ['📝', 'Word document'],
+                  'xls', 'xlsx', 'csv'    => ['📊', 'Spreadsheet'],
                   'jpg', 'jpeg',
-                  'png', 'gif',
-                  'webp'            => '🖼️',
-                  'zip', 'rar','7z' => '🗜️',
-                  default           => '📎',
+                  'png', 'gif', 'webp'    => ['🖼️', 'Image file'],
+                  'zip', 'rar', '7z'      => ['🗜️', 'Archive file'],
+                  default                 => ['📎', 'File'],
                 };
-                $kb = number_format(((int)$f['size_bytes']) / 1024, 1);
+                $bytes = (int)$f['size_bytes'];
+                if ($bytes >= 1048576) {
+                  $size_str = number_format($bytes / 1048576, 1) . ' MB';
+                } else {
+                  $size_str = number_format($bytes / 1024, 1) . ' KB';
+                }
               ?>
               <li class="doc-file-item">
-                <span class="doc-file-icon"><?= $ficon ?></span>
+                <span class="doc-file-icon" role="img" aria-label="<?= h($ficon_label) ?>"><?= $ficon ?></span>
                 <div class="doc-file-meta">
                   <div class="doc-file-name" title="<?= h($f['original_name']) ?>"><?= h($f['original_name']) ?></div>
-                  <div class="doc-file-sub"><?= h($f['mime_type'] ?? 'file') ?> · <?= $kb ?> KB · <?= h($f['created_at']) ?></div>
+                  <div class="doc-file-sub"><?= h($f['mime_type'] ?? 'file') ?> · <?= $size_str ?> · <?= h($f['created_at']) ?></div>
                 </div>
-                <a class="btn" href="uploads/<?= h($f['stored_name']) ?>" target="_blank" rel="noopener">Open</a>
+                <a class="btn" href="order_document_file.php?id=<?= (int)$f['id'] ?>&inline=1" target="_blank" rel="noopener">Open</a>
                 <a class="btn danger"
                    href="order_document_delete.php?id=<?= (int)$f['id'] ?>&order_id=<?= (int)$order['id'] ?>"
                    onclick="return confirm('Delete this file?');">Delete</a>
