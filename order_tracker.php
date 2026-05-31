@@ -346,7 +346,7 @@ render_header('Order Tracker');
       </div>
     </div>
     <div class="order-hero-actions">
-      <a href="rfq_tracker.php" class="order-hero-btn ohb-white">📋 RFQ Tracker</a>
+      <a href="sourcing_rfq_tracker.php" class="order-hero-btn ohb-white">📋 RFQ Tracker</a>
       <a href="order_tracker.php" class="order-hero-btn ohb-ghost">↺ View All Orders</a>
     </div>
   </div>
@@ -386,7 +386,7 @@ render_header('Order Tracker');
     <div class="row">
       <button type="submit" class="btn primary">Filter</button>
       <a class="btn" href="order_tracker.php">Clear</a>
-      <a class="btn" href="rfq_tracker.php">RFQ Tracker</a>
+      <a class="btn" href="sourcing_rfq_tracker.php">RFQ Tracker</a>
     </div>
   </form>
 </div>
@@ -453,7 +453,7 @@ render_header('Order Tracker');
             </td>
             <td class="col-actions">
               <a class="btn" href="order_form.php?order_id=<?= (int)$order['id'] ?>">Edit</a>
-              <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$order['rfq_request_id'] ?>">RFQ</a>
+              <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$order['rfq_request_id'] ?>">RFQ</a>
               <form method="post" style="display:inline;" onsubmit="return confirm('Delete this order? This cannot be undone.');">
                 <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_order_tracker_csrf']) ?>">
                 <input type="hidden" name="action" value="delete_order">

@@ -230,7 +230,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fields['additional_notes'] === '' ? null : $fields['additional_notes'],
         $edit_rfq_id,
       ]);
-      header('Location: rfq_tracker.php');
+      header('Location: sourcing_rfq_tracker.php');
       exit;
     } else {
       $stmt = $pdo->prepare(
@@ -297,13 +297,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 }
 
-render_header($is_edit_mode ? ('Edit RFQ #' . $edit_rfq_id) : ($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'Sourcing RFQ Form'));
+render_header($is_edit_mode ? ('Edit Sourcing RFQ #' . $edit_rfq_id) : ($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'Sourcing RFQ Form'));
 ?>
 
 <div class="card page-header">
   <div class="page-header-body">
     <h1>
-      <?= $is_edit_mode ? ('Edit RFQ Request #' . (int)$edit_rfq_id) : ($is_parts_entrypoint ? 'CO2 Laser Parts RFQ / Sourcing Requests' : 'Sourcing RFQ Form') ?>
+      <?= $is_edit_mode ? ('Edit Sourcing RFQ Request #' . (int)$edit_rfq_id) : ($is_parts_entrypoint ? 'CO2 Laser Parts RFQ / Sourcing Requests' : 'Sourcing RFQ Form') ?>
     </h1>
     <p class="muted">
       <?= $is_edit_mode
@@ -311,7 +311,7 @@ render_header($is_edit_mode ? ('Edit RFQ #' . $edit_rfq_id) : ($is_parts_entrypo
         : 'Submit either machine RFQs or parts sourcing requests (chillers, blowers, laser tubes, and more) in one workflow.' ?>
     </p>
   </div>
-  <a class="btn" href="rfq_tracker.php">Sourcing RFQ Tracker →</a>
+  <a class="btn" href="sourcing_rfq_tracker.php">Sourcing RFQ Tracker →</a>
 </div>
 
 <?php if ($errors): ?>
@@ -485,11 +485,11 @@ render_header($is_edit_mode ? ('Edit RFQ #' . $edit_rfq_id) : ($is_parts_entrypo
   <div class="row" style="margin-top:18px;">
     <button type="submit" class="btn primary"><?= $is_edit_mode ? 'Save Changes' : 'Submit Request' ?></button>
     <?php if (!$is_edit_mode): ?>
-    <a class="btn" href="<?= $fields['request_category'] === 'parts' ? 'rfq_form.php?request_category=machine' : 'rfq_form.php?request_category=parts' ?>">
+    <a class="btn" href="<?= $fields['request_category'] === 'parts' ? 'sourcing_rfq_form.php?request_category=machine' : 'sourcing_rfq_form.php?request_category=parts' ?>">
       <?= $fields['request_category'] === 'parts' ? 'Switch to Machine RFQ Form' : 'Switch to Parts RFQ Form' ?>
     </a>
     <?php endif; ?>
-    <a class="btn" href="rfq_tracker.php">Go to Sourcing RFQ Tracker</a>
+    <a class="btn" href="sourcing_rfq_tracker.php">Go to Sourcing RFQ Tracker</a>
   </div>
 </form>
 

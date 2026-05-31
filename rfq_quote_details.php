@@ -52,7 +52,7 @@ function format_quote_percent_with_amount($percent, $amount): string {
 $rfq_id = isset($_GET['rfq_id']) ? (int)$_GET['rfq_id'] : 0;
 $quote_id = isset($_GET['quote_id']) ? (int)$_GET['quote_id'] : 0;
 if ($rfq_id <= 0 || $quote_id <= 0) {
-  header('Location: rfq_tracker.php');
+  header('Location: sourcing_rfq_tracker.php');
   exit;
 }
 
@@ -72,7 +72,7 @@ $quote = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$quote) {
   http_response_code(404);
   render_header('Quote Not Found');
-  echo '<div class="card"><p class="muted">Quote not found.</p><a class="btn" href="rfq_tracker.php?rfq_id=' . (int)$rfq_id . '">← Back to RFQ Quotes</a></div>';
+  echo '<div class="card"><p class="muted">Quote not found.</p><a class="btn" href="sourcing_rfq_tracker.php?rfq_id=' . (int)$rfq_id . '">← Back to RFQ Quotes</a></div>';
   render_footer();
   exit;
 }
@@ -125,8 +125,8 @@ render_header('Quote Details');
       <p class="muted" style="margin:6px 0 0 0;">RFQ #<?= (int)$quote['rfq_request_id'] ?> — <?= h((string)$quote['request_title']) ?></p>
     </div>
     <div class="actions">
-      <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$quote['rfq_request_id'] ?>">Back to RFQ Quotes</a>
-      <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$quote['rfq_request_id'] ?>&edit_quote_id=<?= (int)$quote['id'] ?>">Edit Quote</a>
+      <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$quote['rfq_request_id'] ?>">Back to RFQ Quotes</a>
+      <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$quote['rfq_request_id'] ?>&edit_quote_id=<?= (int)$quote['id'] ?>">Edit Quote</a>
     </div>
   </div>
 </div>
