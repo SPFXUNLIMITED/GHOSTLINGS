@@ -427,18 +427,54 @@ render_header('Service Request Form');
                   maxlength="5000"><?= h($fields['laser_problem']) ?></textarea>
         <p class="muted" style="margin:4px 0 0;">Max 5000 characters.</p>
       </div>
-      <div class="full">
-        <label>Type of Service <span style="color:var(--d)">*</span></label>
-        <div style="display:flex; gap:20px; margin-top:6px;">
-          <?php foreach ($service_types as $val => $label): ?>
-            <label style="display:flex; align-items:center; gap:6px; font-weight:normal; cursor:pointer;">
-              <input type="radio" name="service_type" value="<?= h($val) ?>"
-                     <?= $fields['service_type'] === $val ? 'checked' : '' ?> required />
-              <?= h($label) ?>
-            </label>
-          <?php endforeach; ?>
-        </div>
-      </div>
+    </div>
+
+    <h2 style="margin-top:28px;">Type of Service <span style="color:var(--d)">*</span></h2>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-top:12px;">
+
+      <label class="svc-card" for="svc_standard" style="
+        display:flex; flex-direction:column; align-items:center; text-align:center;
+        border:2px solid var(--b); border-radius:12px; padding:24px 20px; cursor:pointer;
+        transition:border-color .2s, box-shadow .2s; background:var(--card,#fff);
+      ">
+        <input type="radio" id="svc_standard" name="service_type" value="standard"
+               <?= $fields['service_type'] === 'standard' ? 'checked' : '' ?> required
+               style="position:absolute; opacity:0; pointer-events:none;" />
+        <span style="font-size:2.4rem; line-height:1; margin-bottom:10px;">🔧</span>
+        <strong style="font-size:1.1rem; margin-bottom:6px;">Standard Service</strong>
+        <span style="font-size:.85rem; color:var(--muted,#666);">Normal turnaround &amp; support queue — great for non-urgent repairs.</span>
+      </label>
+
+      <label class="svc-card" for="svc_vip" style="
+        display:flex; flex-direction:column; align-items:center; text-align:center;
+        border:2px solid var(--b); border-radius:12px; padding:24px 20px; cursor:pointer;
+        transition:border-color .2s, box-shadow .2s; background:var(--card,#fff);
+      ">
+        <input type="radio" id="svc_vip" name="service_type" value="vip"
+               <?= $fields['service_type'] === 'vip' ? 'checked' : '' ?>
+               style="position:absolute; opacity:0; pointer-events:none;" />
+        <span style="font-size:2.4rem; line-height:1; margin-bottom:10px;">👑</span>
+        <strong style="font-size:1.1rem; margin-bottom:6px; color:#b8860b;">VIP Service</strong>
+        <span style="font-size:.85rem; color:var(--muted,#666);">Priority handling, expedited turnaround &amp; dedicated support for your machine.</span>
+        <span style="margin-top:10px; display:inline-block; font-size:.75rem; font-weight:600;
+              background:#fef3c7; color:#92400e; border:1px solid #f59e0b; border-radius:99px;
+              padding:2px 12px; letter-spacing:.04em;">⚡ PRIORITY</span>
+      </label>
+
+    </div>
+    <style>
+      .svc-card:has(input[type="radio"]:checked) {
+        border-color: #f59e0b;
+        box-shadow: 0 0 0 3px rgba(245,158,11,.25);
+      }
+      .svc-card:hover {
+        border-color: #d97706;
+        box-shadow: 0 2px 10px rgba(0,0,0,.12);
+      }
+    </style>
+    <hr style="margin:24px 0; border:none; border-top:2px solid var(--b);" />
+
+    <div class="form-grid" style="margin-top:0;">
       <div class="full">
         <div class="g-recaptcha" data-sitekey="<?= h($recaptcha_site_key) ?>"></div>
       </div>
