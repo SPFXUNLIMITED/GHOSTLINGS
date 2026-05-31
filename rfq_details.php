@@ -16,15 +16,6 @@ $request_statuses = [
   'ordered' => 'Ordered',
   'closed' => 'Closed',
 ];
-// Stage level badges: [label, background-color, text-color]
-$stage_badges = [
-  'draft'           => ['Low',      '#e2e8f0', '#475569'],
-  'sourcing'        => ['Moderate', '#fef9c3', '#854d0e'],
-  'quotes_received' => ['Moderate', '#fef9c3', '#854d0e'],
-  'shortlisted'     => ['High',     '#ffedd5', '#9a3412'],
-  'ordered'         => ['Critical', '#fee2e2', '#991b1b'],
-  'closed'          => ['Closed',   '#f1f5f9', '#64748b'],
-];
 $quote_statuses = [
   'received'     => 'Received',
   'under_review' => 'Under Review',
@@ -213,10 +204,6 @@ render_header('RFQ Details');
       <tr>
         <th style="width:220px;">Status</th>
         <td>
-          <?php
-            $sb = $stage_badges[$rfq['request_status']] ?? ['Unknown', '#e2e8f0', '#475569'];
-          ?>
-          <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:0.72em; font-weight:600; letter-spacing:0.04em; background:<?= $sb[1] ?>; color:<?= $sb[2] ?>; vertical-align:middle;"><?= h($sb[0]) ?></span>
           <form method="post" class="row" style="gap:6px; align-items:center; margin-top:6px;">
             <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
             <input type="hidden" name="action" value="update_request_status" />
