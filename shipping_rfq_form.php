@@ -505,7 +505,7 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form
   const METERS_TO_FEET = 3.280839895;
 
   function formatLengthValue(val) {
-    return val.toFixed(DECIMAL_PRECISION).replace(/\.?0+$/, '');
+    return String(Number(val.toFixed(DECIMAL_PRECISION)));
   }
 
   function setConverterValues(meters) {
@@ -545,10 +545,10 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form
     });
   }
 
-  function noConversion(v) { return v; }
+  function identity(v) { return v; }
 
   if (meterInput && cmInput && feetInput) {
-    bindLengthConverter(meterInput, noConversion);
+    bindLengthConverter(meterInput, identity);
     bindLengthConverter(cmInput, function (v) { return v / 100; });
     bindLengthConverter(feetInput, function (v) { return v / METERS_TO_FEET; });
   }
