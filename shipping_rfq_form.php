@@ -500,6 +500,7 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form
   const cmInput = document.getElementById('length_centimeter');
   const feetInput = document.getElementById('length_feet');
   let updatingConverter = false;
+  // Keep enough precision to avoid rounding drift across repeated conversions.
   const DECIMAL_PRECISION = 6;
   const METERS_TO_FEET = 3.280839895;
 
@@ -544,10 +545,10 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form
     });
   }
 
-  function identityValue(v) { return v; }
+  function noConversion(v) { return v; }
 
   if (meterInput && cmInput && feetInput) {
-    bindLengthConverter(meterInput, identityValue);
+    bindLengthConverter(meterInput, noConversion);
     bindLengthConverter(cmInput, function (v) { return v / 100; });
     bindLengthConverter(feetInput, function (v) { return v / METERS_TO_FEET; });
   }
