@@ -390,6 +390,7 @@ foreach ([
   try {
     $pdo->exec($sql);
   } catch (PDOException $e) {
+    // 42S21 = duplicate column name
     if ($e->getCode() !== '42S21') {
       throw $e;
     }

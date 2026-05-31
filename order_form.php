@@ -4,7 +4,7 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_rfq_access();
 
-const MAX_PRODUCTION_LEAD_TIME_DAYS = 730;
+const MAX_PRODUCTION_LEAD_TIME_DAYS = 730; // allow long custom-build/import lead times without leaving the field unbounded
 const DEFAULT_DEPOSIT_PERCENT = 30.00;
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -30,7 +30,7 @@ $errors = [];
 $success = isset($_GET['saved']) ? 'Purchase order saved.' : '';
 
 function format_order_money($value, string $currency): string {
-  return $value !== null ? h($currency) . ' ' . h(number_format((float)$value, 2)) : '—';
+  return $value !== null ? h($currency . ' ' . number_format((float)$value, 2)) : '—';
 }
 
 function format_order_field($value): string {
@@ -53,7 +53,7 @@ function normalize_nullable_text(string $value): ?string {
 }
 
 function format_percentage_label(float $value): string {
-  return rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
+  return preg_replace('/(?:\.0+|(\.\d*?)0+)$/', '$1', number_format($value, 2, '.', '')) ?: '0';
 }
 
 function format_order_shipping(?string $origin, ?string $method): string {
@@ -136,7 +136,7 @@ if ($rfq_id > 0 && $quote_id > 0) {
   }
 }
 
-if (!$order && $source_quote && $source_quote['quote_status'] !== 'accepted') {
+if (!$order && $source_quote && (string)$source_quote['quote_status'] !== 'accepted') {
   http_response_code(400);
   render_header('Accepted Quote Required');
   echo '<div class="card"><p class="muted">Only accepted quotes can be converted into purchase orders.</p><a class="btn" href="rfq_tracker.php?rfq_id=' . (int)$rfq_id . '">← Back to RFQ Quotes</a></div>';
