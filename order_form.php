@@ -4,8 +4,9 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_rfq_access();
 
-const MAX_PRODUCTION_LEAD_TIME_DAYS = 730; // allow long custom-build/import lead times without leaving the field unbounded
+const MAX_PRODUCTION_LEAD_TIME_DAYS = 730; // Maximum 730 days (2 years) to accommodate long custom manufacturing/import lead times.
 const DEFAULT_DEPOSIT_PERCENT = 30.00;
+const PENDING_PO_NUMBER_PLACEHOLDER = 'Will be generated on save';
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
@@ -412,7 +413,7 @@ if (!$order && $source_quote) {
     'rfq_request_id' => $rfq_id,
     'rfq_quote_id' => $quote_id,
     'request_title' => $source_quote['request_title'],
-    'po_number' => 'Will be generated on save',
+    'po_number' => PENDING_PO_NUMBER_PLACEHOLDER,
     'order_status' => 'draft',
     'order_date' => $prefill_order_date,
     'expected_ready_date' => $prefill_ready_date,
@@ -450,7 +451,7 @@ render_header('Purchase Order Form');
     <div class="page-header-body">
       <h1 style="margin:0;">Purchase Order</h1>
       <p class="muted" style="margin:6px 0 0 0;">
-        <?= h((string)($order['po_number'] ?? 'Will be generated on save')) ?> · RFQ #<?= (int)$rfq_id ?> · Quote #<?= (int)$quote_id ?>
+        <?= h((string)($order['po_number'] ?? PENDING_PO_NUMBER_PLACEHOLDER)) ?> · RFQ #<?= (int)$rfq_id ?> · Quote #<?= (int)$quote_id ?>
       </p>
     </div>
     <div class="row">
@@ -496,7 +497,7 @@ render_header('Purchase Order Form');
 
     <div>
       <label>PO Number</label>
-      <input type="text" value="<?= h((string)($order['po_number'] ?? 'Will be generated on save')) ?>" readonly>
+      <input type="text" value="<?= h((string)($order['po_number'] ?? PENDING_PO_NUMBER_PLACEHOLDER)) ?>" readonly>
     </div>
     <div>
       <label>Order Status</label>

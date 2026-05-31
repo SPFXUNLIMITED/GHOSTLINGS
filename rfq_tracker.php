@@ -1351,7 +1351,7 @@ render_header('RFQ Tracker');
                 <?php endif; ?>
                 <?php if (isset($orders_by_quote_id[(int)$q['id']])): ?>
                   <a class="btn" href="order_form.php?order_id=<?= (int)$orders_by_quote_id[(int)$q['id']]['id'] ?>">
-                    PO <?= h((string)($orders_by_quote_id[(int)$q['id']]['po_number'] ?: '#' . (int)$orders_by_quote_id[(int)$q['id']]['id'])) ?>
+                    <?= h((string)($orders_by_quote_id[(int)$q['id']]['po_number'] ?: 'PO #' . (int)$orders_by_quote_id[(int)$q['id']]['id'])) ?>
                   </a>
                 <?php endif; ?>
                 <form method="post" style="display:inline;"
