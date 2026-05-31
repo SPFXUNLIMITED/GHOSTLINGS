@@ -800,6 +800,21 @@ foreach ($params as $k => $v) {
 $stmt->execute();
 $rfqs = $stmt->fetchAll();
 
+$hero_total_rfqs   = count($rfqs);
+$hero_active_rfqs  = 0;
+$hero_sourcing_rfqs = 0;
+$hero_quotes_total = 0;
+foreach ($rfqs as $rfq_row) {
+  $hero_status = (string)($rfq_row['request_status'] ?? 'draft');
+  if ($hero_status !== 'closed') {
+    $hero_active_rfqs++;
+  }
+  if ($hero_status === 'sourcing') {
+    $hero_sourcing_rfqs++;
+  }
+  $hero_quotes_total += (int)($rfq_row['quote_count'] ?? 0);
+}
+
 $selected_rfq = null;
 $quotes = [];
 $editing_quote = null;
@@ -872,11 +887,46 @@ render_header('RFQ Tracker');
   }
 </style>
 
-<div class="card">
-  <h1 style="margin-top:0; margin-bottom:4px;">RFQ Quote Tracking</h1>
-  <p class="muted" style="margin:0;">
-    Track supplier quotes, lead times, and shipping costs for machine RFQs and laser parts sourcing.
-  </p>
+<div class="card laser-rfq-hero page-header">
+  <div class="laser-rfq-hero-beams" aria-hidden="true">
+    <span class="laser-rfq-beam laser-rfq-beam-1"></span>
+    <span class="laser-rfq-beam laser-rfq-beam-2"></span>
+    <span class="laser-rfq-beam laser-rfq-beam-3"></span>
+  </div>
+  <div class="laser-rfq-hero-glow" aria-hidden="true"></div>
+  <div class="page-header-body laser-rfq-hero-body">
+    <span class="laser-rfq-hero-tag">🔴 Global Laser Sourcing Command Center</span>
+    <h1>RFQ Quote Tracking <span class="laser-rfq-hero-count">(<?= (int)$hero_total_rfqs ?>)</span></h1>
+    <p class="muted">Source precision laser cutting machinery and parts from global factories — compare supplier bids, track lead times, and drive the best deals to the table.</p>
+    <ul class="laser-rfq-hero-pills" aria-label="Sourcing highlights">
+      <li class="laser-rfq-hero-pill"><span aria-hidden="true">🏭</span> Factory-direct sourcing</li>
+      <li class="laser-rfq-hero-pill"><span aria-hidden="true">⚡</span> Live quote pipeline</li>
+      <li class="laser-rfq-hero-pill"><span aria-hidden="true">🌏</span> Global supplier network</li>
+      <li class="laser-rfq-hero-pill"><span aria-hidden="true">🔧</span> Machines &amp; precision parts</li>
+    </ul>
+    <div class="laser-rfq-hero-stats" aria-label="RFQ sourcing summary">
+      <div class="laser-rfq-hero-stat">
+        <strong><?= (int)$hero_total_rfqs ?></strong>
+        <span>Total RFQs</span>
+      </div>
+      <div class="laser-rfq-hero-stat">
+        <strong><?= (int)$hero_active_rfqs ?></strong>
+        <span>Active Pipeline</span>
+      </div>
+      <div class="laser-rfq-hero-stat">
+        <strong><?= (int)$hero_sourcing_rfqs ?></strong>
+        <span>In Sourcing</span>
+      </div>
+      <div class="laser-rfq-hero-stat">
+        <strong><?= (int)$hero_quotes_total ?></strong>
+        <span>Quotes Logged</span>
+      </div>
+    </div>
+  </div>
+  <div class="laser-rfq-hero-actions">
+    <a class="btn primary" href="rfq_form.php">+ New Machine RFQ</a>
+    <a class="btn" href="rfq_form.php?request_category=parts">+ New Parts RFQ</a>
+  </div>
 </div>
 
 <?php if ($errors): ?>
@@ -912,8 +962,6 @@ render_header('RFQ Tracker');
     <div class="row">
       <button type="submit" class="btn primary">Filter</button>
       <a class="btn" href="rfq_tracker.php">Clear</a>
-      <a class="btn" href="rfq_form.php">New RFQ</a>
-      <a class="btn" href="rfq_form.php?request_category=parts">New Parts RFQ</a>
     </div>
   </form>
 </div>

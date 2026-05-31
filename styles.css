@@ -849,3 +849,215 @@ tbody tr:hover td {
     text-align: center;
   }
 }
+
+/* ── Laser RFQ Tracker Hero ─────────────────────────────────────────────── */
+.laser-rfq-hero {
+  position: relative;
+  overflow: hidden;
+  border: none;
+  background:
+    radial-gradient(ellipse at 8% 18%, rgba(239, 68, 68, 0.28), transparent 42%),
+    radial-gradient(ellipse at 90% 10%, rgba(251, 146, 60, 0.32), transparent 46%),
+    radial-gradient(ellipse at 55% 90%, rgba(239, 68, 68, 0.18), transparent 50%),
+    linear-gradient(138deg, #0f0f0f 0%, #1c0a0a 38%, #1a0e00 68%, #0f0f0f 100%);
+  color: #e2e8f0;
+  min-height: 220px;
+}
+
+.laser-rfq-hero .muted {
+  color: rgba(226, 232, 240, 0.88);
+}
+
+/* Animated laser beam streaks */
+.laser-rfq-hero-beams {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.laser-rfq-beam {
+  position: absolute;
+  display: block;
+  border-radius: 999px;
+  opacity: 0;
+  animation: laser-sweep 4.8s ease-in-out infinite;
+}
+
+.laser-rfq-beam-1 {
+  width: 2px;
+  height: 60%;
+  top: -10%;
+  left: 22%;
+  background: linear-gradient(180deg, transparent, rgba(239, 68, 68, 0.9) 50%, transparent);
+  --r: 18deg;
+  transform: rotate(18deg);
+  animation-delay: 0s;
+}
+
+.laser-rfq-beam-2 {
+  width: 1px;
+  height: 55%;
+  top: 5%;
+  left: 62%;
+  background: linear-gradient(180deg, transparent, rgba(251, 146, 60, 0.8) 50%, transparent);
+  --r: -10deg;
+  transform: rotate(-10deg);
+  animation-delay: 1.6s;
+}
+
+.laser-rfq-beam-3 {
+  width: 2px;
+  height: 50%;
+  top: -5%;
+  left: 80%;
+  background: linear-gradient(180deg, transparent, rgba(239, 68, 68, 0.7) 50%, transparent);
+  --r: 6deg;
+  transform: rotate(6deg);
+  animation-delay: 3.2s;
+}
+
+@keyframes laser-sweep {
+  0%   { opacity: 0; transform: translateY(-8%) rotate(var(--r)); }
+  15%  { opacity: 1; }
+  60%  { opacity: 0.7; }
+  100% { opacity: 0; transform: translateY(14%) rotate(var(--r)); }
+}
+
+/* Radial glow hotspot */
+.laser-rfq-hero-glow {
+  position: absolute;
+  right: -80px;
+  top: -100px;
+  width: 340px;
+  height: 340px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.22), rgba(251, 146, 60, 0.08) 50%, transparent 75%);
+  pointer-events: none;
+}
+
+.laser-rfq-hero-body {
+  position: relative;
+  z-index: 1;
+  max-width: 780px;
+}
+
+.laser-rfq-hero-tag {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  background: rgba(239, 68, 68, 0.15);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  color: #fca5a5;
+}
+
+.laser-rfq-hero .page-header-body h1 {
+  margin-bottom: 8px;
+  color: #fff;
+}
+
+.laser-rfq-hero-count {
+  font-size: 0.86em;
+  font-weight: 500;
+  color: #fca5a5;
+}
+
+.laser-rfq-hero-pills {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.laser-rfq-hero-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.12);
+  color: #fecaca;
+  font-size: 0.875rem;
+}
+
+.laser-rfq-hero-stats {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(124px, 1fr));
+  gap: 8px;
+}
+
+.laser-rfq-hero-stat {
+  background: rgba(239, 68, 68, 0.16);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.laser-rfq-hero-stat strong {
+  display: block;
+  font-size: 1.15rem;
+  color: #fff;
+  line-height: 1.2;
+}
+
+.laser-rfq-hero-stat span {
+  display: block;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(252, 165, 165, 0.9);
+  margin-top: 2px;
+}
+
+.laser-rfq-hero-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.laser-rfq-hero-actions .btn {
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.laser-rfq-hero-actions .btn:not(.primary) {
+  background: rgba(15, 10, 10, 0.35);
+  color: #fecaca;
+}
+
+.laser-rfq-hero-actions .btn.primary {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(220, 38, 38, 0.45);
+}
+
+.laser-rfq-hero-actions .btn.primary:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  box-shadow: 0 12px 32px rgba(220, 38, 38, 0.55);
+}
+
+@media (max-width: 720px) {
+  .laser-rfq-hero {
+    min-height: auto;
+  }
+
+  .laser-rfq-hero-actions {
+    width: 100%;
+  }
+
+  .laser-rfq-hero-actions .btn {
+    flex: 1;
+    text-align: center;
+  }
+}
