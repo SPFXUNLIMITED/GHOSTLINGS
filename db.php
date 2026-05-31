@@ -287,7 +287,8 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
-// Add service_type column to laser_entries if it does not exist yet
+// Add service_type column to laser_entries for existing installations
+// (new installs already have it from the CREATE TABLE above; 42S21 = duplicate column, safe to ignore)
 try {
   $pdo->exec("ALTER TABLE laser_entries ADD COLUMN service_type VARCHAR(20) NOT NULL DEFAULT 'standard' AFTER laser_problem");
 } catch (PDOException $e) {

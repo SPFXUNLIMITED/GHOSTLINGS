@@ -150,7 +150,7 @@ render_header('Form Entries – Admin');
       </thead>
       <tbody>
         <?php if (!$entries): ?>
-          <tr>          <td colspan="<?= is_admin() ? 11 : 10 ?>" class="muted">No entries found.</td></tr>
+          <tr><td colspan="<?= is_admin() ? 11 : 10 ?>" class="muted">No entries found.</td></tr>
         <?php endif; ?>
         <?php foreach ($entries as $e): ?>
           <tr>
