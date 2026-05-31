@@ -37,6 +37,12 @@ $quote_badges = [
   'accepted'     => ['Accepted',     '#dcfce7', '#166534'],
   'rejected'     => ['Rejected',     '#fee2e2', '#991b1b'],
 ];
+$urgency_badges = [
+  'low' => ['Low', '#ecfeff', '#155e75'],
+  'normal' => ['Normal', '#e2e8f0', '#334155'],
+  'high' => ['High', '#ffedd5', '#9a3412'],
+  'critical' => ['Critical', '#fee2e2', '#991b1b'],
+];
 
 $errors = [];
 $success = '';
@@ -950,11 +956,12 @@ render_header('RFQ Tracker');
               <td>
                 <strong><?= h($r['request_title']) ?></strong><br>
                 <span class="muted">
-                  <?= ($r['request_category'] ?? 'machine') === 'parts' ? 'Parts' : 'Machine' ?> · Qty: <?= (int)$r['quantity'] ?> · Quotes: <?= (int)$r['quote_count'] ?> · Urgency: <?php
-                    $urgency_labels = ['low' => 'Low', 'normal' => 'Normal', 'high' => 'High', 'critical' => 'Critical'];
+                  <?= ($r['request_category'] ?? 'machine') === 'parts' ? 'Parts' : 'Machine' ?> · Qty: <?= (int)$r['quantity'] ?> · Quotes: <?= (int)$r['quote_count'] ?> · Urgency:
+                  <?php
                     $urgency_val = (string)($r['urgency'] ?? 'normal');
-                    echo h($urgency_labels[$urgency_val] ?? ucfirst($urgency_val));
+                    $ub = $urgency_badges[$urgency_val] ?? [ucfirst($urgency_val), '#e2e8f0', '#334155'];
                   ?>
+                  <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:0.72em; font-weight:600; letter-spacing:0.04em; background:<?= h($ub[1]) ?>; color:<?= h($ub[2]) ?>;"><?= h($ub[0]) ?></span>
                 </span>
               </td>
               <td>
