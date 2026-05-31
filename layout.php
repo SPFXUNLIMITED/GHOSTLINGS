@@ -356,6 +356,8 @@ $show_rfq_menu = $show_mod_menu;
       ['href' => 'freight_forwarders.php', 'file' => 'freight_forwarders.php', 'label' => 'Freight Forwarders', 'visible' => true],
       ['href' => 'rfq_form.php', 'file' => 'rfq_form.php', 'label' => 'RFQ Form', 'visible' => $show_rfq_menu],
       ['href' => 'rfq_tracker.php', 'file' => 'rfq_tracker.php', 'label' => 'RFQ Tracker', 'visible' => $show_rfq_menu],
+      ['href' => 'shipping_rfq_form.php', 'file' => 'shipping_rfq_form.php', 'label' => 'Shipping RFQ Form', 'visible' => $show_rfq_menu],
+      ['href' => 'shipping_rfq_tracker.php', 'file' => 'shipping_rfq_tracker.php', 'label' => 'Shipping RFQ Tracker', 'visible' => $show_rfq_menu],
       ['href' => 'order_tracker.php', 'file' => 'order_tracker.php', 'label' => 'Order Tracker', 'visible' => $show_rfq_menu],
     ], $current); ?>
     <?php endif; ?>
