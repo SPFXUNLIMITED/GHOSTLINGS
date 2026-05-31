@@ -805,6 +805,7 @@ $quotes = [];
 $editing_quote = null;
 $rfq_email_text = '';
 $show_add_quote_form = false;
+$orders_by_quote_id = [];
 if ($selected_rfq_id > 0) {
   $sel = $pdo->prepare("SELECT id, request_title FROM rfq_requests WHERE id = ? LIMIT 1");
   $sel->execute([$selected_rfq_id]);
@@ -819,6 +820,12 @@ if ($selected_rfq_id > 0) {
     );
     $qs->execute([$selected_rfq_id]);
     $quotes = $qs->fetchAll();
+
+    $order_stmt = $pdo->prepare("SELECT id, rfq_quote_id, po_number FROM rfq_orders WHERE rfq_request_id = ?");
+    $order_stmt->execute([$selected_rfq_id]);
+    foreach ($order_stmt->fetchAll() as $order_row) {
+      $orders_by_quote_id[(int)$order_row['rfq_quote_id']] = $order_row;
+    }
 
     if ($edit_quote_id > 0) {
       foreach ($quotes as $q) {
@@ -1031,6 +1038,7 @@ render_header('RFQ Tracker');
         <a class="btn" href="rfq_tracker.php?rfq_text_id=<?= (int)$selected_rfq['id'] ?>">Email Text</a>
         <a class="btn" href="rfq_form.php?edit_rfq_id=<?= (int)$selected_rfq['id'] ?>">Edit RFQ</a>
         <a class="btn" href="rfq_details.php?id=<?= (int)$selected_rfq['id'] ?>">View Details</a>
+        <a class="btn" href="order_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>">Order Tracker</a>
       </div>
     </div>
 
@@ -1338,6 +1346,14 @@ render_header('RFQ Tracker');
               <td class="col-actions">
                 <a class="btn" href="rfq_quote_details.php?rfq_id=<?= (int)$selected_rfq['id'] ?>&quote_id=<?= (int)$q['id'] ?>">View</a>
                 <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>&edit_quote_id=<?= (int)$q['id'] ?>">Edit</a>
+                <?php if ((string)$q['quote_status'] === 'accepted'): ?>
+                  <a class="btn primary" href="order_form.php?rfq_id=<?= (int)$selected_rfq['id'] ?>&quote_id=<?= (int)$q['id'] ?>">Convert to Order</a>
+                <?php endif; ?>
+                <?php if (isset($orders_by_quote_id[(int)$q['id']])): ?>
+                  <a class="btn" href="order_form.php?order_id=<?= (int)$orders_by_quote_id[(int)$q['id']]['id'] ?>">
+                    <?= h((string)($orders_by_quote_id[(int)$q['id']]['po_number'] ?: 'PO #' . (int)$orders_by_quote_id[(int)$q['id']]['id'])) ?>
+                  </a>
+                <?php endif; ?>
                 <form method="post" style="display:inline;"
                       onsubmit="return confirm('Delete this quote? This cannot be undone.');">
                   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
