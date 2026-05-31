@@ -353,6 +353,7 @@ $show_rfq_menu = $show_mod_menu;
     <span class="menu-spacer" aria-hidden="true"></span>
     <?php render_menu_dropdown('RFQ & Sourcing', [
       ['href' => 'vendors.php', 'file' => 'vendors.php', 'label' => 'Vendors', 'visible' => true],
+      ['href' => 'freight_forwarders.php', 'file' => 'freight_forwarders.php', 'label' => 'Freight Forwarders', 'visible' => true],
       ['href' => 'rfq_form.php', 'file' => 'rfq_form.php', 'label' => 'RFQ Form', 'visible' => $show_rfq_menu],
       ['href' => 'rfq_tracker.php', 'file' => 'rfq_tracker.php', 'label' => 'RFQ Tracker', 'visible' => $show_rfq_menu],
       ['href' => 'order_tracker.php', 'file' => 'order_tracker.php', 'label' => 'Order Tracker', 'visible' => $show_rfq_menu],
