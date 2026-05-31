@@ -474,6 +474,92 @@ foreach ([
   }
 }
 
+// Create rfq_orders table for purchase orders converted from accepted RFQ quotes
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS rfq_orders (
+    id                       INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    rfq_request_id           INT UNSIGNED NOT NULL,
+    rfq_quote_id             INT UNSIGNED NOT NULL,
+    po_number                VARCHAR(50) NULL,
+    order_status             ENUM('draft','deposit_pending','deposit_paid','in_production','ready_to_ship','shipped','delivered','completed','cancelled') NOT NULL DEFAULT 'draft',
+    order_date               DATE NULL,
+    expected_ready_date      DATE NULL,
+    expected_ship_date       DATE NULL,
+    supplier_name            VARCHAR(255) NOT NULL,
+    model_name               VARCHAR(255) NULL,
+    sku                      VARCHAR(100) NULL,
+    quantity                 INT UNSIGNED NOT NULL DEFAULT 1,
+    unit_price               DECIMAL(12,2) NULL,
+    order_total              DECIMAL(12,2) NOT NULL DEFAULT 0,
+    currency                 CHAR(3) NOT NULL DEFAULT 'USD',
+    deposit_percent          DECIMAL(5,2) NULL,
+    deposit_amount           DECIMAL(12,2) NULL,
+    balance_amount           DECIMAL(12,2) NULL,
+    payment_terms            VARCHAR(255) NULL,
+    incoterm                 VARCHAR(20) NULL,
+    shipping_method          VARCHAR(100) NULL,
+    shipping_origin          VARCHAR(255) NULL,
+    destination_port         VARCHAR(255) NULL,
+    destination_address      VARCHAR(500) NULL,
+    production_lead_time_days INT UNSIGNED NULL,
+    trade_assurance_order_no VARCHAR(100) NULL,
+    proforma_invoice_no      VARCHAR(100) NULL,
+    warranty_terms           TEXT NULL,
+    included_accessories     TEXT NULL,
+    notes                    TEXT NULL,
+    created_by               INT UNSIGNED NOT NULL,
+    created_at               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_rfq_orders_request_id (rfq_request_id),
+    KEY idx_rfq_orders_quote_id (rfq_quote_id),
+    KEY idx_rfq_orders_status (order_status),
+    KEY idx_rfq_orders_order_date (order_date)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// Add RFQ order columns if they do not exist yet
+foreach ([
+  "ALTER TABLE rfq_orders ADD COLUMN po_number VARCHAR(50) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN order_status ENUM('draft','deposit_pending','deposit_paid','in_production','ready_to_ship','shipped','delivered','completed','cancelled') NOT NULL DEFAULT 'draft'",
+  "ALTER TABLE rfq_orders ADD COLUMN order_date DATE NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN expected_ready_date DATE NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN expected_ship_date DATE NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN supplier_name VARCHAR(255) NOT NULL DEFAULT ''",
+  "ALTER TABLE rfq_orders ADD COLUMN model_name VARCHAR(255) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN sku VARCHAR(100) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN quantity INT UNSIGNED NOT NULL DEFAULT 1",
+  "ALTER TABLE rfq_orders ADD COLUMN unit_price DECIMAL(12,2) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN order_total DECIMAL(12,2) NOT NULL DEFAULT 0",
+  "ALTER TABLE rfq_orders ADD COLUMN currency CHAR(3) NOT NULL DEFAULT 'USD'",
+  "ALTER TABLE rfq_orders ADD COLUMN deposit_percent DECIMAL(5,2) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN deposit_amount DECIMAL(12,2) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN balance_amount DECIMAL(12,2) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN payment_terms VARCHAR(255) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN incoterm VARCHAR(20) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN shipping_method VARCHAR(100) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN shipping_origin VARCHAR(255) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN destination_port VARCHAR(255) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN destination_address VARCHAR(500) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN production_lead_time_days INT UNSIGNED NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN trade_assurance_order_no VARCHAR(100) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN proforma_invoice_no VARCHAR(100) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN warranty_terms TEXT NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN included_accessories TEXT NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN notes TEXT NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN created_by INT UNSIGNED NOT NULL DEFAULT 0",
+  "ALTER TABLE rfq_orders ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+  "ALTER TABLE rfq_orders ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    if ($e->getCode() !== '42S21') {
+      throw $e;
+    }
+  }
+}
+
 // Create rfq_canned_responses table for RFQ form quick-fill buttons
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS rfq_canned_responses (
