@@ -204,6 +204,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'received_on'      => trim((string)($_POST['received_on']       ?? '')),
         'notes'            => trim((string)($_POST['notes']             ?? '')),
       ];
+      if ($qf['forwarder_name'] === '__other__' && $qf['forwarder_other'] === '') {
+        $errors[] = 'Please enter a forwarder name when selecting Other.';
+      }
       if ($qf['forwarder_name'] === '__other__') {
         $qf['forwarder_name'] = $qf['forwarder_other'];
       }
@@ -258,6 +261,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'received_on'      => trim((string)($_POST['received_on']        ?? '')),
         'notes'            => trim((string)($_POST['notes']              ?? '')),
       ];
+      if ($qf['forwarder_name'] === '__other__' && $qf['forwarder_other'] === '') {
+        $errors[] = 'Please enter a forwarder name when selecting Other.';
+      }
       if ($qf['forwarder_name'] === '__other__') {
         $qf['forwarder_name'] = $qf['forwarder_other'];
       }
@@ -881,7 +887,6 @@ render_header('Shipping RFQ Tracker');
       var showOther = sel.value === '__other__';
       otherInput.style.display = showOther ? '' : 'none';
       otherInput.required = showOther;
-      if (!showOther) otherInput.value = '';
     };
     sel.addEventListener('change', sync);
     sync();
