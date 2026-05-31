@@ -29,8 +29,11 @@ $vendors = $stmt->fetchAll();
 render_header('Vendors');
 ?>
 
-<div class="card" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-  <h1 style="margin:0;">Vendors</h1>
+<div class="card page-header">
+  <div class="page-header-body">
+    <h1>Vendors <span class="muted" style="font-size:0.7em; font-weight:400;">(<?= count($vendors) ?>)</span></h1>
+    <p class="muted">Manage supplier contacts for RFQs and sourcing requests.</p>
+  </div>
   <a class="btn primary" href="vendor_form.php">+ Add Vendor</a>
 </div>
 
@@ -64,7 +67,7 @@ render_header('Vendors');
     <tbody>
       <?php foreach ($vendors as $v): ?>
       <tr>
-        <td><?= h($v['company_name']) ?></td>
+        <td><strong><?= h($v['company_name']) ?></strong></td>
         <td><?= h($v['contact_name']) ?></td>
         <td>
           <?php if ($v['email'] !== ''): ?>
@@ -76,7 +79,8 @@ render_header('Vendors');
         <td><?= $v['phone'] !== '' ? h($v['phone']) : '<span class="muted">—</span>' ?></td>
         <td>
           <?php if ($v['website'] !== ''): ?>
-            <a href="<?= h($v['website']) ?>" target="_blank" rel="noopener noreferrer"><?= h($v['website']) ?></a>
+            <?php $display_url = mb_strlen($v['website']) > 40 ? mb_substr($v['website'], 0, 40) . '…' : $v['website']; ?>
+            <a href="<?= h($v['website']) ?>" target="_blank" rel="noopener noreferrer" title="<?= h($v['website']) ?>"><?= h($display_url) ?></a>
           <?php else: ?>
             <span class="muted">—</span>
           <?php endif; ?>

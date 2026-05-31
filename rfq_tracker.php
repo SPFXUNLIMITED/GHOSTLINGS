@@ -1133,7 +1133,7 @@ function syncColorPicker(pickerId, hexVal) {
                   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
                   <input type="hidden" name="action" value="delete_rfq" />
                   <input type="hidden" name="rfq_id" value="<?= (int)$r['id'] ?>" />
-                  <button type="submit" class="btn" style="color:#b91c1c;">Delete</button>
+                  <button type="submit" class="btn danger">Delete</button>
                 </form>
               </td>
             </tr>
@@ -1146,7 +1146,18 @@ function syncColorPicker(pickerId, hexVal) {
 
 <?php if ($selected_rfq): ?>
   <div class="card">
-    <h2 style="margin-top:0;">Quotes for RFQ #<?= (int)$selected_rfq['id'] ?> — <?= h($selected_rfq['request_title']) ?></h2>
+    <div class="page-header" style="margin-bottom:14px;">
+      <div class="page-header-body">
+        <h2>Quotes — <span class="muted" style="font-weight:400;">RFQ #<?= (int)$selected_rfq['id'] ?></span></h2>
+        <p class="muted"><?= h($selected_rfq['request_title']) ?></p>
+      </div>
+      <div class="row" style="flex-shrink:0;">
+        <a class="btn" href="rfq_tracker.php<?= $search !== '' || $status_filter !== '' ? '?' . http_build_query(array_filter(['q' => $search, 'status' => $status_filter])) : '' ?>">← All RFQs</a>
+        <a class="btn" href="rfq_tracker.php?rfq_text_id=<?= (int)$selected_rfq['id'] ?>">Email Text</a>
+        <a class="btn" href="rfq_form.php?edit_rfq_id=<?= (int)$selected_rfq['id'] ?>">Edit RFQ</a>
+        <a class="btn" href="rfq_details.php?id=<?= (int)$selected_rfq['id'] ?>">View Details</a>
+      </div>
+    </div>
 
     <?php if ($editing_quote): ?>
       <h3 style="margin-top:0; margin-bottom:12px;">Edit Quote</h3>
@@ -1459,7 +1470,7 @@ function syncColorPicker(pickerId, hexVal) {
                   <input type="hidden" name="action" value="delete_quote" />
                   <input type="hidden" name="rfq_id" value="<?= (int)$selected_rfq['id'] ?>" />
                   <input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>" />
-                  <button type="submit" class="btn" style="color:#b91c1c;">Delete</button>
+                  <button type="submit" class="btn danger">Delete</button>
                 </form>
               </td>
             </tr>

@@ -292,15 +292,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 render_header($is_edit_mode ? ('Edit RFQ #' . $edit_rfq_id) : ($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ / Sourcing Request Form'));
 ?>
 
-<div class="card">
-  <h1 style="margin-top:0; margin-bottom:4px;">
-    <?= $is_edit_mode ? ('Edit RFQ Request #' . (int)$edit_rfq_id) : ($is_parts_entrypoint ? 'CO2 Laser Parts RFQ / Sourcing Requests' : 'RFQ / Sourcing Requests') ?>
-  </h1>
-  <p class="muted" style="margin:0;">
-    <?= $is_edit_mode
-      ? 'Update this RFQ request using the same form used for new RFQs.'
-      : 'Submit either machine RFQs or parts sourcing requests (chillers, blowers, laser tubes, and more) in one workflow.' ?>
-  </p>
+<div class="card page-header">
+  <div class="page-header-body">
+    <h1>
+      <?= $is_edit_mode ? ('Edit RFQ Request #' . (int)$edit_rfq_id) : ($is_parts_entrypoint ? 'CO2 Laser Parts RFQ / Sourcing Requests' : 'RFQ / Sourcing Requests') ?>
+    </h1>
+    <p class="muted">
+      <?= $is_edit_mode
+        ? 'Update this RFQ request using the same form used for new RFQs.'
+        : 'Submit either machine RFQs or parts sourcing requests (chillers, blowers, laser tubes, and more) in one workflow.' ?>
+    </p>
+  </div>
+  <a class="btn" href="rfq_tracker.php">RFQ Tracker →</a>
 </div>
 
 <?php if ($errors): ?>
@@ -323,10 +326,10 @@ render_header($is_edit_mode ? ('Edit RFQ #' . $edit_rfq_id) : ($is_parts_entrypo
     <input type="hidden" name="edit_rfq_id" value="<?= (int)$edit_rfq_id ?>" />
   <?php endif; ?>
 
-  <p class="muted" style="margin-top:0; margin-bottom:16px;">
-    Company and contact details are pulled from your <a href="user_page.php">profile</a>.
-  </p>
-  <h2 style="margin-top:0; margin-bottom:12px; font-size:1rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted, #6b7280);">Request Details</h2>
+  <div class="info-banner">
+    ℹ️ Company and contact details are pre-filled from your <a href="user_page.php">profile</a>. Update your profile to change these defaults.
+  </div>
+  <h2 class="form-section-heading">Request Details</h2>
 
   <div class="form-grid">
     <div>
@@ -360,7 +363,7 @@ render_header($is_edit_mode ? ('Edit RFQ #' . $edit_rfq_id) : ($is_parts_entrypo
   </div>
 
   <div id="customer_information_section" style="margin-top:12px; display:<?= $fields['acquisition_purpose'] === 'customer' ? 'block' : 'none' ?>;">
-    <h2 style="margin-top:0; margin-bottom:12px; font-size:1rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted, #6b7280);">Customer Information</h2>
+    <h2 class="form-section-heading">Customer Information</h2>
     <div class="form-grid" style="margin-bottom:12px;">
       <div>
         <label>Customer Name</label>
