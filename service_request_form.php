@@ -315,25 +315,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 render_header('Service Request Form');
 ?>
 
-<div class="card">
-  <h1 style="margin-top:0; margin-bottom:4px;">Service Request Form</h1>
-  <p class="muted" style="margin:0;">
-    Fill out the form below to submit a customer service request. You will receive a verification
-    email with your login credentials.
-  </p>
+<div class="srf-hero">
+  <div class="srf-hero-glow"></div>
+  <div class="srf-hero-content">
+    <div class="srf-hero-icon">🛠️</div>
+    <h1 class="srf-hero-title">CO2 Laser Service Request</h1>
+    <p class="srf-hero-sub">
+      Fast Diagnostics &bull; Expert Repairs &bull; Priority Turnaround Options
+    </p>
+    <div class="srf-hero-badges">
+      <span class="srf-badge">⚡ CO2 Specialists</span>
+      <span class="srf-badge">🔬 Tube + Optics Support</span>
+      <span class="srf-badge">📞 Real Technician Follow-Up</span>
+      <span class="srf-badge">🚚 Nationwide Service Help</span>
+    </div>
+  </div>
+</div>
+
+<div class="card srf-value-card">
+  <strong>Need your machine back online quickly?</strong>
+  Submit your request in minutes and our service team will review your issue, send your login credentials,
+  and guide you through next steps for your CO2 laser repair.
 </div>
 
 <?php if ($success): ?>
-  <div class="card" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; text-align:center; padding:32px;">
-    <h2 style="margin-top:0;">✅ Request Submitted!</h2>
-    <p>
+  <div class="card srf-success">
+    <div class="srf-success-icon">✅</div>
+    <h2 style="margin-top:0;">Request Submitted!</h2>
+    <p style="margin:0 0 8px;">
       Thank you! We have received your customer service request. An email has been sent to
       <strong><?= h($fields['email']) ?></strong> with your login credentials and a
       verification link.
     </p>
-    <p style="margin-bottom:0;">
+    <p style="margin:0;">
       Please check your inbox (and spam folder), verify your email, then
-      <a href="login.php" style="color:#166534; font-weight:600;">log in here</a>.
+      <a href="login.php" style="color:#14532d; font-weight:700;">log in here</a>.
     </p>
   </div>
 <?php else: ?>
@@ -346,7 +362,17 @@ render_header('Service Request Form');
     </div>
   <?php endif; ?>
 
-  <form method="post" class="card" novalidate>
+  <div class="card srf-steps-card">
+    <div class="srf-steps">
+      <div class="srf-step active"><span class="srf-step-num">1</span><span class="srf-step-label">Your Info</span></div>
+      <div class="srf-step-line"></div>
+      <div class="srf-step active"><span class="srf-step-num">2</span><span class="srf-step-label">Machine Problem</span></div>
+      <div class="srf-step-line"></div>
+      <div class="srf-step active"><span class="srf-step-num">3</span><span class="srf-step-label">Service Level</span></div>
+    </div>
+  </div>
+
+  <form method="post" class="srf-form" novalidate>
     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['form_csrf']) ?>" />
     <!-- Honeypot field – hidden from real users, catches bots -->
     <div style="display:none;" aria-hidden="true">
@@ -354,151 +380,150 @@ render_header('Service Request Form');
       <input type="text" name="website" tabindex="-1" autocomplete="off" />
     </div>
 
-    <h2 style="margin-top:0;">Personal Information</h2>
-    <div class="form-grid">
-      <div>
-        <label>First Name <span style="color:var(--d)">*</span></label>
-        <input type="text" name="first_name" value="<?= h($fields['first_name']) ?>"
-               maxlength="100" required autocomplete="given-name" />
+    <div class="card srf-section">
+      <div class="srf-section-header">
+        <span class="srf-section-num">1</span>
+        <div>
+          <h2 style="margin:0;">Customer Information</h2>
+          <p class="muted" style="margin:2px 0 0;">How can our laser repair specialists reach you?</p>
+        </div>
       </div>
-      <div>
-        <label>Last Name <span style="color:var(--d)">*</span></label>
-        <input type="text" name="last_name" value="<?= h($fields['last_name']) ?>"
-               maxlength="100" required autocomplete="family-name" />
-      </div>
-      <div>
-        <label>Cell Phone <span style="color:var(--d)">*</span></label>
-        <input type="tel" name="cell_phone" value="<?= h($fields['cell_phone']) ?>"
-               maxlength="30" required autocomplete="tel" placeholder="e.g. 555-867-5309" />
-      </div>
-      <div>
-        <label>Email Address <span style="color:var(--d)">*</span></label>
-        <input type="email" name="email" value="<?= h($fields['email']) ?>"
-               maxlength="255" required autocomplete="email" />
-      </div>
-      <div>
-        <label>City <span style="color:var(--d)">*</span></label>
-        <input type="text" name="city" value="<?= h($fields['city']) ?>"
-               maxlength="100" required autocomplete="address-level2" />
-      </div>
-      <div>
-        <label>State <span style="color:var(--d)">*</span></label>
-        <select name="state" required>
-          <option value="">— Select state —</option>
-          <?php foreach ($us_states as $code => $label): ?>
-            <option value="<?= h($code) ?>" <?= $fields['state'] === $code ? 'selected' : '' ?>>
-              <?= h($label) ?>
-            </option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <div>
-        <label>ZIP Code <span style="color:var(--d)">*</span></label>
-        <input type="text" name="zip_code" value="<?= h($fields['zip_code']) ?>"
-               maxlength="10" required autocomplete="postal-code" placeholder="e.g. 90210" />
-      </div>
-    </div>
-
-    <h2 style="margin-top:20px;">Laser Machine Information</h2>
-    <div class="form-grid">
-      <div>
-        <label>Brand of Laser Machine <span style="color:var(--d)">*</span></label>
-        <input type="text" name="laser_brand" value="<?= h($fields['laser_brand']) ?>"
-               maxlength="100" required placeholder="e.g. xTool, Sculpfun, OMTech" />
-      </div>
-      <div>
-        <label>Model <span style="color:var(--d)">*</span></label>
-        <input type="text" name="laser_model" value="<?= h($fields['laser_model']) ?>"
-               maxlength="100" required placeholder="e.g. S30 Ultra" />
-      </div>
-      <div>
-        <label>Wattage <span style="color:var(--d)">*</span></label>
-        <input type="text" name="laser_watts" value="<?= h($fields['laser_watts']) ?>"
-               maxlength="50" required placeholder="e.g. 40W" />
-      </div>
-      <div>
-        <label>How Old is the Machine? <span style="color:var(--d)">*</span></label>
-        <input type="text" name="laser_age" value="<?= h($fields['laser_age']) ?>"
-               maxlength="50" required placeholder="e.g. 2 years" />
-      </div>
-      <div class="full">
-        <label>What is the Problem with the Machine? <span style="color:var(--d)">*</span></label>
-        <textarea name="laser_problem" rows="5" required
-                  maxlength="5000"><?= h($fields['laser_problem']) ?></textarea>
-        <p class="muted" style="margin:4px 0 0;">Max 5000 characters.</p>
+      <div class="form-grid">
+        <div>
+          <label>First Name <span class="srf-req">*</span></label>
+          <input type="text" name="first_name" value="<?= h($fields['first_name']) ?>"
+                 maxlength="100" required autocomplete="given-name" />
+        </div>
+        <div>
+          <label>Last Name <span class="srf-req">*</span></label>
+          <input type="text" name="last_name" value="<?= h($fields['last_name']) ?>"
+                 maxlength="100" required autocomplete="family-name" />
+        </div>
+        <div>
+          <label>Cell Phone <span class="srf-req">*</span></label>
+          <input type="tel" name="cell_phone" value="<?= h($fields['cell_phone']) ?>"
+                 maxlength="30" required autocomplete="tel" placeholder="e.g. 555-867-5309" />
+        </div>
+        <div>
+          <label>Email Address <span class="srf-req">*</span></label>
+          <input type="email" name="email" value="<?= h($fields['email']) ?>"
+                 maxlength="255" required autocomplete="email" />
+        </div>
+        <div>
+          <label>City <span class="srf-req">*</span></label>
+          <input type="text" name="city" value="<?= h($fields['city']) ?>"
+                 maxlength="100" required autocomplete="address-level2" />
+        </div>
+        <div>
+          <label>State <span class="srf-req">*</span></label>
+          <select name="state" required>
+            <option value="">— Select state —</option>
+            <?php foreach ($us_states as $code => $label): ?>
+              <option value="<?= h($code) ?>" <?= $fields['state'] === $code ? 'selected' : '' ?>>
+                <?= h($label) ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div>
+          <label>ZIP Code <span class="srf-req">*</span></label>
+          <input type="text" name="zip_code" value="<?= h($fields['zip_code']) ?>"
+                 maxlength="10" required autocomplete="postal-code" placeholder="e.g. 90210" />
+        </div>
       </div>
     </div>
 
-    <h2 style="margin-top:28px;">Type of Service <span style="color:var(--d)">*</span></h2>
-    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-top:12px;">
-
-      <label class="svc-card" for="svc_standard" style="
-        display:flex; flex-direction:column; align-items:center; text-align:center;
-        border:2px solid var(--b); border-radius:12px; padding:24px 20px; cursor:pointer;
-        transition:border-color .2s, box-shadow .2s; background:var(--card,#fff);
-      ">
-        <input type="radio" id="svc_standard" name="service_type" value="standard"
-               <?= $fields['service_type'] === 'standard' ? 'checked' : '' ?> required
-               style="position:absolute; opacity:0; pointer-events:none;" />
-        <span style="font-size:2.4rem; line-height:1; margin-bottom:10px;">🔧</span>
-        <strong style="font-size:1.1rem; margin-bottom:6px;">Standard Service</strong>
-        <span style="font-size:.85rem; color:var(--muted,#666);">Normal turnaround &amp; support queue — great for non-urgent repairs.</span>
-      </label>
-
-      <label class="svc-card" for="svc_vip" style="
-        display:flex; flex-direction:column; align-items:center; text-align:center;
-        border:2px solid var(--b); border-radius:12px; padding:24px 20px; cursor:pointer;
-        transition:border-color .2s, box-shadow .2s; background:var(--card,#fff);
-      ">
-        <input type="radio" id="svc_vip" name="service_type" value="vip"
-               <?= $fields['service_type'] === 'vip' ? 'checked' : '' ?>
-               style="position:absolute; opacity:0; pointer-events:none;" />
-        <span style="font-size:2.4rem; line-height:1; margin-bottom:10px;">👑</span>
-        <strong style="font-size:1.1rem; margin-bottom:6px; color:#b8860b;">VIP Service</strong>
-        <span style="font-size:.85rem; color:var(--muted,#666);">Priority handling, expedited turnaround &amp; dedicated support for your machine.</span>
-        <span style="margin-top:10px; display:inline-block; font-size:.75rem; font-weight:600;
-              background:#fef3c7; color:#92400e; border:1px solid #f59e0b; border-radius:99px;
-              padding:2px 12px; letter-spacing:.04em;">⚡ PRIORITY</span>
-      </label>
-
+    <div class="card srf-section">
+      <div class="srf-section-header">
+        <span class="srf-section-num">2</span>
+        <div>
+          <h2 style="margin:0;">Machine Details &amp; Issue</h2>
+          <p class="muted" style="margin:2px 0 0;">Give us the key details so we can diagnose faster.</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div>
+          <label>Brand of Laser Machine <span class="srf-req">*</span></label>
+          <input type="text" name="laser_brand" value="<?= h($fields['laser_brand']) ?>"
+                 maxlength="100" required placeholder="e.g. xTool, Sculpfun, OMTech" />
+        </div>
+        <div>
+          <label>Model <span class="srf-req">*</span></label>
+          <input type="text" name="laser_model" value="<?= h($fields['laser_model']) ?>"
+                 maxlength="100" required placeholder="e.g. S30 Ultra" />
+        </div>
+        <div>
+          <label>Wattage <span class="srf-req">*</span></label>
+          <input type="text" name="laser_watts" value="<?= h($fields['laser_watts']) ?>"
+                 maxlength="50" required placeholder="e.g. 40W" />
+        </div>
+        <div>
+          <label>How Old is the Machine? <span class="srf-req">*</span></label>
+          <input type="text" name="laser_age" value="<?= h($fields['laser_age']) ?>"
+                 maxlength="50" required placeholder="e.g. 2 years" />
+        </div>
+        <div class="full">
+          <label>What is the Problem with the Machine? <span class="srf-req">*</span></label>
+          <textarea name="laser_problem" rows="5" required
+                    maxlength="5000"><?= h($fields['laser_problem']) ?></textarea>
+          <p class="muted" style="margin:4px 0 0;">Max 5000 characters.</p>
+        </div>
+      </div>
     </div>
-    <style>
-      .svc-card:has(input[type="radio"]:checked) {
-        border-color: #f59e0b;
-        box-shadow: 0 0 0 3px rgba(245,158,11,.25);
-      }
-      .svc-card:hover {
-        border-color: #d97706;
-        box-shadow: 0 2px 10px rgba(0,0,0,.12);
-      }
-    </style>
-    <hr style="margin:24px 0; border:none; border-top:2px solid var(--b);" />
 
-    <div class="form-grid" style="margin-top:0;">
-      <div class="full">
+    <div class="card srf-section">
+      <div class="srf-section-header">
+        <span class="srf-section-num">3</span>
+        <div>
+          <h2 style="margin:0;">Choose Service Level <span class="srf-req">*</span></h2>
+          <p class="muted" style="margin:2px 0 0;">Pick the turnaround speed that best matches your repair urgency.</p>
+        </div>
+      </div>
+
+      <div class="srf-service-grid">
+        <label class="srf-service-card <?= $fields['service_type'] === 'standard' ? 'selected' : '' ?>" for="svc_standard">
+          <input type="radio" id="svc_standard" name="service_type" value="standard"
+                 <?= $fields['service_type'] === 'standard' ? 'checked' : '' ?> required />
+          <span class="srf-service-icon">🔧</span>
+          <strong class="srf-service-title">Standard Service</strong>
+          <span class="srf-service-desc">Normal turnaround &amp; support queue — ideal for non-urgent repairs.</span>
+        </label>
+
+        <label class="srf-service-card srf-service-card-vip <?= $fields['service_type'] === 'vip' ? 'selected' : '' ?>" for="svc_vip">
+          <input type="radio" id="svc_vip" name="service_type" value="vip"
+                 <?= $fields['service_type'] === 'vip' ? 'checked' : '' ?> />
+          <span class="srf-service-icon">👑</span>
+          <strong class="srf-service-title">VIP Service</strong>
+          <span class="srf-service-desc">Priority handling, expedited turnaround, and dedicated support.</span>
+          <span class="srf-priority-pill">⚡ PRIORITY</span>
+        </label>
+      </div>
+
+      <div class="srf-captcha-wrap">
         <div class="g-recaptcha" data-sitekey="<?= h($recaptcha_site_key) ?>"></div>
       </div>
     </div>
 
-    <div class="row" style="margin-top:18px;">
-      <button type="submit" class="btn primary">Submit Customer Service Request</button>
-      <a class="btn" href="login.php">Already registered? Log in</a>
+    <div class="card srf-submit-card">
+      <button type="submit" class="btn primary srf-submit-btn">🚀 Submit Customer Service Request</button>
+      <a class="btn srf-login-btn" href="login.php">Already registered? Log in</a>
+      <p class="muted srf-submit-note">We respond quickly so you can get back to cutting and engraving fast.</p>
     </div>
   </form>
 <?php endif; ?>
 
-<div class="card">
+<div class="card srf-map-card">
   <h2 style="margin-top:0;">Customer Service Request Map</h2>
-  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:10px; margin-bottom:12px;">
-    <div style="border:1px solid var(--b); border-radius:8px; padding:10px 12px;">
+  <div class="srf-map-stats">
+    <div class="srf-map-stat">
       <p class="muted" style="margin:0 0 4px;">Total Waiting Users</p>
       <strong style="font-size:20px;"><?= (int)$waiting_total ?></strong>
     </div>
-    <div style="border:1px solid var(--b); border-radius:8px; padding:10px 12px;">
+    <div class="srf-map-stat">
       <p class="muted" style="margin:0 0 4px;">Verified Users</p>
       <strong style="font-size:20px;"><?= (int)$waiting_verified ?></strong>
     </div>
-    <div style="border:1px solid var(--b); border-radius:8px; padding:10px 12px;">
+    <div class="srf-map-stat">
       <p class="muted" style="margin:0 0 4px;">Pending Verification</p>
       <strong style="font-size:20px;"><?= (int)$waiting_unverified ?></strong>
     </div>
@@ -507,11 +532,191 @@ render_header('Service Request Form');
   <div id="serviceRequestMap" style="height:400px; border-radius:8px; border:1px solid var(--b);"></div>
 </div>
 
+<style>
+.srf-hero {
+  position: relative;
+  background: linear-gradient(135deg, #111827 0%, #0f3b63 45%, #07283f 100%);
+  border-radius: 14px;
+  padding: 48px 24px;
+  text-align: center;
+  margin: 12px 0;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(2, 6, 23, .45);
+}
+.srf-hero-glow {
+  position: absolute;
+  top: -70px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 520px;
+  height: 260px;
+  background: radial-gradient(ellipse, rgba(59,130,246,.3) 0%, transparent 70%);
+  pointer-events: none;
+}
+.srf-hero-content { position: relative; z-index: 1; }
+.srf-hero-icon { font-size: 54px; line-height: 1; margin-bottom: 12px; filter: drop-shadow(0 0 20px rgba(59,130,246,.65)); }
+.srf-hero-title { margin: 0 0 8px; color: #eff6ff; font-size: 2rem; text-shadow: 0 2px 10px rgba(0,0,0,.45); }
+.srf-hero-sub { margin: 0 0 18px; color: #bfdbfe; font-size: 1.05rem; }
+.srf-hero-badges { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.srf-badge {
+  background: rgba(255,255,255,.1);
+  color: #dbeafe;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  backdrop-filter: blur(4px);
+}
+.srf-value-card {
+  margin-top: 10px;
+  border-left: 4px solid #f59e0b;
+  background: linear-gradient(90deg, #fffbeb, #ffffff 75%);
+}
+.srf-success {
+  text-align: center;
+  padding: 38px 24px;
+  border-color: #bbf7d0;
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  color: #166534;
+}
+.srf-success-icon { font-size: 52px; line-height: 1; margin-bottom: 10px; }
+.srf-steps-card { padding: 16px 20px; }
+.srf-steps { display: flex; align-items: center; gap: 6px; }
+.srf-step { display: flex; align-items: center; gap: 8px; color: var(--m); font-size: 14px; font-weight: 500; }
+.srf-step.active { color: var(--p); }
+.srf-step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--b);
+  color: var(--m);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+.srf-step.active .srf-step-num { background: var(--p); color: #fff; }
+.srf-step-line { flex: 1; min-width: 24px; height: 2px; background: var(--b); }
+.srf-form { display: flex; flex-direction: column; gap: 8px; }
+.srf-section { margin: 0; }
+.srf-section-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--b);
+}
+.srf-section-num {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2563eb, #0ea5e9);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: 0 3px 12px rgba(37,99,235,.32);
+}
+.srf-req { color: var(--d); }
+.srf-service-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+.srf-service-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  border: 2px solid var(--b);
+  border-radius: 12px;
+  padding: 24px 20px;
+  cursor: pointer;
+  transition: border-color .2s, box-shadow .2s, background .2s;
+  background: var(--card, #fff);
+  position: relative;
+}
+.srf-service-card:hover { border-color: #d97706; box-shadow: 0 2px 12px rgba(0,0,0,.12); }
+.srf-service-card.selected,
+.srf-service-card:has(input[type="radio"]:checked) {
+  border-color: #f59e0b;
+  background: #fffbeb;
+  box-shadow: 0 0 0 3px rgba(245,158,11,.2);
+}
+.srf-service-card input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; }
+.srf-service-icon { font-size: 2.4rem; line-height: 1; margin-bottom: 10px; }
+.srf-service-title { font-size: 1.1rem; margin-bottom: 6px; }
+.srf-service-desc { font-size: .85rem; color: var(--m); }
+.srf-service-card-vip .srf-service-title { color: #b45309; }
+.srf-priority-pill {
+  margin-top: 10px;
+  display: inline-block;
+  font-size: .75rem;
+  font-weight: 600;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #f59e0b;
+  border-radius: 999px;
+  padding: 3px 12px;
+  letter-spacing: .04em;
+}
+.srf-captcha-wrap { margin-top: 20px; }
+.srf-submit-card { text-align: center; padding: 24px; }
+.srf-submit-btn {
+  font-size: 16px !important;
+  padding: 14px 34px !important;
+  border-radius: 999px !important;
+  background: linear-gradient(135deg, #2563eb, #7c3aed) !important;
+  border: none !important;
+  box-shadow: 0 5px 16px rgba(37,99,235,.4) !important;
+}
+.srf-submit-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(37,99,235,.46) !important;
+}
+.srf-login-btn { margin-left: 8px; }
+.srf-submit-note { margin: 10px 0 0; font-size: 13px; }
+.srf-map-card { margin-top: 10px; }
+.srf-map-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px,1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.srf-map-stat {
+  border: 1px solid var(--b);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, #fff, #f8fafc);
+}
+@media (max-width: 640px) {
+  .srf-hero { padding: 34px 16px; }
+  .srf-hero-title { font-size: 1.4rem; }
+  .srf-step-label { display: none; }
+  .srf-login-btn { margin-left: 0; margin-top: 8px; }
+}
+</style>
+
 <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+document.querySelectorAll('.srf-service-card input[type="radio"]').forEach(function (input) {
+  input.addEventListener('change', function () {
+    document.querySelectorAll('.srf-service-card').forEach(function (card) {
+      card.classList.remove('selected');
+    });
+    var card = input.closest('.srf-service-card');
+    if (card) card.classList.add('selected');
+  });
+});
+</script>
 <script>
 (function () {
   var waitingUsers = <?= json_encode($waiting_users, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?> || [];
