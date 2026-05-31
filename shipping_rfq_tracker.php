@@ -347,15 +347,15 @@ $hero_total_rfqs   = count($rfqs);
 $hero_open_rfqs    = 0;
 $hero_booked_rfqs  = 0;
 $hero_quotes_total = 0;
-foreach ($rfqs as $hero_rfq) {
-  $hero_status = (string)($hero_rfq['request_status'] ?? 'draft');
+foreach ($rfqs as $rfq_row) {
+  $hero_status = (string)($rfq_row['request_status'] ?? 'draft');
   if ($hero_status !== 'closed') {
     $hero_open_rfqs++;
   }
   if ($hero_status === 'booked') {
     $hero_booked_rfqs++;
   }
-  $hero_quotes_total += (int)($hero_rfq['quote_count'] ?? 0);
+  $hero_quotes_total += (int)($rfq_row['quote_count'] ?? 0);
 }
 
 // Selected RFQ (for quotes view)
