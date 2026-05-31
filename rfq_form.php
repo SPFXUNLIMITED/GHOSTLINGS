@@ -230,7 +230,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fields['additional_notes'] === '' ? null : $fields['additional_notes'],
         $edit_rfq_id,
       ]);
-      header('Location: rfq_details.php?id=' . $edit_rfq_id);
+      header('Location: rfq_tracker.php');
       exit;
     } else {
       $stmt = $pdo->prepare(
