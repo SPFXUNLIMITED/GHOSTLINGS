@@ -37,7 +37,7 @@ try {
   $promo_stmt = $pdo->prepare("SELECT setting_val FROM machine_inquiry_settings WHERE setting_key = 'promo_text' LIMIT 1");
   $promo_stmt->execute();
   $promo_row = $promo_stmt->fetch();
-  $promo_text = trim((string)($promo_row['promo_text'] ?? ($promo_row['setting_val'] ?? '')));
+  $promo_text = trim((string)($promo_row['setting_val'] ?? ''));
 } catch (\Throwable $ex) {
   $promo_text = '';
 }
@@ -264,13 +264,14 @@ render_header('CO2 Laser Machine Inquiry');
 <div class="mif-promo">
   <div class="mif-promo-pulse"></div>
   <div class="mif-promo-inner">
+    <?php // Admin-controlled HTML from TinyMCE — intentionally unescaped ?>
     <?= $promo_text ?>
   </div>
 </div>
 <?php endif; ?>
 
 <?php if ($success): ?>
-<div class="card mif-success">
+<div class="card mif-success" role="status" aria-live="polite">
   <div class="mif-success-icon">🎯</div>
   <h2 style="margin:0 0 8px;">Inquiry Submitted!</h2>
   <p style="margin:0 0 6px;">
@@ -333,7 +334,8 @@ render_header('CO2 Laser Machine Inquiry');
       <div>
         <label>Cell Phone <span class="req">*</span></label>
         <input type="tel" name="cell_phone" value="<?= h($fields['cell_phone']) ?>"
-               maxlength="30" required autocomplete="tel" placeholder="e.g. 555-867-5309" />
+               maxlength="30" required autocomplete="tel" placeholder="e.g. 555-867-5309"
+               pattern="[\d\s\-\+\(\)\.]{7,30}" />
       </div>
       <div>
         <label>Email Address <span class="req">*</span></label>
