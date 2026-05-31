@@ -318,16 +318,16 @@ render_header('Service Request Form');
 <div class="srf-hero">
   <div class="srf-hero-glow"></div>
   <div class="srf-hero-content">
-    <div class="srf-hero-icon">🛠️</div>
+    <div class="srf-hero-icon" aria-hidden="true">🛠️</div>
     <h1 class="srf-hero-title">CO2 Laser Service Request</h1>
     <p class="srf-hero-sub">
       Fast Diagnostics &bull; Expert Repairs &bull; Priority Turnaround Options
     </p>
     <div class="srf-hero-badges">
-      <span class="srf-badge">⚡ CO2 Specialists</span>
-      <span class="srf-badge">🔬 Tube + Optics Support</span>
-      <span class="srf-badge">📞 Real Technician Follow-Up</span>
-      <span class="srf-badge">🚚 Nationwide Service Help</span>
+      <span class="srf-badge"><span aria-hidden="true">⚡</span> CO2 Specialists</span>
+      <span class="srf-badge"><span aria-hidden="true">🔬</span> Tube + Optics Support</span>
+      <span class="srf-badge"><span aria-hidden="true">📞</span> Real Technician Follow-Up</span>
+      <span class="srf-badge"><span aria-hidden="true">🚚</span> Nationwide Service Help</span>
     </div>
   </div>
 </div>
@@ -484,7 +484,7 @@ render_header('Service Request Form');
         <label class="srf-service-card <?= $fields['service_type'] === 'standard' ? 'selected' : '' ?>" for="svc_standard">
           <input type="radio" id="svc_standard" name="service_type" value="standard"
                  <?= $fields['service_type'] === 'standard' ? 'checked' : '' ?> required />
-          <span class="srf-service-icon">🔧</span>
+          <span class="srf-service-icon" aria-hidden="true">🔧</span>
           <strong class="srf-service-title">Standard Service</strong>
           <span class="srf-service-desc">Normal turnaround &amp; support queue — ideal for non-urgent repairs.</span>
         </label>
@@ -492,7 +492,7 @@ render_header('Service Request Form');
         <label class="srf-service-card srf-service-card-vip <?= $fields['service_type'] === 'vip' ? 'selected' : '' ?>" for="svc_vip">
           <input type="radio" id="svc_vip" name="service_type" value="vip"
                  <?= $fields['service_type'] === 'vip' ? 'checked' : '' ?> />
-          <span class="srf-service-icon">👑</span>
+          <span class="srf-service-icon" aria-hidden="true">👑</span>
           <strong class="srf-service-title">VIP Service</strong>
           <span class="srf-service-desc">Priority handling, expedited turnaround, and dedicated support.</span>
           <span class="srf-priority-pill">⚡ PRIORITY</span>
@@ -556,11 +556,11 @@ render_header('Service Request Form');
 .srf-hero-content { position: relative; z-index: 1; }
 .srf-hero-icon { font-size: 54px; line-height: 1; margin-bottom: 12px; filter: drop-shadow(0 0 20px rgba(59,130,246,.65)); }
 .srf-hero-title { margin: 0 0 8px; color: #eff6ff; font-size: 2rem; text-shadow: 0 2px 10px rgba(0,0,0,.45); }
-.srf-hero-sub { margin: 0 0 18px; color: #bfdbfe; font-size: 1.05rem; }
+.srf-hero-sub { margin: 0 0 18px; color: #dbeafe; font-size: 1.05rem; }
 .srf-hero-badges { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 .srf-badge {
   background: rgba(255,255,255,.1);
-  color: #dbeafe;
+  color: #eff6ff;
   border: 1px solid rgba(255,255,255,.2);
   border-radius: 999px;
   padding: 6px 14px;
@@ -641,13 +641,29 @@ render_header('Service Request Form');
   position: relative;
 }
 .srf-service-card:hover { border-color: #d97706; box-shadow: 0 2px 12px rgba(0,0,0,.12); }
-.srf-service-card.selected,
-.srf-service-card:has(input[type="radio"]:checked) {
+.srf-service-card.selected {
   border-color: #f59e0b;
   background: #fffbeb;
   box-shadow: 0 0 0 3px rgba(245,158,11,.2);
 }
-.srf-service-card input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; }
+.srf-service-card:focus-within {
+  box-shadow: 0 0 0 4px rgba(59,130,246,.5);
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+.srf-service-card input[type="radio"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0;
+}
 .srf-service-icon { font-size: 2.4rem; line-height: 1; margin-bottom: 10px; }
 .srf-service-title { font-size: 1.1rem; margin-bottom: 6px; }
 .srf-service-desc { font-size: .85rem; color: var(--m); }
@@ -667,16 +683,16 @@ render_header('Service Request Form');
 .srf-captcha-wrap { margin-top: 20px; }
 .srf-submit-card { text-align: center; padding: 24px; }
 .srf-submit-btn {
-  font-size: 16px !important;
-  padding: 14px 34px !important;
-  border-radius: 999px !important;
-  background: linear-gradient(135deg, #2563eb, #7c3aed) !important;
-  border: none !important;
-  box-shadow: 0 5px 16px rgba(37,99,235,.4) !important;
+  font-size: 16px;
+  padding: 14px 34px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  border: none;
+  box-shadow: 0 5px 16px rgba(37,99,235,.4);
 }
 .srf-submit-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 24px rgba(37,99,235,.46) !important;
+  box-shadow: 0 8px 24px rgba(37,99,235,.46);
 }
 .srf-login-btn { margin-left: 8px; }
 .srf-submit-note { margin: 10px 0 0; font-size: 13px; }
@@ -712,7 +728,7 @@ document.querySelectorAll('.srf-service-card input[type="radio"]').forEach(funct
     document.querySelectorAll('.srf-service-card').forEach(function (card) {
       card.classList.remove('selected');
     });
-    var card = input.closest('.srf-service-card');
+    const card = input.closest('.srf-service-card');
     if (card) card.classList.add('selected');
   });
 });
