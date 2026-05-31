@@ -814,7 +814,7 @@ $where_sql = $where_parts ? ('WHERE ' . implode(' AND ', $where_parts)) : '';
 $sql = "
   SELECT
     r.id, r.request_category, r.request_title, r.machine_size, r.laser_watts, r.tube_type, r.part_category, r.part_specs, r.quantity,
-    r.required_features, r.additional_notes, r.request_status, r.created_at, r.updated_at,
+    r.required_features, r.additional_notes, r.request_status, r.urgency, r.created_at, r.updated_at,
     u.username AS requested_by_username,
     COUNT(q.id) AS quote_count,
     MIN(q.quote_amount) AS lowest_quote_amount,
@@ -1107,7 +1107,11 @@ function syncColorPicker(pickerId, hexVal) {
                 <strong><?= h($r['request_title']) ?></strong>
                 <span style="display:inline-block; margin-left:6px; padding:2px 8px; border-radius:12px; font-size:0.72em; font-weight:600; letter-spacing:0.04em; background:<?= $sb[1] ?>; color:<?= $sb[2] ?>; vertical-align:middle;"><?= h($sb[0]) ?></span><br>
                 <span class="muted">
-                  <?= ($r['request_category'] ?? 'machine') === 'parts' ? 'Parts' : 'Machine' ?> · Qty: <?= (int)$r['quantity'] ?> · Quotes: <?= (int)$r['quote_count'] ?>
+                  <?= ($r['request_category'] ?? 'machine') === 'parts' ? 'Parts' : 'Machine' ?> · Qty: <?= (int)$r['quantity'] ?> · Quotes: <?= (int)$r['quote_count'] ?> · Urgency: <?php
+                    $urgency_labels = ['low' => 'Low', 'normal' => 'Normal', 'high' => 'High', 'critical' => 'Critical'];
+                    $urgency_val = (string)($r['urgency'] ?? 'normal');
+                    echo h($urgency_labels[$urgency_val] ?? ucfirst($urgency_val));
+                  ?>
                 </span>
               </td>
               <td>

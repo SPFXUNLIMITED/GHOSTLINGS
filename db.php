@@ -563,6 +563,15 @@ try {
   }
 }
 
+// Add urgency column to rfq_requests if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE rfq_requests ADD COLUMN urgency ENUM('low','normal','high','critical') NOT NULL DEFAULT 'normal'");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
 // Create machine_inquiries table for CO2 laser machine purchase inquiries
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS machine_inquiries (
