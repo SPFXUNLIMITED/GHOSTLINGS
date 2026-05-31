@@ -24,9 +24,10 @@ if ($q !== '') {
        OR email LIKE ?
        OR phone LIKE ?
        OR primary_routes LIKE ?
+      OR certifications LIKE ?
     ORDER BY company_name ASC
   ");
-  $stmt->execute([$like, $like, $like, $like, $like, $like]);
+  $stmt->execute([$like, $like, $like, $like, $like, $like, $like]);
 } else {
   $stmt = $pdo->query("SELECT * FROM freight_forwarders ORDER BY company_name ASC");
 }
@@ -45,7 +46,7 @@ render_header('Freight Forwarders');
 
 <div class="card">
   <form method="get" action="freight_forwarders.php" class="row" style="margin-bottom:4px;">
-    <input type="text" name="q" value="<?= h($q) ?>" placeholder="Search by company, route, contact, email, or phone…" style="max-width:360px;" />
+    <input type="text" name="q" value="<?= h($q) ?>" placeholder="Search by company, route, certification, contact, email, or phone…" style="max-width:360px;" />
     <button type="submit" class="btn">Search</button>
     <?php if ($q !== ''): ?>
       <a class="btn" href="freight_forwarders.php">Clear</a>
@@ -64,9 +65,7 @@ render_header('Freight Forwarders');
       <tr>
         <th>Company</th>
         <th>Headquarters</th>
-        <th>Contact</th>
-        <th>Email</th>
-        <th>Phone</th>
+        <th>Certifications / Strengths</th>
         <th>Primary Routes</th>
         <th>Actions</th>
       </tr>
@@ -76,15 +75,7 @@ render_header('Freight Forwarders');
       <tr>
         <td><strong><?= h($f['company_name']) ?></strong></td>
         <td><?= $f['headquarters'] !== '' ? h($f['headquarters']) : '<span class="muted">—</span>' ?></td>
-        <td><?= $f['contact_person'] !== '' ? h($f['contact_person']) : '<span class="muted">—</span>' ?></td>
-        <td>
-          <?php if ($f['email'] !== ''): ?>
-            <a href="mailto:<?= h($f['email']) ?>"><?= h($f['email']) ?></a>
-          <?php else: ?>
-            <span class="muted">—</span>
-          <?php endif; ?>
-        </td>
-        <td><?= $f['phone'] !== '' ? h($f['phone']) : '<span class="muted">—</span>' ?></td>
+        <td><?= $f['certifications'] !== '' ? h($f['certifications']) : '<span class="muted">—</span>' ?></td>
         <td><?= $f['primary_routes'] !== '' ? h($f['primary_routes']) : '<span class="muted">—</span>' ?></td>
         <td class="actions">
           <a class="btn" href="freight_forwarder_details.php?id=<?= (int)$f['id'] ?>">View</a>
