@@ -12,7 +12,34 @@ body { font-family: system-ui, Arial, sans-serif; color: var(--t); background:#f
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
+  padding: 4px 0;
+}
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.topbar-logo {
+  height: 36px;
+  width: auto;
+  display: block;
+}
+.topbar-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.topbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.topbar-clock-label {
+  white-space: nowrap;
 }
 .brand { font-weight: 700; text-decoration:none; color: var(--t); }
 .card { background:#fff; border:1px solid var(--b); border-radius: 10px; padding: 14px; margin: 12px 0; }
@@ -41,17 +68,6 @@ th, td { border-bottom:1px solid var(--b); padding: 10px; text-align:left; verti
   flex-wrap: wrap;
 }
 
-/* ONLY the topbar actions should stack (login/logout then clock) */
-.topbar .actions {
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-}
-
-.topbar .actions .row {
-  flex-wrap: nowrap;
-  justify-content: flex-end;
-}
 
 .topbar-search {
   display: flex;

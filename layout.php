@@ -240,76 +240,64 @@ function render_header(string $title): void {
 <body>
   <div class="container">
 	<div class="topbar">
-	  <div>
-		<img src='logo1.jpg'><br>
+	  <div class="topbar-brand">
+		<img src='logo1.jpg' class="topbar-logo">
 		<a class="brand" href="index.php">Project Manager</a>
 	  </div>
 
-		<div class="actions">
-		  <div class="row" style="justify-content:flex-end; align-items:center;">
-			<?php if ($username): ?>
-              <?= $clock_status_badge ?>
-			  <span class="muted">Signed in as <strong><?= h($username) ?></strong></span>
-			  <a class="btn" href="logout.php">Logout</a>
-			<?php else: ?>
-			  <a class="btn" href="login.php">Login</a>
-			<?php endif; ?>
-		  </div>
-
-		<!-- START TIME (under Login/Logout) -->
+	  <div class="topbar-right">
 		<?php
 		  $tz = new DateTimeZone('America/Los_Angeles');
 		  $now = new DateTime('now', $tz);
 		  $now_ms = (int)$now->format('U') * 1000;
 		?>
-		<div class="card actions-clock-card">
-			<div class="muted actions-clock">
-			  Current time (Los Angeles): <strong id="clock"></strong>
-			</div>
+		<div class="topbar-meta">
+		  <?php if ($username): ?>
+            <?= $clock_status_badge ?>
+		    <span class="muted topbar-clock-label">LA: <strong id="clock"></strong></span>
+		    <span class="muted">Signed in as <strong><?= h($username) ?></strong></span>
+		    <a class="btn" href="logout.php">Logout</a>
+		  <?php else: ?>
+		    <a class="btn" href="login.php">Login</a>
+		  <?php endif; ?>
 		</div>
 
 		<script>
 		  (function () {
 			let ms = <?= (int)$now_ms ?>;
-
 			function tick() {
 			  ms += 1000;
-
 			  const parts = new Intl.DateTimeFormat('en-US', {
 				timeZone: 'America/Los_Angeles',
 				year: 'numeric',
-				month: 'numeric',   // no leading zero
-				day: 'numeric',     // no leading zero
-				hour: 'numeric',    // no leading zero
+				month: 'numeric',
+				day: 'numeric',
+				hour: 'numeric',
 				minute: '2-digit',
 				second: '2-digit',
 				hour12: true
 			  }).formatToParts(new Date(ms));
-
 			  const get = (type) => parts.find(p => p.type === type)?.value || '';
-
 			  document.getElementById('clock').textContent =
 				`${get('month')}-${get('day')}-${get('year')} ${get('hour')}:${get('minute')}:${get('second')} ${get('dayPeriod')}`;
 			}
-
 			tick();
 			setInterval(tick, 1000);
 		  })();
 		</script>
-		<!-- END TIME -->
 
-      <?php if ($show_global_search): ?>
-        <form method="get" action="search.php" class="topbar-search" role="search">
-          <input
-            type="text"
-            name="q"
-            value="<?= h($header_search_query) ?>"
-            placeholder="Search projects, playbooks, documents, tasks, files..."
-            aria-label="Search projects, playbooks, documents, tasks, and files"
-          />
-          <button type="submit" class="btn">Search</button>
-        </form>
-      <?php endif; ?>
+        <?php if ($show_global_search): ?>
+          <form method="get" action="search.php" class="topbar-search" role="search">
+            <input
+              type="text"
+              name="q"
+              value="<?= h($header_search_query) ?>"
+              placeholder="Search projects, playbooks, documents, tasks, files..."
+              aria-label="Search projects, playbooks, documents, tasks, and files"
+            />
+            <button type="submit" class="btn">Search</button>
+          </form>
+        <?php endif; ?>
 	  </div>
 	</div>
 
