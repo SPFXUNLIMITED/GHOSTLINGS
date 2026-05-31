@@ -297,13 +297,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 }
 
-render_header($is_edit_mode ? ('Edit RFQ #' . $edit_rfq_id) : ($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'RFQ / Sourcing Request Form'));
+render_header($is_edit_mode ? ('Edit RFQ #' . $edit_rfq_id) : ($is_parts_entrypoint ? 'Parts RFQ / Sourcing Request Form' : 'Sourcing RFQ Form'));
 ?>
 
 <div class="card page-header">
   <div class="page-header-body">
     <h1>
-      <?= $is_edit_mode ? ('Edit RFQ Request #' . (int)$edit_rfq_id) : ($is_parts_entrypoint ? 'CO2 Laser Parts RFQ / Sourcing Requests' : 'RFQ / Sourcing Requests') ?>
+      <?= $is_edit_mode ? ('Edit RFQ Request #' . (int)$edit_rfq_id) : ($is_parts_entrypoint ? 'CO2 Laser Parts RFQ / Sourcing Requests' : 'Sourcing RFQ Form') ?>
     </h1>
     <p class="muted">
       <?= $is_edit_mode
@@ -311,7 +311,7 @@ render_header($is_edit_mode ? ('Edit RFQ #' . $edit_rfq_id) : ($is_parts_entrypo
         : 'Submit either machine RFQs or parts sourcing requests (chillers, blowers, laser tubes, and more) in one workflow.' ?>
     </p>
   </div>
-  <a class="btn" href="rfq_tracker.php">RFQ Tracker →</a>
+  <a class="btn" href="rfq_tracker.php">Sourcing RFQ Tracker →</a>
 </div>
 
 <?php if ($errors): ?>
@@ -489,7 +489,7 @@ render_header($is_edit_mode ? ('Edit RFQ #' . $edit_rfq_id) : ($is_parts_entrypo
       <?= $fields['request_category'] === 'parts' ? 'Switch to Machine RFQ Form' : 'Switch to Parts RFQ Form' ?>
     </a>
     <?php endif; ?>
-    <a class="btn" href="rfq_tracker.php">Go to RFQ Tracker</a>
+    <a class="btn" href="rfq_tracker.php">Go to Sourcing RFQ Tracker</a>
   </div>
 </form>
 
