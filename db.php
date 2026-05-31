@@ -600,6 +600,27 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Create freight_forwarders table if it does not exist yet
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS freight_forwarders (
+    id                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    company_name        VARCHAR(255) NOT NULL,
+    headquarters        VARCHAR(255) NOT NULL DEFAULT '',
+    contact_person      VARCHAR(255) NOT NULL DEFAULT '',
+    phone               VARCHAR(100) NOT NULL DEFAULT '',
+    email               VARCHAR(255) NOT NULL DEFAULT '',
+    website             VARCHAR(255) NOT NULL DEFAULT '',
+    primary_routes      VARCHAR(500) NOT NULL DEFAULT '',
+    shipping_modes      VARCHAR(255) NOT NULL DEFAULT '',
+    certifications      VARCHAR(255) NOT NULL DEFAULT '',
+    notes               TEXT         NULL,
+    created_at          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_ff_company_name (company_name(191))
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 // Add profile_notes column to users if it does not exist yet
 try {
   $pdo->exec("ALTER TABLE users ADD COLUMN profile_notes TEXT NULL");
