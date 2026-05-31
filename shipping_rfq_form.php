@@ -356,28 +356,6 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form
     ℹ️ Contact details are pre-filled from your <a href="user_page.php">profile</a>.
   </div>
 
-  <h2 class="form-section-heading">Request Overview</h2>
-  <div class="form-grid">
-    <div class="full">
-      <label>Request Title <span style="color:var(--d)">*</span></label>
-      <input type="text" name="request_title" maxlength="255" required
-             value="<?= h($fields['request_title']) ?>"
-             placeholder="e.g. 130W CO2 Laser Cutter Shipping Quote – May 2025" />
-    </div>
-    <div>
-      <label>Machine Model <span style="color:var(--d)">*</span></label>
-      <input type="text" name="machine_model" maxlength="255" required
-             value="<?= h($fields['machine_model']) ?>"
-             placeholder="e.g. OMTech 130W CO2 Laser" />
-    </div>
-    <div>
-      <label>Machine Weight (kg)</label>
-      <input type="number" name="machine_weight_kg" min="0.01" step="0.01"
-             value="<?= h($fields['machine_weight_kg']) ?>"
-             placeholder="e.g. 350" />
-    </div>
-  </div>
-
   <h2 class="form-section-heading">Cargo Crate Details</h2>
   <p class="muted" style="margin-top:0;">Enter dimensions and weight for each crate or pallet. Click <strong>+ Add Crate</strong> to add more.</p>
 
