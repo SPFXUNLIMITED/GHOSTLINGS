@@ -260,6 +260,14 @@ render_header('RFQ Details');
         <td><?= (($rfq['acquisition_purpose'] ?? 'customer') === 'internal') ? 'Internal Use (Inventory / Repairs)' : 'Customer Request' ?></td>
       </tr>
       <tr>
+        <th>Urgency</th>
+        <td><?php
+          $urgency_labels = ['low' => 'Low', 'normal' => 'Normal', 'high' => 'High', 'critical' => 'Critical'];
+          $urgency_val = (string)($rfq['urgency'] ?? 'normal');
+          echo h($urgency_labels[$urgency_val] ?? ucfirst($urgency_val));
+        ?></td>
+      </tr>
+      <tr>
         <th>Contact Phone</th>
         <td><?= $rfq['contact_phone'] !== null && $rfq['contact_phone'] !== '' ? h($rfq['contact_phone']) : '<span class="muted">—</span>' ?></td>
       </tr>

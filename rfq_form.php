@@ -43,6 +43,7 @@ $fields = [
   'request_category'=> $forced_request_category ?? 'machine',
   'request_type'    => 'RFQ',
   'acquisition_purpose' => 'customer',
+  'urgency'         => 'normal',
   'contact_name'    => '',
   'company_name'    => '',
   'contact_email'   => '',
@@ -96,7 +97,7 @@ $fields = array_merge($fields, $profile_contact_fields);
 
 if ($is_edit_mode && $_SERVER['REQUEST_METHOD'] !== 'POST') {
   $edit_stmt = $pdo->prepare(
-    "SELECT id, request_category, acquisition_purpose, buyer_name, buyer_company, buyer_email, buyer_phone,
+    "SELECT id, request_category, acquisition_purpose, urgency, buyer_name, buyer_company, buyer_email, buyer_phone,
             request_title, machine_size, laser_watts, tube_type, part_category, part_specs, quantity, required_features, additional_notes
      FROM rfq_requests
      WHERE id = ?
@@ -113,6 +114,7 @@ if ($is_edit_mode && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     $fields['request_type'] = in_array($parsed_request_type, REQUEST_TYPES, true) ? $parsed_request_type : 'RFQ';
     $fields['request_category'] = (string)($editing_rfq['request_category'] ?? 'machine');
     $fields['acquisition_purpose'] = (string)($editing_rfq['acquisition_purpose'] ?? 'customer');
+    $fields['urgency'] = (string)($editing_rfq['urgency'] ?? 'normal');
     $fields['buyer_name'] = (string)($editing_rfq['buyer_name'] ?? '');
     $fields['buyer_company'] = (string)($editing_rfq['buyer_company'] ?? '');
     $fields['buyer_email'] = (string)($editing_rfq['buyer_email'] ?? '');
@@ -154,6 +156,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
   if (!in_array($fields['acquisition_purpose'], ['customer', 'internal'], true)) {
     $errors[] = 'Acquisition purpose must be Customer Request or Internal Use.';
+  }
+  if (!in_array($fields['urgency'], ['low', 'normal', 'high', 'critical'], true)) {
+    $errors[] = 'Urgency must be Low, Normal, High, or Critical.';
   }
   if ($fields['request_title'] === '') $errors[] = 'Request title is required.';
   if ($fields['request_category'] === 'machine') {
@@ -201,7 +206,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($is_edit_mode) {
       $stmt = $pdo->prepare(
         "UPDATE rfq_requests SET
-          request_category = ?, acquisition_purpose = ?, buyer_name = ?, buyer_company = ?, buyer_email = ?, buyer_phone = ?,
+          request_category = ?, acquisition_purpose = ?, urgency = ?, buyer_name = ?, buyer_company = ?, buyer_email = ?, buyer_phone = ?,
           request_title = ?, machine_size = ?, laser_watts = ?, tube_type = ?, part_category = ?, part_specs = ?,
           quantity = ?, required_features = ?, additional_notes = ?
          WHERE id = ?"
@@ -209,6 +214,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $stmt->execute([
         $fields['request_category'],
         $fields['acquisition_purpose'],
+        $fields['urgency'],
         $fields['buyer_name']    === '' ? null : $fields['buyer_name'],
         $fields['buyer_company'] === '' ? null : $fields['buyer_company'],
         $fields['buyer_email']   === '' ? null : $fields['buyer_email'],
@@ -230,17 +236,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $stmt = $pdo->prepare(
         "INSERT INTO rfq_requests
           (
-            requested_by, request_category, acquisition_purpose, contact_name, company_name, contact_email, contact_phone,
+            requested_by, request_category, acquisition_purpose, urgency, contact_name, company_name, contact_email, contact_phone,
             buyer_name, buyer_company, buyer_email, buyer_phone,
             request_title, machine_size, laser_watts, tube_type, part_category, part_specs,
             quantity, required_features, additional_notes
           )
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
       );
       $stmt->execute([
         (int)current_user_id(),
         $fields['request_category'],
         $fields['acquisition_purpose'],
+        $fields['urgency'],
         $fields['contact_name']  === '' ? null : $fields['contact_name'],
         $fields['company_name']  === '' ? null : $fields['company_name'],
         $fields['contact_email'] === '' ? null : $fields['contact_email'],
@@ -266,6 +273,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'request_category'=> $forced_request_category ?? 'machine',
         'request_type'    => 'RFQ',
         'acquisition_purpose' => 'customer',
+        'urgency'         => 'normal',
         'contact_name'    => '',
         'company_name'    => '',
         'contact_email'   => '',
@@ -355,6 +363,15 @@ render_header($is_edit_mode ? ('Edit RFQ #' . $edit_rfq_id) : ($is_parts_entrypo
       <select name="acquisition_purpose" id="acquisition_purpose" required>
         <option value="customer" <?= $fields['acquisition_purpose'] === 'customer' ? 'selected' : '' ?>>Customer Request</option>
         <option value="internal" <?= $fields['acquisition_purpose'] === 'internal' ? 'selected' : '' ?>>Internal Use (Inventory / Repairs)</option>
+      </select>
+    </div>
+    <div>
+      <label>Urgency <span style="color:var(--d)">*</span></label>
+      <select name="urgency" required>
+        <option value="low"      <?= $fields['urgency'] === 'low'      ? 'selected' : '' ?>>Low</option>
+        <option value="normal"   <?= $fields['urgency'] === 'normal'   ? 'selected' : '' ?>>Normal</option>
+        <option value="high"     <?= $fields['urgency'] === 'high'     ? 'selected' : '' ?>>High</option>
+        <option value="critical" <?= $fields['urgency'] === 'critical' ? 'selected' : '' ?>>Critical</option>
       </select>
     </div>
   </div>
