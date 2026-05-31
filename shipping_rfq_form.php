@@ -359,7 +359,7 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form
   <div class="card" style="margin-bottom:14px; background:var(--surface-alt, #f8f9fa);">
     <h2 class="form-section-heading" style="margin-top:0;">Length Converter</h2>
     <p class="muted" style="margin-top:0;">Convert between meter, centimeter, and feet.</p>
-    <div class="form-grid">
+    <div class="form-grid" style="grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px;">
       <div>
         <label for="length_meter">Meter (m)</label>
         <input type="number" id="length_meter" min="0" step="any" placeholder="e.g. 2.2" />
