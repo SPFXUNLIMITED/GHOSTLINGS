@@ -1059,7 +1059,7 @@ render_header('RFQ Tracker');
                     $ub = $urgency_badges[$urgency_val] ?? [ucfirst($urgency_val), '#e2e8f0', '#334155'];
                   ?>
                   <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:0.72em; font-weight:600; letter-spacing:0.04em; background:<?= h($ub[1]) ?>; color:<?= h($ub[2]) ?>;"><?= h($ub[0]) ?></span>
-                  · Acquisition: <?= h(format_acquisition_purpose($r)) ?>
+                  <br>Acquisition: <?= h(format_acquisition_purpose($r)) ?>
                 </span>
               </td>
               <td>
