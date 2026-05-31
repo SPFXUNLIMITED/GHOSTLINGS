@@ -109,8 +109,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       } else {
         $stmt = $pdo->prepare("UPDATE rfq_requests SET request_status = ? WHERE id = ?");
         $stmt->execute([$new_status, $rfq['id']]);
-        $rfq['request_status'] = $new_status;
-        $success = 'RFQ status updated.';
+        if ($stmt->rowCount() > 0) {
+          $rfq['request_status'] = $new_status;
+          $success = 'RFQ status updated.';
+        } else {
+          $errors[] = 'RFQ not found.';
+        }
       }
     } elseif ($action === 'update_quote_status') {
       $quote_id = (int)($_POST['quote_id'] ?? 0);
@@ -122,7 +126,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       } else {
         $stmt = $pdo->prepare("UPDATE rfq_quotes SET quote_status = ? WHERE id = ? AND rfq_request_id = ?");
         $stmt->execute([$new_status, $quote_id, $rfq['id']]);
-        $success = 'Quote status updated.';
+        if ($stmt->rowCount() > 0) {
+          $success = 'Quote status updated.';
+        } else {
+          $errors[] = 'Quote not found.';
+        }
       }
     }
   }
