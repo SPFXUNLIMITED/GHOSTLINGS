@@ -42,21 +42,21 @@ render_header('Freight Forwarders');
     <span class="freight-hero-tag">Global Logistics Network</span>
     <h1>Freight Forwarders <span class="freight-hero-count">(<?= count($forwarders) ?>)</span></h1>
     <p class="muted">Build a premium logistics bench with trusted carriers, certified operators, and route experts ready for your next shipment.</p>
-    <div class="freight-hero-stats" aria-label="Freight forwarder summary">
-      <span class="freight-hero-pill">🌍 Multi-region coverage</span>
-      <span class="freight-hero-pill">✅ Compliance-ready partners</span>
-      <span class="freight-hero-pill">⚡ Faster quote turnarounds</span>
-    </div>
+    <ul class="freight-hero-stats" aria-label="Freight forwarder summary">
+      <li class="freight-hero-pill"><span class="freight-hero-emoji" aria-hidden="true">🌍</span> Multi-region coverage</li>
+      <li class="freight-hero-pill"><span class="freight-hero-emoji" aria-hidden="true">✅</span> Compliance-ready partners</li>
+      <li class="freight-hero-pill"><span class="freight-hero-emoji" aria-hidden="true">⚡</span> Faster quote turnarounds</li>
+    </ul>
   </div>
   <div class="freight-hero-actions">
     <a class="btn primary" href="freight_forwarder_form.php">+ Add Freight Forwarder</a>
-    <a class="btn" href="#forwarder-search">Find a Partner</a>
+    <a class="btn" href="#forwarder-search" aria-label="Jump to freight forwarder search form">Find a Partner</a>
   </div>
 </div>
 
-<div class="card">
-  <form id="forwarder-search" method="get" action="freight_forwarders.php" class="row" style="margin-bottom:4px;">
-    <input type="text" name="q" value="<?= h($q) ?>" placeholder="Search by company, route, certification, contact, email, or phone…" style="max-width:360px;" />
+<div id="forwarder-search" class="card">
+  <form method="get" action="freight_forwarders.php" class="row" style="margin-bottom:4px;">
+    <input id="forwarder-search-input" type="text" name="q" value="<?= h($q) ?>" placeholder="Search by company, route, certification, contact, email, or phone…" style="max-width:360px;" />
     <button type="submit" class="btn">Search</button>
     <?php if ($q !== ''): ?>
       <a class="btn" href="freight_forwarders.php">Clear</a>
