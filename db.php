@@ -551,3 +551,52 @@ try {
     throw $e;
   }
 }
+
+// Create machine_inquiries table for CO2 laser machine purchase inquiries
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS machine_inquiries (
+    id                    INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    first_name            VARCHAR(100) NOT NULL,
+    last_name             VARCHAR(100) NOT NULL,
+    cell_phone            VARCHAR(30)  NOT NULL,
+    email                 VARCHAR(255) NOT NULL,
+    city                  VARCHAR(100) NOT NULL,
+    state                 VARCHAR(50)  NOT NULL,
+    zip_code              VARCHAR(20)  NOT NULL,
+    machine_condition     ENUM('new','used','either') NOT NULL DEFAULT 'either',
+    laser_type            VARCHAR(100) NULL,
+    desired_watts         VARCHAR(50)  NULL,
+    work_area             VARCHAR(100) NULL,
+    budget                VARCHAR(100) NULL,
+    intended_use          TEXT         NULL,
+    features_wanted       TEXT         NULL,
+    timeline              VARCHAR(100) NULL,
+    current_machine       TINYINT(1)   NOT NULL DEFAULT 0,
+    current_machine_brand VARCHAR(100) NULL,
+    additional_notes      TEXT         NULL,
+    heard_about_us        VARCHAR(100) NULL,
+    submission_ip         VARCHAR(45)  NULL,
+    created_at            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_mi_email (email),
+    KEY idx_mi_created_at (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// Create machine_inquiry_settings table for admin-editable settings (e.g. promo text)
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS machine_inquiry_settings (
+    setting_key  VARCHAR(100)  NOT NULL,
+    setting_val  MEDIUMTEXT    NULL,
+    updated_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (setting_key)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// Seed default promo text if not already set
+$pdo->exec("
+  INSERT IGNORE INTO machine_inquiry_settings (setting_key, setting_val) VALUES (
+    'promo_text',
+    '<div style=\"text-align:center;\">🔥 <strong>Limited-Time Offer!</strong> Mention this form and receive a <strong>FREE extended warranty upgrade</strong> on any new CO2 laser machine purchase. Ask our team for details!</div>'
+  )
+");

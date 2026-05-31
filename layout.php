@@ -345,6 +345,10 @@ $show_rfq_menu = $show_mod_menu;
       ['href' => 'form.php', 'file' => 'form.php', 'label' => 'Customer Service Request Form', 'visible' => true],
       ['href' => 'form_admin.php', 'file' => 'form_admin.php', 'label' => 'Form Entries', 'visible' => $show_mod_menu],
     ], $current); ?>
+    <?php render_menu_dropdown('Machine Inquiries', [
+      ['href' => 'machine_inquiry_form.php', 'file' => 'machine_inquiry_form.php', 'label' => 'Machine Inquiry Form', 'visible' => true],
+      ['href' => 'machine_inquiry_admin.php', 'file' => 'machine_inquiry_admin.php', 'label' => 'Inquiry Admin', 'visible' => $show_mod_menu],
+    ], $current); ?>
     <?php if ($show_mod_menu): ?>
     <span class="menu-spacer" aria-hidden="true"></span>
     <?php render_menu_dropdown('RFQ & Sourcing', [
