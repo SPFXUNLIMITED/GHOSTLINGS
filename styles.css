@@ -518,3 +518,51 @@ td.col-project-wrap, th.col-project-wrap {
     grid-template-columns: 1fr;
   }
 }
+
+/* Table row hover */
+tbody tr:hover td {
+  background: #f8fafc;
+}
+
+/* Form section heading (replaces long inline style in rfq_form.php etc.) */
+.form-section-heading {
+  margin: 16px 0 12px;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--m);
+  font-weight: 600;
+  border-bottom: 1px solid var(--b);
+  padding-bottom: 6px;
+}
+
+/* Info banner for contextual notes */
+.info-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  color: #1e40af;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+/* Page header card layout (title + subtitle + optional actions) */
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.page-header-body h1 {
+  margin: 0 0 4px;
+}
+
+.page-header-body p {
+  margin: 0;
+}
