@@ -28,6 +28,7 @@ $quote_statuses = [
   'negotiating' => 'Negotiating',
   'accepted' => 'Accepted',
   'rejected' => 'Rejected',
+  'lost' => 'Lost',
 ];
 // Quote status badges: [label, background-color, text-color]
 $quote_badges = [
@@ -36,6 +37,7 @@ $quote_badges = [
   'negotiating'  => ['Negotiating',  '#ffedd5', '#9a3412'],
   'accepted'     => ['Accepted',     '#dcfce7', '#166534'],
   'rejected'     => ['Rejected',     '#fee2e2', '#991b1b'],
+  'lost'         => ['Lost',         '#e2e8f0', '#475569'],
 ];
 $urgency_badges = [
   'low' => ['Low', '#ecfeff', '#155e75'],
