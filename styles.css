@@ -572,3 +572,122 @@ tbody tr:hover td {
 .page-header-body p {
   margin: 0;
 }
+
+/* Freight forwarders hero banner */
+.freight-hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 85% 15%, rgba(56, 189, 248, 0.28), transparent 44%),
+    linear-gradient(130deg, #0f172a 0%, #1d4ed8 45%, #0ea5e9 100%);
+  color: #e2e8f0;
+  border: none;
+  min-height: 180px;
+}
+
+.freight-hero .muted {
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.freight-hero-glow {
+  position: absolute;
+  width: 260px;
+  height: 260px;
+  top: -100px;
+  right: -70px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
+.freight-hero-body {
+  position: relative;
+  z-index: 1;
+  max-width: 720px;
+}
+
+.freight-hero-tag {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.36);
+  border: 1px solid rgba(226, 232, 240, 0.35);
+}
+
+.freight-hero .page-header-body h1 {
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.freight-hero-count {
+  font-size: 0.875em;
+  font-weight: 500;
+  color: #fff;
+}
+
+.freight-hero-stats {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin-bottom: 0;
+}
+
+.freight-hero-pill {
+  font-size: 0.875rem;
+  line-height: 1.3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid rgba(226, 232, 240, 0.28);
+  color: #e2e8f0;
+}
+
+.freight-hero-emoji {
+  line-height: 1;
+}
+
+.freight-hero-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.freight-hero-actions .btn {
+  border-color: rgba(226, 232, 240, 0.45);
+}
+
+.freight-hero-actions .btn:not(.primary) {
+  background: rgba(15, 23, 42, 0.3);
+  color: #fff;
+}
+
+.freight-hero-actions .btn.primary {
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.28);
+}
+
+@media (max-width: 720px) {
+  .freight-hero {
+    min-height: auto;
+  }
+
+  .freight-hero-actions {
+    width: 100%;
+  }
+
+  .freight-hero-actions .btn {
+    flex: 1;
+    text-align: center;
+  }
+}

@@ -36,17 +36,27 @@ $forwarders = $stmt->fetchAll();
 render_header('Freight Forwarders');
 ?>
 
-<div class="card page-header">
-  <div class="page-header-body">
-    <h1>Freight Forwarders <span class="muted" style="font-size:0.7em; font-weight:400;">(<?= count($forwarders) ?>)</span></h1>
-    <p class="muted">Manage freight forwarding partners for import/export routes and logistics.</p>
+<div class="card freight-hero page-header">
+  <div class="freight-hero-glow" aria-hidden="true"></div>
+  <div class="page-header-body freight-hero-body">
+    <span class="freight-hero-tag">Global Logistics Network</span>
+    <h1>Freight Forwarders <span class="freight-hero-count">(<?= count($forwarders) ?>)</span></h1>
+    <p class="muted">Build a premium logistics bench with trusted carriers, certified operators, and route experts ready for your next shipment.</p>
+    <ul class="freight-hero-stats" aria-label="Freight forwarder summary">
+      <li class="freight-hero-pill"><span class="freight-hero-emoji" aria-hidden="true">🌍</span> Multi-region coverage</li>
+      <li class="freight-hero-pill"><span class="freight-hero-emoji" aria-hidden="true">✅</span> Compliance-ready partners</li>
+      <li class="freight-hero-pill"><span class="freight-hero-emoji" aria-hidden="true">⚡</span> Faster quote turnarounds</li>
+    </ul>
   </div>
-  <a class="btn primary" href="freight_forwarder_form.php">+ Add Freight Forwarder</a>
+  <div class="freight-hero-actions">
+    <a class="btn primary" href="freight_forwarder_form.php">+ Add Freight Forwarder</a>
+    <button type="button" class="btn" id="focus-forwarder-search">Find a Partner</button>
+  </div>
 </div>
 
-<div class="card">
+<div id="forwarder-search" class="card">
   <form method="get" action="freight_forwarders.php" class="row" style="margin-bottom:4px;">
-    <input type="text" name="q" value="<?= h($q) ?>" placeholder="Search by company, route, certification, contact, email, or phone…" style="max-width:360px;" />
+    <input id="forwarder-search-input" type="text" name="q" value="<?= h($q) ?>" aria-label="Search freight forwarders" placeholder="Search by company, route, certification, contact, email, or phone…" style="max-width:360px;" />
     <button type="submit" class="btn">Search</button>
     <?php if ($q !== ''): ?>
       <a class="btn" href="freight_forwarders.php">Clear</a>
@@ -95,5 +105,20 @@ render_header('Freight Forwarders');
   </table>
 </div>
 <?php endif; ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var jumpButton = document.getElementById('focus-forwarder-search');
+  var searchInput = document.getElementById('forwarder-search-input');
+  if (!jumpButton || !searchInput) return;
+
+  jumpButton.addEventListener('click', function () {
+    searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    requestAnimationFrame(function () {
+      searchInput.focus();
+    });
+  });
+});
+</script>
 
 <?php render_footer(); ?>
