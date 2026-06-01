@@ -57,8 +57,10 @@ render_header('Vendors');
     <thead>
       <tr>
         <th>Company</th>
+        <th>Contact</th>
+        <th>Email</th>
         <th>Phone</th>
-        <th>Alibaba Store Link</th>
+        <th>Website</th>
         <th>Actions</th>
       </tr>
     </thead>
@@ -66,20 +68,19 @@ render_header('Vendors');
       <?php foreach ($vendors as $v): ?>
       <tr>
         <td><strong><?= h($v['company_name']) ?></strong></td>
+        <td><?= h($v['contact_name']) ?></td>
+        <td>
+          <?php if ($v['email'] !== ''): ?>
+            <a href="mailto:<?= h($v['email']) ?>"><?= h($v['email']) ?></a>
+          <?php else: ?>
+            <span class="muted">—</span>
+          <?php endif; ?>
+        </td>
         <td><?= $v['phone'] !== '' ? h($v['phone']) : '<span class="muted">—</span>' ?></td>
         <td>
-          <?php
-            $store_url = trim((string)($v['website'] ?? ''));
-            $max_url_display_length = 40;
-            $display_url = mb_strlen($store_url) > $max_url_display_length ? mb_substr($store_url, 0, $max_url_display_length) . '…' : $store_url;
-            $parsed_scheme = parse_url($store_url, PHP_URL_SCHEME);
-            $scheme = is_string($parsed_scheme) ? strtolower($parsed_scheme) : '';
-            $is_safe_url = $store_url !== '' && in_array($scheme, ['http', 'https'], true);
-          ?>
-          <?php if ($is_safe_url): ?>
-            <a href="<?= h($store_url) ?>" target="_blank" rel="noopener noreferrer" title="<?= h($store_url) ?>"><?= h($display_url) ?></a>
-          <?php elseif ($store_url !== ''): ?>
-            <?= h($store_url) ?>
+          <?php if ($v['website'] !== ''): ?>
+            <?php $display_url = strlen($v['website']) > 40 ? substr($v['website'], 0, 40) . '…' : $v['website']; ?>
+            <a href="<?= h($v['website']) ?>" target="_blank" rel="noopener noreferrer" title="<?= h($v['website']) ?>"><?= h($display_url) ?></a>
           <?php else: ?>
             <span class="muted">—</span>
           <?php endif; ?>
