@@ -69,15 +69,17 @@ render_header('Vendors');
         <td><?= $v['phone'] !== '' ? h($v['phone']) : '<span class="muted">—</span>' ?></td>
         <td>
           <?php
-            $alibaba_url = trim((string)($v['website'] ?? ''));
-            $display_url = mb_strlen($alibaba_url) > 40 ? mb_substr($alibaba_url, 0, 40) . '…' : $alibaba_url;
-            $scheme = strtolower((string)parse_url($alibaba_url, PHP_URL_SCHEME));
-            $is_safe_url = $alibaba_url !== '' && in_array($scheme, ['http', 'https'], true);
+            $store_url = trim((string)($v['website'] ?? ''));
+            $max_url_display_length = 40;
+            $display_url = mb_strlen($store_url) > $max_url_display_length ? mb_substr($store_url, 0, $max_url_display_length) . '…' : $store_url;
+            $parsed_scheme = parse_url($store_url, PHP_URL_SCHEME);
+            $scheme = is_string($parsed_scheme) ? strtolower($parsed_scheme) : '';
+            $is_safe_url = $store_url !== '' && in_array($scheme, ['http', 'https'], true);
           ?>
           <?php if ($is_safe_url): ?>
-            <a href="<?= h($alibaba_url) ?>" target="_blank" rel="noopener noreferrer" title="<?= h($alibaba_url) ?>"><?= h($display_url) ?></a>
-          <?php elseif ($alibaba_url !== ''): ?>
-            <?= h($alibaba_url) ?>
+            <a href="<?= h($store_url) ?>" target="_blank" rel="noopener noreferrer" title="<?= h($store_url) ?>"><?= h($display_url) ?></a>
+          <?php elseif ($store_url !== ''): ?>
+            <?= h($store_url) ?>
           <?php else: ?>
             <span class="muted">—</span>
           <?php endif; ?>
