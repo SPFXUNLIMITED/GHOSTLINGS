@@ -29,6 +29,25 @@ function is_image_attachment_mime(?string $mime): bool {
   return is_string($mime) && preg_match('#^image/(png|jpe?g|gif|webp)$#i', $mime);
 }
 
+function is_inline_preview_attachment(?string $file_name, ?string $mime): bool {
+  if (is_image_attachment_mime($mime)) {
+    return true;
+  }
+
+  $mime = strtolower(trim((string)$mime));
+  $ext = strtolower(pathinfo((string)$file_name, PATHINFO_EXTENSION));
+
+  if ($mime === 'application/pdf' || $ext === 'pdf') {
+    return true;
+  }
+
+  if (in_array($mime, ['text/plain', 'text/csv'], true) || in_array($ext, ['txt', 'csv'], true)) {
+    return true;
+  }
+
+  return false;
+}
+
 function attachment_icon_emoji(?string $file_name, ?string $mime): string {
   $mime = strtolower(trim((string)$mime));
   $file_name = strtolower(trim((string)$file_name));
@@ -45,6 +64,107 @@ function attachment_icon_emoji(?string $file_name, ?string $mime): string {
   return '📄';
 }
 
+function render_attachment_modal_assets(): string {
+  static $rendered = false;
+  if ($rendered) {
+    return '';
+  }
+  $rendered = true;
+
+  return <<<HTML
+<style>
+  .attachment-modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.72);display:none;align-items:center;justify-content:center;padding:20px;z-index:2000;}
+  .attachment-modal-overlay.open{display:flex;}
+  .attachment-modal{width:min(1100px,96vw);max-height:90vh;background:#fff;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 22px 52px rgba(0,0,0,.35);}
+  .attachment-modal-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.1);}
+  .attachment-modal-title{flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .attachment-modal-body{padding:12px;overflow:auto;display:flex;align-items:center;justify-content:center;background:#f8fafc;min-height:320px;}
+  .attachment-modal-body img{max-width:100%;max-height:70vh;display:block;}
+  .attachment-modal-frame{width:100%;height:70vh;border:1px solid rgba(0,0,0,.12);border-radius:8px;background:#fff;}
+  .attachment-open-link{cursor:pointer;}
+  .attachment-open-link:not(.btn){font:inherit;padding:0;margin:0;border:0;background:none;color:#2563eb;text-align:left;text-decoration:underline;}
+  .attachment-modal-note{color:#475569;text-align:center;}
+</style>
+<div id="attachmentPreviewModal" class="attachment-modal-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="attachmentModalTitle">
+  <div class="attachment-modal">
+    <div class="attachment-modal-head">
+      <div class="attachment-modal-title" id="attachmentModalTitle">Attachment</div>
+      <a class="btn" id="attachmentModalDownload" href="#" target="_blank" rel="noopener noreferrer">Download</a>
+      <button type="button" class="btn" id="attachmentModalClose">Close</button>
+    </div>
+    <div class="attachment-modal-body" id="attachmentModalBody"></div>
+  </div>
+</div>
+<script>
+(() => {
+  if (window.__attachmentModalInit) return;
+  window.__attachmentModalInit = true;
+
+  const modal = document.getElementById('attachmentPreviewModal');
+  const title = document.getElementById('attachmentModalTitle');
+  const body = document.getElementById('attachmentModalBody');
+  const closeBtn = document.getElementById('attachmentModalClose');
+  const downloadBtn = document.getElementById('attachmentModalDownload');
+  if (!modal || !title || !body || !closeBtn || !downloadBtn) return;
+
+  const closeModal = () => {
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+    body.innerHTML = '';
+  };
+
+  closeBtn.addEventListener('click', closeModal);
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) closeModal();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && modal.classList.contains('open')) closeModal();
+  });
+
+  document.addEventListener('click', (event) => {
+    const trigger = event.target.closest('.attachment-open-link');
+    if (!trigger) return;
+
+    event.preventDefault();
+    const name = trigger.getAttribute('data-attachment-name') || 'Attachment';
+    const fileUrl = trigger.getAttribute('data-attachment-file') || '';
+    const previewUrl = trigger.getAttribute('data-attachment-preview') || '';
+    const canPreview = trigger.getAttribute('data-attachment-previewable') === '1' && previewUrl !== '';
+    const isImage = trigger.getAttribute('data-attachment-image') === '1';
+
+    title.textContent = name;
+    downloadBtn.href = fileUrl || previewUrl;
+    downloadBtn.style.display = (fileUrl || previewUrl) ? '' : 'none';
+    body.innerHTML = '';
+
+    if (canPreview) {
+      if (isImage) {
+        const img = document.createElement('img');
+        img.src = previewUrl;
+        img.alt = name;
+        body.appendChild(img);
+      } else {
+        const frame = document.createElement('iframe');
+        frame.className = 'attachment-modal-frame';
+        frame.src = previewUrl;
+        frame.setAttribute('title', name);
+        body.appendChild(frame);
+      }
+    } else {
+      const note = document.createElement('p');
+      note.className = 'attachment-modal-note';
+      note.textContent = 'Preview is unavailable for this file type. Use Download to open it externally.';
+      body.appendChild(note);
+    }
+
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+  });
+})();
+</script>
+HTML;
+}
+
 function render_attachment_preview(?string $file_url, ?string $display_name, ?string $mime_type = null, ?string $preview_url = null): string {
   $file_url = trim((string)$file_url);
   if ($file_url === '') {
@@ -58,18 +178,33 @@ function render_attachment_preview(?string $file_url, ?string $display_name, ?st
   $is_image = is_image_attachment_mime($mime_type);
   $icon = attachment_icon_emoji($display_name, $mime_type);
   $preview_src = trim((string)($preview_url ?? $file_url));
+  $can_preview_inline = $preview_src !== '' && is_inline_preview_attachment($display_name, $mime_type);
 
-  $out = '<div style="display:flex; align-items:center; gap:8px;">';
+  $data_name = h($display_name);
+  $data_file = h($file_url);
+  $data_preview = h($can_preview_inline ? $preview_src : '');
+  $data_previewable = $can_preview_inline ? '1' : '0';
+  $data_image = $is_image ? '1' : '0';
+  $trigger_attrs = ' class="attachment-open-link"'
+   . ' data-attachment-name="' . $data_name . '"'
+   . ' data-attachment-file="' . $data_file . '"'
+   . ' data-attachment-preview="' . $data_preview . '"'
+   . ' data-attachment-previewable="' . $data_previewable . '"'
+   . ' data-attachment-image="' . $data_image . '"';
+
+  $out = render_attachment_modal_assets();
+  $out .= '<div style="display:flex; align-items:center; gap:8px;">';
   if ($is_image) {
-    $out .= '<a href="' . h($file_url) . '" target="_blank" rel="noopener noreferrer">'
-      . '<img src="' . h($preview_src) . '" alt="' . h($display_name) . '"'
-      . ' style="width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid rgba(0,0,0,.12); display:block;" />'
-      . '</a>';
+   $out .= '<button type="button"' . $trigger_attrs . ' aria-label="' . h('Preview ' . $display_name) . '" style="padding:0; border:0; background:none;">'
+     . '<img src="' . h($can_preview_inline ? $preview_src : $file_url) . '" alt="' . h($display_name) . '"'
+     . ' style="width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid rgba(0,0,0,.12); display:block;" />'
+     . '</button>';
   } else {
-    $out .= '<span aria-hidden="true" style="font-size:20px; line-height:1;">' . h($icon) . '</span>';
+   $out .= '<span aria-hidden="true" style="font-size:20px; line-height:1;">' . h($icon) . '</span>';
   }
-  $out .= '<a href="' . h($file_url) . '" target="_blank" rel="noopener noreferrer"'
-    . ' style="font-size:12px; line-height:1.3; word-break:break-word;">' . h($display_name) . '</a>'
+  $out .= '<button type="button"' . $trigger_attrs
+    . ' style="padding:0; border:0; background:none; font-size:12px; line-height:1.3; word-break:break-word;">' . h($display_name) . '</button>'
+    . '<noscript><a href="' . h($file_url) . '" target="_blank" rel="noopener noreferrer" style="font-size:12px;">Open ' . h($display_name) . '</a></noscript>'
     . '</div>';
 
   return $out;

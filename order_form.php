@@ -638,6 +638,7 @@ if (($order['id'] ?? 0) > 0) {
 <div class="card" id="order-documents">
   <h2 style="margin-top:0;">Documents</h2>
   <p class="muted" style="margin-top:0;">Upload supporting documents for this purchase order. Each document type supports multiple files.</p>
+  <?= render_attachment_modal_assets() ?>
 
   <style>
     .doc-section { border: 1px solid rgba(0,0,0,.08); border-radius:10px; overflow:hidden; margin-bottom:16px; }
@@ -703,7 +704,15 @@ if (($order['id'] ?? 0) > 0) {
                   <div class="doc-file-name" title="<?= h($f['original_name']) ?>"><?= h($f['original_name']) ?></div>
                   <div class="doc-file-sub"><?= h($f['mime_type'] ?? 'file') ?> · <?= $size_str ?> · <?= h($f['created_at']) ?></div>
                 </div>
-                <a class="btn" href="order_document_file.php?id=<?= (int)$f['id'] ?>&inline=1" target="_blank" rel="noopener">Open</a>
+                <button type="button"
+                        class="btn attachment-open-link"
+                        data-attachment-name="<?= h((string)$f['original_name']) ?>"
+                        data-attachment-file="order_document_file.php?id=<?= (int)$f['id'] ?>"
+                        data-attachment-preview="order_document_file.php?id=<?= (int)$f['id'] ?>&inline=1"
+                        data-attachment-previewable="<?= is_inline_preview_attachment((string)$f['original_name'], (string)($f['mime_type'] ?? '')) ? '1' : '0' ?>"
+                        data-attachment-image="<?= is_image_attachment_mime((string)($f['mime_type'] ?? '')) ? '1' : '0' ?>">
+                  Open
+                </button>
                 <a class="btn danger"
                    href="order_document_delete.php?id=<?= (int)$f['id'] ?>&order_id=<?= (int)$order['id'] ?>"
                    onclick="return confirm('Delete this file?');">Delete</a>

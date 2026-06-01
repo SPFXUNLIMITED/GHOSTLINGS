@@ -51,7 +51,7 @@ $mime = trim((string)($quote['quote_file_mime_type'] ?? ''));
 if ($mime === '') {
   $mime = 'application/octet-stream';
 }
-$inline = isset($_GET['inline']) && $_GET['inline'] === '1' && is_image_attachment_mime($mime);
+$inline = isset($_GET['inline']) && $_GET['inline'] === '1' && is_inline_preview_attachment($download_name, $mime);
 
 header('Content-Type: ' . $mime);
 header('X-Content-Type-Options: nosniff');
