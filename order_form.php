@@ -616,10 +616,6 @@ if (($order['id'] ?? 0) > 0) {
       <label>Destination Address</label>
       <textarea name="destination_address" rows="2" maxlength="500"><?= h((string)order_value($order, 'destination_address', '')) ?></textarea>
     </div>
-    <div>
-      <label>Alibaba Trade Assurance Order #</label>
-      <input type="text" name="trade_assurance_order_no" maxlength="100" value="<?= h((string)order_value($order, 'trade_assurance_order_no', '')) ?>">
-    </div>
     <?php foreach ($inline_doc_type_keys as $inline_type_key): ?>
       <?php
         $inline_type_info = $doc_types[$inline_type_key];
@@ -659,10 +655,6 @@ if (($order['id'] ?? 0) > 0) {
         <?php endif; ?>
       </div>
     <?php endforeach; ?>
-    <div>
-      <label>Proforma Invoice #</label>
-      <input type="text" name="proforma_invoice_no" maxlength="100" value="<?= h((string)order_value($order, 'proforma_invoice_no', '')) ?>">
-    </div>
     <div class="full">
       <label>Included Accessories / Options</label>
       <textarea name="included_accessories" rows="3"><?= h((string)order_value($order, 'included_accessories', '')) ?></textarea>
