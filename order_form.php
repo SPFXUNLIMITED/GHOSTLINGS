@@ -637,7 +637,7 @@ if (($order['id'] ?? 0) > 0) {
 <?php if (($order['id'] ?? 0) > 0): ?>
 <div class="card" id="order-documents">
   <h2 style="margin-top:0;">Documents</h2>
-  <p class="muted" style="margin-top:0;">Upload trade, shipping, and customs documents for this purchase order. Each document type supports multiple files.</p>
+  <p class="muted" style="margin-top:0;">Upload supporting documents for this purchase order. Each document type supports multiple files.</p>
 
   <style>
     .doc-section { border: 1px solid rgba(0,0,0,.08); border-radius:10px; overflow:hidden; margin-bottom:16px; }
@@ -651,7 +651,7 @@ if (($order['id'] ?? 0) > 0) {
     .doc-file-item .doc-file-meta { flex:1; min-width:0; }
     .doc-file-item .doc-file-name { font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .doc-file-item .doc-file-sub { font-size:12px; color:rgba(0,0,0,.5); margin-top:2px; }
-    .doc-upload-form { display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; }
+    .doc-upload-form { display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; }
     .doc-upload-field { flex:1; min-width:220px; }
     .doc-upload-label { display:block; margin-bottom:6px; font-size:12px; }
     .doc-upload-form input[type="file"] {
@@ -719,7 +719,7 @@ if (($order['id'] ?? 0) > 0) {
           <input type="hidden" name="order_id" value="<?= (int)$order['id'] ?>">
           <input type="hidden" name="doc_type" value="<?= h($type_key) ?>">
           <div class="doc-upload-field">
-            <label class="muted doc-upload-label" for="<?= h($file_input_id) ?>">Choose file</label>
+            <label class="muted doc-upload-label" for="<?= h($file_input_id) ?>">Choose <?= h($type_info['label']) ?> file</label>
             <input id="<?= h($file_input_id) ?>" type="file" name="file" required>
           </div>
           <button class="btn primary" type="submit" style="white-space:nowrap;">Upload</button>
