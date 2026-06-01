@@ -37,7 +37,6 @@ $doc_types = [
   'certificate_origin' => ['label' => 'Certificate of Origin','icon' => '🏅'],
   'customs_documents'  => ['label' => 'Customs Documents',    'icon' => '🛃'],
 ];
-
 $errors = [];
 $success = isset($_GET['saved']) ? 'Purchase order saved.' : '';
 
