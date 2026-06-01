@@ -85,7 +85,7 @@ function render_attachment_modal_assets(): string {
   .attachment-open-link:not(.btn){font:inherit;padding:0;margin:0;border:0;background:none;color:#2563eb;text-align:left;text-decoration:underline;}
   .attachment-modal-note{color:#475569;text-align:center;}
 </style>
-<div id="attachmentPreviewModal" class="attachment-modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+<div id="attachmentPreviewModal" class="attachment-modal-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="attachmentModalTitle">
   <div class="attachment-modal">
     <div class="attachment-modal-head">
       <div class="attachment-modal-title" id="attachmentModalTitle">Attachment</div>
@@ -195,7 +195,7 @@ function render_attachment_preview(?string $file_url, ?string $display_name, ?st
   $out = render_attachment_modal_assets();
   $out .= '<div style="display:flex; align-items:center; gap:8px;">';
   if ($is_image) {
-   $out .= '<button type="button"' . $trigger_attrs . '>'
+   $out .= '<button type="button"' . $trigger_attrs . ' aria-label="' . h('Preview ' . $display_name) . '" style="padding:0; border:0; background:none;">'
      . '<img src="' . h($can_preview_inline ? $preview_src : $file_url) . '" alt="' . h($display_name) . '"'
      . ' style="width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid rgba(0,0,0,.12); display:block;" />'
      . '</button>';
@@ -203,8 +203,8 @@ function render_attachment_preview(?string $file_url, ?string $display_name, ?st
    $out .= '<span aria-hidden="true" style="font-size:20px; line-height:1;">' . h($icon) . '</span>';
   }
   $out .= '<button type="button"' . $trigger_attrs
-    . ' style="font-size:12px; line-height:1.3; word-break:break-word;">' . h($display_name) . '</button>'
-    . '<noscript><a href="' . h($file_url) . '" target="_blank" rel="noopener noreferrer" style="font-size:12px;">Open</a></noscript>'
+    . ' style="padding:0; border:0; background:none; font-size:12px; line-height:1.3; word-break:break-word;">' . h($display_name) . '</button>'
+    . '<noscript><a href="' . h($file_url) . '" target="_blank" rel="noopener noreferrer" style="font-size:12px;">Open ' . h($display_name) . '</a></noscript>'
     . '</div>';
 
   return $out;
