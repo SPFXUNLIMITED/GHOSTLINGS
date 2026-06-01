@@ -57,10 +57,8 @@ render_header('Vendors');
     <thead>
       <tr>
         <th>Company</th>
-        <th>Contact</th>
-        <th>Email</th>
         <th>Phone</th>
-        <th>Website</th>
+        <th>Alibaba Store Link</th>
         <th>Actions</th>
       </tr>
     </thead>
@@ -68,19 +66,18 @@ render_header('Vendors');
       <?php foreach ($vendors as $v): ?>
       <tr>
         <td><strong><?= h($v['company_name']) ?></strong></td>
-        <td><?= h($v['contact_name']) ?></td>
-        <td>
-          <?php if ($v['email'] !== ''): ?>
-            <a href="mailto:<?= h($v['email']) ?>"><?= h($v['email']) ?></a>
-          <?php else: ?>
-            <span class="muted">—</span>
-          <?php endif; ?>
-        </td>
         <td><?= $v['phone'] !== '' ? h($v['phone']) : '<span class="muted">—</span>' ?></td>
         <td>
-          <?php if ($v['website'] !== ''): ?>
-            <?php $display_url = mb_strlen($v['website']) > 40 ? mb_substr($v['website'], 0, 40) . '…' : $v['website']; ?>
-            <a href="<?= h($v['website']) ?>" target="_blank" rel="noopener noreferrer" title="<?= h($v['website']) ?>"><?= h($display_url) ?></a>
+          <?php
+            $alibaba_url = trim((string)($v['website'] ?? ''));
+            $display_url = mb_strlen($alibaba_url) > 40 ? mb_substr($alibaba_url, 0, 40) . '…' : $alibaba_url;
+            $scheme = strtolower((string)parse_url($alibaba_url, PHP_URL_SCHEME));
+            $is_safe_url = $alibaba_url !== '' && in_array($scheme, ['http', 'https'], true);
+          ?>
+          <?php if ($is_safe_url): ?>
+            <a href="<?= h($alibaba_url) ?>" target="_blank" rel="noopener noreferrer" title="<?= h($alibaba_url) ?>"><?= h($display_url) ?></a>
+          <?php elseif ($alibaba_url !== ''): ?>
+            <?= h($alibaba_url) ?>
           <?php else: ?>
             <span class="muted">—</span>
           <?php endif; ?>
