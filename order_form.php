@@ -642,14 +642,8 @@ if (($order['id'] ?? 0) > 0) {
           <?php else: ?>
             <p class="muted" style="margin:0 0 10px 0; font-size:13px;">No file uploaded yet.</p>
           <?php endif; ?>
-          <form action="order_document_upload.php" method="post" enctype="multipart/form-data" class="doc-upload-form">
-            <input type="hidden" name="order_id" value="<?= (int)$order['id'] ?>">
-            <input type="hidden" name="doc_type" value="<?= h($inline_type_key) ?>">
-            <div style="min-width:0;">
-              <input type="file" name="file" required style="font-size:13px; width:100%;">
-            </div>
-            <button class="btn primary" type="submit" style="white-space:nowrap;">Upload</button>
-          </form>
+          <p class="muted" style="margin:0 0 10px 0; font-size:13px;">Upload <?= h($inline_type_info['label']) ?> in the Documents section below to avoid interrupting edits.</p>
+          <a class="btn" href="#order-documents">Go to Documents</a>
         <?php else: ?>
           <p class="muted" style="margin:0; font-size:13px;">Save the purchase order first to upload this document.</p>
         <?php endif; ?>
@@ -675,7 +669,7 @@ if (($order['id'] ?? 0) > 0) {
 </div>
 
 <?php if (($order['id'] ?? 0) > 0): ?>
-<div class="card">
+<div class="card" id="order-documents">
   <h2 style="margin-top:0;">Documents</h2>
   <p class="muted" style="margin-top:0;">Upload shipping and trade documents for this purchase order. Each document type supports multiple files.</p>
 
