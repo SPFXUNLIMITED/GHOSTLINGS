@@ -28,8 +28,8 @@ $order_statuses = [
 ];
 $incoterm_options = ['EXW', 'FOB', 'CIF', 'CFR', 'DDP', 'DAP'];
 $doc_types = [
-  'trade_order'        => ['label' => 'Trade Order',          'icon' => '📝'],
-  'trade_assurance'    => ['label' => 'Trade Assurance',      'icon' => '🤝'],
+  'trade_order'        => ['label' => 'Trade Order',           'icon' => '📝'],
+  'trade_assurance'    => ['label' => 'Trade Assurance',       'icon' => '🤝'],
   'proforma_invoice'   => ['label' => 'Proforma Invoice',     'icon' => '📋'],
   'commercial_invoice' => ['label' => 'Commercial Invoice',   'icon' => '🧾'],
   'packing_list'       => ['label' => 'Packing List',         'icon' => '📦'],
