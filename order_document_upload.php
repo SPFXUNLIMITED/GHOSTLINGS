@@ -21,6 +21,8 @@ const ORDER_DOC_ALLOWED_MIMES = [
 ];
 
 $valid_doc_types = [
+  'trade_order',
+  'trade_assurance',
   'proforma_invoice',
   'commercial_invoice',
   'packing_list',

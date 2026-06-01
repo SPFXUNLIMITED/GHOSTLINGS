@@ -28,6 +28,8 @@ $order_statuses = [
 ];
 $incoterm_options = ['EXW', 'FOB', 'CIF', 'CFR', 'DDP', 'DAP'];
 $doc_types = [
+  'trade_order'        => ['label' => 'Trade Order',          'icon' => '📝'],
+  'trade_assurance'    => ['label' => 'Trade Assurance',      'icon' => '🤝'],
   'proforma_invoice'   => ['label' => 'Proforma Invoice',     'icon' => '📋'],
   'commercial_invoice' => ['label' => 'Commercial Invoice',   'icon' => '🧾'],
   'packing_list'       => ['label' => 'Packing List',         'icon' => '📦'],
@@ -35,6 +37,7 @@ $doc_types = [
   'certificate_origin' => ['label' => 'Certificate of Origin','icon' => '🏅'],
   'customs_documents'  => ['label' => 'Customs Documents',    'icon' => '🛃'],
 ];
+$inline_doc_type_keys = ['trade_order', 'trade_assurance'];
 $errors = [];
 $success = isset($_GET['saved']) ? 'Purchase order saved.' : '';
 
@@ -617,6 +620,45 @@ if (($order['id'] ?? 0) > 0) {
       <label>Alibaba Trade Assurance Order #</label>
       <input type="text" name="trade_assurance_order_no" maxlength="100" value="<?= h((string)order_value($order, 'trade_assurance_order_no', '')) ?>">
     </div>
+    <?php foreach ($inline_doc_type_keys as $inline_type_key): ?>
+      <?php
+        $inline_type_info = $doc_types[$inline_type_key];
+        $inline_files = $order_documents[$inline_type_key] ?? [];
+      ?>
+      <div>
+        <label><?= h($inline_type_info['label']) ?> Document</label>
+        <?php if (($order['id'] ?? 0) > 0): ?>
+          <?php if ($inline_files): ?>
+            <ul class="doc-file-list" style="margin-bottom:10px;">
+              <?php foreach ($inline_files as $f): ?>
+                <li class="doc-file-item" style="padding:6px 8px;">
+                  <div class="doc-file-meta">
+                    <div class="doc-file-name" title="<?= h($f['original_name']) ?>"><?= h($f['original_name']) ?></div>
+                    <div class="doc-file-sub"><?= h($f['created_at']) ?></div>
+                  </div>
+                  <a class="btn" href="order_document_file.php?id=<?= (int)$f['id'] ?>&inline=1" target="_blank" rel="noopener">Open</a>
+                  <a class="btn danger"
+                     href="order_document_delete.php?id=<?= (int)$f['id'] ?>&order_id=<?= (int)$order['id'] ?>"
+                     onclick="return confirm('Delete this file?');">Delete</a>
+                </li>
+              <?php endforeach; ?>
+            </ul>
+          <?php else: ?>
+            <p class="muted" style="margin:0 0 10px 0; font-size:13px;">No file uploaded yet.</p>
+          <?php endif; ?>
+          <form action="order_document_upload.php" method="post" enctype="multipart/form-data" class="doc-upload-form">
+            <input type="hidden" name="order_id" value="<?= (int)$order['id'] ?>">
+            <input type="hidden" name="doc_type" value="<?= h($inline_type_key) ?>">
+            <div style="min-width:0;">
+              <input type="file" name="file" required style="font-size:13px; width:100%;">
+            </div>
+            <button class="btn primary" type="submit" style="white-space:nowrap;">Upload</button>
+          </form>
+        <?php else: ?>
+          <p class="muted" style="margin:0; font-size:13px;">Save the purchase order first to upload this document.</p>
+        <?php endif; ?>
+      </div>
+    <?php endforeach; ?>
     <div>
       <label>Proforma Invoice #</label>
       <input type="text" name="proforma_invoice_no" maxlength="100" value="<?= h((string)order_value($order, 'proforma_invoice_no', '')) ?>">
@@ -661,6 +703,7 @@ if (($order['id'] ?? 0) > 0) {
   </style>
 
   <?php foreach ($doc_types as $type_key => $type_info): ?>
+    <?php if (in_array($type_key, $inline_doc_type_keys, true)) { continue; } ?>
     <?php $files = $order_documents[$type_key] ?? []; ?>
     <div class="doc-section">
       <div class="doc-section-header">
