@@ -57,9 +57,8 @@ render_header('Vendors');
     <thead>
       <tr>
         <th>Company</th>
-        <th>Contact</th>
-        <th>Email</th>
         <th>Phone</th>
+        <th>Alibaba Store</th>
         <th>Website</th>
         <th>Actions</th>
       </tr>
@@ -68,15 +67,15 @@ render_header('Vendors');
       <?php foreach ($vendors as $v): ?>
       <tr>
         <td><strong><?= h($v['company_name']) ?></strong></td>
-        <td><?= h($v['contact_name']) ?></td>
+        <td><?= $v['phone'] !== '' ? h($v['phone']) : '<span class="muted">—</span>' ?></td>
         <td>
-          <?php if ($v['email'] !== ''): ?>
-            <a href="mailto:<?= h($v['email']) ?>"><?= h($v['email']) ?></a>
+          <?php if ($v['alibaba_store'] !== ''): ?>
+            <?php $display_alibaba = strlen($v['alibaba_store']) > 40 ? substr($v['alibaba_store'], 0, 40) . '…' : $v['alibaba_store']; ?>
+            <a href="<?= h($v['alibaba_store']) ?>" target="_blank" rel="noopener noreferrer" title="<?= h($v['alibaba_store']) ?>"><?= h($display_alibaba) ?></a>
           <?php else: ?>
             <span class="muted">—</span>
           <?php endif; ?>
         </td>
-        <td><?= $v['phone'] !== '' ? h($v['phone']) : '<span class="muted">—</span>' ?></td>
         <td>
           <?php if ($v['website'] !== ''): ?>
             <?php $display_url = strlen($v['website']) > 40 ? substr($v['website'], 0, 40) . '…' : $v['website']; ?>
