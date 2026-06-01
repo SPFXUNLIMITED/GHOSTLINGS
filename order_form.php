@@ -37,7 +37,6 @@ $doc_types = [
   'certificate_origin' => ['label' => 'Certificate of Origin','icon' => '🏅'],
   'customs_documents'  => ['label' => 'Customs Documents',    'icon' => '🛃'],
 ];
-$inline_doc_type_keys = ['trade_order', 'trade_assurance'];
 $errors = [];
 $success = isset($_GET['saved']) ? 'Purchase order saved.' : '';
 
@@ -510,43 +509,6 @@ if (($order['id'] ?? 0) > 0) {
   </div>
 <?php endif; ?>
 
-<style>
-  .inline-doc-card {
-    border: 1px solid rgba(0,0,0,.08);
-    border-radius: 10px;
-    background: #fff;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    min-height: 210px;
-  }
-  .inline-doc-card .inline-doc-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 10px;
-  }
-  .inline-doc-card .inline-doc-header label {
-    margin: 0;
-    font-weight: 600;
-    color: var(--t);
-  }
-  .inline-doc-card .inline-doc-body {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-  }
-  .inline-doc-card .doc-file-list {
-    margin-bottom: 10px;
-  }
-  .inline-doc-card .doc-file-item {
-    padding: 6px 8px;
-  }
-  .inline-doc-card .inline-doc-upload {
-    margin-top: auto;
-  }
-</style>
-
 <div class="card">
   <h2 style="margin-top:0;">Order Details</h2>
   <p class="muted" style="margin-top:0;">Prefilled from the accepted quote so you can complete supplier, deposit, logistics, and Alibaba/China ordering details.</p>
@@ -653,50 +615,6 @@ if (($order['id'] ?? 0) > 0) {
       <label>Destination Address</label>
       <textarea name="destination_address" rows="2" maxlength="500"><?= h((string)order_value($order, 'destination_address', '')) ?></textarea>
     </div>
-    <?php foreach ($inline_doc_type_keys as $inline_type_key): ?>
-      <?php
-        $inline_type_info = $doc_types[$inline_type_key];
-        $inline_files = $order_documents[$inline_type_key] ?? [];
-      ?>
-      <div class="inline-doc-card">
-        <div class="inline-doc-header">
-          <span role="img" aria-hidden="true"><?= $inline_type_info['icon'] ?></span>
-          <label><?= h($inline_type_info['label']) ?> Document</label>
-        </div>
-        <div class="inline-doc-body">
-        <?php if (($order['id'] ?? 0) > 0): ?>
-          <?php if ($inline_files): ?>
-            <ul class="doc-file-list">
-              <?php foreach ($inline_files as $f): ?>
-                <li class="doc-file-item">
-                  <div class="doc-file-meta">
-                    <div class="doc-file-name" title="<?= h($f['original_name']) ?>"><?= h($f['original_name']) ?></div>
-                    <div class="doc-file-sub"><?= h($f['created_at']) ?></div>
-                  </div>
-                  <a class="btn" href="order_document_file.php?id=<?= (int)$f['id'] ?>&inline=1" target="_blank" rel="noopener">Open</a>
-                  <a class="btn danger"
-                     href="order_document_delete.php?id=<?= (int)$f['id'] ?>&order_id=<?= (int)$order['id'] ?>"
-                     onclick="return confirm('Delete this file?');">Delete</a>
-                </li>
-              <?php endforeach; ?>
-            </ul>
-          <?php else: ?>
-            <p class="muted" style="margin:0 0 10px 0; font-size:13px;">No file uploaded yet.</p>
-          <?php endif; ?>
-          <form action="order_document_upload.php" method="post" enctype="multipart/form-data" class="doc-upload-form inline-doc-upload">
-            <input type="hidden" name="order_id" value="<?= (int)$order['id'] ?>">
-            <input type="hidden" name="doc_type" value="<?= h($inline_type_key) ?>">
-            <div style="min-width:0;">
-              <input type="file" name="file" required style="font-size:13px; width:100%;">
-            </div>
-            <button class="btn primary" type="submit" style="white-space:nowrap;">Upload</button>
-          </form>
-        <?php else: ?>
-          <p class="muted" style="margin:0; font-size:13px;">Save the purchase order first to upload this document.</p>
-        <?php endif; ?>
-        </div>
-      </div>
-    <?php endforeach; ?>
     <div class="full">
       <label>Included Accessories / Options</label>
       <textarea name="included_accessories" rows="3"><?= h((string)order_value($order, 'included_accessories', '')) ?></textarea>
@@ -717,9 +635,9 @@ if (($order['id'] ?? 0) > 0) {
 </div>
 
 <?php if (($order['id'] ?? 0) > 0): ?>
-<div class="card">
+<div class="card" id="order-documents">
   <h2 style="margin-top:0;">Documents</h2>
-  <p class="muted" style="margin-top:0;">Upload shipping and trade documents for this purchase order. Each document type supports multiple files.</p>
+  <p class="muted" style="margin-top:0;">Upload supporting documents for this purchase order. Each document type supports multiple files.</p>
 
   <style>
     .doc-section { border: 1px solid rgba(0,0,0,.08); border-radius:10px; overflow:hidden; margin-bottom:16px; }
@@ -734,10 +652,20 @@ if (($order['id'] ?? 0) > 0) {
     .doc-file-item .doc-file-name { font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .doc-file-item .doc-file-sub { font-size:12px; color:rgba(0,0,0,.5); margin-top:2px; }
     .doc-upload-form { display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; }
+    .doc-upload-field { flex:1; min-width:220px; }
+    .doc-upload-label { display:block; margin-bottom:6px; font-size:12px; }
+    .doc-upload-form input[type="file"] {
+      width:100%;
+      padding:8px 10px;
+      border:1px solid rgba(0,0,0,.12);
+      border-radius:8px;
+      background:#fff;
+      font-size:13px;
+      box-sizing:border-box;
+    }
   </style>
 
   <?php foreach ($doc_types as $type_key => $type_info): ?>
-    <?php if (in_array($type_key, $inline_doc_type_keys, true)) { continue; } ?>
     <?php $files = $order_documents[$type_key] ?? []; ?>
     <div class="doc-section">
       <div class="doc-section-header">
@@ -786,13 +714,15 @@ if (($order['id'] ?? 0) > 0) {
           <p class="muted" style="margin:0 0 12px 0; font-size:13px;">No files uploaded yet.</p>
         <?php endif; ?>
 
+        <?php $file_input_id = 'doc-file-' . $type_key; ?>
         <form action="order_document_upload.php" method="post" enctype="multipart/form-data" class="doc-upload-form">
           <input type="hidden" name="order_id" value="<?= (int)$order['id'] ?>">
           <input type="hidden" name="doc_type" value="<?= h($type_key) ?>">
-          <div>
-            <input type="file" name="file" required style="font-size:13px;">
+          <div class="doc-upload-field">
+            <label class="muted doc-upload-label" for="<?= h($file_input_id) ?>">Choose <?= h($type_info['label']) ?> file</label>
+            <input id="<?= h($file_input_id) ?>" type="file" name="file" required>
           </div>
-          <button class="btn primary" type="submit" style="white-space:nowrap;">Upload <?= h($type_info['label']) ?></button>
+          <button class="btn primary" type="submit" style="white-space:nowrap;">Upload</button>
         </form>
       </div>
     </div>
