@@ -18,13 +18,14 @@ $errors  = [];
 $success = '';
 
 $fields = [
-  'company_name' => '',
-  'contact_name' => '',
-  'email'        => '',
-  'phone'        => '',
-  'website'      => '',
-  'address'      => '',
-  'notes'        => '',
+  'company_name'  => '',
+  'contact_name'  => '',
+  'email'         => '',
+  'phone'         => '',
+  'website'       => '',
+  'alibaba_store' => '',
+  'address'       => '',
+  'notes'         => '',
 ];
 
 // Load existing record for edits
@@ -73,6 +74,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (mb_strlen($fields['website']) > 255) {
       $errors[] = 'Website must be 255 characters or fewer.';
     }
+    if (mb_strlen($fields['alibaba_store']) > 255) {
+      $errors[] = 'Alibaba Store link must be 255 characters or fewer.';
+    }
     if (mb_strlen($fields['address']) > 500) {
       $errors[] = 'Address must be 500 characters or fewer.';
     }
@@ -82,22 +86,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->prepare("
           UPDATE vendors SET
             company_name = ?, contact_name = ?, email = ?, phone = ?,
-            website = ?, address = ?, notes = ?
+            website = ?, alibaba_store = ?, address = ?, notes = ?
           WHERE id = ?
         ")->execute([
           $fields['company_name'], $fields['contact_name'], $fields['email'],
-          $fields['phone'], $fields['website'], $fields['address'],
+          $fields['phone'], $fields['website'], $fields['alibaba_store'],
+          $fields['address'],
           $fields['notes'] !== '' ? $fields['notes'] : null,
           $id,
         ]);
         $success = 'Vendor updated.';
       } else {
         $pdo->prepare("
-          INSERT INTO vendors (company_name, contact_name, email, phone, website, address, notes)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO vendors (company_name, contact_name, email, phone, website, alibaba_store, address, notes)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ")->execute([
           $fields['company_name'], $fields['contact_name'], $fields['email'],
-          $fields['phone'], $fields['website'], $fields['address'],
+          $fields['phone'], $fields['website'], $fields['alibaba_store'],
+          $fields['address'],
           $fields['notes'] !== '' ? $fields['notes'] : null,
         ]);
         $id = (int)$pdo->lastInsertId();
@@ -161,6 +167,11 @@ render_header($page_title);
         <label>Website</label>
         <input type="text" name="website" maxlength="255"
                value="<?= h($fields['website']) ?>" placeholder="e.g. https://acmecorp.com" />
+      </div>
+      <div>
+        <label>Alibaba Store</label>
+        <input type="text" name="alibaba_store" maxlength="255"
+               value="<?= h($fields['alibaba_store']) ?>" placeholder="e.g. https://acmecorp.en.alibaba.com" />
       </div>
       <div>
         <label>Address</label>
