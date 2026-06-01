@@ -67,7 +67,13 @@ render_header('Vendors');
       <?php foreach ($vendors as $v): ?>
       <tr>
         <td><strong><?= h($v['company_name']) ?></strong></td>
-        <td><?= $v['phone'] !== '' ? h($v['phone']) : '<span class="muted">—</span>' ?></td>
+        <td>
+          <?php if ($v['phone'] !== ''): ?>
+            <?= h($v['phone']) ?>
+          <?php else: ?>
+            <span class="muted">—</span>
+          <?php endif; ?>
+        </td>
         <td>
           <?php if ($v['alibaba_store'] !== ''): ?>
             <?php $display_alibaba = strlen($v['alibaba_store']) > 40 ? substr($v['alibaba_store'], 0, 40) . '…' : $v['alibaba_store']; ?>
