@@ -510,6 +510,43 @@ if (($order['id'] ?? 0) > 0) {
   </div>
 <?php endif; ?>
 
+<style>
+  .inline-doc-card {
+    border: 1px solid rgba(0,0,0,.08);
+    border-radius: 10px;
+    background: #fff;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    min-height: 210px;
+  }
+  .inline-doc-card .inline-doc-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .inline-doc-card .inline-doc-header label {
+    margin: 0;
+    font-weight: 600;
+    color: var(--t);
+  }
+  .inline-doc-card .inline-doc-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .inline-doc-card .doc-file-list {
+    margin-bottom: 10px;
+  }
+  .inline-doc-card .doc-file-item {
+    padding: 6px 8px;
+  }
+  .inline-doc-card .inline-doc-upload {
+    margin-top: auto;
+  }
+</style>
+
 <div class="card">
   <h2 style="margin-top:0;">Order Details</h2>
   <p class="muted" style="margin-top:0;">Prefilled from the accepted quote so you can complete supplier, deposit, logistics, and Alibaba/China ordering details.</p>
@@ -621,13 +658,17 @@ if (($order['id'] ?? 0) > 0) {
         $inline_type_info = $doc_types[$inline_type_key];
         $inline_files = $order_documents[$inline_type_key] ?? [];
       ?>
-      <div>
-        <label><?= h($inline_type_info['label']) ?> Document</label>
+      <div class="inline-doc-card">
+        <div class="inline-doc-header">
+          <span role="img" aria-hidden="true"><?= $inline_type_info['icon'] ?></span>
+          <label><?= h($inline_type_info['label']) ?> Document</label>
+        </div>
+        <div class="inline-doc-body">
         <?php if (($order['id'] ?? 0) > 0): ?>
           <?php if ($inline_files): ?>
-            <ul class="doc-file-list" style="margin-bottom:10px;">
+            <ul class="doc-file-list">
               <?php foreach ($inline_files as $f): ?>
-                <li class="doc-file-item" style="padding:6px 8px;">
+                <li class="doc-file-item">
                   <div class="doc-file-meta">
                     <div class="doc-file-name" title="<?= h($f['original_name']) ?>"><?= h($f['original_name']) ?></div>
                     <div class="doc-file-sub"><?= h($f['created_at']) ?></div>
@@ -642,7 +683,7 @@ if (($order['id'] ?? 0) > 0) {
           <?php else: ?>
             <p class="muted" style="margin:0 0 10px 0; font-size:13px;">No file uploaded yet.</p>
           <?php endif; ?>
-          <form action="order_document_upload.php" method="post" enctype="multipart/form-data" class="doc-upload-form">
+          <form action="order_document_upload.php" method="post" enctype="multipart/form-data" class="doc-upload-form inline-doc-upload">
             <input type="hidden" name="order_id" value="<?= (int)$order['id'] ?>">
             <input type="hidden" name="doc_type" value="<?= h($inline_type_key) ?>">
             <div style="min-width:0;">
@@ -653,6 +694,7 @@ if (($order['id'] ?? 0) > 0) {
         <?php else: ?>
           <p class="muted" style="margin:0; font-size:13px;">Save the purchase order first to upload this document.</p>
         <?php endif; ?>
+        </div>
       </div>
     <?php endforeach; ?>
     <div class="full">
