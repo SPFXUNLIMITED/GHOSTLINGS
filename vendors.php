@@ -57,30 +57,47 @@ render_header('Vendors');
     <thead>
       <tr>
         <th>Company</th>
-        <th>Contact</th>
-        <th>Email</th>
         <th>Phone</th>
+        <th>Alibaba Store</th>
         <th>Website</th>
         <th>Actions</th>
       </tr>
     </thead>
     <tbody>
       <?php foreach ($vendors as $v): ?>
+      <?php
+        $alibabaStore = trim((string)($v['alibaba_store'] ?? ''));
+        $websiteUrl = trim((string)($v['website'] ?? ''));
+        $isValidAlibabaStore = $alibabaStore !== '' && filter_var($alibabaStore, FILTER_VALIDATE_URL)
+          && in_array(strtolower((string)parse_url($alibabaStore, PHP_URL_SCHEME)), ['http', 'https'], true);
+        $isValidWebsite = $websiteUrl !== '' && filter_var($websiteUrl, FILTER_VALIDATE_URL)
+          && in_array(strtolower((string)parse_url($websiteUrl, PHP_URL_SCHEME)), ['http', 'https'], true);
+      ?>
       <tr>
         <td><strong><?= h($v['company_name']) ?></strong></td>
-        <td><?= h($v['contact_name']) ?></td>
         <td>
-          <?php if ($v['email'] !== ''): ?>
-            <a href="mailto:<?= h($v['email']) ?>"><?= h($v['email']) ?></a>
+          <?php if ($v['phone'] !== ''): ?>
+            <?= h($v['phone']) ?>
           <?php else: ?>
             <span class="muted">—</span>
           <?php endif; ?>
         </td>
-        <td><?= $v['phone'] !== '' ? h($v['phone']) : '<span class="muted">—</span>' ?></td>
         <td>
-          <?php if ($v['website'] !== ''): ?>
-            <?php $display_url = strlen($v['website']) > 40 ? substr($v['website'], 0, 40) . '…' : $v['website']; ?>
-            <a href="<?= h($v['website']) ?>" target="_blank" rel="noopener noreferrer" title="<?= h($v['website']) ?>"><?= h($display_url) ?></a>
+          <?php if ($isValidAlibabaStore): ?>
+            <?php $display_alibaba = strlen($alibabaStore) > 40 ? substr($alibabaStore, 0, 40) . '…' : $alibabaStore; ?>
+            <a href="<?= h($alibabaStore) ?>" target="_blank" rel="noopener noreferrer" title="<?= h($alibabaStore) ?>"><?= h($display_alibaba) ?></a>
+          <?php elseif ($alibabaStore !== ''): ?>
+            <?= h($alibabaStore) ?>
+          <?php else: ?>
+            <span class="muted">—</span>
+          <?php endif; ?>
+        </td>
+        <td>
+          <?php if ($isValidWebsite): ?>
+            <?php $display_url = strlen($websiteUrl) > 40 ? substr($websiteUrl, 0, 40) . '…' : $websiteUrl; ?>
+            <a href="<?= h($websiteUrl) ?>" target="_blank" rel="noopener noreferrer" title="<?= h($websiteUrl) ?>"><?= h($display_url) ?></a>
+          <?php elseif ($websiteUrl !== ''): ?>
+            <?= h($websiteUrl) ?>
           <?php else: ?>
             <span class="muted">—</span>
           <?php endif; ?>
