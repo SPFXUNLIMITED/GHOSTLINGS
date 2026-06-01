@@ -797,6 +797,13 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Add rfq_id column to time_entries for associating clock entries with sourcing RFQs
+try {
+  $pdo->exec("ALTER TABLE time_entries ADD COLUMN rfq_id INT UNSIGNED NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') throw $e;
+}
+
 // Create order_documents table for shipping/trade documents attached to purchase orders
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS order_documents (

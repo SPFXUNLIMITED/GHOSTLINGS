@@ -29,6 +29,9 @@ if (is_admin()) {
 // ── Fetch playbooks for the clock-in dropdown ─────────────────────────────
 $playbooks = $pdo->query("SELECT id, name FROM projects WHERE playbook = 1 AND archived = 0 ORDER BY name ASC")->fetchAll();
 
+// ── Fetch active sourcing RFQs for the RFQ dropdown ───────────────────────
+$sourcing_rfqs = $pdo->query("SELECT id, request_title FROM rfq_requests WHERE request_status = 'sourcing' ORDER BY created_at DESC")->fetchAll();
+
 // ── Check for an open clock-in (clock_out IS NULL) ────────────────────────
 $open_stmt = $pdo->prepare("
   SELECT id, clock_in, project_id, description
@@ -56,16 +59,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (!$proj) {
         $proj = (int)($_POST['playbook_id'] ?? 0) ?: null;
       }
+      $rfq_id_in = (int)($_POST['rfq_id'] ?? 0) ?: null;
       $desc = trim($_POST['description'] ?? '');
-      if (!$has_project_or_text($proj, $desc)) {
-        $errors[] = 'Please select a project, playbook, or enter a note before clocking in.';
+      if (!$has_project_or_text($proj, $desc) && !$rfq_id_in) {
+        $errors[] = 'Please select a project, playbook, RFQ, or enter a note before clocking in.';
       } else {
         $now  = (new DateTime('now', $tz))->format('Y-m-d H:i:s');
         $stmt = $pdo->prepare("
-          INSERT INTO time_entries (user_id, project_id, description, clock_in)
-          VALUES (?, ?, ?, ?)
+          INSERT INTO time_entries (user_id, project_id, rfq_id, description, clock_in)
+          VALUES (?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$uid, $proj, $desc ?: null, $now]);
+        $stmt->execute([$uid, $proj, $rfq_id_in, $desc ?: null, $now]);
         $success = 'Clocked in at ' . (new DateTime('now', $tz))->format('g:i A');
         // Refresh open entry
         $open_stmt->execute([$uid]);
@@ -95,6 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $start = trim($_POST['start_time'] ?? '');
     $end   = trim($_POST['end_time'] ?? '');
     $proj  = (int)($_POST['project_id'] ?? 0) ?: null;
+    $rfq_id_man = (int)($_POST['rfq_id'] ?? 0) ?: null;
     $desc  = trim($_POST['description'] ?? '');
 
     $clock_in_obj  = DateTime::createFromFormat('Y-m-d H:i', "$date $start", $tz);
@@ -102,8 +107,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$date || !$start || !$end) {
       $errors[] = 'Date, start time, and end time are required.';
-    } elseif (!$has_project_or_text($proj, $desc)) {
-      $errors[] = 'Please select a project or enter a description for manual entry.';
+    } elseif (!$has_project_or_text($proj, $desc) && !$rfq_id_man) {
+      $errors[] = 'Please select a project, RFQ, or enter a description for manual entry.';
     } elseif (!$clock_in_obj || !$clock_out_obj) {
       $errors[] = 'Invalid date or time format.';
     } elseif ($clock_out_obj <= $clock_in_obj) {
@@ -111,11 +116,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
       $diff_hours = ($clock_out_obj->getTimestamp() - $clock_in_obj->getTimestamp()) / 3600;
       $pdo->prepare("
-        INSERT INTO time_entries (user_id, project_id, description, clock_in, clock_out, hours_override)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO time_entries (user_id, project_id, rfq_id, description, clock_in, clock_out, hours_override)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       ")->execute([
         $uid,
         $proj,
+        $rfq_id_man,
         $desc ?: null,
         $clock_in_obj->format('Y-m-d H:i:s'),
         $clock_out_obj->format('Y-m-d H:i:s'),
@@ -156,10 +162,12 @@ if ($view === 'today') {
 $entries_stmt = $pdo->prepare("
   SELECT
     te.id, te.clock_in, te.clock_out, te.hours_override,
-    te.description, te.project_id,
-    p.name AS project_name
+    te.description, te.project_id, te.rfq_id,
+    p.name AS project_name,
+    r.request_title AS rfq_title
   FROM time_entries te
   LEFT JOIN projects p ON p.id = te.project_id
+  LEFT JOIN rfq_requests r ON r.id = te.rfq_id
   WHERE te.user_id = ?
     $where_date
   ORDER BY te.clock_in DESC
@@ -261,6 +269,14 @@ render_header('Time Clock');
         <?php endforeach; ?>
       </select>
 
+      <label>Sourcing RFQ</label>
+      <select name="rfq_id" id="ci_rfq_id">
+        <option value="">— No RFQ —</option>
+        <?php foreach ($sourcing_rfqs as $rfq): ?>
+          <option value="<?= (int)$rfq['id'] ?>">RFQ #<?= (int)$rfq['id'] ?> – <?= h($rfq['request_title']) ?></option>
+        <?php endforeach; ?>
+      </select>
+
       <label>Note (or select a project)</label>
       <input type="text" name="description" maxlength="255" placeholder="What are you working on?" />
 
@@ -288,6 +304,15 @@ render_header('Time Clock');
           <option value="">— No project —</option>
           <?php foreach ($projects as $pr): ?>
             <option value="<?= (int)$pr['id'] ?>"><?= h($pr['name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div>
+        <label>Sourcing RFQ</label>
+        <select name="rfq_id">
+          <option value="">— No RFQ —</option>
+          <?php foreach ($sourcing_rfqs as $rfq): ?>
+            <option value="<?= (int)$rfq['id'] ?>">RFQ #<?= (int)$rfq['id'] ?> – <?= h($rfq['request_title']) ?></option>
           <?php endforeach; ?>
         </select>
       </div>
@@ -335,13 +360,14 @@ render_header('Time Clock');
           <th>Clock Out</th>
           <th>Hours</th>
           <th>Project</th>
+          <th>RFQ</th>
           <th>Description</th>
           <th class="col-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
         <?php if (!$entries): ?>
-          <tr><td colspan="7" class="muted">No entries for this period.</td></tr>
+          <tr><td colspan="8" class="muted">No entries for this period.</td></tr>
         <?php endif; ?>
         <?php foreach ($entries as $e): ?>
           <?php
@@ -367,6 +393,7 @@ render_header('Time Clock');
               <?php endif; ?>
             </td>
             <td><?= $e['project_name'] ? h($e['project_name']) : '<span class="muted">—</span>' ?></td>
+            <td><?= $e['rfq_title'] ? '<a href="sourcing_rfq_tracker.php?rfq_id=' . (int)$e['rfq_id'] . '">' . h($e['rfq_title']) . '</a>' : '<span class="muted">—</span>' ?></td>
             <td class="col-desc"><?= $e['description'] ? h($e['description']) : '<span class="muted">—</span>' ?></td>
             <td class="col-actions">
               <form method="post" style="display:inline;"
