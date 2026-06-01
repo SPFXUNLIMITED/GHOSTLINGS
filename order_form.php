@@ -642,7 +642,7 @@ if (($order['id'] ?? 0) > 0) {
           <?php else: ?>
             <p class="muted" style="margin:0 0 10px 0; font-size:13px;">No file uploaded yet.</p>
           <?php endif; ?>
-          <p class="muted" style="margin:0 0 10px 0; font-size:13px;">Upload <?= h($inline_type_info['label']) ?> in the Documents section below to avoid interrupting edits.</p>
+          <p class="muted" style="margin:0 0 10px 0; font-size:13px;">Upload <?= h($inline_type_info['label']) ?> in the Documents section below without interrupting edits.</p>
           <a class="btn" href="#order-documents">Go to Documents</a>
         <?php else: ?>
           <p class="muted" style="margin:0; font-size:13px;">Save the purchase order first to upload this document.</p>
