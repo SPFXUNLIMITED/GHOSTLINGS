@@ -900,7 +900,7 @@ if ($rfq_text_id > 0) {
   }
 }
 
-render_header('RFQ Tracker');
+render_header('Sourcing RFQ Tracker');
 ?>
 
 <style>
@@ -918,7 +918,7 @@ render_header('RFQ Tracker');
   <div class="laser-rfq-hero-glow" aria-hidden="true"></div>
   <div class="page-header-body laser-rfq-hero-body">
     <span class="laser-rfq-hero-tag">🔴 Global Laser Sourcing Command Center</span>
-    <h1>RFQ Quote Tracking <span class="laser-rfq-hero-count">(<?= (int)$hero_total_rfqs ?>)</span></h1>
+    <h1>Sourcing RFQ Quote Tracking <span class="laser-rfq-hero-count">(<?= (int)$hero_total_rfqs ?>)</span></h1>
     <p class="muted">Source precision laser cutting machinery and parts from global factories — compare supplier bids, track lead times, and drive the best deals to the table.</p>
     <ul class="laser-rfq-hero-pills" aria-label="Sourcing highlights">
       <li class="laser-rfq-hero-pill"><span aria-hidden="true">🏭</span> Factory-direct sourcing</li>
@@ -946,8 +946,8 @@ render_header('RFQ Tracker');
     </div>
   </div>
   <div class="laser-rfq-hero-actions">
-    <a class="btn primary" href="rfq_form.php">+ New Machine RFQ</a>
-    <a class="btn" href="rfq_form.php?request_category=parts">+ New Parts RFQ</a>
+    <a class="btn primary" href="sourcing_rfq_form.php">+ New Machine RFQ</a>
+    <a class="btn" href="sourcing_rfq_form.php?request_category=parts">+ New Parts RFQ</a>
   </div>
 </div>
 
@@ -983,7 +983,7 @@ render_header('RFQ Tracker');
     </div>
     <div class="row">
       <button type="submit" class="btn primary">Filter</button>
-      <a class="btn" href="rfq_tracker.php">Clear</a>
+      <a class="btn" href="sourcing_rfq_tracker.php">Clear</a>
     </div>
   </form>
 </div>
@@ -1078,9 +1078,9 @@ render_header('RFQ Tracker');
               </td>
               <td class="col-actions">
                 <a class="btn" href="rfq_details.php?id=<?= (int)$r['id'] ?>">View</a>
-                <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$r['id'] ?>">Quotes</a>
-                <a class="btn" href="rfq_tracker.php?rfq_text_id=<?= (int)$r['id'] ?>">Email Text</a>
-                <a class="btn" href="rfq_form.php?edit_rfq_id=<?= (int)$r['id'] ?>">Edit</a>
+                <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$r['id'] ?>">Quotes</a>
+                <a class="btn" href="sourcing_rfq_tracker.php?rfq_text_id=<?= (int)$r['id'] ?>">Email Text</a>
+                <a class="btn" href="sourcing_rfq_form.php?edit_rfq_id=<?= (int)$r['id'] ?>">Edit</a>
                 <form method="post" style="display:inline;"
                       onsubmit="return confirm('Delete this RFQ and all its quotes? This cannot be undone.');">
                   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
@@ -1105,9 +1105,9 @@ render_header('RFQ Tracker');
         <p class="muted"><?= h($selected_rfq['request_title']) ?></p>
       </div>
       <div class="row" style="flex-shrink:0;">
-        <a class="btn" href="rfq_tracker.php<?= $search !== '' || $status_filter !== '' ? '?' . http_build_query(array_filter(['q' => $search, 'status' => $status_filter])) : '' ?>">← All RFQs</a>
-        <a class="btn" href="rfq_tracker.php?rfq_text_id=<?= (int)$selected_rfq['id'] ?>">Email Text</a>
-        <a class="btn" href="rfq_form.php?edit_rfq_id=<?= (int)$selected_rfq['id'] ?>">Edit RFQ</a>
+        <a class="btn" href="sourcing_rfq_tracker.php<?= $search !== '' || $status_filter !== '' ? '?' . http_build_query(array_filter(['q' => $search, 'status' => $status_filter])) : '' ?>">← All RFQs</a>
+        <a class="btn" href="sourcing_rfq_tracker.php?rfq_text_id=<?= (int)$selected_rfq['id'] ?>">Email Text</a>
+        <a class="btn" href="sourcing_rfq_form.php?edit_rfq_id=<?= (int)$selected_rfq['id'] ?>">Edit RFQ</a>
         <a class="btn" href="rfq_details.php?id=<?= (int)$selected_rfq['id'] ?>">View Details</a>
         <a class="btn" href="order_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>">Order Tracker</a>
       </div>
@@ -1229,7 +1229,7 @@ render_header('RFQ Tracker');
         </div>
         <div class="full row" style="margin-top:8px;">
           <button type="submit" class="btn primary">Save Changes</button>
-          <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>">Cancel</a>
+          <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>">Cancel</a>
         </div>
       </form>
     <?php elseif ($show_add_quote_form): ?>
@@ -1335,12 +1335,12 @@ render_header('RFQ Tracker');
         </div>
         <div class="full row" style="margin-top:8px;">
           <button type="submit" class="btn primary">Add Quote</button>
-          <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>">Cancel</a>
+          <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>">Cancel</a>
         </div>
       </form>
     <?php else: ?>
       <div class="row" style="margin-bottom:14px;">
-        <a class="btn primary" href="rfq_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>&add_quote_id=<?= (int)$selected_rfq['id'] ?>">Add Quote</a>
+        <a class="btn primary" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>&add_quote_id=<?= (int)$selected_rfq['id'] ?>">Add Quote</a>
       </div>
     <?php endif; ?>
 
@@ -1416,7 +1416,7 @@ render_header('RFQ Tracker');
               <td class="muted"><?= h($q['created_by_username'] ?? 'Unknown') ?></td>
               <td class="col-actions">
                 <a class="btn" href="rfq_quote_details.php?rfq_id=<?= (int)$selected_rfq['id'] ?>&quote_id=<?= (int)$q['id'] ?>">View</a>
-                <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>&edit_quote_id=<?= (int)$q['id'] ?>">Edit</a>
+                <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>&edit_quote_id=<?= (int)$q['id'] ?>">Edit</a>
                 <?php if ((string)$q['quote_status'] === 'accepted'): ?>
                   <a class="btn primary" href="order_form.php?rfq_id=<?= (int)$selected_rfq['id'] ?>&quote_id=<?= (int)$q['id'] ?>">Convert to Order</a>
                 <?php endif; ?>

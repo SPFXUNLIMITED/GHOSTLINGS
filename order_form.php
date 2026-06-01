@@ -133,7 +133,7 @@ if ($rfq_id > 0 && $quote_id > 0) {
   if (!$source_quote && !$order) {
     http_response_code(404);
     render_header('Accepted Quote Not Found');
-    echo '<div class="card"><p class="muted">The selected RFQ quote could not be found.</p><a class="btn" href="rfq_tracker.php">← Back to RFQ Tracker</a></div>';
+    echo '<div class="card"><p class="muted">The selected RFQ quote could not be found.</p><a class="btn" href="sourcing_rfq_tracker.php">← Back to RFQ Tracker</a></div>';
     render_footer();
     exit;
   }
@@ -152,7 +152,7 @@ if ($rfq_id > 0 && $quote_id > 0) {
 if (!$order && $source_quote && (string)$source_quote['quote_status'] !== 'accepted') {
   http_response_code(400);
   render_header('Accepted Quote Required');
-  echo '<div class="card"><p class="muted">Only accepted quotes can be converted into purchase orders.</p><a class="btn" href="rfq_tracker.php?rfq_id=' . (int)$rfq_id . '">← Back to RFQ Quotes</a></div>';
+  echo '<div class="card"><p class="muted">Only accepted quotes can be converted into purchase orders.</p><a class="btn" href="sourcing_rfq_tracker.php?rfq_id=' . (int)$rfq_id . '">← Back to RFQ Quotes</a></div>';
   render_footer();
   exit;
 }
@@ -160,7 +160,7 @@ if (!$order && $source_quote && (string)$source_quote['quote_status'] !== 'accep
 if (!$order && $source_quote && (string)($source_quote['request_status'] ?? '') === 'closed') {
   http_response_code(400);
   render_header('RFQ Closed');
-  echo '<div class="card"><p class="muted">Closed RFQs cannot be converted into new purchase orders.</p><a class="btn" href="rfq_tracker.php?rfq_id=' . (int)$rfq_id . '">← Back to RFQ Quotes</a></div>';
+  echo '<div class="card"><p class="muted">Closed RFQs cannot be converted into new purchase orders.</p><a class="btn" href="sourcing_rfq_tracker.php?rfq_id=' . (int)$rfq_id . '">← Back to RFQ Quotes</a></div>';
   render_footer();
   exit;
 }
@@ -480,7 +480,7 @@ if (($order['id'] ?? 0) > 0) {
     </div>
     <div class="row">
       <a class="btn" href="order_tracker.php">Order Tracker</a>
-      <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$rfq_id ?>">Back to RFQ Quotes</a>
+      <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$rfq_id ?>">Back to RFQ Quotes</a>
     </div>
   </div>
 </div>

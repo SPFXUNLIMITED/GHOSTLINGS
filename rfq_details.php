@@ -40,7 +40,7 @@ $errors = [];
 $success = '';
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($id <= 0) {
-  header('Location: rfq_tracker.php');
+  header('Location: sourcing_rfq_tracker.php');
   exit;
 }
 
@@ -58,7 +58,7 @@ $rfq = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$rfq) {
   http_response_code(404);
   render_header('RFQ Not Found');
-  echo '<div class="card"><p class="muted">RFQ request not found.</p><a class="btn" href="rfq_tracker.php">← Back to RFQ Tracker</a></div>';
+  echo '<div class="card"><p class="muted">RFQ request not found.</p><a class="btn" href="sourcing_rfq_tracker.php">← Back to RFQ Tracker</a></div>';
   render_footer();
   exit;
 }
@@ -189,9 +189,9 @@ render_header('RFQ Details');
       <p class="muted" style="margin:6px 0 0 0;">Created <?= h((string)$rfq['created_at']) ?></p>
     </div>
     <div class="actions">
-      <a class="btn" href="rfq_tracker.php">Back to RFQ Tracker</a>
-      <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$rfq['id'] ?>">Track Quotes</a>
-      <a class="btn" href="rfq_tracker.php?edit_rfq_id=<?= (int)$rfq['id'] ?>">Edit Request</a>
+      <a class="btn" href="sourcing_rfq_tracker.php">Back to RFQ Tracker</a>
+      <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$rfq['id'] ?>">Track Quotes</a>
+      <a class="btn" href="sourcing_rfq_tracker.php?edit_rfq_id=<?= (int)$rfq['id'] ?>">Edit Request</a>
     </div>
   </div>
 </div>
@@ -395,7 +395,7 @@ render_header('RFQ Details');
             <td class="muted"><?= h((string)($q['created_by_username'] ?? 'Unknown')) ?></td>
             <td class="col-actions">
               <a class="btn" href="rfq_quote_details.php?rfq_id=<?= (int)$rfq['id'] ?>&quote_id=<?= (int)$q['id'] ?>">View</a>
-              <a class="btn" href="rfq_tracker.php?rfq_id=<?= (int)$rfq['id'] ?>&edit_quote_id=<?= (int)$q['id'] ?>">Edit</a>
+              <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$rfq['id'] ?>&edit_quote_id=<?= (int)$q['id'] ?>">Edit</a>
               <form method="post" style="display:inline;" onsubmit="return confirm('Delete this quote? This cannot be undone.');">
                 <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
                 <input type="hidden" name="action" value="delete_quote" />

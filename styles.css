@@ -541,7 +541,7 @@ tbody tr:hover td {
   background: #f8fafc;
 }
 
-/* Form section heading (replaces long inline style in rfq_form.php etc.) */
+/* Form section heading (replaces long inline style in sourcing_rfq_form.php etc.) */
 .form-section-heading {
   margin: 16px 0 12px;
   font-size: 0.875rem;

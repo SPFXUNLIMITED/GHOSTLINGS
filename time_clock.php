@@ -393,7 +393,7 @@ render_header('Time Clock');
               <?php endif; ?>
             </td>
             <td><?= $e['project_name'] ? h($e['project_name']) : '<span class="muted">—</span>' ?></td>
-            <td><?= $e['rfq_title'] ? '<a href="rfq_tracker.php?id=' . (int)$e['rfq_id'] . '">' . h($e['rfq_title']) . '</a>' : '<span class="muted">—</span>' ?></td>
+            <td><?= $e['rfq_title'] ? '<a href="' . h('sourcing_rfq_tracker.php?rfq_id=' . (int)$e['rfq_id']) . '">' . h($e['rfq_title']) . '</a>' : '<span class="muted">—</span>' ?></td>
             <td class="col-desc"><?= $e['description'] ? h($e['description']) : '<span class="muted">—</span>' ?></td>
             <td class="col-actions">
               <form method="post" style="display:inline;"
