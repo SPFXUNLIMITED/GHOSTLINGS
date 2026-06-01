@@ -600,6 +600,12 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+try {
+  $pdo->exec("ALTER TABLE vendors ADD COLUMN alibaba_store VARCHAR(255) NOT NULL DEFAULT ''");
+} catch (PDOException $e) {
+  // Column already exists
+}
+
 // Create freight_forwarders table if it does not exist yet
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS freight_forwarders (
