@@ -36,6 +36,19 @@ function is_safe_stored_upload_name(string $name): bool {
   return (bool)preg_match('/^[a-zA-Z0-9._-]+$/', $name);
 }
 
+function parse_rfq_request_type(string $title): string {
+  if (preg_match('/^Purchase\s+Order\s*:/i', $title) || preg_match('/^PO\s*:/i', $title)) {
+    return 'PO';
+  }
+  if (preg_match('/^Sourcing\s*:/i', $title)) {
+    return 'Sourcing';
+  }
+  if (preg_match('/^RFQ\s*:/i', $title)) {
+    return 'RFQ';
+  }
+  return 'RFQ';
+}
+
 $errors = [];
 $success = '';
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -199,6 +212,7 @@ render_header('RFQ Details');
 <div class="card">
   <h2 style="margin-top:0;">RFQ Information</h2>
   <?php $is_parts_request = (($rfq['request_category'] ?? 'machine') === 'parts'); ?>
+  <?php $request_type = parse_rfq_request_type((string)($rfq['request_title'] ?? '')); ?>
   <table>
     <tbody>
       <tr>
@@ -241,6 +255,10 @@ render_header('RFQ Details');
       <tr>
         <th>Request Category</th>
         <td><?= $is_parts_request ? 'Parts' : 'Machine' ?></td>
+      </tr>
+      <tr>
+        <th>Request Type</th>
+        <td><?= h($request_type) ?></td>
       </tr>
       <tr>
         <th>Acquisition Purpose</th>
@@ -296,6 +314,44 @@ render_header('RFQ Details');
         <th>Additional Notes</th>
         <td><?= !empty($rfq['additional_notes']) ? nl2br(h((string)$rfq['additional_notes'])) : '<span class="muted">—</span>' ?></td>
       </tr>
+      <?php if ($request_type === 'PO'): ?>
+        <tr>
+          <th>Supplier Information</th>
+          <td><?= !empty($rfq['po_supplier_info']) ? nl2br(h((string)$rfq['po_supplier_info'])) : '<span class="muted">—</span>' ?></td>
+        </tr>
+        <tr>
+          <th>Unit Price</th>
+          <td><?= $rfq['po_unit_price'] !== null ? h(number_format((float)$rfq['po_unit_price'], 2)) : '<span class="muted">—</span>' ?></td>
+        </tr>
+        <tr>
+          <th>Line Total</th>
+          <td><?= $rfq['po_line_total'] !== null ? h(number_format((float)$rfq['po_line_total'], 2)) : '<span class="muted">—</span>' ?></td>
+        </tr>
+        <tr>
+          <th>Expected Delivery Date</th>
+          <td><?= !empty($rfq['po_expected_delivery_date']) ? h((string)$rfq['po_expected_delivery_date']) : '<span class="muted">—</span>' ?></td>
+        </tr>
+        <tr>
+          <th>Delivery Address</th>
+          <td><?= !empty($rfq['po_delivery_address']) ? nl2br(h((string)$rfq['po_delivery_address'])) : '<span class="muted">—</span>' ?></td>
+        </tr>
+        <tr>
+          <th>Payment Terms</th>
+          <td><?= !empty($rfq['po_payment_terms']) ? nl2br(h((string)$rfq['po_payment_terms'])) : '<span class="muted">—</span>' ?></td>
+        </tr>
+        <tr>
+          <th>Shipping Method</th>
+          <td><?= !empty($rfq['po_shipping_method']) ? h((string)$rfq['po_shipping_method']) : '<span class="muted">—</span>' ?></td>
+        </tr>
+        <tr>
+          <th>Shipping Cost</th>
+          <td><?= $rfq['po_shipping_cost'] !== null ? h(number_format((float)$rfq['po_shipping_cost'], 2)) : '<span class="muted">—</span>' ?></td>
+        </tr>
+        <tr>
+          <th>Total Amount</th>
+          <td><?= $rfq['po_total_amount'] !== null ? h(number_format((float)$rfq['po_total_amount'], 2)) : '<span class="muted">—</span>' ?></td>
+        </tr>
+      <?php endif; ?>
       <tr>
         <th>Last Updated</th>
         <td><?= h((string)$rfq['updated_at']) ?></td>

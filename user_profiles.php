@@ -21,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email         = trim((string)($_POST['email'] ?? ''));
     $company_name  = trim((string)($_POST['company_name'] ?? ''));
     $contact_phone = trim((string)($_POST['contact_phone'] ?? ''));
+    $delivery_address = trim((string)($_POST['delivery_address'] ?? ''));
 
     if ($uid <= 0) {
       $errors[] = 'Invalid user.';
@@ -40,6 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (strlen($contact_phone) > 100) {
       $errors[] = 'Contact phone must be 100 characters or fewer.';
     }
+    if (strlen($delivery_address) > 500) {
+      $errors[] = 'Delivery address must be 500 characters or fewer.';
+    }
 
     if (empty($errors) && $email !== '') {
       $email_check = $pdo->prepare("SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1");
@@ -52,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($errors)) {
       $upd = $pdo->prepare(
         "UPDATE users
-         SET contact_name = ?, email = ?, company_name = ?, contact_phone = ?
+         SET contact_name = ?, email = ?, company_name = ?, contact_phone = ?, delivery_address = ?
          WHERE id = ?"
       );
       $upd->execute([
@@ -60,6 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email === '' ? null : $email,
         $company_name === '' ? null : $company_name,
         $contact_phone === '' ? null : $contact_phone,
+        $delivery_address === '' ? null : $delivery_address,
         $uid,
       ]);
       $_SESSION['user_profiles_csrf'] = bin2hex(random_bytes(24));
@@ -69,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $users = $pdo->query(
-  "SELECT id, username, role, contact_name, email, company_name, contact_phone
+  "SELECT id, username, role, contact_name, email, company_name, contact_phone, delivery_address
    FROM users
    ORDER BY username ASC"
 )->fetchAll();
@@ -108,12 +113,13 @@ render_header('User Profiles');
           <th>Email</th>
           <th>Company Name</th>
           <th>Contact Phone</th>
+          <th>Delivery Address</th>
           <th class="col-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
         <?php if (!$users): ?>
-          <tr><td colspan="7" class="muted">No users found.</td></tr>
+          <tr><td colspan="8" class="muted">No users found.</td></tr>
         <?php endif; ?>
         <?php foreach ($users as $u): ?>
           <?php $role = (string)($u['role'] ?? 'user'); ?>
@@ -149,6 +155,10 @@ render_header('User Profiles');
             <td>
               <input type="text" name="contact_phone" form="<?= h($form_id) ?>" maxlength="100"
                      value="<?= h((string)($u['contact_phone'] ?? '')) ?>" />
+            </td>
+            <td>
+              <input type="text" name="delivery_address" form="<?= h($form_id) ?>" maxlength="500"
+                     value="<?= h((string)($u['delivery_address'] ?? '')) ?>" />
             </td>
             <td class="col-actions">
               <form id="<?= h($form_id) ?>" method="post" style="display:inline;">
