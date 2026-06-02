@@ -102,6 +102,10 @@ function build_rfq_email_text(array $rfq): string {
   $sep  = str_repeat('=', 60);
   $sep2 = str_repeat('-', 60);
   $date = date('F j, Y', strtotime((string)$rfq['created_at']));
+  $request_title = trim((string)($rfq['request_title'] ?? ''));
+  $is_purchase_order = preg_match('/^\s*(PO|Purchase\s+Order)\s*:/i', $request_title) === 1;
+  $email_heading = $is_purchase_order ? 'PURCHASE ORDER (PO)' : 'REQUEST FOR QUOTATION (RFQ)';
+  $request_number_label = $is_purchase_order ? 'PO #:         ' : 'RFQ #:        ';
 
   $contact_name  = trim((string)($rfq['contact_name']  ?? ''));
   $company_name  = trim((string)($rfq['company_name']  ?? ''));
@@ -111,10 +115,10 @@ function build_rfq_email_text(array $rfq): string {
 
   $lines = [
     $sep,
-    'REQUEST FOR QUOTATION (RFQ)',
+    $email_heading,
     $sep,
     '',
-    'RFQ #:        ' . (int)$rfq['id'],
+    $request_number_label . (int)$rfq['id'],
     'Date:         ' . $date,
     'Status:       ' . ucfirst(str_replace('_', ' ', trim((string)$rfq['request_status']))),
     'Acquisition:  ' . format_acquisition_purpose($rfq),
@@ -146,7 +150,7 @@ function build_rfq_email_text(array $rfq): string {
     $sep2,
     $is_parts_request ? 'PARTS REQUEST DETAILS:' : 'MACHINE SPECIFICATIONS:',
     $sep2,
-    'Title:        ' . trim((string)$rfq['request_title']),
+    'Title:        ' . $request_title,
     'Quantity:     ' . (int)$rfq['quantity'],
   ]);
 
