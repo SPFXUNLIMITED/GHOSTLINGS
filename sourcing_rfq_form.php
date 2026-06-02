@@ -350,7 +350,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             quantity, required_features, additional_notes, po_supplier_info, po_unit_price, po_line_total, po_expected_delivery_date,
             po_delivery_address, po_payment_terms, po_shipping_method, po_shipping_cost, po_total_amount
           )
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
       );
       $stmt->execute([
         (int)current_user_id(),
