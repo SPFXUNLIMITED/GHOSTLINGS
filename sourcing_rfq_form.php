@@ -5,7 +5,7 @@ require __DIR__ . '/auth.php';
 require_rfq_access();
 
 const MAX_RFQ_QUANTITY = 1000;
-const REQUEST_TYPES = ['RFQ', 'Sourcing', 'Purchase Order'];
+const REQUEST_TYPES = ['RFQ', 'Sourcing', 'PO'];
 const REQUEST_CATEGORIES = ['machine', 'parts'];
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -34,8 +34,11 @@ $is_parts_entrypoint = $forced_request_category === 'parts';
 
 function split_request_title_with_type(string $stored_title): array {
   $stored_title = trim($stored_title);
+  if (preg_match('/^Purchase\s+Order\s*:\s*(.+)$/i', $stored_title, $m)) {
+    return ['PO', trim($m[1])];
+  }
   foreach (REQUEST_TYPES as $request_type) {
-    $request_type_pattern = preg_replace('/\s+/', '\\s+', preg_quote($request_type, '/'));
+    $request_type_pattern = preg_quote($request_type, '/');
     if (preg_match('/^' . $request_type_pattern . '\s*:\s*(.+)$/i', $stored_title, $m)) {
       return [$request_type, trim($m[1])];
     }
