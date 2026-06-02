@@ -98,12 +98,33 @@ function format_acquisition_purpose(array $rfq): string {
   return ucwords(str_replace('_', ' ', $purpose));
 }
 
+function infer_request_type_from_title(?string $request_title): string {
+  $request_title = trim((string)$request_title);
+  if (preg_match('/^\s*(PO|Purchase\s+Order)\s*:/i', $request_title) === 1) {
+    return 'PO';
+  }
+  if (preg_match('/^\s*Sourcing\s*:/i', $request_title) === 1) {
+    return 'Sourcing';
+  }
+  return 'RFQ';
+}
+
+function format_po_amount($value): string {
+  if ($value === null || $value === '') {
+    return 'N/A';
+  }
+  if (is_numeric($value)) {
+    return '$' . number_format((float)$value, 2);
+  }
+  return trim((string)$value);
+}
+
 function build_rfq_email_text(array $rfq): string {
   $sep  = str_repeat('=', 60);
   $sep2 = str_repeat('-', 60);
   $date = date('F j, Y', strtotime((string)$rfq['created_at']));
   $request_title = trim((string)($rfq['request_title'] ?? ''));
-  $is_purchase_order = preg_match('/^\s*(PO|Purchase\s+Order)\s*:/i', $request_title) === 1;
+  $is_purchase_order = infer_request_type_from_title($request_title) === 'PO';
   $email_heading = $is_purchase_order ? 'PURCHASE ORDER (PO)' : 'REQUEST FOR QUOTATION (RFQ)';
   $request_number_label = $is_purchase_order ? 'PO #:         ' : 'RFQ #:        ';
 
@@ -179,6 +200,30 @@ function build_rfq_email_text(array $rfq): string {
     $lines[] = 'ADDITIONAL NOTES:';
     $lines[] = $sep2;
     $lines[] = $additional_notes;
+  }
+
+  if ($is_purchase_order) {
+    $lines[] = '';
+    $lines[] = $sep2;
+    $lines[] = 'PURCHASE ORDER DETAILS:';
+    $lines[] = $sep2;
+    $lines[] = 'Supplier:      ' . trim((string)($rfq['po_supplier_info'] ?? 'N/A'));
+    $lines[] = 'Unit Price:    ' . format_po_amount($rfq['po_unit_price'] ?? null);
+    $lines[] = 'Line Total:    ' . format_po_amount($rfq['po_line_total'] ?? null);
+    $lines[] = 'Delivery Date: ' . trim((string)($rfq['po_expected_delivery_date'] ?? 'N/A'));
+    $lines[] = 'Ship Method:   ' . trim((string)($rfq['po_shipping_method'] ?? 'N/A'));
+    $lines[] = 'Shipping Cost: ' . format_po_amount($rfq['po_shipping_cost'] ?? null);
+    $lines[] = 'Total Amount:  ' . format_po_amount($rfq['po_total_amount'] ?? null);
+    $lines[] = '';
+    $lines[] = $sep2;
+    $lines[] = 'DELIVERY ADDRESS:';
+    $lines[] = $sep2;
+    $lines[] = trim((string)($rfq['po_delivery_address'] ?? 'N/A'));
+    $lines[] = '';
+    $lines[] = $sep2;
+    $lines[] = 'PAYMENT TERMS:';
+    $lines[] = $sep2;
+    $lines[] = trim((string)($rfq['po_payment_terms'] ?? 'N/A'));
   }
 
   $lines[] = '';
@@ -844,6 +889,7 @@ $selected_rfq = null;
 $quotes = [];
 $editing_quote = null;
 $rfq_email_text = '';
+$rfq_email_text_title = 'RFQ Email Text';
 $show_add_quote_form = false;
 $orders_by_quote_id = [];
 if ($selected_rfq_id > 0) {
@@ -888,7 +934,8 @@ if ($rfq_text_id > 0) {
   $txt = $pdo->prepare(
     "SELECT r.id, r.request_category, r.request_title, r.machine_size, r.laser_watts, r.tube_type, r.part_category, r.part_specs, r.quantity,
             r.required_features, r.additional_notes, r.request_status, r.acquisition_purpose, r.buyer_name, r.created_at,
-            r.contact_name, r.company_name, r.contact_email, r.contact_phone,
+            r.contact_name, r.company_name, r.contact_email, r.contact_phone, r.po_supplier_info, r.po_unit_price, r.po_line_total,
+            r.po_expected_delivery_date, r.po_delivery_address, r.po_payment_terms, r.po_shipping_method, r.po_shipping_cost, r.po_total_amount,
             u.username AS requested_by_username
      FROM rfq_requests r
      LEFT JOIN users u ON u.id = r.requested_by
@@ -897,6 +944,9 @@ if ($rfq_text_id > 0) {
   $txt->execute([$rfq_text_id]);
   $rfq_for_email = $txt->fetch();
   if ($rfq_for_email) {
+    $rfq_email_text_title = infer_request_type_from_title((string)($rfq_for_email['request_title'] ?? '')) === 'PO'
+      ? 'PO Email Text'
+      : 'RFQ Email Text';
     $rfq_email_text = build_rfq_email_text($rfq_for_email);
   } else {
     $errors[] = 'RFQ not found for email text export.';
@@ -993,7 +1043,7 @@ render_header('Sourcing RFQ Tracker');
 
 <?php if ($rfq_email_text !== ''): ?>
   <div class="card">
-    <h2 style="margin-top:0;">RFQ Email Text</h2>
+    <h2 style="margin-top:0;"><?= h($rfq_email_text_title) ?></h2>
     <p class="muted" style="margin-top:0;">
       Copy this text and paste it into your email.
     </p>
@@ -1101,10 +1151,12 @@ render_header('Sourcing RFQ Tracker');
 <?php endif; ?>
 
 <?php if ($selected_rfq): ?>
+  <?php $selected_request_type = infer_request_type_from_title((string)($selected_rfq['request_title'] ?? '')); ?>
+  <?php $selected_request_number_label = $selected_request_type === 'PO' ? 'PO' : 'RFQ'; ?>
   <div class="card">
     <div class="page-header" style="margin-bottom:14px;">
       <div class="page-header-body">
-        <h2>Quotes — <span class="muted" style="font-weight:400;">RFQ #<?= (int)$selected_rfq['id'] ?></span></h2>
+        <h2>Quotes — <span class="muted" style="font-weight:400;"><?= h($selected_request_number_label) ?> #<?= (int)$selected_rfq['id'] ?></span></h2>
         <p class="muted"><?= h($selected_rfq['request_title']) ?></p>
       </div>
       <div class="row" style="flex-shrink:0;">
