@@ -30,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $p_email        = trim((string)($_POST['profile_email'] ?? ''));
     $p_phone        = trim((string)($_POST['contact_phone'] ?? ''));
     $p_company      = trim((string)($_POST['company_name'] ?? ''));
+    $p_delivery_address = trim((string)($_POST['delivery_address'] ?? ''));
     $p_notes        = trim((string)($_POST['profile_notes'] ?? ''));
 
     if (strlen($p_contact_name) > 255) {
@@ -47,6 +48,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if (strlen($p_company) > 255) {
       $profile_errors[] = 'Company name must be 255 characters or fewer.';
     }
+    if (strlen($p_delivery_address) > 500) {
+      $profile_errors[] = 'Delivery address must be 500 characters or fewer.';
+    }
 
     if (empty($profile_errors) && $p_email !== '') {
       $ck = $pdo->prepare("SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1");
@@ -59,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if (empty($profile_errors)) {
       $upd = $pdo->prepare(
         "UPDATE users
-         SET contact_name = ?, email = ?, contact_phone = ?, company_name = ?, profile_notes = ?
+         SET contact_name = ?, email = ?, contact_phone = ?, company_name = ?, delivery_address = ?, profile_notes = ?
          WHERE id = ?"
       );
       $upd->execute([
@@ -67,6 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $p_email        === '' ? null : $p_email,
         $p_phone        === '' ? null : $p_phone,
         $p_company      === '' ? null : $p_company,
+        $p_delivery_address === '' ? null : $p_delivery_address,
         $p_notes        === '' ? null : $p_notes,
         (int)$_SESSION['user_id'],
       ]);
@@ -79,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // ── Fetch the current user's full record
 $stmt = $pdo->prepare(
   "SELECT u.id, u.username, u.email, u.role,
-          u.contact_name, u.contact_phone, u.company_name, u.profile_notes,
+          u.contact_name, u.contact_phone, u.company_name, u.delivery_address, u.profile_notes,
           le.first_name, le.last_name, le.cell_phone,
           le.city, le.state, le.zip_code, le.email AS entry_email,
           le.laser_brand, le.laser_model, le.laser_watts, le.laser_age,
@@ -190,6 +195,12 @@ render_header('My Profile');
         <input type="text" name="company_name" maxlength="255"
                value="<?= h((string)($data['company_name'] ?? '')) ?>"
                placeholder="Your company name" />
+      </div>
+
+      <div class="full">
+        <label>Delivery Address</label>
+        <textarea name="delivery_address" rows="3" maxlength="500"
+                  placeholder="Address to prefill for purchase orders"><?= h((string)($data['delivery_address'] ?? '')) ?></textarea>
       </div>
 
       <div class="full">

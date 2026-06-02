@@ -248,6 +248,7 @@ foreach ([
   "ALTER TABLE users ADD COLUMN contact_name VARCHAR(255) NULL",
   "ALTER TABLE users ADD COLUMN company_name VARCHAR(255) NULL",
   "ALTER TABLE users ADD COLUMN contact_phone VARCHAR(100) NULL",
+  "ALTER TABLE users ADD COLUMN delivery_address VARCHAR(500) NULL",
 ] as $sql) {
   try {
     $pdo->exec($sql);
@@ -371,6 +372,15 @@ $pdo->exec("
     quantity           INT UNSIGNED NOT NULL DEFAULT 1,
     required_features  TEXT         NULL,
     additional_notes   TEXT         NULL,
+    po_supplier_info   VARCHAR(500) NULL,
+    po_unit_price      DECIMAL(12,2) NULL,
+    po_line_total      DECIMAL(12,2) NULL,
+    po_expected_delivery_date DATE NULL,
+    po_delivery_address VARCHAR(500) NULL,
+    po_payment_terms   TEXT NULL,
+    po_shipping_method ENUM('Sea Freight','Air Freight','Express','Pickup') NULL,
+    po_shipping_cost   DECIMAL(12,2) NULL,
+    po_total_amount    DECIMAL(12,2) NULL,
     request_status     ENUM('draft','sourcing','quotes_received','shortlisted','ordered','closed') NOT NULL DEFAULT 'sourcing',
     created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -682,6 +692,27 @@ try {
 } catch (PDOException $e) {
   if ($e->getCode() !== '42S21') {
     throw $e;
+  }
+}
+
+// Add PO-specific fields to rfq_requests if they do not exist yet
+foreach ([
+  "ALTER TABLE rfq_requests ADD COLUMN po_supplier_info VARCHAR(500) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN po_unit_price DECIMAL(12,2) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN po_line_total DECIMAL(12,2) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN po_expected_delivery_date DATE NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN po_delivery_address VARCHAR(500) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN po_payment_terms TEXT NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN po_shipping_method ENUM('Sea Freight','Air Freight','Express','Pickup') NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN po_shipping_cost DECIMAL(12,2) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN po_total_amount DECIMAL(12,2) NULL",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    if ($e->getCode() !== '42S21') {
+      throw $e;
+    }
   }
 }
 
