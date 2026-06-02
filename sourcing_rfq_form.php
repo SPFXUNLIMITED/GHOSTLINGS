@@ -5,6 +5,8 @@ require __DIR__ . '/auth.php';
 require_rfq_access();
 
 const MAX_RFQ_QUANTITY = 1000;
+// Small tolerance to avoid false mismatches from decimal rounding in money math.
+const PRICE_COMPARISON_TOLERANCE = 0.01;
 const REQUEST_TYPES = ['RFQ', 'Sourcing', 'PO'];
 const REQUEST_CATEGORIES = ['machine', 'parts'];
 const PO_SHIPPING_METHODS = ['Sea Freight', 'Air Freight', 'Express', 'Pickup'];
@@ -33,27 +35,27 @@ if ($forced_request_category === null && !$is_edit_mode && in_array($query_categ
 }
 $is_parts_entrypoint = $forced_request_category === 'parts';
 
+function validate_po_money(string $value, string $label, array &$errors): ?float {
+  if ($value === '') {
+    $errors[] = $label . ' is required for purchase orders.';
+    return null;
+  }
+  if (!is_numeric($value)) {
+    $errors[] = $label . ' must be a valid number.';
+    return null;
+  }
+  $amount = round((float)$value, 2);
+  if ($amount < 0) {
+    $errors[] = $label . ' cannot be negative.';
+    return null;
+  }
+  return $amount;
+}
+
 function split_request_title_with_type(string $stored_title): array {
   $stored_title = trim($stored_title);
   if (preg_match('/^Purchase\s+Order\s*:\s*(.+)$/i', $stored_title, $m)) {
     return ['PO', trim($m[1])];
-  }
-
-  function validate_po_money(string $value, string $label, array &$errors): ?float {
-    if ($value === '') {
-      $errors[] = $label . ' is required for purchase orders.';
-      return null;
-    }
-    if (!is_numeric($value)) {
-      $errors[] = $label . ' must be a valid number.';
-      return null;
-    }
-    $amount = round((float)$value, 2);
-    if ($amount < 0) {
-      $errors[] = $label . ' cannot be negative.';
-      return null;
-    }
-    return $amount;
   }
   foreach (REQUEST_TYPES as $request_type) {
     $request_type_pattern = preg_quote($request_type, '/');
@@ -270,6 +272,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $date_ok = $expected_date && $expected_date->format('Y-m-d') === $fields['po_expected_delivery_date'];
       if (!$date_ok) {
         $errors[] = 'Expected delivery date must be a valid date.';
+      } elseif ($fields['po_expected_delivery_date'] < date('Y-m-d')) {
+        $errors[] = 'Expected delivery date cannot be in the past.';
       }
     }
     if ($fields['po_delivery_address'] === '') {
@@ -287,6 +291,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $po_shipping_cost_amount = validate_po_money($fields['po_shipping_cost'], 'Shipping cost', $errors);
     $po_total_amount_amount = validate_po_money($fields['po_total_amount'], 'Total amount', $errors);
+    if ($po_unit_price_amount !== null && $po_line_total_amount !== null) {
+      $expected_line_total = round($po_unit_price_amount * (int)$fields['quantity'], 2);
+      if (abs($po_line_total_amount - $expected_line_total) > PRICE_COMPARISON_TOLERANCE) {
+        $errors[] = 'Line total must equal unit price × quantity (excluding shipping).';
+      }
+    }
   }
 
   if (!$errors) {
@@ -696,7 +706,6 @@ render_header($is_edit_mode ? ('Edit Sourcing RFQ #' . $edit_rfq_id) : ($is_part
       document.querySelectorAll('[data-required-on-type]').forEach(function (input) {
         var isRequired = input.getAttribute('data-required-on-type') === (requestTypeField ? requestTypeField.value : '');
         input.required = isRequired;
-        input.disabled = !isRequired;
       });
     }
     categoryField.addEventListener('change', toggleSections);
