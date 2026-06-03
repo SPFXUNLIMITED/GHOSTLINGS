@@ -540,7 +540,7 @@ if (($order['id'] ?? 0) > 0) {
   </div>
 </div>
 
-<?php render_alibaba_workflow_banner('create_order'); ?>
+<?php render_alibaba_workflow_banner('create_purchase_order'); ?>
 
 <?php if ($errors): ?>
   <div class="alert error">
