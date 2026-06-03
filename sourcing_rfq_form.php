@@ -151,12 +151,16 @@ if ($is_edit_mode && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     $edit_rfq_id = 0;
   } else {
     [$parsed_request_type, $parsed_request_title] = split_request_title_with_type((string)($editing_rfq['request_title'] ?? ''));
+    $editing_request_category = strtolower(trim((string)($editing_rfq['request_category'] ?? 'machine')));
     $fields['request_type'] = in_array($parsed_request_type, REQUEST_TYPES, true) ? $parsed_request_type : 'RFQ';
-    $stored_request_category = strtolower(trim((string)($editing_rfq['request_category'] ?? 'machine')));
-    if (!in_array($stored_request_category, REQUEST_CATEGORIES, true)) {
-      $stored_request_category = trim((string)($editing_rfq['part_category'] ?? '')) !== '' ? 'parts' : 'machine';
+    if ($fields['request_type'] !== 'PO' && $editing_request_category === 'po') {
+      $fields['request_type'] = 'PO';
     }
-    $fields['request_category'] = $stored_request_category;
+    $form_request_category = $editing_request_category;
+    if (!in_array($form_request_category, REQUEST_CATEGORIES, true)) {
+      $form_request_category = trim((string)($editing_rfq['part_category'] ?? '')) !== '' ? 'parts' : 'machine';
+    }
+    $fields['request_category'] = $form_request_category;
     $fields['acquisition_purpose'] = (string)($editing_rfq['acquisition_purpose'] ?? 'customer');
     $fields['urgency'] = (string)($editing_rfq['urgency'] ?? 'normal');
     $fields['buyer_name'] = (string)($editing_rfq['buyer_name'] ?? '');
@@ -304,7 +308,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 
   if (!$errors) {
-    $storage_request_category = $fields['request_type'] === 'PO' ? 'po' : $fields['request_category'];
+    $stored_request_category = $fields['request_type'] === 'PO' ? 'po' : $fields['request_category'];
     $full_request_title = $fields['request_type'] . ': ' . $fields['request_title'];
     if ($is_edit_mode) {
       $stmt = $pdo->prepare(
@@ -316,7 +320,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
          WHERE id = ?"
       );
       $stmt->execute([
-        $storage_request_category,
+        $stored_request_category,
         $fields['acquisition_purpose'],
         $fields['urgency'],
         $fields['buyer_name']    === '' ? null : $fields['buyer_name'],
@@ -359,7 +363,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       );
       $stmt->execute([
         (int)current_user_id(),
-        $storage_request_category,
+        $stored_request_category,
         $fields['acquisition_purpose'],
         $fields['urgency'],
         $fields['contact_name']  === '' ? null : $fields['contact_name'],
