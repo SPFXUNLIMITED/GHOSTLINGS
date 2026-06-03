@@ -12,21 +12,54 @@ if (empty($_SESSION['rfq_order_tracker_csrf'])) {
 }
 
 $order_statuses = [
-  'draft' => 'Draft',
-  'deposit_pending' => 'Deposit Pending',
-  'deposit_paid' => 'Deposit Paid',
-  'in_production' => 'In Production',
-  'ready_to_ship' => 'Ready to Ship',
-  'shipped' => 'Shipped',
-  'delivered' => 'Delivered',
-  'completed' => 'Completed',
+  'create_rfq' => 'Create RFQ',
+  'receive_quotes' => 'Receive Quotes',
+  'evaluate_select_quote' => 'Evaluate and Select Best Quote',
+  'negotiate_terms' => 'Negotiate Terms',
+  'send_purchase_order' => 'Send Purchase Order',
+  'vendor_accepts_po' => 'Vendor Accepts PO',
+  'make_deposit_payment' => 'Make Deposit Payment',
+  'vendor_produces_machine' => 'Vendor Produces Machine',
+  'make_final_payment' => 'Make Final Payment',
+  'vendor_ships_machine' => 'Vendor Ships Machine',
+  'receive_tracking_documents' => 'Receive Tracking and Documents',
+  'arrives_clears_customs' => 'Arrives and Clears Customs',
+  'final_inspection_acceptance' => 'Final Inspection and Acceptance',
   'cancelled' => 'Cancelled',
 ];
+$timeline_stage_keys = array_values(array_filter(array_keys($order_statuses), static fn(string $status): bool => $status !== 'cancelled'));
+
+function apply_order_stage_milestone(PDO $pdo, int $order_id, string $order_status): void {
+  $sql_by_stage = [
+    'make_deposit_payment' => "UPDATE rfq_orders SET deposit_paid_at = COALESCE(deposit_paid_at, NOW()) WHERE id = ?",
+    'vendor_accepts_po' => "UPDATE rfq_orders SET po_accepted_at = COALESCE(po_accepted_at, NOW()) WHERE id = ?",
+    'vendor_produces_machine' => "UPDATE rfq_orders SET production_started_at = COALESCE(production_started_at, NOW()) WHERE id = ?",
+    'make_final_payment' => "UPDATE rfq_orders SET final_payment_paid_at = COALESCE(final_payment_paid_at, NOW()) WHERE id = ?",
+    'vendor_ships_machine' => "UPDATE rfq_orders SET shipped_at = COALESCE(shipped_at, NOW()) WHERE id = ?",
+    'receive_tracking_documents' => "UPDATE rfq_orders SET tracking_docs_received_at = COALESCE(tracking_docs_received_at, NOW()) WHERE id = ?",
+    'arrives_clears_customs' => "UPDATE rfq_orders SET customs_cleared_at = COALESCE(customs_cleared_at, NOW()) WHERE id = ?",
+    'final_inspection_acceptance' => "UPDATE rfq_orders SET accepted_at = COALESCE(accepted_at, NOW()) WHERE id = ?",
+  ];
+  if (!isset($sql_by_stage[$order_status])) {
+    return;
+  }
+  $stmt = $pdo->prepare($sql_by_stage[$order_status]);
+  $stmt->execute([$order_id]);
+}
+
+function record_order_stage_history(PDO $pdo, int $order_id, ?string $from_stage, string $to_stage, int $changed_by): void {
+  $stmt = $pdo->prepare(
+    "INSERT INTO rfq_order_stage_history (order_id, from_stage, to_stage, changed_by, change_note)
+     VALUES (?, ?, ?, ?, NULL)"
+  );
+  $stmt->execute([$order_id, $from_stage, $to_stage, $changed_by]);
+}
 $errors = [];
 $success = '';
 $search = trim((string)($_GET['q'] ?? ''));
 $status_filter = trim((string)($_GET['status'] ?? ''));
 $rfq_filter = isset($_GET['rfq_id']) ? (int)$_GET['rfq_id'] : 0;
+$can_manage_stage = is_admin_or_moderator();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
@@ -37,17 +70,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'update_order_status') {
       $order_id = (int)($_POST['order_id'] ?? 0);
       $order_status = (string)($_POST['order_status'] ?? '');
-      if ($order_id <= 0) {
+      if (!$can_manage_stage) {
+        $errors[] = 'Only admins and moderators can update workflow stages.';
+      } elseif ($order_id <= 0) {
         $errors[] = 'Invalid order.';
       } elseif (!isset($order_statuses[$order_status])) {
         $errors[] = 'Invalid order status selected.';
       } else {
-        $stmt = $pdo->prepare("UPDATE rfq_orders SET order_status = ? WHERE id = ?");
-        $stmt->execute([$order_status, $order_id]);
-        if ($stmt->rowCount() > 0) {
-          $success = 'Order status updated.';
-        } else {
-          $errors[] = 'Order not found or already set to that status.';
+        try {
+          $current_stmt = $pdo->prepare("SELECT order_status FROM rfq_orders WHERE id = ?");
+          $current_stmt->execute([$order_id]);
+          $current = $current_stmt->fetch();
+          if (!$current) {
+            $errors[] = 'Order not found.';
+          } elseif ((string)$current['order_status'] === $order_status) {
+            $errors[] = 'Order is already set to that status.';
+          } else {
+            $pdo->beginTransaction();
+            $stmt = $pdo->prepare("UPDATE rfq_orders SET order_status = ? WHERE id = ?");
+            $stmt->execute([$order_status, $order_id]);
+            apply_order_stage_milestone($pdo, $order_id, $order_status);
+            record_order_stage_history($pdo, $order_id, (string)$current['order_status'], $order_status, (int)current_user_id());
+            $pdo->commit();
+            $success = 'Order status updated.';
+          }
+        } catch (Throwable $e) {
+          if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+          }
+          error_log('Failed to update order status for order #' . $order_id . ': ' . $e->getMessage());
+          $errors[] = $e instanceof PDOException && $e->getCode() === '45000'
+            ? (string)$e->getMessage()
+            : 'Unable to update order status right now. Please try again.';
         }
       }
     } elseif ($action === 'delete_order') {
@@ -134,15 +188,43 @@ $hero_stmt = $pdo->query("SELECT order_status FROM rfq_orders");
 $hero_rows  = $hero_stmt->fetchAll();
 $hero_total = count($hero_rows);
 $hero_active = $hero_shipped = $hero_completed = 0;
+$stage_counts = array_fill_keys(array_keys($order_statuses), 0);
 foreach ($hero_rows as $_hr) {
-  if (in_array($_hr['order_status'], ['deposit_pending','deposit_paid','in_production','ready_to_ship'], true)) {
+  $stage_key = (string)($_hr['order_status'] ?? '');
+  if (isset($stage_counts[$stage_key])) {
+    $stage_counts[$stage_key]++;
+  }
+  if (in_array($_hr['order_status'], [
+    'create_rfq',
+    'receive_quotes',
+    'evaluate_select_quote',
+    'negotiate_terms',
+    'send_purchase_order',
+    'vendor_accepts_po',
+    'make_deposit_payment',
+    'vendor_produces_machine',
+    'make_final_payment',
+  ], true)) {
     $hero_active++;
-  } elseif ($_hr['order_status'] === 'shipped') {
+  } elseif (in_array($_hr['order_status'], ['vendor_ships_machine', 'receive_tracking_documents', 'arrives_clears_customs'], true)) {
     $hero_shipped++;
-  } elseif ($_hr['order_status'] === 'completed') {
+  } elseif ($_hr['order_status'] === 'final_inspection_acceptance') {
     $hero_completed++;
   }
 }
+$timeline_current_stage = ($status_filter !== '' && isset($order_statuses[$status_filter]))
+  ? $status_filter
+  : 'create_rfq';
+if ($status_filter === '') {
+  foreach (array_reverse($timeline_stage_keys) as $stage_key) {
+    if (($stage_counts[$stage_key] ?? 0) > 0) {
+      $timeline_current_stage = $stage_key;
+      break;
+    }
+  }
+}
+$timeline_current_index = array_search($timeline_current_stage, $timeline_stage_keys, true);
+$timeline_current_index = $timeline_current_index === false ? 0 : (int)$timeline_current_index;
 
 render_header('Order Tracker');
 ?>
@@ -310,10 +392,106 @@ render_header('Order Tracker');
   0%,100% { transform: translateY(-50%); }
   50%      { transform: translateY(calc(-50% - 10px)); }
 }
+.flowbite-order-timeline {
+  margin: 0 0 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15,23,42,.06);
+  padding: 18px 18px 16px;
+}
+.flowbite-order-timeline-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.flowbite-order-timeline-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+}
+.flowbite-order-timeline-subtitle {
+  font-size: 12px;
+  color: #6b7280;
+}
+.flowbite-order-track {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(13, minmax(120px, 1fr));
+  gap: 10px;
+  overflow-x: auto;
+  padding: 8px 0 4px;
+}
+.flowbite-order-track::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 28px;
+  height: 2px;
+  background: #dbeafe;
+}
+.flowbite-order-fill {
+  position: absolute;
+  left: 12px;
+  top: 28px;
+  height: 2px;
+  background: #2563eb;
+  z-index: 1;
+}
+.flowbite-order-step {
+  position: relative;
+  z-index: 2;
+  min-width: 120px;
+}
+.flowbite-order-step-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #93c5fd;
+  background: #fff;
+  margin-bottom: 8px;
+}
+.flowbite-order-step.done .flowbite-order-step-dot,
+.flowbite-order-step.current .flowbite-order-step-dot {
+  border-color: #2563eb;
+  background: #2563eb;
+}
+.flowbite-order-step.current .flowbite-order-step-dot {
+  box-shadow: 0 0 0 4px rgba(59,130,246,.2);
+}
+.flowbite-order-step-label {
+  display: block;
+  text-decoration: none;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #374151;
+  padding: 6px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 9px;
+  background: #fff;
+}
+.flowbite-order-step-label:hover { border-color: #93c5fd; background: #eff6ff; }
+.flowbite-order-step.current .flowbite-order-step-label {
+  border-color: #2563eb;
+  background: #dbeafe;
+  color: #1e3a8a;
+  font-weight: 600;
+}
+.flowbite-order-step-count {
+  display: inline-block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: #6b7280;
+}
 @media (max-width: 640px) {
   .order-hero { padding: 28px 20px; }
   .order-hero-title { font-size: 24px; }
   .order-hero-deco { display: none; }
+  .flowbite-order-timeline { padding: 14px 12px; }
 }
 </style>
 
@@ -324,8 +502,7 @@ render_header('Order Tracker');
     <div class="order-hero-eyebrow">🚚 Procurement &amp; Logistics</div>
     <h1 class="order-hero-title">Order <span>Tracker</span></h1>
     <p class="order-hero-subtitle">
-      Track purchase orders created from accepted RFQ quotes — monitor deposit status,
-      production milestones, logistics, and delivery in one place.
+      Track purchase orders through the Alibaba workflow timeline from RFQ creation to final inspection and acceptance.
     </p>
     <div class="order-hero-stats">
       <div class="order-hero-stat">
@@ -351,6 +528,33 @@ render_header('Order Tracker');
     </div>
   </div>
 </div>
+
+<section class="flowbite-order-timeline">
+  <div class="flowbite-order-timeline-head">
+    <h2 class="flowbite-order-timeline-title">Order Workflow Timeline</h2>
+    <span class="flowbite-order-timeline-subtitle">
+      Current view: <?= h((string)($order_statuses[$timeline_current_stage] ?? $timeline_current_stage)) ?>
+    </span>
+  </div>
+  <div class="flowbite-order-track">
+    <div class="flowbite-order-fill" style="width: calc((100% - 24px) * <?= count($timeline_stage_keys) > 1 ? (($timeline_current_index) / (count($timeline_stage_keys) - 1)) : 0 ?>);"></div>
+    <?php foreach ($timeline_stage_keys as $index => $stage_key): ?>
+      <?php
+        $is_done = $index < $timeline_current_index;
+        $is_current = $stage_key === $timeline_current_stage;
+        $query = $_GET;
+        $query['status'] = $stage_key;
+      ?>
+      <div class="flowbite-order-step <?= $is_done ? 'done' : '' ?> <?= $is_current ? 'current' : '' ?>">
+        <div class="flowbite-order-step-dot" aria-hidden="true"></div>
+        <a class="flowbite-order-step-label" href="order_tracker.php?<?= h(http_build_query($query)) ?>">
+          <?= h((string)$order_statuses[$stage_key]) ?>
+          <span class="flowbite-order-step-count"><?= (int)($stage_counts[$stage_key] ?? 0) ?> order<?= ((int)($stage_counts[$stage_key] ?? 0) === 1) ? '' : 's' ?></span>
+        </a>
+      </div>
+    <?php endforeach; ?>
+  </div>
+</section>
 
 <?php if ($errors): ?>
   <div class="alert error">
@@ -439,17 +643,21 @@ render_header('Order Tracker');
               <div class="muted" style="font-size:12px;">Ship: <?= !empty($order['expected_ship_date']) ? h((string)$order['expected_ship_date']) : '—' ?></div>
             </td>
             <td>
-              <form method="post" class="row" style="gap:6px; align-items:center;">
-                <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_order_tracker_csrf']) ?>">
-                <input type="hidden" name="action" value="update_order_status">
-                <input type="hidden" name="order_id" value="<?= (int)$order['id'] ?>">
-                <select name="order_status" style="min-width:170px;">
-                  <?php foreach ($order_statuses as $value => $label): ?>
-                    <option value="<?= h($value) ?>" <?= $order['order_status'] === $value ? 'selected' : '' ?>><?= h($label) ?></option>
-                  <?php endforeach; ?>
-                </select>
-                <button type="submit" class="btn">Save</button>
-              </form>
+              <?php if ($can_manage_stage): ?>
+                <form method="post" class="row" style="gap:6px; align-items:center;">
+                  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_order_tracker_csrf']) ?>">
+                  <input type="hidden" name="action" value="update_order_status">
+                  <input type="hidden" name="order_id" value="<?= (int)$order['id'] ?>">
+                  <select name="order_status" style="min-width:170px;">
+                    <?php foreach ($order_statuses as $value => $label): ?>
+                      <option value="<?= h($value) ?>" <?= $order['order_status'] === $value ? 'selected' : '' ?>><?= h($label) ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                  <button type="submit" class="btn">Save</button>
+                </form>
+              <?php else: ?>
+                <span class="muted"><?= h((string)($order_statuses[(string)$order['order_status']] ?? $order['order_status'])) ?></span>
+              <?php endif; ?>
             </td>
             <td class="col-actions">
               <a class="btn" href="order_form.php?order_id=<?= (int)$order['id'] ?>">Edit</a>

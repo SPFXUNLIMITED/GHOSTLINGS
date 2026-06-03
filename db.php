@@ -485,13 +485,15 @@ foreach ([
 }
 
 // Create rfq_orders table for purchase orders converted from accepted RFQ quotes
+$rfq_order_status_enum = "ENUM('create_rfq','receive_quotes','evaluate_select_quote','negotiate_terms','send_purchase_order','vendor_accepts_po','make_deposit_payment','vendor_produces_machine','make_final_payment','vendor_ships_machine','receive_tracking_documents','arrives_clears_customs','final_inspection_acceptance','cancelled')";
+$rfq_order_status_enum_with_legacy = "ENUM('draft','deposit_pending','deposit_paid','in_production','ready_to_ship','shipped','delivered','completed','create_rfq','receive_quotes','evaluate_select_quote','negotiate_terms','send_purchase_order','vendor_accepts_po','make_deposit_payment','vendor_produces_machine','make_final_payment','vendor_ships_machine','receive_tracking_documents','arrives_clears_customs','final_inspection_acceptance','cancelled')";
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS rfq_orders (
     id                       INT UNSIGNED NOT NULL AUTO_INCREMENT,
     rfq_request_id           INT UNSIGNED NOT NULL,
     rfq_quote_id             INT UNSIGNED NOT NULL,
     po_number                VARCHAR(50) NULL,
-    order_status             ENUM('draft','deposit_pending','deposit_paid','in_production','ready_to_ship','shipped','delivered','completed','cancelled') NOT NULL DEFAULT 'draft',
+    order_status             {$rfq_order_status_enum} NOT NULL DEFAULT 'create_rfq',
     order_date               DATE NULL,
     expected_ready_date      DATE NULL,
     expected_ship_date       DATE NULL,
@@ -517,6 +519,14 @@ $pdo->exec("
     warranty_terms           TEXT NULL,
     included_accessories     TEXT NULL,
     notes                    TEXT NULL,
+    deposit_paid_at          DATETIME NULL,
+    po_accepted_at           DATETIME NULL,
+    production_started_at    DATETIME NULL,
+    final_payment_paid_at    DATETIME NULL,
+    shipped_at               DATETIME NULL,
+    tracking_docs_received_at DATETIME NULL,
+    customs_cleared_at       DATETIME NULL,
+    accepted_at              DATETIME NULL,
     created_by               INT UNSIGNED NOT NULL,
     created_at               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -531,7 +541,7 @@ $pdo->exec("
 // Add RFQ order columns if they do not exist yet
 foreach ([
   "ALTER TABLE rfq_orders ADD COLUMN po_number VARCHAR(50) NULL",
-  "ALTER TABLE rfq_orders ADD COLUMN order_status ENUM('draft','deposit_pending','deposit_paid','in_production','ready_to_ship','shipped','delivered','completed','cancelled') NOT NULL DEFAULT 'draft'",
+  "ALTER TABLE rfq_orders ADD COLUMN order_status {$rfq_order_status_enum} NOT NULL DEFAULT 'create_rfq'",
   "ALTER TABLE rfq_orders ADD COLUMN order_date DATE NULL",
   "ALTER TABLE rfq_orders ADD COLUMN expected_ready_date DATE NULL",
   "ALTER TABLE rfq_orders ADD COLUMN expected_ship_date DATE NULL",
@@ -557,6 +567,14 @@ foreach ([
   "ALTER TABLE rfq_orders ADD COLUMN warranty_terms TEXT NULL",
   "ALTER TABLE rfq_orders ADD COLUMN included_accessories TEXT NULL",
   "ALTER TABLE rfq_orders ADD COLUMN notes TEXT NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN deposit_paid_at DATETIME NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN po_accepted_at DATETIME NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN production_started_at DATETIME NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN final_payment_paid_at DATETIME NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN shipped_at DATETIME NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN tracking_docs_received_at DATETIME NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN customs_cleared_at DATETIME NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN accepted_at DATETIME NULL",
   "ALTER TABLE rfq_orders ADD COLUMN created_by INT UNSIGNED NOT NULL DEFAULT 0",
   "ALTER TABLE rfq_orders ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
   "ALTER TABLE rfq_orders ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
@@ -568,6 +586,60 @@ foreach ([
       throw $e;
     }
   }
+}
+
+// Migrate rfq_orders.order_status from legacy values to Alibaba 13-stage workflow values.
+$pdo->exec("ALTER TABLE rfq_orders MODIFY COLUMN order_status {$rfq_order_status_enum_with_legacy} NOT NULL DEFAULT 'create_rfq'");
+$pdo->exec("
+  UPDATE rfq_orders
+  SET order_status = CASE order_status
+    WHEN 'draft' THEN 'create_rfq'
+    WHEN 'deposit_pending' THEN 'send_purchase_order'
+    WHEN 'deposit_paid' THEN 'make_deposit_payment'
+    WHEN 'in_production' THEN 'vendor_produces_machine'
+    WHEN 'ready_to_ship' THEN 'make_final_payment'
+    WHEN 'shipped' THEN 'vendor_ships_machine'
+    WHEN 'delivered' THEN 'arrives_clears_customs'
+    WHEN 'completed' THEN 'final_inspection_acceptance'
+    ELSE order_status
+  END
+  WHERE order_status IN ('draft','deposit_pending','deposit_paid','in_production','ready_to_ship','shipped','delivered','completed')
+");
+$pdo->exec("ALTER TABLE rfq_orders MODIFY COLUMN order_status {$rfq_order_status_enum} NOT NULL DEFAULT 'create_rfq'");
+
+// Stage history for RFQ order workflow timeline.
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS rfq_order_stage_history (
+    id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    order_id    INT UNSIGNED NOT NULL,
+    from_stage  VARCHAR(64) NULL,
+    to_stage    VARCHAR(64) NOT NULL,
+    changed_by  INT UNSIGNED NOT NULL,
+    change_note TEXT NULL,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_stage_history_order_created (order_id, created_at),
+    KEY idx_stage_history_to_stage (to_stage)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// Guardrail: final acceptance requires final payment and customs clearance.
+$trigger_name = 'rfq_orders_before_update_stage_guard';
+$trigger_check = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE() AND TRIGGER_NAME = ?");
+$trigger_check->execute([$trigger_name]);
+if ((int)$trigger_check->fetchColumn() === 0) {
+  $pdo->exec("
+    CREATE TRIGGER rfq_orders_before_update_stage_guard
+    BEFORE UPDATE ON rfq_orders
+    FOR EACH ROW
+    BEGIN
+      IF NEW.order_status = 'final_inspection_acceptance'
+         AND (NEW.final_payment_paid_at IS NULL OR NEW.customs_cleared_at IS NULL) THEN
+        SIGNAL SQLSTATE '45000'
+          SET MESSAGE_TEXT = 'Cannot mark final inspection and acceptance before final payment and customs clearance.';
+      END IF;
+    END
+  ");
 }
 
 // Create rfq_canned_responses table for RFQ form quick-fill buttons
