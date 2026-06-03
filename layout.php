@@ -567,6 +567,11 @@ function render_alibaba_workflow_banner(string $current_step = 'create_rfq'): vo
       'instruction' => 'Negotiate pricing, payment schedule, delivery timeline, and warranty with the supplier.',
       'url'         => 'sourcing_rfq_tracker.php',
     ],
+    'create_order' => [
+      'label'       => 'Create Purchase Order',
+      'instruction' => 'Convert the winning quote into a formal purchase order.',
+      'url'         => 'order_form.php',
+    ],
     'send_purchase_order' => [
       'label'       => 'Send PO',
       'instruction' => 'Issue the formal Purchase Order. The supplier will confirm receipt and acceptance.',
