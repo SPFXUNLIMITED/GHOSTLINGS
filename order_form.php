@@ -132,7 +132,7 @@ if ($order_id > 0) {
             q.quote_status, q.quote_amount AS source_quote_amount, q.shipping_cost AS source_shipping_cost
      FROM rfq_orders o
      INNER JOIN rfq_requests r ON r.id = o.rfq_request_id
-     INNER JOIN rfq_quotes q ON q.id = o.rfq_quote_id
+     LEFT JOIN rfq_quotes q ON q.id = o.rfq_quote_id
      WHERE o.id = ?
      LIMIT 1"
   );
@@ -179,6 +179,32 @@ if ($rfq_id > 0 && $quote_id > 0) {
   }
 }
 
+// ─── Handle direct PO rfq_id (no quote needed) ───────────────────────────────
+$direct_po_rfq = null;
+if ($rfq_id > 0 && $quote_id === 0 && !$order) {
+  $direct_stmt = $pdo->prepare(
+    "SELECT r.id, r.request_category, r.request_title, r.quantity, r.request_status,
+            r.po_supplier_info, r.po_unit_price, r.po_line_total, r.po_expected_delivery_date,
+            r.po_delivery_address, r.po_payment_terms, r.po_shipping_method, r.po_shipping_cost, r.po_total_amount
+     FROM rfq_requests r
+     WHERE r.id = ? AND r.request_category = 'po'
+     LIMIT 1"
+  );
+  $direct_stmt->execute([$rfq_id]);
+  $direct_po_rfq = $direct_stmt->fetch() ?: null;
+
+  if ($direct_po_rfq) {
+    // Redirect to an existing order for this direct PO if one already exists.
+    $existing_stmt = $pdo->prepare("SELECT id FROM rfq_orders WHERE rfq_request_id = ? AND rfq_quote_id IS NULL ORDER BY id DESC LIMIT 1");
+    $existing_stmt->execute([$rfq_id]);
+    $existing_id = (int)$existing_stmt->fetchColumn();
+    if ($existing_id > 0) {
+      header('Location: order_form.php?order_id=' . $existing_id);
+      exit;
+    }
+  }
+}
+
 if (!$order && $source_quote && (string)$source_quote['quote_status'] !== 'accepted') {
   http_response_code(400);
   render_header('Accepted Quote Required');
@@ -195,7 +221,7 @@ if (!$order && $source_quote && (string)($source_quote['request_status'] ?? '') 
   exit;
 }
 
-if (!$order && !$source_quote) {
+if (!$order && !$source_quote && !$direct_po_rfq) {
   header('Location: order_tracker.php');
   exit;
 }
@@ -366,7 +392,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           );
           $insert->execute([
             $rfq_id,
-            $quote_id,
+            $quote_id > 0 ? $quote_id : null,
             $order_status,
             normalize_nullable_text($order_date),
             normalize_nullable_text($expected_ready_date),
@@ -506,7 +532,47 @@ if (!$order && $source_quote) {
   ];
 }
 
-$can_manage_stage = is_admin_or_moderator();
+if (!$order && $direct_po_rfq) {
+  $prefill_total  = (float)($direct_po_rfq['po_total_amount'] ?? 0);
+  $prefill_quantity = max(1, (int)($direct_po_rfq['quantity'] ?? 1));
+  $prefill_unit   = $direct_po_rfq['po_unit_price'] !== null
+    ? (float)$direct_po_rfq['po_unit_price']
+    : ($prefill_quantity > 0 ? round($prefill_total / $prefill_quantity, 2) : $prefill_total);
+
+  $order = [
+    'id'                       => 0,
+    'rfq_request_id'           => $rfq_id,
+    'rfq_quote_id'             => null,
+    'request_title'            => (string)$direct_po_rfq['request_title'],
+    'po_number'                => PENDING_PO_NUMBER_PLACEHOLDER,
+    'order_status'             => 'send_purchase_order',
+    'order_date'               => date('Y-m-d'),
+    'expected_ready_date'      => (string)($direct_po_rfq['po_expected_delivery_date'] ?? ''),
+    'expected_ship_date'       => '',
+    'supplier_name'            => (string)($direct_po_rfq['po_supplier_info'] ?? ''),
+    'model_name'               => '',
+    'sku'                      => '',
+    'quantity'                 => (string)$prefill_quantity,
+    'unit_price'               => $direct_po_rfq['po_unit_price'] !== null ? number_format((float)$direct_po_rfq['po_unit_price'], 2, '.', '') : '',
+    'order_total'              => $prefill_total > 0 ? number_format($prefill_total, 2, '.', '') : '',
+    'currency'                 => 'USD',
+    'deposit_percent'          => number_format(DEFAULT_DEPOSIT_PERCENT, 2, '.', ''),
+    'deposit_amount'           => $prefill_total > 0 ? number_format(round($prefill_total * (DEFAULT_DEPOSIT_PERCENT / 100), 2), 2, '.', '') : '',
+    'balance_amount'           => $prefill_total > 0 ? number_format(round($prefill_total * ((100 - DEFAULT_DEPOSIT_PERCENT) / 100), 2), 2, '.', '') : '',
+    'payment_terms'            => (string)($direct_po_rfq['po_payment_terms'] ?? ''),
+    'incoterm'                 => '',
+    'shipping_method'          => (string)($direct_po_rfq['po_shipping_method'] ?? ''),
+    'shipping_origin'          => '',
+    'destination_port'         => '',
+    'destination_address'      => (string)($direct_po_rfq['po_delivery_address'] ?? ''),
+    'production_lead_time_days'=> '',
+    'trade_assurance_order_no' => '',
+    'proforma_invoice_no'      => '',
+    'warranty_terms'           => '',
+    'included_accessories'     => '',
+    'notes'                    => '',
+  ];
+}
 $current_order_status = (string)order_value($order ?? [], 'order_status', 'create_rfq');
 
 render_header('Purchase Order Form');
@@ -530,12 +596,17 @@ if (($order['id'] ?? 0) > 0) {
     <div class="page-header-body">
       <h1 style="margin:0;">Purchase Order</h1>
       <p class="muted" style="margin:6px 0 0 0;">
-        <?= h((string)($order['po_number'] ?? PENDING_PO_NUMBER_PLACEHOLDER)) ?> · RFQ #<?= (int)$rfq_id ?> · Quote #<?= (int)$quote_id ?>
+        <?= h((string)($order['po_number'] ?? PENDING_PO_NUMBER_PLACEHOLDER)) ?> · RFQ #<?= (int)$rfq_id ?>
+        <?php if ($quote_id > 0): ?> · Quote #<?= (int)$quote_id ?><?php endif; ?>
       </p>
     </div>
     <div class="row">
       <a class="btn" href="order_tracker.php">Order Tracker</a>
-      <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$rfq_id ?>">Back to RFQ Quotes</a>
+      <?php if ($quote_id > 0): ?>
+        <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$rfq_id ?>">Back to RFQ Quotes</a>
+      <?php else: ?>
+        <a class="btn" href="sourcing_rfq_submitted.php?rfq_id=<?= (int)$rfq_id ?>">← Back to PO Submitted</a>
+      <?php endif; ?>
     </div>
   </div>
 </div>
