@@ -844,6 +844,25 @@ $pdo->exec("
   )
 ");
 
+// Create customer_phone_inquiries table for quick internal phone inquiry logging
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS customer_phone_inquiries (
+    id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    customer_name    VARCHAR(255) NOT NULL,
+    company_name     VARCHAR(255) NULL,
+    phone_number     VARCHAR(50) NULL,
+    email            VARCHAR(255) NULL,
+    inquiry_date     DATE NOT NULL,
+    notes            TEXT NULL,
+    created_by       INT UNSIGNED NULL,
+    created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_cpi_inquiry_date (inquiry_date),
+    KEY idx_cpi_created_at (created_at),
+    CONSTRAINT fk_cpi_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 // Create shipping_rfq_requests table for freight/shipping quote requests
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS shipping_rfq_requests (
