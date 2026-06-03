@@ -572,6 +572,11 @@ function render_alibaba_workflow_banner(string $current_step = 'create_rfq'): vo
       'instruction' => 'Convert the winning quote into a formal purchase order.',
       'url'         => 'order_form.php',
     ],
+    'send_po' => [
+      'label'       => 'Send PO',
+      'instruction' => 'Copy this text and send the Purchase Order to the supplier.',
+      'url'         => 'sourcing_rfq_submitted.php',
+    ],
     'send_purchase_order' => [
       'label'       => 'Send PO',
       'instruction' => 'Issue the formal Purchase Order. The supplier will confirm receipt and acceptance.',
