@@ -441,6 +441,8 @@ render_header($is_edit_mode ? ('Edit Sourcing RFQ #' . $edit_rfq_id) : ($is_part
   <a class="btn" href="sourcing_rfq_tracker.php">Sourcing RFQ Tracker →</a>
 </div>
 
+<?php render_alibaba_workflow_banner('create_rfq'); ?>
+
 <?php if ($errors): ?>
   <div class="alert error">
     <ul style="margin:0; padding-left:18px;">

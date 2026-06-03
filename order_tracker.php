@@ -529,6 +529,8 @@ render_header('Order Tracker');
   </div>
 </div>
 
+<?php render_alibaba_workflow_banner($timeline_current_stage); ?>
+
 <section class="flowbite-order-timeline">
   <div class="flowbite-order-timeline-head">
     <h2 class="flowbite-order-timeline-title">Order Workflow Timeline</h2>
