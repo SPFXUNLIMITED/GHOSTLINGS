@@ -202,7 +202,33 @@ render_header($page_title);
   <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$rfq['id'] ?>">Go to Quotes →</a>
 </div>
 
-<?php render_alibaba_workflow_banner($is_purchase_order ? 'send_po' : 'copy_rfq_text'); ?>
+<?php render_alibaba_workflow_banner('copy_rfq_text'); ?>
+<?php if ($is_purchase_order): ?>
+<script>
+  (function () {
+    var banner = document.querySelector('.awb-wrap');
+    if (!banner) return;
+    var stepTwoLabel = 'Copy & Send PO';
+    var stepLabels = banner.querySelectorAll('.awb-step-label');
+    var stepCircles = banner.querySelectorAll('.awb-step-circle');
+    if (stepLabels.length > 1) {
+      stepLabels[1].textContent = stepTwoLabel;
+    }
+    if (stepCircles.length > 1) {
+      stepCircles[1].title = stepTwoLabel;
+      stepCircles[1].setAttribute('aria-label', 'Step 2: ' + stepTwoLabel + ' (current)');
+    }
+    var badge = banner.querySelector('.awb-head-badge');
+    if (badge) {
+      badge.textContent = 'Step 2 of 10: ' + stepTwoLabel;
+    }
+    var instructionText = banner.querySelector('.awb-instruction-text');
+    if (instructionText) {
+      instructionText.innerHTML = '<span class="awb-instruction-step">Step 2: ' + stepTwoLabel + ' —</span> Copy the prepared PO content and send it directly to the supplier.';
+    }
+  })();
+</script>
+<?php endif; ?>
 
 <div class="card">
   <h2 style="margin-top:0;"><?= h($email_text_title) ?></h2>
