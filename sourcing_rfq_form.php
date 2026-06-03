@@ -152,7 +152,11 @@ if ($is_edit_mode && $_SERVER['REQUEST_METHOD'] !== 'POST') {
   } else {
     [$parsed_request_type, $parsed_request_title] = split_request_title_with_type((string)($editing_rfq['request_title'] ?? ''));
     $fields['request_type'] = in_array($parsed_request_type, REQUEST_TYPES, true) ? $parsed_request_type : 'RFQ';
-    $fields['request_category'] = (string)($editing_rfq['request_category'] ?? 'machine');
+    $stored_request_category = strtolower(trim((string)($editing_rfq['request_category'] ?? 'machine')));
+    if (!in_array($stored_request_category, REQUEST_CATEGORIES, true)) {
+      $stored_request_category = trim((string)($editing_rfq['part_category'] ?? '')) !== '' ? 'parts' : 'machine';
+    }
+    $fields['request_category'] = $stored_request_category;
     $fields['acquisition_purpose'] = (string)($editing_rfq['acquisition_purpose'] ?? 'customer');
     $fields['urgency'] = (string)($editing_rfq['urgency'] ?? 'normal');
     $fields['buyer_name'] = (string)($editing_rfq['buyer_name'] ?? '');
@@ -300,6 +304,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 
   if (!$errors) {
+    $storage_request_category = $fields['request_type'] === 'PO' ? 'po' : $fields['request_category'];
     $full_request_title = $fields['request_type'] . ': ' . $fields['request_title'];
     if ($is_edit_mode) {
       $stmt = $pdo->prepare(
@@ -311,7 +316,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
          WHERE id = ?"
       );
       $stmt->execute([
-        $fields['request_category'],
+        $storage_request_category,
         $fields['acquisition_purpose'],
         $fields['urgency'],
         $fields['buyer_name']    === '' ? null : $fields['buyer_name'],
@@ -354,7 +359,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       );
       $stmt->execute([
         (int)current_user_id(),
-        $fields['request_category'],
+        $storage_request_category,
         $fields['acquisition_purpose'],
         $fields['urgency'],
         $fields['contact_name']  === '' ? null : $fields['contact_name'],
@@ -387,15 +392,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       $new_request_id = (int)$pdo->lastInsertId();
       $_SESSION['rfq_form_csrf'] = bin2hex(random_bytes(24));
-      $title_for_type_check = strtolower(trim((string)$full_request_title));
-      $is_purchase_order = $title_for_type_check !== ''
-        && (strncmp($title_for_type_check, 'po:', 3) === 0
-          || strncmp($title_for_type_check, 'purchase order:', 15) === 0);
-      if ($is_purchase_order) {
-        header('Location: purchase_order_submitted.php?po_id=' . $new_request_id);
-      } else {
-        header('Location: sourcing_rfq_submitted.php?rfq_id=' . $new_request_id);
-      }
+      header('Location: sourcing_rfq_submitted.php?rfq_id=' . $new_request_id);
       exit;
     }
   }
@@ -673,6 +670,19 @@ render_header($is_edit_mode ? ('Edit Sourcing RFQ #' . $edit_rfq_id) : ($is_part
     var machineFields = document.querySelectorAll('.machine-only');
     var partsFields = document.querySelectorAll('.parts-only');
     var poFields = document.querySelectorAll('.po-only');
+    var workflowStepLabels = document.querySelectorAll('.awb-wrap .awb-step-label');
+    var workflowStepCircles = document.querySelectorAll('.awb-wrap .awb-step-circle');
+    function updateWorkflowStepTwoLabel() {
+      var isPO = requestTypeField && requestTypeField.value === 'PO';
+      var stepTwoLabel = isPO ? 'Copy & Send PO' : 'Copy & Send RFQ';
+      if (workflowStepLabels.length > 1) {
+        workflowStepLabels[1].textContent = stepTwoLabel;
+      }
+      if (workflowStepCircles.length > 1) {
+        workflowStepCircles[1].title = stepTwoLabel;
+        workflowStepCircles[1].setAttribute('aria-label', 'Step 2: ' + stepTwoLabel);
+      }
+    }
     function toggleSections() {
       var isParts = categoryField.value === 'parts';
       var isPO = requestTypeField && requestTypeField.value === 'PO';
@@ -686,6 +696,7 @@ render_header($is_edit_mode ? ('Edit Sourcing RFQ #' . $edit_rfq_id) : ($is_part
         var isRequired = input.getAttribute('data-required-on-type') === (requestTypeField ? requestTypeField.value : '');
         input.required = isRequired;
       });
+      updateWorkflowStepTwoLabel();
     }
     categoryField.addEventListener('change', toggleSections);
     if (requestTypeField) {
