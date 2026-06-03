@@ -1004,6 +1004,8 @@ render_header('Sourcing RFQ Tracker');
   </div>
 </div>
 
+<?php render_alibaba_workflow_banner('receive_quotes'); ?>
+
 <?php if ($errors): ?>
   <div class="alert error">
     <ul style="margin:0; padding-left:18px;">
