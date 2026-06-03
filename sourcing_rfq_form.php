@@ -407,7 +407,11 @@ render_header($is_edit_mode ? ('Edit Sourcing RFQ #' . $edit_rfq_id) : ($is_part
 
 <div class="card page-header">
   <div class="page-header-body">
-    <h1>
+    <h1 id="page-heading"
+      <?php if (!$is_edit_mode && !$is_parts_entrypoint): ?>
+        data-default-heading="Sourcing RFQ Form"
+        data-po-heading="Purchase Order Form"
+      <?php endif; ?>>
       <?= $is_edit_mode ? ('Edit Sourcing RFQ Request #' . (int)$edit_rfq_id) : ($is_parts_entrypoint ? 'CO2 Laser Parts RFQ / Sourcing Requests' : 'Sourcing RFQ Form') ?>
     </h1>
     <p class="muted">
@@ -420,10 +424,7 @@ render_header($is_edit_mode ? ('Edit Sourcing RFQ #' . $edit_rfq_id) : ($is_part
 </div>
 
 <?php
-$raw_request_type = $fields['request_type'] ?? 'RFQ';
-$current_request_type = is_scalar($raw_request_type) ? (string)$raw_request_type : 'RFQ';
-$initial_workflow_step = $current_request_type === 'PO' ? 'create_purchase_order' : 'create_rfq';
-render_alibaba_workflow_banner($initial_workflow_step);
+render_alibaba_workflow_banner('create_rfq');
 ?>
 
 <?php if ($errors): ?>
@@ -770,7 +771,10 @@ render_alibaba_workflow_banner($initial_workflow_step);
         input.required = isRequired;
       });
       updateWorkflowStepTwoLabel();
-      updateWorkflowBanner();
+      var pageHeading = document.getElementById('page-heading');
+      if (pageHeading && pageHeading.dataset.defaultHeading) {
+        pageHeading.textContent = isPO ? pageHeading.dataset.poHeading : pageHeading.dataset.defaultHeading;
+      }
     }
     categoryField.addEventListener('change', toggleSections);
     if (requestTypeField) {
