@@ -206,7 +206,7 @@ render_header($page_title);
   <a class="btn" href="sourcing_rfq_tracker.php">Sourcing RFQ Tracker →</a>
 </div>
 
-<?php render_alibaba_workflow_banner('receive_quotes'); ?>
+<?php render_alibaba_workflow_banner('copy_rfq_text'); ?>
 
 <div class="card" style="margin-top:18px;">
   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; gap:12px; flex-wrap:wrap;">
