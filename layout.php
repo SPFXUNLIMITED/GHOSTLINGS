@@ -530,9 +530,171 @@ $show_rfq_menu = $show_mod_menu;
   })();
 </script>
 
-
-
 <?php }
+
+/**
+ * Renders the Alibaba 13-step procurement workflow banner.
+ *
+ * @param string $current_step  One of the 13 stage keys (e.g. 'create_rfq').
+ *                              Defaults to the first step.
+ */
+function render_alibaba_workflow_banner(string $current_step = 'create_rfq'): void {
+  static $css_rendered = false;
+
+  $steps = [
+    'create_rfq' => [
+      'label'       => 'Create RFQ',
+      'instruction' => 'Submit a request for quotation to Alibaba suppliers to begin the procurement process.',
+      'url'         => 'sourcing_rfq_form.php',
+    ],
+    'receive_quotes' => [
+      'label'       => 'Receive Quotes',
+      'instruction' => 'Wait for suppliers to respond. Review incoming quotes as they arrive in the RFQ Tracker.',
+      'url'         => 'sourcing_rfq_tracker.php',
+    ],
+    'evaluate_select_quote' => [
+      'label'       => 'Evaluate & Select',
+      'instruction' => 'Compare quotes on price, quality, lead time, and terms. Choose the best supplier.',
+      'url'         => 'sourcing_rfq_tracker.php',
+    ],
+    'negotiate_terms' => [
+      'label'       => 'Negotiate Terms',
+      'instruction' => 'Negotiate pricing, payment schedule, delivery timeline, and warranty with the supplier.',
+      'url'         => 'sourcing_rfq_tracker.php',
+    ],
+    'send_purchase_order' => [
+      'label'       => 'Send PO',
+      'instruction' => 'Issue the formal Purchase Order. The supplier will confirm receipt and acceptance.',
+      'url'         => 'sourcing_rfq_tracker.php',
+    ],
+    'vendor_accepts_po' => [
+      'label'       => 'Vendor Accepts PO',
+      'instruction' => 'Confirm the vendor has acknowledged and accepted the Purchase Order in writing.',
+      'url'         => 'order_tracker.php?status=vendor_accepts_po',
+    ],
+    'make_deposit_payment' => [
+      'label'       => 'Make Deposit',
+      'instruction' => 'Submit the agreed deposit payment to the vendor via Trade Assurance or wire transfer.',
+      'url'         => 'order_tracker.php?status=make_deposit_payment',
+    ],
+    'vendor_produces_machine' => [
+      'label'       => 'Production',
+      'instruction' => 'The vendor manufactures the machine. Track progress and request updates as needed.',
+      'url'         => 'order_tracker.php?status=vendor_produces_machine',
+    ],
+    'make_final_payment' => [
+      'label'       => 'Final Payment',
+      'instruction' => 'Pay the remaining balance before the machine is released for shipment.',
+      'url'         => 'order_tracker.php?status=make_final_payment',
+    ],
+    'vendor_ships_machine' => [
+      'label'       => 'Vendor Ships',
+      'instruction' => 'The vendor ships the machine to the freight forwarder or direct to port.',
+      'url'         => 'order_tracker.php?status=vendor_ships_machine',
+    ],
+    'receive_tracking_documents' => [
+      'label'       => 'Tracking & Docs',
+      'instruction' => 'Obtain the bill of lading, packing list, commercial invoice, and tracking information.',
+      'url'         => 'order_tracker.php?status=receive_tracking_documents',
+    ],
+    'arrives_clears_customs' => [
+      'label'       => 'Customs Clearance',
+      'instruction' => 'Machine arrives at destination port. Pay duties and complete customs clearance.',
+      'url'         => 'order_tracker.php?status=arrives_clears_customs',
+    ],
+    'final_inspection_acceptance' => [
+      'label'       => 'Final Acceptance',
+      'instruction' => 'Inspect the machine upon delivery and formally accept or flag any issues.',
+      'url'         => 'order_tracker.php?status=final_inspection_acceptance',
+    ],
+  ];
+
+  $step_keys     = array_keys($steps);
+  $total         = count($step_keys);
+  $current_index = array_search($current_step, $step_keys, true);
+  if ($current_index === false) {
+    $current_index = 0;
+    $current_step  = $step_keys[0];
+  }
+  $current_label       = $steps[$current_step]['label'];
+  $current_instruction = $steps[$current_step]['instruction'];
+
+  if (!$css_rendered) {
+    $css_rendered = true;
+    ?>
+<style>
+.awb-wrap{border:1px solid #e5e7eb;border-radius:14px;background:#fff;box-shadow:0 1px 4px rgba(15,23,42,.07);margin:0 0 20px;overflow:hidden;}
+.awb-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:14px 18px 12px;border-bottom:1px solid #f1f5f9;}
+.awb-head-left{display:flex;align-items:center;gap:10px;}
+.awb-head-icon{font-size:20px;line-height:1;}
+.awb-head-title{font-size:15px;font-weight:700;color:#111827;margin:0;}
+.awb-head-badge{display:inline-flex;align-items:center;padding:3px 11px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe;}
+.awb-track-outer{overflow-x:auto;padding:16px 18px 0;}
+.awb-track{display:flex;align-items:flex-start;gap:0;min-width:max-content;padding-bottom:12px;}
+.awb-step{display:flex;align-items:flex-start;gap:0;}
+.awb-step-body{display:flex;flex-direction:column;align-items:center;width:88px;}
+.awb-step-circle-wrap{position:relative;display:flex;align-items:center;justify-content:center;width:32px;height:32px;margin-bottom:7px;}
+.awb-step-circle{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:2px solid #d1d5db;background:#f9fafb;color:#9ca3af;transition:background .15s,border-color .15s,color .15s;cursor:pointer;text-decoration:none;line-height:1;}
+.awb-step-circle:hover{border-color:#93c5fd;background:#eff6ff;color:#2563eb;}
+.awb-step.awb-done .awb-step-circle{background:#2563eb;border-color:#2563eb;color:#fff;}
+.awb-step.awb-current .awb-step-circle{background:#2563eb;border-color:#1d4ed8;color:#fff;box-shadow:0 0 0 4px rgba(59,130,246,.22);}
+.awb-step-label{font-size:11px;line-height:1.3;text-align:center;color:#6b7280;word-break:break-word;max-width:88px;}
+.awb-step.awb-done .awb-step-label{color:#374151;}
+.awb-step.awb-current .awb-step-label{color:#1e40af;font-weight:600;}
+.awb-connector{width:28px;flex-shrink:0;height:32px;display:flex;align-items:center;justify-content:center;}
+.awb-connector-line{height:2px;width:100%;background:#e5e7eb;border-radius:1px;}
+.awb-step.awb-done+.awb-connector .awb-connector-line{background:#2563eb;}
+.awb-instruction{display:flex;align-items:flex-start;gap:10px;margin:0 18px 16px;padding:11px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;}
+.awb-instruction-icon{font-size:16px;line-height:1;flex-shrink:0;margin-top:1px;}
+.awb-instruction-text{font-size:13px;line-height:1.5;color:#1e40af;}
+.awb-instruction-step{font-weight:700;color:#1e40af;}
+@media(max-width:640px){.awb-head{padding:12px 14px 10px;}.awb-track-outer{padding:14px 14px 0;}.awb-instruction{margin:0 14px 14px;}}
+</style>
+    <?php
+  }
+  ?>
+<div class="awb-wrap">
+  <div class="awb-head">
+    <div class="awb-head-left">
+      <span class="awb-head-icon" aria-hidden="true">🛒</span>
+      <h2 class="awb-head-title">Alibaba Procurement Workflow</h2>
+    </div>
+    <span class="awb-head-badge">Step <?= ($current_index + 1) ?> of <?= $total ?>: <?= h($current_label) ?></span>
+  </div>
+  <div class="awb-track-outer" role="list" aria-label="Workflow steps">
+    <div class="awb-track">
+      <?php foreach ($step_keys as $i => $key):
+        $is_done    = $i < $current_index;
+        $is_current = $i === $current_index;
+        $step_data  = $steps[$key];
+        $css_class  = 'awb-step' . ($is_done ? ' awb-done' : '') . ($is_current ? ' awb-current' : '');
+        $aria_label = 'Step ' . ($i + 1) . ': ' . $step_data['label'] . ($is_current ? ' (current)' : ($is_done ? ' (completed)' : ''));
+      ?>
+        <div class="<?= $css_class ?>" role="listitem">
+          <div class="awb-step-body">
+            <a class="awb-step-circle"
+               href="<?= h($step_data['url']) ?>"
+               aria-label="<?= h($aria_label) ?>"
+               title="<?= h($step_data['label']) ?>"><?= ($i + 1) ?></a>
+            <span class="awb-step-label"><?= h($step_data['label']) ?></span>
+          </div>
+        </div>
+        <?php if ($i < $total - 1): ?>
+          <div class="awb-connector" aria-hidden="true"><div class="awb-connector-line"></div></div>
+        <?php endif; ?>
+      <?php endforeach; ?>
+    </div>
+  </div>
+  <div class="awb-instruction" role="note">
+    <span class="awb-instruction-icon" aria-hidden="true">💡</span>
+    <p class="awb-instruction-text" style="margin:0;">
+      <span class="awb-instruction-step">Step <?= ($current_index + 1) ?>: <?= h($current_label) ?> —</span>
+      <?= h($current_instruction) ?>
+    </p>
+  </div>
+</div>
+  <?php
+}
 
 function render_footer(): void {
   // Pass login state to JS so idle tracking only runs for authenticated users.
