@@ -16,14 +16,19 @@ if (empty($_SESSION['rfq_order_csrf'])) {
 }
 
 $order_statuses = [
-  'draft' => 'Draft',
-  'deposit_pending' => 'Deposit Pending',
-  'deposit_paid' => 'Deposit Paid',
-  'in_production' => 'In Production',
-  'ready_to_ship' => 'Ready to Ship',
-  'shipped' => 'Shipped',
-  'delivered' => 'Delivered',
-  'completed' => 'Completed',
+  'create_rfq' => 'Create RFQ',
+  'receive_quotes' => 'Receive Quotes',
+  'evaluate_select_quote' => 'Evaluate and Select Best Quote',
+  'negotiate_terms' => 'Negotiate Terms',
+  'send_purchase_order' => 'Send Purchase Order',
+  'vendor_accepts_po' => 'Vendor Accepts PO',
+  'make_deposit_payment' => 'Make Deposit Payment',
+  'vendor_produces_machine' => 'Vendor Produces Machine',
+  'make_final_payment' => 'Make Final Payment',
+  'vendor_ships_machine' => 'Vendor Ships Machine',
+  'receive_tracking_documents' => 'Receive Tracking and Documents',
+  'arrives_clears_customs' => 'Arrives and Clears Customs',
+  'final_inspection_acceptance' => 'Final Inspection and Acceptance',
   'cancelled' => 'Cancelled',
 ];
 $incoterm_options = ['EXW', 'FOB', 'CIF', 'CFR', 'DDP', 'DAP'];
@@ -61,6 +66,32 @@ function is_valid_order_date(string $value): bool {
 function normalize_nullable_text(string $value): ?string {
   $value = trim($value);
   return $value === '' ? null : $value;
+}
+
+function apply_order_stage_milestone(PDO $pdo, int $order_id, string $order_status): void {
+  $sql_by_stage = [
+    'make_deposit_payment' => "UPDATE rfq_orders SET deposit_paid_at = COALESCE(deposit_paid_at, NOW()) WHERE id = ?",
+    'vendor_accepts_po' => "UPDATE rfq_orders SET po_accepted_at = COALESCE(po_accepted_at, NOW()) WHERE id = ?",
+    'vendor_produces_machine' => "UPDATE rfq_orders SET production_started_at = COALESCE(production_started_at, NOW()) WHERE id = ?",
+    'make_final_payment' => "UPDATE rfq_orders SET final_payment_paid_at = COALESCE(final_payment_paid_at, NOW()) WHERE id = ?",
+    'vendor_ships_machine' => "UPDATE rfq_orders SET shipped_at = COALESCE(shipped_at, NOW()) WHERE id = ?",
+    'receive_tracking_documents' => "UPDATE rfq_orders SET tracking_docs_received_at = COALESCE(tracking_docs_received_at, NOW()) WHERE id = ?",
+    'arrives_clears_customs' => "UPDATE rfq_orders SET customs_cleared_at = COALESCE(customs_cleared_at, NOW()) WHERE id = ?",
+    'final_inspection_acceptance' => "UPDATE rfq_orders SET accepted_at = COALESCE(accepted_at, NOW()) WHERE id = ?",
+  ];
+  if (!isset($sql_by_stage[$order_status])) {
+    return;
+  }
+  $stmt = $pdo->prepare($sql_by_stage[$order_status]);
+  $stmt->execute([$order_id]);
+}
+
+function record_order_stage_history(PDO $pdo, int $order_id, ?string $from_stage, string $to_stage, int $changed_by): void {
+  $stmt = $pdo->prepare(
+    "INSERT INTO rfq_order_stage_history (order_id, from_stage, to_stage, changed_by, change_note)
+     VALUES (?, ?, ?, ?, NULL)"
+  );
+  $stmt->execute([$order_id, $from_stage, $to_stage, $changed_by]);
 }
 
 function format_percentage_label(float $value): string {
@@ -171,10 +202,13 @@ if (!$order && !$source_quote) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
+  $can_manage_stage = is_admin_or_moderator();
   if (empty($_SESSION['rfq_order_csrf']) || !hash_equals((string)$_SESSION['rfq_order_csrf'], $submitted_csrf)) {
     $errors[] = 'Security token mismatch. Please refresh and try again.';
   } else {
-    $order_status = (string)($_POST['order_status'] ?? 'draft');
+    $existing_order_status = (string)($order['order_status'] ?? 'create_rfq');
+    $requested_order_status = (string)($_POST['order_status'] ?? $existing_order_status);
+    $order_status = $can_manage_stage ? $requested_order_status : $existing_order_status;
     $order_date = trim((string)($_POST['order_date'] ?? ''));
     $expected_ready_date = trim((string)($_POST['expected_ready_date'] ?? ''));
     $expected_ship_date = trim((string)($_POST['expected_ship_date'] ?? ''));
@@ -276,100 +310,119 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$errors) {
       $is_new_order = !$order;
+      $previous_status = $order ? (string)$order['order_status'] : null;
 
-      if ($order) {
-        $update = $pdo->prepare(
-          "UPDATE rfq_orders
-           SET order_status = ?, order_date = ?, expected_ready_date = ?, expected_ship_date = ?, supplier_name = ?,
-               model_name = ?, sku = ?, quantity = ?, unit_price = ?, order_total = ?, currency = ?, deposit_percent = ?,
-               deposit_amount = ?, balance_amount = ?, payment_terms = ?, incoterm = ?, shipping_method = ?, shipping_origin = ?,
-               destination_port = ?, destination_address = ?, production_lead_time_days = ?, trade_assurance_order_no = ?,
-               proforma_invoice_no = ?, warranty_terms = ?, included_accessories = ?, notes = ?
-           WHERE id = ?"
-        );
-        $update->execute([
-          $order_status,
-          normalize_nullable_text($order_date),
-          normalize_nullable_text($expected_ready_date),
-          normalize_nullable_text($expected_ship_date),
-          $supplier_name,
-          normalize_nullable_text($model_name),
-          normalize_nullable_text($sku),
-          $quantity,
-          $unit_price,
-          $order_total,
-          $currency,
-          $deposit_percent,
-          $deposit_amount,
-          $balance_amount,
-          normalize_nullable_text($payment_terms),
-          normalize_nullable_text($incoterm),
-          normalize_nullable_text($shipping_method),
-          normalize_nullable_text($shipping_origin),
-          normalize_nullable_text($destination_port),
-          normalize_nullable_text($destination_address),
-          $production_lead_time_days_raw === '' ? null : (int)$production_lead_time_days_raw,
-          normalize_nullable_text($trade_assurance_order_no),
-          normalize_nullable_text($proforma_invoice_no),
-          normalize_nullable_text($warranty_terms),
-          normalize_nullable_text($included_accessories),
-          normalize_nullable_text($notes),
-          (int)$order['id'],
-        ]);
-        $saved_order_id = (int)$order['id'];
-      } else {
-        $insert = $pdo->prepare(
-          "INSERT INTO rfq_orders
-           (rfq_request_id, rfq_quote_id, po_number, order_status, order_date, expected_ready_date, expected_ship_date, supplier_name,
-            model_name, sku, quantity, unit_price, order_total, currency, deposit_percent, deposit_amount, balance_amount, payment_terms,
-            incoterm, shipping_method, shipping_origin, destination_port, destination_address, production_lead_time_days,
-            trade_assurance_order_no, proforma_invoice_no, warranty_terms, included_accessories, notes, created_by)
-           VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        );
-        $insert->execute([
-          $rfq_id,
-          $quote_id,
-          $order_status,
-          normalize_nullable_text($order_date),
-          normalize_nullable_text($expected_ready_date),
-          normalize_nullable_text($expected_ship_date),
-          $supplier_name,
-          normalize_nullable_text($model_name),
-          normalize_nullable_text($sku),
-          $quantity,
-          $unit_price,
-          $order_total,
-          $currency,
-          $deposit_percent,
-          $deposit_amount,
-          $balance_amount,
-          normalize_nullable_text($payment_terms),
-          normalize_nullable_text($incoterm),
-          normalize_nullable_text($shipping_method),
-          normalize_nullable_text($shipping_origin),
-          normalize_nullable_text($destination_port),
-          normalize_nullable_text($destination_address),
-          $production_lead_time_days_raw === '' ? null : (int)$production_lead_time_days_raw,
-          normalize_nullable_text($trade_assurance_order_no),
-          normalize_nullable_text($proforma_invoice_no),
-          normalize_nullable_text($warranty_terms),
-          normalize_nullable_text($included_accessories),
-          normalize_nullable_text($notes),
-          (int)current_user_id(),
-        ]);
-        $saved_order_id = (int)$pdo->lastInsertId();
-        $generated_po_number = generate_po_number($saved_order_id);
-        $pdo->prepare("UPDATE rfq_orders SET po_number = ? WHERE id = ?")->execute([$generated_po_number, $saved_order_id]);
+      try {
+        $pdo->beginTransaction();
+
+        if ($order) {
+          $update = $pdo->prepare(
+            "UPDATE rfq_orders
+             SET order_status = ?, order_date = ?, expected_ready_date = ?, expected_ship_date = ?, supplier_name = ?,
+                 model_name = ?, sku = ?, quantity = ?, unit_price = ?, order_total = ?, currency = ?, deposit_percent = ?,
+                 deposit_amount = ?, balance_amount = ?, payment_terms = ?, incoterm = ?, shipping_method = ?, shipping_origin = ?,
+                 destination_port = ?, destination_address = ?, production_lead_time_days = ?, trade_assurance_order_no = ?,
+                 proforma_invoice_no = ?, warranty_terms = ?, included_accessories = ?, notes = ?
+             WHERE id = ?"
+          );
+          $update->execute([
+            $order_status,
+            normalize_nullable_text($order_date),
+            normalize_nullable_text($expected_ready_date),
+            normalize_nullable_text($expected_ship_date),
+            $supplier_name,
+            normalize_nullable_text($model_name),
+            normalize_nullable_text($sku),
+            $quantity,
+            $unit_price,
+            $order_total,
+            $currency,
+            $deposit_percent,
+            $deposit_amount,
+            $balance_amount,
+            normalize_nullable_text($payment_terms),
+            normalize_nullable_text($incoterm),
+            normalize_nullable_text($shipping_method),
+            normalize_nullable_text($shipping_origin),
+            normalize_nullable_text($destination_port),
+            normalize_nullable_text($destination_address),
+            $production_lead_time_days_raw === '' ? null : (int)$production_lead_time_days_raw,
+            normalize_nullable_text($trade_assurance_order_no),
+            normalize_nullable_text($proforma_invoice_no),
+            normalize_nullable_text($warranty_terms),
+            normalize_nullable_text($included_accessories),
+            normalize_nullable_text($notes),
+            (int)$order['id'],
+          ]);
+          $saved_order_id = (int)$order['id'];
+        } else {
+          $insert = $pdo->prepare(
+            "INSERT INTO rfq_orders
+             (rfq_request_id, rfq_quote_id, po_number, order_status, order_date, expected_ready_date, expected_ship_date, supplier_name,
+              model_name, sku, quantity, unit_price, order_total, currency, deposit_percent, deposit_amount, balance_amount, payment_terms,
+              incoterm, shipping_method, shipping_origin, destination_port, destination_address, production_lead_time_days,
+              trade_assurance_order_no, proforma_invoice_no, warranty_terms, included_accessories, notes, created_by)
+             VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+          );
+          $insert->execute([
+            $rfq_id,
+            $quote_id,
+            $order_status,
+            normalize_nullable_text($order_date),
+            normalize_nullable_text($expected_ready_date),
+            normalize_nullable_text($expected_ship_date),
+            $supplier_name,
+            normalize_nullable_text($model_name),
+            normalize_nullable_text($sku),
+            $quantity,
+            $unit_price,
+            $order_total,
+            $currency,
+            $deposit_percent,
+            $deposit_amount,
+            $balance_amount,
+            normalize_nullable_text($payment_terms),
+            normalize_nullable_text($incoterm),
+            normalize_nullable_text($shipping_method),
+            normalize_nullable_text($shipping_origin),
+            normalize_nullable_text($destination_port),
+            normalize_nullable_text($destination_address),
+            $production_lead_time_days_raw === '' ? null : (int)$production_lead_time_days_raw,
+            normalize_nullable_text($trade_assurance_order_no),
+            normalize_nullable_text($proforma_invoice_no),
+            normalize_nullable_text($warranty_terms),
+            normalize_nullable_text($included_accessories),
+            normalize_nullable_text($notes),
+            (int)current_user_id(),
+          ]);
+          $saved_order_id = (int)$pdo->lastInsertId();
+          $generated_po_number = generate_po_number($saved_order_id);
+          $pdo->prepare("UPDATE rfq_orders SET po_number = ? WHERE id = ?")->execute([$generated_po_number, $saved_order_id]);
+        }
+
+        if ($previous_status !== $order_status) {
+          apply_order_stage_milestone($pdo, $saved_order_id, $order_status);
+          record_order_stage_history($pdo, $saved_order_id, $previous_status, $order_status, (int)current_user_id());
+        }
+
+        if ($is_new_order) {
+          // Only the first conversion to a purchase order should move the parent RFQ into ordered status.
+          $rfq_status_update = $pdo->prepare("UPDATE rfq_requests SET request_status = 'ordered' WHERE id = ? AND request_status NOT IN ('ordered', 'closed')");
+          $rfq_status_update->execute([$rfq_id]);
+        }
+
+        $pdo->commit();
+        header('Location: order_form.php?order_id=' . $saved_order_id . '&saved=1');
+        exit;
+      } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+          $pdo->rollBack();
+        }
+        error_log('Failed to save purchase order: ' . $e->getMessage());
+        $errors[] = $e instanceof PDOException && $e->getCode() === '45000'
+          ? (string)$e->getMessage()
+          : 'Unable to save purchase order right now. Please try again.';
       }
-
-      if ($is_new_order) {
-        // Only the first conversion to a purchase order should move the parent RFQ into ordered status.
-        $rfq_status_update = $pdo->prepare("UPDATE rfq_requests SET request_status = 'ordered' WHERE id = ? AND request_status NOT IN ('ordered', 'closed')");
-        $rfq_status_update->execute([$rfq_id]);
-      }
-
-      header('Location: order_form.php?order_id=' . $saved_order_id . '&saved=1');
-      exit;
     }
 
     $order = array_merge($order ?? [], [
@@ -424,7 +477,7 @@ if (!$order && $source_quote) {
     'rfq_quote_id' => $quote_id,
     'request_title' => $source_quote['request_title'],
     'po_number' => PENDING_PO_NUMBER_PLACEHOLDER,
-    'order_status' => 'draft',
+    'order_status' => 'create_rfq',
     'order_date' => $prefill_order_date,
     'expected_ready_date' => $prefill_ready_date,
     'expected_ship_date' => '',
@@ -452,6 +505,8 @@ if (!$order && $source_quote) {
     'notes' => (string)($source_quote['notes'] ?? ''),
   ];
 }
+
+$can_manage_stage = is_admin_or_moderator();
 
 render_header('Purchase Order Form');
 
@@ -524,11 +579,15 @@ if (($order['id'] ?? 0) > 0) {
     </div>
     <div>
       <label>Order Status</label>
-      <select name="order_status">
+      <select name="order_status" <?= $can_manage_stage ? '' : 'disabled' ?>>
         <?php foreach ($order_statuses as $value => $label): ?>
-          <option value="<?= h($value) ?>" <?= order_value($order, 'order_status', 'draft') === $value ? 'selected' : '' ?>><?= h($label) ?></option>
+          <option value="<?= h($value) ?>" <?= order_value($order, 'order_status', 'create_rfq') === $value ? 'selected' : '' ?>><?= h($label) ?></option>
         <?php endforeach; ?>
       </select>
+      <?php if (!$can_manage_stage): ?>
+        <input type="hidden" name="order_status" value="<?= h((string)order_value($order, 'order_status', 'create_rfq')) ?>">
+        <div class="muted" style="font-size:12px; margin-top:4px;">Only admins and moderators can update workflow stages.</div>
+      <?php endif; ?>
     </div>
     <div>
       <label>Order Date</label>
