@@ -547,6 +547,11 @@ function render_alibaba_workflow_banner(string $current_step = 'create_rfq'): vo
       'instruction' => 'Submit a request for quotation to Alibaba suppliers to begin the procurement process.',
       'url'         => 'sourcing_rfq_form.php',
     ],
+    'copy_rfq_text' => [
+      'label'       => 'Copy RFQ Text',
+      'instruction' => 'Copy the formatted RFQ text and paste it into your Alibaba message to request quotes from suppliers.',
+      'url'         => 'sourcing_rfq_submitted.php',
+    ],
     'receive_quotes' => [
       'label'       => 'Receive Quotes',
       'instruction' => 'Wait for suppliers to respond. Review incoming quotes as they arrive in the RFQ Tracker.',
