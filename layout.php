@@ -533,9 +533,9 @@ $show_rfq_menu = $show_mod_menu;
 <?php }
 
 /**
- * Renders the Alibaba 13-step procurement workflow banner.
+ * Renders the Alibaba procurement workflow banner.
  *
- * @param string $current_step  One of the 13 stage keys (e.g. 'create_rfq').
+ * @param string $current_step  One of the workflow stage keys (e.g. 'create_rfq').
  *                              Defaults to the first step.
  */
 function render_alibaba_workflow_banner(string $current_step = 'create_rfq'): void {
@@ -547,9 +547,9 @@ function render_alibaba_workflow_banner(string $current_step = 'create_rfq'): vo
       'instruction' => 'Submit a request for quotation to Alibaba suppliers to begin the procurement process.',
       'url'         => 'sourcing_rfq_form.php',
     ],
-    'copy_rfq_text' => [
-      'label'       => 'Copy RFQ Text',
-      'instruction' => 'Copy the formatted RFQ text and paste it into your Alibaba message to request quotes from suppliers.',
+    'copy_send_rfq' => [
+      'label'       => 'Copy & Send RFQ',
+      'instruction' => 'Copy the prepared RFQ content and send it to target suppliers on Alibaba.',
       'url'         => 'sourcing_rfq_submitted.php',
     ],
     'receive_quotes' => [
@@ -557,28 +557,18 @@ function render_alibaba_workflow_banner(string $current_step = 'create_rfq'): vo
       'instruction' => 'Wait for suppliers to respond. Review incoming quotes as they arrive in the RFQ Tracker.',
       'url'         => 'sourcing_rfq_tracker.php',
     ],
-    'evaluate_select_quote' => [
-      'label'       => 'Evaluate & Select',
-      'instruction' => 'Compare quotes on price, quality, lead time, and terms. Choose the best supplier.',
+    'select_winning_quote' => [
+      'label'       => 'Select Winning Quote',
+      'instruction' => 'Compare submitted quotes and select the best supplier based on pricing, quality, and terms.',
       'url'         => 'sourcing_rfq_tracker.php',
     ],
-    'negotiate_terms' => [
-      'label'       => 'Negotiate Terms',
-      'instruction' => 'Negotiate pricing, payment schedule, delivery timeline, and warranty with the supplier.',
-      'url'         => 'sourcing_rfq_tracker.php',
-    ],
-    'create_order' => [
+    'create_purchase_order' => [
       'label'       => 'Create Purchase Order',
       'instruction' => 'Convert the winning quote into a formal purchase order.',
       'url'         => 'order_form.php',
     ],
-    'send_po' => [
-      'label'       => 'Send PO',
-      'instruction' => 'Copy this text and send the Purchase Order to the supplier.',
-      'url'         => 'sourcing_rfq_submitted.php',
-    ],
     'send_purchase_order' => [
-      'label'       => 'Send PO',
+      'label'       => 'Send Purchase Order',
       'instruction' => 'Issue the formal Purchase Order. The supplier will confirm receipt and acceptance.',
       'url'         => 'sourcing_rfq_tracker.php',
     ],
@@ -587,42 +577,40 @@ function render_alibaba_workflow_banner(string $current_step = 'create_rfq'): vo
       'instruction' => 'Confirm the vendor has acknowledged and accepted the Purchase Order in writing.',
       'url'         => 'order_tracker.php?status=vendor_accepts_po',
     ],
-    'make_deposit_payment' => [
-      'label'       => 'Make Deposit',
-      'instruction' => 'Submit the agreed deposit payment to the vendor via Trade Assurance or wire transfer.',
-      'url'         => 'order_tracker.php?status=make_deposit_payment',
-    ],
-    'vendor_produces_machine' => [
-      'label'       => 'Production',
-      'instruction' => 'The vendor manufactures the machine. Track progress and request updates as needed.',
+    'in_production' => [
+      'label'       => 'In Production',
+      'instruction' => 'Production is underway. Monitor milestones and supplier updates until goods are ready to ship.',
       'url'         => 'order_tracker.php?status=vendor_produces_machine',
     ],
-    'make_final_payment' => [
-      'label'       => 'Final Payment',
-      'instruction' => 'Pay the remaining balance before the machine is released for shipment.',
-      'url'         => 'order_tracker.php?status=make_final_payment',
-    ],
-    'vendor_ships_machine' => [
-      'label'       => 'Vendor Ships',
-      'instruction' => 'The vendor ships the machine to the freight forwarder or direct to port.',
+    'shipping' => [
+      'label'       => 'Shipping',
+      'instruction' => 'The order is in transit. Track shipment progress and required logistics documents.',
       'url'         => 'order_tracker.php?status=vendor_ships_machine',
     ],
-    'receive_tracking_documents' => [
-      'label'       => 'Tracking & Docs',
-      'instruction' => 'Obtain the bill of lading, packing list, commercial invoice, and tracking information.',
-      'url'         => 'order_tracker.php?status=receive_tracking_documents',
-    ],
-    'arrives_clears_customs' => [
-      'label'       => 'Customs Clearance',
-      'instruction' => 'Machine arrives at destination port. Pay duties and complete customs clearance.',
-      'url'         => 'order_tracker.php?status=arrives_clears_customs',
-    ],
-    'final_inspection_acceptance' => [
-      'label'       => 'Final Acceptance',
-      'instruction' => 'Inspect the machine upon delivery and formally accept or flag any issues.',
+    'received' => [
+      'label'       => 'Received',
+      'instruction' => 'Confirm delivery and completion of final receipt and acceptance activities.',
       'url'         => 'order_tracker.php?status=final_inspection_acceptance',
     ],
   ];
+
+  $legacy_step_aliases = [
+    'copy_rfq_text'               => 'copy_send_rfq',
+    'evaluate_select_quote'       => 'select_winning_quote',
+    'negotiate_terms'             => 'select_winning_quote',
+    'create_order'                => 'create_purchase_order',
+    'send_po'                     => 'send_purchase_order',
+    'make_deposit_payment'        => 'vendor_accepts_po',
+    'vendor_produces_machine'     => 'in_production',
+    'make_final_payment'          => 'in_production',
+    'vendor_ships_machine'        => 'shipping',
+    'receive_tracking_documents'  => 'shipping',
+    'arrives_clears_customs'      => 'shipping',
+    'final_inspection_acceptance' => 'received',
+  ];
+  if (isset($legacy_step_aliases[$current_step])) {
+    $current_step = $legacy_step_aliases[$current_step];
+  }
 
   $step_keys     = array_keys($steps);
   $total         = count($step_keys);
