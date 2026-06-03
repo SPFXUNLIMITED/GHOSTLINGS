@@ -418,7 +418,10 @@ render_header($is_edit_mode ? ('Edit Sourcing RFQ #' . $edit_rfq_id) : ($is_part
   <a class="btn" href="sourcing_rfq_tracker.php">Sourcing RFQ Tracker →</a>
 </div>
 
-<?php render_alibaba_workflow_banner('create_rfq'); ?>
+<?php
+$initial_workflow_step = $fields['request_type'] === 'PO' ? 'create_purchase_order' : 'create_rfq';
+render_alibaba_workflow_banner($initial_workflow_step);
+?>
 
 <?php if ($errors): ?>
   <div class="alert error">
@@ -658,6 +661,58 @@ render_header($is_edit_mode ? ('Edit Sourcing RFQ #' . $edit_rfq_id) : ($is_part
     var acquisitionField = document.getElementById('acquisition_purpose');
     var customerInfoSection = document.getElementById('customer_information_section');
     var customerInfoInputs = customerInfoSection ? customerInfoSection.querySelectorAll('input') : [];
+    var workflowBanner = document.querySelector('.awb-wrap');
+    var workflowSteps = workflowBanner ? workflowBanner.querySelectorAll('.awb-step') : [];
+    var workflowBadge = workflowBanner ? workflowBanner.querySelector('.awb-head-badge') : null;
+    var workflowInstructionText = workflowBanner ? workflowBanner.querySelector('.awb-instruction-text') : null;
+    var workflowInstructionStep = workflowInstructionText ? workflowInstructionText.querySelector('.awb-instruction-step') : null;
+    var workflowStepConfig = {
+      create_rfq: {
+        index: 0,
+        label: 'Create RFQ',
+        instruction: 'Submit a request for quotation to Alibaba suppliers to begin the procurement process.'
+      },
+      create_purchase_order: {
+        index: 4,
+        label: 'Create Purchase Order',
+        instruction: 'Convert the winning quote into a formal purchase order.'
+      }
+    };
+
+    function updateWorkflowBanner() {
+      if (!workflowBanner || !workflowSteps.length) return;
+      var workflowKey = requestTypeField && requestTypeField.value === 'PO' ? 'create_purchase_order' : 'create_rfq';
+      var workflowState = workflowStepConfig[workflowKey];
+      if (!workflowState) return;
+
+      workflowSteps.forEach(function (step, index) {
+        step.classList.toggle('awb-done', index < workflowState.index);
+        step.classList.toggle('awb-current', index === workflowState.index);
+      });
+
+      if (workflowBadge) {
+        workflowBadge.textContent = 'Step ' + (workflowState.index + 1) + ' of ' + workflowSteps.length + ': ' + workflowState.label;
+      }
+
+      if (workflowInstructionStep) {
+        workflowInstructionStep.textContent = 'Step ' + (workflowState.index + 1) + ': ' + workflowState.label + ' —';
+      }
+
+      if (workflowInstructionText) {
+        var instructionSuffix = ' ' + workflowState.instruction;
+        if (workflowInstructionStep) {
+          var nextNode = workflowInstructionStep.nextSibling;
+          if (nextNode && nextNode.nodeType === 3) {
+            nextNode.nodeValue = instructionSuffix;
+          } else {
+            workflowInstructionStep.insertAdjacentText('afterend', instructionSuffix);
+          }
+        } else {
+          workflowInstructionText.textContent = workflowState.instruction;
+        }
+      }
+    }
+
     if (acquisitionField && customerInfoSection) {
       function toggleCustomerInfo() {
         var showCustomerInfo = acquisitionField.value === 'customer';
@@ -686,6 +741,7 @@ render_header($is_edit_mode ? ('Edit Sourcing RFQ #' . $edit_rfq_id) : ($is_part
         var isRequired = input.getAttribute('data-required-on-type') === (requestTypeField ? requestTypeField.value : '');
         input.required = isRequired;
       });
+      updateWorkflowBanner();
     }
     categoryField.addEventListener('change', toggleSections);
     if (requestTypeField) {
