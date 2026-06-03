@@ -4,9 +4,8 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_login();
 
-if (session_status() !== PHP_SESSION_ACTIVE) {
-  session_start();
-}
+const MAX_NOTES_LENGTH = 10000;
+
 if (empty($_SESSION['customer_inquiry_csrf'])) {
   $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
 }
@@ -54,16 +53,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($fields['email'] !== '' && !filter_var($fields['email'], FILTER_VALIDATE_EMAIL)) {
       $errors[] = 'Please enter a valid email address.';
     }
-    if ($fields['notes'] !== '' && strlen($fields['notes']) > 10000) {
-      $errors[] = 'Notes must be 10000 characters or fewer.';
+    if ($fields['notes'] !== '' && strlen($fields['notes']) > MAX_NOTES_LENGTH) {
+      $errors[] = 'Notes must be ' . MAX_NOTES_LENGTH . ' characters or fewer.';
     }
 
     $date = DateTime::createFromFormat('Y-m-d', $fields['inquiry_date']);
     if (!$date || $date->format('Y-m-d') !== $fields['inquiry_date']) {
       $errors[] = 'Please provide a valid inquiry date.';
+    } elseif ($date > new DateTime('now', new DateTimeZone(APP_TZ))) {
+      $errors[] = 'Date of Inquiry cannot be in the future.';
     }
 
     if (!$errors) {
+      $created_by = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+      if ($created_by !== null && $created_by <= 0) {
+        $created_by = null;
+      }
+
       $ins = $pdo->prepare(
         "INSERT INTO customer_phone_inquiries
            (customer_name, company_name, phone_number, email, inquiry_date, notes, created_by)
@@ -76,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fields['email'] !== '' ? $fields['email'] : null,
         $fields['inquiry_date'],
         $fields['notes'] !== '' ? $fields['notes'] : null,
-        (int)($_SESSION['user_id'] ?? 0) ?: null,
+        $created_by,
       ]);
 
       $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
@@ -120,7 +126,7 @@ render_header('Customer Inquiry Log');
       Inquiry saved successfully.
     </div>
     <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
-      <a class="btn primary" href="customer_inquiry_form.php?new=1" style="font-size:16px; padding:12px 18px;">New Inquiry</a>
+      <a class="btn primary" href="customer_inquiry_form.php" style="font-size:16px; padding:12px 18px;">New Inquiry</a>
       <a class="btn" href="customer_inquiry_form.php?view=all" style="font-size:16px; padding:12px 18px;">View All Inquiries</a>
     </div>
   </div>
@@ -128,7 +134,7 @@ render_header('Customer Inquiry Log');
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
       <h2 style="margin:0;">All Customer Inquiries</h2>
-      <a class="btn primary" href="customer_inquiry_form.php?new=1">New Inquiry</a>
+      <a class="btn primary" href="customer_inquiry_form.php">New Inquiry</a>
     </div>
     <div style="overflow-x:auto;">
       <table style="min-width:840px;">
@@ -167,28 +173,28 @@ render_header('Customer Inquiry Log');
     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customer_inquiry_csrf']) ?>" />
     <div class="form-grid">
       <div>
-        <label>Customer Name <span style="color:var(--d)">*</span></label>
-        <input type="text" name="customer_name" maxlength="255" required value="<?= h($fields['customer_name']) ?>" />
+        <label for="customer_name">Customer Name <span style="color:var(--d)">*</span></label>
+        <input id="customer_name" type="text" name="customer_name" maxlength="255" required value="<?= h($fields['customer_name']) ?>" />
       </div>
       <div>
-        <label>Company Name</label>
-        <input type="text" name="company_name" maxlength="255" value="<?= h($fields['company_name']) ?>" />
+        <label for="company_name">Company Name</label>
+        <input id="company_name" type="text" name="company_name" maxlength="255" value="<?= h($fields['company_name']) ?>" />
       </div>
       <div>
-        <label>Phone Number</label>
-        <input type="text" name="phone_number" maxlength="50" value="<?= h($fields['phone_number']) ?>" />
+        <label for="phone_number">Phone Number</label>
+        <input id="phone_number" type="text" name="phone_number" maxlength="50" value="<?= h($fields['phone_number']) ?>" />
       </div>
       <div>
-        <label>Email</label>
-        <input type="email" name="email" maxlength="255" value="<?= h($fields['email']) ?>" />
+        <label for="email">Email</label>
+        <input id="email" type="email" name="email" maxlength="255" value="<?= h($fields['email']) ?>" />
       </div>
       <div>
-        <label>Date of Inquiry</label>
-        <input type="date" name="inquiry_date" value="<?= h($fields['inquiry_date']) ?>" />
+        <label for="inquiry_date">Date of Inquiry</label>
+        <input id="inquiry_date" type="date" name="inquiry_date" value="<?= h($fields['inquiry_date']) ?>" />
       </div>
       <div class="full">
-        <label>Notes / What they want</label>
-        <textarea name="notes" rows="6" maxlength="10000"><?= h($fields['notes']) ?></textarea>
+        <label for="notes">Notes / What they want</label>
+        <textarea id="notes" name="notes" rows="6" maxlength="<?= MAX_NOTES_LENGTH ?>"><?= h($fields['notes']) ?></textarea>
       </div>
     </div>
     <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">

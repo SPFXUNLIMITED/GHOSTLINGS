@@ -858,7 +858,8 @@ $pdo->exec("
     created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     KEY idx_cpi_inquiry_date (inquiry_date),
-    KEY idx_cpi_created_at (created_at)
+    KEY idx_cpi_created_at (created_at),
+    CONSTRAINT fk_cpi_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
