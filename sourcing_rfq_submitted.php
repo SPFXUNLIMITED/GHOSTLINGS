@@ -80,7 +80,8 @@ function build_rfq_email_text_submitted(array $rfq): string {
     $lines[] = 'Phone:        ' . $contact_phone;
   }
 
-  $is_parts_request = strtolower($request_category !== '' ? $request_category : 'machine') === 'parts';
+  $normalized_request_category = $request_category !== '' ? $request_category : 'machine';
+  $is_parts_request = strtolower($normalized_request_category) === 'parts';
   $lines = array_merge($lines, [
     '',
     $sep2,
