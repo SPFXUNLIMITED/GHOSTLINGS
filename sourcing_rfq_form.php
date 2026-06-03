@@ -386,40 +386,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       ]);
 
       $_SESSION['rfq_form_csrf'] = bin2hex(random_bytes(24));
-      $success = $fields['request_type'] . ' request submitted. You can now track quotes in RFQ Tracker.';
-      $fields = [
-        'request_category'=> $forced_request_category ?? 'machine',
-        'request_type'    => 'RFQ',
-        'acquisition_purpose' => 'customer',
-        'urgency'         => 'normal',
-        'contact_name'    => '',
-        'company_name'    => '',
-        'contact_email'   => '',
-        'contact_phone'   => '',
-        'buyer_name'      => '',
-        'buyer_company'   => '',
-        'buyer_email'     => '',
-        'buyer_phone'     => '',
-        'request_title'   => '',
-        'machine_size'    => '',
-        'laser_watts'     => '',
-        'tube_type'       => '',
-        'part_category'   => '',
-        'part_specs'      => '',
-        'quantity'        => '1',
-        'required_features' => '',
-        'additional_notes'  => '',
-        'po_supplier_info' => '',
-        'po_unit_price' => '',
-        'po_line_total' => '',
-        'po_expected_delivery_date' => '',
-        'po_delivery_address' => $profile_delivery_address,
-        'po_payment_terms' => '',
-        'po_shipping_method' => '',
-        'po_shipping_cost' => '',
-        'po_total_amount' => '',
-      ];
-      $fields = array_merge($fields, $profile_contact_fields);
+      $new_rfq_id = (int)$pdo->lastInsertId();
+      header('Location: sourcing_rfq_submitted.php?rfq_id=' . $new_rfq_id);
+      exit;
     }
   }
 }
