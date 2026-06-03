@@ -31,7 +31,6 @@ $order_statuses = [
   'final_inspection_acceptance' => 'Final Inspection and Acceptance',
   'cancelled' => 'Cancelled',
 ];
-$timeline_stage_keys = array_values(array_filter(array_keys($order_statuses), static fn(string $status): bool => $status !== 'cancelled'));
 $incoterm_options = ['EXW', 'FOB', 'CIF', 'CFR', 'DDP', 'DAP'];
 $doc_types = [
   'trade_order'        => ['label' => 'Trade Order',           'icon' => '📝'],
@@ -509,8 +508,6 @@ if (!$order && $source_quote) {
 
 $can_manage_stage = is_admin_or_moderator();
 $current_order_status = (string)order_value($order ?? [], 'order_status', 'create_rfq');
-$current_timeline_index = array_search($current_order_status, $timeline_stage_keys, true);
-$current_timeline_index = $current_timeline_index === false ? -1 : (int)$current_timeline_index;
 
 render_header('Purchase Order Form');
 
@@ -543,6 +540,8 @@ if (($order['id'] ?? 0) > 0) {
   </div>
 </div>
 
+<?php render_alibaba_workflow_banner('create_order'); ?>
+
 <?php if ($errors): ?>
   <div class="alert error">
     <ul style="margin:0; padding-left:18px;">
@@ -568,34 +567,6 @@ if (($order['id'] ?? 0) > 0) {
   </div>
 <?php endif; ?>
 
-<style>
-  .flowbite-order-layout { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:20px; align-items:start; }
-  .flowbite-timeline-card { border:1px solid #e5e7eb; border-radius:12px; background:#fff; box-shadow:0 1px 2px rgba(15,23,42,.06); position:sticky; top:14px; }
-  .flowbite-timeline-head { padding:14px 16px; border-bottom:1px solid #f3f4f6; }
-  .flowbite-timeline-head h3 { margin:0; font-size:16px; color:#111827; }
-  .flowbite-timeline-head p { margin:6px 0 0; font-size:12px; color:#6b7280; line-height:1.5; }
-  .flowbite-timeline-list { list-style:none; margin:0; padding:10px 14px 14px; }
-  .flowbite-timeline-item { position:relative; padding:0 0 12px 30px; }
-  .flowbite-timeline-item:last-child { padding-bottom:0; }
-  .flowbite-timeline-item::before { content:''; position:absolute; left:8px; top:26px; bottom:-8px; width:2px; background:#dbeafe; }
-  .flowbite-timeline-item:last-child::before { display:none; }
-  .flowbite-timeline-node { position:absolute; left:0; top:4px; width:18px; height:18px; border-radius:999px; border:2px solid #93c5fd; background:#fff; box-sizing:border-box; }
-  .flowbite-timeline-item.done .flowbite-timeline-node { background:#2563eb; border-color:#2563eb; }
-  .flowbite-timeline-item.current .flowbite-timeline-node { background:#fff; border-color:#1d4ed8; box-shadow:0 0 0 3px rgba(59,130,246,.2); }
-  .flowbite-stage-btn { width:100%; text-align:left; border:1px solid #e5e7eb; border-radius:10px; background:#fff; color:#111827; padding:9px 11px; font-size:13px; line-height:1.4; cursor:pointer; transition:border-color .15s, background .15s, color .15s; }
-  .flowbite-stage-btn:hover { border-color:#93c5fd; background:#eff6ff; }
-  .flowbite-stage-btn.active { border-color:#2563eb; background:#dbeafe; color:#1e3a8a; font-weight:600; }
-  .flowbite-stage-btn[disabled] { cursor:not-allowed; opacity:.78; background:#f9fafb; }
-  .flowbite-stage-label { display:block; }
-  .flowbite-stage-meta { display:block; font-size:11px; color:#6b7280; margin-top:2px; }
-  .flowbite-stage-pill { display:inline-flex; align-items:center; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:600; margin-bottom:4px; }
-  .flowbite-stage-pill.done { background:#dcfce7; color:#166534; }
-  .flowbite-stage-pill.current { background:#dbeafe; color:#1e40af; }
-  .flowbite-stage-pill.pending { background:#f3f4f6; color:#4b5563; }
-  @media (max-width: 1100px) { .flowbite-order-layout { grid-template-columns:1fr; } .flowbite-timeline-card { position:static; order:-1; } }
-</style>
-
-<div class="flowbite-order-layout">
 <div class="card">
   <h2 style="margin-top:0;">Order Details</h2>
   <p class="muted" style="margin-top:0;">Prefilled from the accepted quote so you can complete supplier, deposit, logistics, and Alibaba/China ordering details.</p>
@@ -720,64 +691,6 @@ if (($order['id'] ?? 0) > 0) {
     </div>
   </form>
 </div>
-
-<aside class="flowbite-timeline-card">
-  <div class="flowbite-timeline-head">
-    <h3>Order Timeline</h3>
-    <p>Flowbite-styled stage picker for the Alibaba workflow.</p>
-  </div>
-  <ol class="flowbite-timeline-list">
-    <?php foreach ($order_statuses as $status_key => $status_label): ?>
-      <?php
-        $stage_index = array_search($status_key, $timeline_stage_keys, true);
-        $stage_index = $stage_index === false ? -1 : (int)$stage_index;
-        $is_done = $current_timeline_index >= 0 && $stage_index >= 0 && $stage_index < $current_timeline_index;
-        $is_current = $current_order_status === $status_key;
-        $pill_class = $is_current ? 'current' : ($is_done ? 'done' : 'pending');
-        $pill_text = $is_current ? 'Current' : ($is_done ? 'Completed' : 'Pending');
-      ?>
-      <li class="flowbite-timeline-item <?= $is_done ? 'done' : '' ?> <?= $is_current ? 'current' : '' ?>">
-        <span class="flowbite-timeline-node" aria-hidden="true"></span>
-        <span class="flowbite-stage-pill <?= $pill_class ?>"><?= h($pill_text) ?></span>
-        <?php if ($can_manage_stage): ?>
-          <button type="button"
-                  class="flowbite-stage-btn <?= $is_current ? 'active' : '' ?>"
-                  data-stage-select
-                  data-stage-key="<?= h($status_key) ?>"
-                  data-stage-label="<?= h($status_label) ?>">
-            <span class="flowbite-stage-label"><?= h($status_label) ?></span>
-            <span class="flowbite-stage-meta"><?= h($status_key) ?></span>
-          </button>
-        <?php else: ?>
-          <button type="button" class="flowbite-stage-btn <?= $is_current ? 'active' : '' ?>" disabled>
-            <span class="flowbite-stage-label"><?= h($status_label) ?></span>
-            <span class="flowbite-stage-meta"><?= h($status_key) ?></span>
-          </button>
-        <?php endif; ?>
-      </li>
-    <?php endforeach; ?>
-  </ol>
-</aside>
-</div>
-
-<?php if ($can_manage_stage): ?>
-<script>
-(() => {
-  const input = document.getElementById('order-status-input');
-  const label = document.getElementById('order-status-label');
-  const buttons = Array.from(document.querySelectorAll('[data-stage-select]'));
-  if (!input || !label || buttons.length === 0) return;
-  buttons.forEach((button) => {
-    button.addEventListener('click', () => {
-      input.value = button.getAttribute('data-stage-key') || input.value;
-      label.value = button.getAttribute('data-stage-label') || label.value;
-      buttons.forEach((item) => item.classList.remove('active'));
-      button.classList.add('active');
-    });
-  });
-})();
-</script>
-<?php endif; ?>
 
 <?php if (($order['id'] ?? 0) > 0): ?>
 <div class="card" id="order-documents">
