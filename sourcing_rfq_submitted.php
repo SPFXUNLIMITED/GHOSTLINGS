@@ -24,17 +24,6 @@ function format_acquisition_purpose_submitted(array $rfq): string {
   return ucwords(str_replace('_', ' ', $purpose));
 }
 
-function infer_request_type_from_title_submitted(?string $request_title): string {
-  $request_title = trim((string)$request_title);
-  if (preg_match('/^\s*(PO|Purchase\s+Order)\s*:/i', $request_title) === 1) {
-    return 'PO';
-  }
-  if (preg_match('/^\s*Sourcing\s*:/i', $request_title) === 1) {
-    return 'Sourcing';
-  }
-  return 'RFQ';
-}
-
 function format_po_amount_submitted($value): string {
   if ($value === null || $value === '') {
     return 'N/A';
@@ -50,7 +39,8 @@ function build_rfq_email_text_submitted(array $rfq): string {
   $sep2 = str_repeat('-', 60);
   $date = date('F j, Y', strtotime((string)$rfq['created_at']));
   $request_title = trim((string)($rfq['request_title'] ?? ''));
-  $is_purchase_order = infer_request_type_from_title_submitted($request_title) === 'PO';
+  $request_category = trim((string)($rfq['request_category'] ?? ''));
+  $is_purchase_order = (strtolower($request_category) === 'po');
   $email_heading = $is_purchase_order ? 'PURCHASE ORDER (PO)' : 'REQUEST FOR QUOTATION (RFQ)';
   $request_number_label = $is_purchase_order ? 'PO #:         ' : 'RFQ #:        ';
 
@@ -90,8 +80,8 @@ function build_rfq_email_text_submitted(array $rfq): string {
     $lines[] = 'Phone:        ' . $contact_phone;
   }
 
-  $request_category = trim((string)($rfq['request_category'] ?? 'machine'));
-  $is_parts_request = $request_category === 'parts';
+  $normalized_request_category = $request_category !== '' ? $request_category : 'machine';
+  $is_parts_request = strtolower($normalized_request_category) === 'parts';
   $lines = array_merge($lines, [
     '',
     $sep2,
@@ -188,7 +178,8 @@ if (!$rfq) {
   exit;
 }
 
-$is_purchase_order = infer_request_type_from_title_submitted((string)($rfq['request_title'] ?? '')) === 'PO';
+$request_category = trim((string)($rfq['request_category'] ?? ''));
+$is_purchase_order = (strtolower($request_category) === 'po');
 $page_title        = $is_purchase_order ? 'Purchase Order Submitted' : 'RFQ Submitted';
 $email_text_title  = $is_purchase_order ? 'PO Email Text' : 'RFQ Email Text';
 $rfq_email_text    = build_rfq_email_text_submitted($rfq);
