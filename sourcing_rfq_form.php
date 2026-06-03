@@ -419,7 +419,12 @@ render_header($is_edit_mode ? ('Edit Sourcing RFQ #' . $edit_rfq_id) : ($is_part
   <a class="btn" href="sourcing_rfq_tracker.php">Sourcing RFQ Tracker →</a>
 </div>
 
-<?php render_alibaba_workflow_banner('create_rfq'); ?>
+<?php
+$raw_request_type = $fields['request_type'] ?? 'RFQ';
+$current_request_type = is_scalar($raw_request_type) ? (string)$raw_request_type : 'RFQ';
+$initial_workflow_step = $current_request_type === 'PO' ? 'create_purchase_order' : 'create_rfq';
+render_alibaba_workflow_banner($initial_workflow_step);
+?>
 
 <?php if ($errors): ?>
   <div class="alert error">
@@ -659,6 +664,70 @@ render_header($is_edit_mode ? ('Edit Sourcing RFQ #' . $edit_rfq_id) : ($is_part
     var acquisitionField = document.getElementById('acquisition_purpose');
     var customerInfoSection = document.getElementById('customer_information_section');
     var customerInfoInputs = customerInfoSection ? customerInfoSection.querySelectorAll('input') : [];
+    var workflowStepConfig = {
+      create_rfq: {
+        label: 'Create RFQ',
+        instruction: 'Submit a request for quotation to Alibaba suppliers to begin the procurement process.'
+      },
+      create_purchase_order: {
+        label: 'Create Purchase Order',
+        instruction: 'Convert the winning quote into a formal purchase order.'
+      }
+    };
+
+    function findWorkflowStepIndex(steps, targetLabel) {
+      for (var i = 0; i < steps.length; i++) {
+        var labelElement = steps[i].querySelector('.awb-step-label');
+        if (labelElement && labelElement.textContent.trim() === targetLabel) {
+          return i;
+        }
+      }
+      return -1;
+    }
+
+    function updateWorkflowBanner() {
+      var workflowBanner = document.querySelector('.awb-wrap');
+      if (!workflowBanner) return;
+      var workflowSteps = workflowBanner.querySelectorAll('.awb-step');
+      if (!workflowSteps.length) return;
+
+      var workflowBadge = workflowBanner.querySelector('.awb-head-badge');
+      var workflowInstructionText = workflowBanner.querySelector('.awb-instruction-text');
+      var workflowInstructionStep = workflowInstructionText ? workflowInstructionText.querySelector('.awb-instruction-step') : null;
+      var workflowKey = requestTypeField && requestTypeField.value === 'PO' ? 'create_purchase_order' : 'create_rfq';
+      var workflowState = workflowStepConfig[workflowKey];
+      if (!workflowState) return;
+      var workflowIndex = findWorkflowStepIndex(workflowSteps, workflowState.label);
+      if (workflowIndex < 0) workflowIndex = 0;
+
+      workflowSteps.forEach(function (step, index) {
+        step.classList.toggle('awb-done', index < workflowIndex);
+        step.classList.toggle('awb-current', index === workflowIndex);
+      });
+
+      if (workflowBadge) {
+        workflowBadge.textContent = 'Step ' + (workflowIndex + 1) + ' of ' + workflowSteps.length + ': ' + workflowState.label;
+      }
+
+      if (workflowInstructionStep) {
+        workflowInstructionStep.textContent = 'Step ' + (workflowIndex + 1) + ': ' + workflowState.label + ' —';
+      }
+
+      if (workflowInstructionText) {
+        var instructionSuffix = ' ' + workflowState.instruction;
+        if (workflowInstructionStep) {
+          var nextNode = workflowInstructionStep.nextSibling;
+          if (nextNode && nextNode.nodeType === Node.TEXT_NODE) {
+            nextNode.nodeValue = instructionSuffix;
+          } else {
+            workflowInstructionStep.insertAdjacentText('afterend', instructionSuffix);
+          }
+        } else {
+          workflowInstructionText.textContent = workflowState.instruction;
+        }
+      }
+    }
+
     if (acquisitionField && customerInfoSection) {
       function toggleCustomerInfo() {
         var showCustomerInfo = acquisitionField.value === 'customer';
@@ -701,6 +770,7 @@ render_header($is_edit_mode ? ('Edit Sourcing RFQ #' . $edit_rfq_id) : ($is_part
         input.required = isRequired;
       });
       updateWorkflowStepTwoLabel();
+      updateWorkflowBanner();
     }
     categoryField.addEventListener('change', toggleSections);
     if (requestTypeField) {
