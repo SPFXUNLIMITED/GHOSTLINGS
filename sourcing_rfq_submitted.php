@@ -40,7 +40,7 @@ function build_rfq_email_text_submitted(array $rfq): string {
   $date = date('F j, Y', strtotime((string)$rfq['created_at']));
   $request_title = trim((string)($rfq['request_title'] ?? ''));
   $request_category = trim((string)($rfq['request_category'] ?? ''));
-  $is_purchase_order = (strtolower(trim($request_category ?? '')) === 'po');
+  $is_purchase_order = (strtolower($request_category) === 'po');
   $email_heading = $is_purchase_order ? 'PURCHASE ORDER (PO)' : 'REQUEST FOR QUOTATION (RFQ)';
   $request_number_label = $is_purchase_order ? 'PO #:         ' : 'RFQ #:        ';
 
@@ -80,7 +80,7 @@ function build_rfq_email_text_submitted(array $rfq): string {
     $lines[] = 'Phone:        ' . $contact_phone;
   }
 
-  $is_parts_request = strtolower(trim($request_category !== '' ? $request_category : 'machine')) === 'parts';
+  $is_parts_request = strtolower($request_category !== '' ? $request_category : 'machine') === 'parts';
   $lines = array_merge($lines, [
     '',
     $sep2,
@@ -178,7 +178,7 @@ if (!$rfq) {
 }
 
 $request_category = trim((string)($rfq['request_category'] ?? ''));
-$is_purchase_order = (strtolower(trim($request_category ?? '')) === 'po');
+$is_purchase_order = (strtolower($request_category) === 'po');
 $page_title        = $is_purchase_order ? 'Purchase Order Submitted' : 'RFQ Submitted';
 $email_text_title  = $is_purchase_order ? 'PO Email Text' : 'RFQ Email Text';
 $rfq_email_text    = build_rfq_email_text_submitted($rfq);
