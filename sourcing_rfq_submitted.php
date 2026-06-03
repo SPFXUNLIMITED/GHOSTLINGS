@@ -206,7 +206,7 @@ render_header($page_title);
       Copy the formatted text below and paste it into your Alibaba message to request quotes from suppliers.
     </p>
   </div>
-  <a class="btn" href="sourcing_rfq_tracker.php">Sourcing RFQ Tracker →</a>
+  <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$rfq['id'] ?>">Go to Quotes →</a>
 </div>
 
 <?php render_alibaba_workflow_banner('copy_rfq_text'); ?>
@@ -241,11 +241,11 @@ render_header($page_title);
 
 <div class="card" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
   <p style="margin:0;">
-    Next step: paste this text into your Alibaba supplier message, then monitor incoming quotes in the
-    <a href="sourcing_rfq_tracker.php">Sourcing RFQ Tracker</a>.
+    Next step: paste this text into your Alibaba supplier message, then add received quotes directly to
+    <a href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$rfq['id'] ?>">RFQ #<?= (int)$rfq['id'] ?></a>.
   </p>
   <div class="row" style="gap:8px;">
-    <a class="btn" href="sourcing_rfq_tracker.php?rfq_text_id=<?= (int)$rfq['id'] ?>">View in Tracker</a>
+    <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$rfq['id'] ?>">Add Received Quotes</a>
     <a class="btn" href="sourcing_rfq_form.php">New RFQ</a>
   </div>
 </div>
