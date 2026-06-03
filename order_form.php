@@ -412,7 +412,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $pdo->commit();
-        header('Location: order_form.php?order_id=' . $saved_order_id . '&saved=1');
+        header('Location: sourcing_rfq_submitted.php?rfq_id=' . (int)$saved_order_id);
         exit;
       } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
