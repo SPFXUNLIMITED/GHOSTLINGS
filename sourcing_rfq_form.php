@@ -385,9 +385,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fields['request_type'] === 'PO' ? $po_total_amount_amount : null,
       ]);
 
-      $new_rfq_id = (int)$pdo->lastInsertId();
+      $new_request_id = (int)$pdo->lastInsertId();
       $_SESSION['rfq_form_csrf'] = bin2hex(random_bytes(24));
-      header('Location: sourcing_rfq_submitted.php?rfq_id=' . $new_rfq_id);
+      $title_for_type_check = strtolower(trim((string)$full_request_title));
+      $is_purchase_order = $title_for_type_check !== ''
+        && (strncmp($title_for_type_check, 'po:', 3) === 0
+          || strncmp($title_for_type_check, 'purchase order:', 15) === 0);
+      if ($is_purchase_order) {
+        header('Location: purchase_order_submitted.php?po_id=' . $new_request_id);
+      } else {
+        header('Location: sourcing_rfq_submitted.php?rfq_id=' . $new_request_id);
+      }
       exit;
     }
   }
