@@ -27,6 +27,7 @@ $order_statuses = [
   'final_inspection_acceptance' => 'Final Inspection and Acceptance',
   'cancelled' => 'Cancelled',
 ];
+$timeline_stage_keys = array_values(array_filter(array_keys($order_statuses), static fn(string $status): bool => $status !== 'cancelled'));
 
 function apply_order_stage_milestone(PDO $pdo, int $order_id, string $order_status): void {
   $sql_by_stage = [
@@ -187,7 +188,12 @@ $hero_stmt = $pdo->query("SELECT order_status FROM rfq_orders");
 $hero_rows  = $hero_stmt->fetchAll();
 $hero_total = count($hero_rows);
 $hero_active = $hero_shipped = $hero_completed = 0;
+$stage_counts = array_fill_keys(array_keys($order_statuses), 0);
 foreach ($hero_rows as $_hr) {
+  $stage_key = (string)($_hr['order_status'] ?? '');
+  if (isset($stage_counts[$stage_key])) {
+    $stage_counts[$stage_key]++;
+  }
   if (in_array($_hr['order_status'], [
     'create_rfq',
     'receive_quotes',
@@ -206,6 +212,19 @@ foreach ($hero_rows as $_hr) {
     $hero_completed++;
   }
 }
+$timeline_current_stage = ($status_filter !== '' && isset($order_statuses[$status_filter]))
+  ? $status_filter
+  : 'create_rfq';
+if ($status_filter === '') {
+  foreach (array_reverse($timeline_stage_keys) as $stage_key) {
+    if (($stage_counts[$stage_key] ?? 0) > 0) {
+      $timeline_current_stage = $stage_key;
+      break;
+    }
+  }
+}
+$timeline_current_index = array_search($timeline_current_stage, $timeline_stage_keys, true);
+$timeline_current_index = $timeline_current_index === false ? 0 : (int)$timeline_current_index;
 
 render_header('Order Tracker');
 ?>
@@ -373,10 +392,106 @@ render_header('Order Tracker');
   0%,100% { transform: translateY(-50%); }
   50%      { transform: translateY(calc(-50% - 10px)); }
 }
+.flowbite-order-timeline {
+  margin: 0 0 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15,23,42,.06);
+  padding: 18px 18px 16px;
+}
+.flowbite-order-timeline-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.flowbite-order-timeline-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+}
+.flowbite-order-timeline-subtitle {
+  font-size: 12px;
+  color: #6b7280;
+}
+.flowbite-order-track {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(13, minmax(120px, 1fr));
+  gap: 10px;
+  overflow-x: auto;
+  padding: 8px 0 4px;
+}
+.flowbite-order-track::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 28px;
+  height: 2px;
+  background: #dbeafe;
+}
+.flowbite-order-fill {
+  position: absolute;
+  left: 12px;
+  top: 28px;
+  height: 2px;
+  background: #2563eb;
+  z-index: 1;
+}
+.flowbite-order-step {
+  position: relative;
+  z-index: 2;
+  min-width: 120px;
+}
+.flowbite-order-step-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #93c5fd;
+  background: #fff;
+  margin-bottom: 8px;
+}
+.flowbite-order-step.done .flowbite-order-step-dot,
+.flowbite-order-step.current .flowbite-order-step-dot {
+  border-color: #2563eb;
+  background: #2563eb;
+}
+.flowbite-order-step.current .flowbite-order-step-dot {
+  box-shadow: 0 0 0 4px rgba(59,130,246,.2);
+}
+.flowbite-order-step-label {
+  display: block;
+  text-decoration: none;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #374151;
+  padding: 6px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 9px;
+  background: #fff;
+}
+.flowbite-order-step-label:hover { border-color: #93c5fd; background: #eff6ff; }
+.flowbite-order-step.current .flowbite-order-step-label {
+  border-color: #2563eb;
+  background: #dbeafe;
+  color: #1e3a8a;
+  font-weight: 600;
+}
+.flowbite-order-step-count {
+  display: inline-block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: #6b7280;
+}
 @media (max-width: 640px) {
   .order-hero { padding: 28px 20px; }
   .order-hero-title { font-size: 24px; }
   .order-hero-deco { display: none; }
+  .flowbite-order-timeline { padding: 14px 12px; }
 }
 </style>
 
@@ -413,6 +528,33 @@ render_header('Order Tracker');
     </div>
   </div>
 </div>
+
+<section class="flowbite-order-timeline">
+  <div class="flowbite-order-timeline-head">
+    <h2 class="flowbite-order-timeline-title">Order Workflow Timeline</h2>
+    <span class="flowbite-order-timeline-subtitle">
+      Current view: <?= h((string)($order_statuses[$timeline_current_stage] ?? $timeline_current_stage)) ?>
+    </span>
+  </div>
+  <div class="flowbite-order-track">
+    <div class="flowbite-order-fill" style="width: calc((100% - 24px) * <?= count($timeline_stage_keys) > 1 ? (($timeline_current_index) / (count($timeline_stage_keys) - 1)) : 0 ?>);"></div>
+    <?php foreach ($timeline_stage_keys as $index => $stage_key): ?>
+      <?php
+        $is_done = $index < $timeline_current_index;
+        $is_current = $stage_key === $timeline_current_stage;
+        $query = $_GET;
+        $query['status'] = $stage_key;
+      ?>
+      <div class="flowbite-order-step <?= $is_done ? 'done' : '' ?> <?= $is_current ? 'current' : '' ?>">
+        <div class="flowbite-order-step-dot" aria-hidden="true"></div>
+        <a class="flowbite-order-step-label" href="order_tracker.php?<?= h(http_build_query($query)) ?>">
+          <?= h((string)$order_statuses[$stage_key]) ?>
+          <span class="flowbite-order-step-count"><?= (int)($stage_counts[$stage_key] ?? 0) ?> order<?= ((int)($stage_counts[$stage_key] ?? 0) === 1) ? '' : 's' ?></span>
+        </a>
+      </div>
+    <?php endforeach; ?>
+  </div>
+</section>
 
 <?php if ($errors): ?>
   <div class="alert error">
