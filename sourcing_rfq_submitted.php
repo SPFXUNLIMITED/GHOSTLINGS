@@ -202,7 +202,7 @@ render_header($page_title);
   <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$rfq['id'] ?>">Go to Quotes →</a>
 </div>
 
-<?php render_alibaba_workflow_banner($is_purchase_order ? 'send_po' : 'copy_rfq_text'); ?>
+<?php render_alibaba_workflow_banner('copy_send_rfq'); ?>
 
 <div class="card">
   <h2 style="margin-top:0;"><?= h($email_text_title) ?></h2>
@@ -238,15 +238,18 @@ render_header($page_title);
 <div class="card" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
   <p style="margin:0;">
     <?php if ($is_purchase_order): ?>
-      Next step: send this Purchase Order to the supplier, then track it in
-      <a href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$rfq['id'] ?>">PO #<?= (int)$rfq['id'] ?></a>.
+      Next step: copy the PO text and send it to the supplier, then complete the Full Purchase Order Form to track the order.
     <?php else: ?>
       Next step: paste this text into your Alibaba supplier message, then add received quotes directly to
       <a href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$rfq['id'] ?>">RFQ #<?= (int)$rfq['id'] ?></a>.
     <?php endif; ?>
   </p>
   <div class="row" style="gap:8px;">
-    <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$rfq['id'] ?>"><?= $is_purchase_order ? 'Track Purchase Order' : 'Add Received Quotes' ?></a>
+    <?php if ($is_purchase_order): ?>
+      <a class="btn" href="order_form.php?rfq_id=<?= (int)$rfq['id'] ?>" style="font-size:15px; padding:10px 22px; font-weight:700; background:#2563eb; color:#fff; border-color:#1d4ed8;">📋 Go to Full Purchase Order Form →</a>
+    <?php else: ?>
+      <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$rfq['id'] ?>">Add Received Quotes</a>
+    <?php endif; ?>
     <a class="btn" href="sourcing_rfq_form.php"><?= $is_purchase_order ? 'New PO' : 'New RFQ' ?></a>
   </div>
 </div>

@@ -588,6 +588,13 @@ foreach ([
   }
 }
 
+// Allow rfq_orders to be created without a quote (direct PO submissions).
+try {
+  $pdo->exec("ALTER TABLE rfq_orders MODIFY rfq_quote_id INT UNSIGNED NULL");
+} catch (PDOException $e) {
+  // Ignore – column may already be nullable.
+}
+
 // Migrate rfq_orders.order_status from legacy values to Alibaba 13-stage workflow values.
 $pdo->exec("ALTER TABLE rfq_orders MODIFY COLUMN order_status {$rfq_order_status_enum_with_legacy} NOT NULL DEFAULT 'create_rfq'");
 $pdo->exec("
