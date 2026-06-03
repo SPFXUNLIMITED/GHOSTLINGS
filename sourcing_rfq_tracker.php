@@ -502,8 +502,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $quote_file_mime_type,
             $quote_file_size_bytes,
           ]);
-          $success = 'Quote added to RFQ tracker.';
-          $selected_rfq_id = $rfq_id;
+          header('Location: sourcing_rfq_tracker.php?rfq_id=' . (int)$rfq_id);
+          exit;
           }
         }
       }
