@@ -481,6 +481,9 @@ render_header('Admin Backend');
       <div class="card">
         <h2 style="margin-top:0;">Integrations</h2>
         <p class="muted" style="margin-bottom:16px;">Manage third-party API credentials used by the system.</p>
+        <div class="alert" style="margin-bottom:14px; border-color:#f59e0b; background:#fffbeb; color:#92400e;">
+          Before entering your HubSpot token, you must first set the APP_SETTINGS_ENCRYPTION_KEY in your configuration. This key is required for securely storing the token.
+        </div>
 
         <?php if ($integrations_errors): ?>
           <div class="alert error" style="margin-bottom:14px;">
