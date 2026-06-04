@@ -233,6 +233,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errors) {
+      $_SESSION['inventory_form_csrf'] = bin2hex(random_bytes(24));
       if ($is_edit) {
         $upd = $pdo->prepare("
           UPDATE inventory_items SET
