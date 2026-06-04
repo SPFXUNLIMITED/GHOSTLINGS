@@ -66,13 +66,20 @@ function normalize_inventory_part_numbers(PDO $pdo): void {
   }
 }
 
-normalize_inventory_part_numbers($pdo);
+function inventory_part_number_index_exists(PDO $pdo): bool {
+  $stmt = $pdo->query("SHOW INDEX FROM inventory_items WHERE Key_name = 'uq_inventory_part_number'");
+  return $stmt->fetch() !== false;
+}
 
-try {
-  $pdo->exec("ALTER TABLE inventory_items ADD UNIQUE INDEX uq_inventory_part_number (part_number)");
-} catch (PDOException $e) {
-  if (!in_array((string)$e->getCode(), ['42000', '42S11'], true)) {
-    throw $e;
+if (!inventory_part_number_index_exists($pdo)) {
+  normalize_inventory_part_numbers($pdo);
+
+  try {
+    $pdo->exec("ALTER TABLE inventory_items ADD UNIQUE INDEX uq_inventory_part_number (part_number)");
+  } catch (PDOException $e) {
+    if (!in_array((string)$e->getCode(), ['42000', '42S11'], true)) {
+      throw $e;
+    }
   }
 }
 

@@ -70,6 +70,11 @@ function normalize_inventory_part_numbers(PDO $pdo): void {
   }
 }
 
+function inventory_part_number_index_exists(PDO $pdo): bool {
+  $stmt = $pdo->query("SHOW INDEX FROM inventory_items WHERE Key_name = 'uq_inventory_part_number'");
+  return $stmt->fetch() !== false;
+}
+
 function generate_inventory_part_number(PDO $pdo, int $inventory_id): string {
   $seed = max(1, $inventory_id);
   do {
@@ -82,13 +87,15 @@ function generate_inventory_part_number(PDO $pdo, int $inventory_id): string {
   return $candidate;
 }
 
-normalize_inventory_part_numbers($pdo);
+if (!inventory_part_number_index_exists($pdo)) {
+  normalize_inventory_part_numbers($pdo);
 
-try {
-  $pdo->exec("ALTER TABLE inventory_items ADD UNIQUE INDEX uq_inventory_part_number (part_number)");
-} catch (PDOException $e) {
-  if (!in_array((string)$e->getCode(), ['42000', '42S11'], true)) {
-    throw $e;
+  try {
+    $pdo->exec("ALTER TABLE inventory_items ADD UNIQUE INDEX uq_inventory_part_number (part_number)");
+  } catch (PDOException $e) {
+    if (!in_array((string)$e->getCode(), ['42000', '42S11'], true)) {
+      throw $e;
+    }
   }
 }
 
