@@ -140,7 +140,6 @@ render_header('Alibaba Quick Responses');
     statusEl.classList.add('show');
     window.setTimeout(() => {
       statusEl.classList.remove('show');
-      statusEl.textContent = 'Copied';
     }, COPY_STATUS_DISPLAY_DURATION);
   };
 
@@ -152,6 +151,7 @@ render_header('Alibaba Quick Responses');
     try {
       field.focus();
       field.select();
+      // Intentional legacy fallback for browsers without Clipboard API support.
       const copied = document.execCommand('copy');
       field.setSelectionRange(0, 0);
       field.blur();
