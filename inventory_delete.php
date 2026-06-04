@@ -7,6 +7,12 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
 }
 
+function inventory_delete_redirect(string $location): void {
+  $_SESSION['inventory_delete_csrf'] = bin2hex(random_bytes(24));
+  header('Location: ' . $location);
+  exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   http_response_code(405);
   exit('Method not allowed.');
@@ -20,8 +26,7 @@ if (empty($_SESSION['inventory_delete_csrf']) || !hash_equals((string)$_SESSION[
 
 $id = (int)($_POST['id'] ?? 0);
 if ($id <= 0) {
-  header('Location: inventory_list.php');
-  exit;
+  inventory_delete_redirect('inventory_list.php');
 }
 
 $stmt = $pdo->prepare("SELECT item_name, part_number, image_stored_name FROM inventory_items WHERE id = ? LIMIT 1");
@@ -29,21 +34,22 @@ $stmt->execute([$id]);
 $item = $stmt->fetch();
 
 if (!$item) {
-  header('Location: inventory_list.php');
-  exit;
+  inventory_delete_redirect('inventory_list.php');
 }
-
-$pdo->prepare("DELETE FROM inventory_items WHERE id = ?")->execute([$id]);
 
 $image_stored_name = trim((string)($item['image_stored_name'] ?? ''));
 if ($image_stored_name !== '') {
   $image_path = __DIR__ . '/uploads/inventory/' . basename($image_stored_name);
   if (is_file($image_path)) {
-    @unlink($image_path);
+    if (!@unlink($image_path)) {
+      inventory_delete_redirect('inventory_form.php?id=' . $id . '&delete_error=image');
+    }
   }
 }
 
 try {
+  $pdo->prepare("DELETE FROM inventory_items WHERE id = ?")->execute([$id]);
+
   $actor_id = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
   if ($actor_id !== null && $actor_id <= 0) {
     $actor_id = null;
@@ -59,7 +65,4 @@ try {
   // Non-blocking audit log write.
 }
 
-$_SESSION['inventory_delete_csrf'] = bin2hex(random_bytes(24));
-
-header('Location: inventory_list.php?success=deleted');
-exit;
+inventory_delete_redirect('inventory_list.php?success=deleted');

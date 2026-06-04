@@ -202,6 +202,10 @@ if ($is_edit) {
   $image_mime_type = $existing['image_mime_type'] ?? null;
 }
 
+if ($is_edit && (string)($_GET['delete_error'] ?? '') === 'image') {
+  $errors[] = 'Unable to remove the stored image file, so the inventory item was not deleted.';
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $csrf = (string)($_POST['csrf_token'] ?? '');
   if (!hash_equals((string)$_SESSION['inventory_form_csrf'], $csrf)) {
