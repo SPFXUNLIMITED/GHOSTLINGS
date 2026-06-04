@@ -714,10 +714,15 @@ $legacy_rfq_canned_response_defaults = [
     'body' => 'Please share packaging dimensions and gross/net weight, and confirm whether export-grade wooden crate packing is included.',
   ],
 ];
-$rfq_canned_response_legacy_only_slots = array_map('intval', array_values(array_diff(
+$rfq_canned_response_new_slots = array_keys($rfq_canned_response_defaults);
+$rfq_canned_response_legacy_only_slot_numbers = array_diff(
   $rfq_canned_response_legacy_slots,
-  array_keys($rfq_canned_response_defaults)
-)));
+  $rfq_canned_response_new_slots
+);
+$rfq_canned_response_legacy_only_slots = array_map(
+  'intval',
+  array_values($rfq_canned_response_legacy_only_slot_numbers)
+);
 $rfq_canned_response_rows_stmt = $pdo->prepare(
   "SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN ($rfq_canned_response_legacy_slot_placeholders) ORDER BY slot"
 );
@@ -730,22 +735,22 @@ foreach ($rfq_canned_response_rows as $rfq_canned_response_row) {
     'body' => (string)$rfq_canned_response_row['body'],
   ];
 }
-$replace_legacy_rfq_canned_defaults = true;
+$should_migrate_legacy_rfq_canned_responses = true;
 foreach ($legacy_rfq_canned_response_defaults as $slot => $legacy_response) {
   if (!isset($rfq_canned_response_by_slot[$slot])) {
     if ($slot <= RFQ_CANNED_RESPONSE_SLOT_COUNT) {
-      $replace_legacy_rfq_canned_defaults = false;
+      $should_migrate_legacy_rfq_canned_responses = false;
       break;
     }
     continue;
   }
   if ($rfq_canned_response_by_slot[$slot]['label'] !== $legacy_response['label']
       || $rfq_canned_response_by_slot[$slot]['body'] !== $legacy_response['body']) {
-    $replace_legacy_rfq_canned_defaults = false;
+    $should_migrate_legacy_rfq_canned_responses = false;
     break;
   }
 }
-if ($replace_legacy_rfq_canned_defaults) {
+if ($should_migrate_legacy_rfq_canned_responses) {
   $rfq_canned_response_stmt = $pdo->prepare(
     "INSERT INTO rfq_canned_responses (slot, label, body) VALUES (?, ?, ?)
      ON DUPLICATE KEY UPDATE label = ?, body = ?"

@@ -115,9 +115,11 @@ render_header('Alibaba Quick Responses');
 <div class="alibaba-grid">
   <?php foreach ($responses as $index => $response): ?>
     <?php $field_id = 'alibaba-response-' . ($index + 1); ?>
-    <div class="alibaba-response-card" role="group" aria-label="<?= h('Notice ' . ($index + 1) . ' of ' . count($responses) . ': ' . $response['title']) ?>">
-      <div class="alibaba-response-label"><span>Notice <?= $index + 1 ?></span></div>
-      <h2 class="alibaba-response-title"><?= h($response['title']) ?></h2>
+    <?php $label_id = $field_id . '-label'; ?>
+    <?php $title_id = $field_id . '-title'; ?>
+    <div class="alibaba-response-card" role="group" aria-labelledby="<?= h($label_id . ' ' . $title_id) ?>">
+      <div class="alibaba-response-label" id="<?= h($label_id) ?>"><span>Notice <?= $index + 1 ?></span></div>
+      <h2 class="alibaba-response-title" id="<?= h($title_id) ?>"><?= h($response['title']) ?></h2>
       <textarea
         id="<?= h($field_id) ?>"
         class="alibaba-response-text"
