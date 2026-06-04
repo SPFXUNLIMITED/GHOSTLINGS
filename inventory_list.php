@@ -38,6 +38,14 @@ function fmt_money($value): string {
 }
 
 $q = trim((string)($_GET['q'] ?? ''));
+$success_param = (string)($_GET['success'] ?? '');
+$success_message = '';
+if ($success_param === 'created') {
+  $success_message = 'Inventory item created.';
+} elseif ($success_param === 'updated') {
+  $success_message = 'Inventory item updated.';
+}
+
 if ($q !== '') {
   $like = '%' . $q . '%';
   $stmt = $pdo->prepare("
@@ -177,6 +185,14 @@ render_header('Inventory List');
   </div>
   <a class="btn primary inventory-add-btn" href="inventory_form.php">Add New Item</a>
 </div>
+
+<?php if ($success_message !== ''): ?>
+  <div class="card">
+    <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">
+      <?= h($success_message) ?>
+    </div>
+  </div>
+<?php endif; ?>
 
 <div class="card">
   <form method="get" action="inventory_list.php" class="row" style="margin-bottom:4px;">
