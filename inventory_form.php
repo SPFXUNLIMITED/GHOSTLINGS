@@ -328,10 +328,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $image_mime_type,
           $id,
         ]);
+        try {
+          $actor_id = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+          if ($actor_id !== null && $actor_id <= 0) {
+            $actor_id = null;
+          }
+          $actor_name = isset($_SESSION['username']) ? trim((string)$_SESSION['username']) : '';
+          $detail = 'Inventory item #' . (int)$id . ' updated: ' . $fields['item_name'];
+          if ($part_number !== '') {
+            $detail .= ' [' . $part_number . ']';
+          }
+          log_admin_activity($pdo, $actor_id, 'Inventory Item Updated', $detail, $actor_name);
+        } catch (Throwable $e) {
+          // Non-blocking audit log write.
+        }
         header('Location: inventory_list.php?success=updated');
         exit;
       } else {
         $pdo->beginTransaction();
+        $new_id = 0;
+        $created_part_number = '';
         try {
           $placeholder_part_number = 'TEMP-' . bin2hex(random_bytes(12));
           $ins = $pdo->prepare("
@@ -364,12 +380,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $part_number = generate_inventory_part_number($pdo, $new_id);
           $part_upd = $pdo->prepare("UPDATE inventory_items SET part_number = ? WHERE id = ?");
           $part_upd->execute([$part_number, $new_id]);
+          $created_part_number = $part_number;
           $pdo->commit();
         } catch (Throwable $e) {
           if ($pdo->inTransaction()) {
             $pdo->rollBack();
           }
           throw $e;
+        }
+        try {
+          $actor_id = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+          if ($actor_id !== null && $actor_id <= 0) {
+            $actor_id = null;
+          }
+          $actor_name = isset($_SESSION['username']) ? trim((string)$_SESSION['username']) : '';
+          $detail = 'Inventory item #' . (int)$new_id . ' created: ' . $fields['item_name'];
+          if ($created_part_number !== '') {
+            $detail .= ' [' . $created_part_number . ']';
+          }
+          log_admin_activity($pdo, $actor_id, 'Inventory Item Created', $detail, $actor_name);
+        } catch (Throwable $e) {
+          // Non-blocking audit log write.
         }
         header('Location: inventory_list.php?success=created');
         exit;

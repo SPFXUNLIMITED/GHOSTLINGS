@@ -988,3 +988,42 @@ $pdo->exec("
     KEY idx_messages_created_at (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+// Create admin activity log table for key backend audit events
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS admin_activity_log (
+    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id     INT UNSIGNED NULL,
+    user_label  VARCHAR(255) NULL,
+    action_name VARCHAR(150) NOT NULL,
+    details     TEXT NULL,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_admin_activity_created_at (created_at),
+    KEY idx_admin_activity_user_id (user_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+if (!function_exists('log_admin_activity')) {
+  function log_admin_activity(PDO $pdo, ?int $user_id, string $action_name, string $details = '', ?string $fallback_user = null): void {
+    $safe_user_id = $user_id !== null && $user_id > 0 ? $user_id : null;
+    $safe_action = trim($action_name);
+    if ($safe_action === '') {
+      return;
+    }
+
+    $safe_details = trim($details);
+    $safe_user_label = trim((string)$fallback_user);
+
+    $stmt = $pdo->prepare("
+      INSERT INTO admin_activity_log (user_id, user_label, action_name, details)
+      VALUES (?, ?, ?, ?)
+    ");
+    $stmt->execute([
+      $safe_user_id,
+      $safe_user_label !== '' ? mb_substr($safe_user_label, 0, 255) : null,
+      mb_substr($safe_action, 0, 150),
+      $safe_details !== '' ? mb_substr($safe_details, 0, 5000) : null,
+    ]);
+  }
+}

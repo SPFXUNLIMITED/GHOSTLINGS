@@ -123,40 +123,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
        $errors[] = 'Notes must be ' . MAX_NOTES_LENGTH . ' characters or fewer.';
      }
 
-     $date = DateTime::createFromFormat('Y-m-d', $fields['inquiry_date']);
-     if (!$date || $date->format('Y-m-d') !== $fields['inquiry_date']) {
-       $errors[] = 'Please provide a valid inquiry date.';
-     } elseif ($date > new DateTime('now', new DateTimeZone(APP_TZ))) {
-       $errors[] = 'Date of Inquiry cannot be in the future.';
-     }
+    if (!$errors) {
+      if ($edit_id !== null) {
+        // Update existing record
+        $upd = $pdo->prepare(
+          "UPDATE customer_phone_inquiries SET
+             customer_name = ?, company_name = ?, phone_number = ?,
+             email = ?, inquiry_date = ?, notes = ?
+           WHERE id = ?"
+        );
+        $upd->execute([
+          $fields['customer_name'],
+          $fields['company_name'] !== '' ? $fields['company_name'] : null,
+          $fields['phone_number'] !== '' ? $fields['phone_number'] : null,
+          $fields['email'] !== '' ? $fields['email'] : null,
+          $fields['inquiry_date'],
+          $fields['notes'] !== '' ? $fields['notes'] : null,
+          $edit_id,
+        ]);
+        try {
+          $actor_id = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+          if ($actor_id !== null && $actor_id <= 0) {
+            $actor_id = null;
+          }
+          $actor_name = isset($_SESSION['username']) ? trim((string)$_SESSION['username']) : '';
+          $detail = 'Inquiry #' . (int)$edit_id . ' updated for ' . $fields['customer_name'];
+          if ($fields['company_name'] !== '') {
+            $detail .= ' (' . $fields['company_name'] . ')';
+          }
+          log_admin_activity($pdo, $actor_id, 'Customer Inquiry Updated', $detail, $actor_name);
+        } catch (Throwable $e) {
+          // Non-blocking audit log write.
+        }
+        $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
+        header('Location: customer_inquiry_form.php?view=all&updated=1');
+        exit;
+      } else {
+        // Insert new record
+        $created_by = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+        if ($created_by !== null && $created_by <= 0) {
+          $created_by = null;
+        }
 
-     if (!$errors) {
-       if ($edit_id !== null) {
-         // Update existing record
-         $upd = $pdo->prepare(
-           "UPDATE customer_phone_inquiries SET
-              customer_name = ?, company_name = ?, phone_number = ?,
-              email = ?, inquiry_date = ?, notes = ?
-            WHERE id = ?"
-         );
-         $upd->execute([
-           $fields['customer_name'],
-           $fields['company_name'] !== '' ? $fields['company_name'] : null,
-           $fields['phone_number'] !== '' ? $fields['phone_number'] : null,
-           $fields['email'] !== '' ? $fields['email'] : null,
-           $fields['inquiry_date'],
-           $fields['notes'] !== '' ? $fields['notes'] : null,
-           $edit_id,
-         ]);
-         $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
-         header('Location: customer_inquiry_form.php?view=all&updated=1');
-         exit;
-       } else {
-         // Insert new record
-         $created_by = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
-         if ($created_by !== null && $created_by <= 0) {
-           $created_by = null;
-         }
+        $ins = $pdo->prepare(
+          "INSERT INTO customer_phone_inquiries
+             (customer_name, company_name, phone_number, email, inquiry_date, notes, created_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?)"
+        );
+        $ins->execute([
+          $fields['customer_name'],
+          $fields['company_name'] !== '' ? $fields['company_name'] : null,
+          $fields['phone_number'] !== '' ? $fields['phone_number'] : null,
+          $fields['email'] !== '' ? $fields['email'] : null,
+          $fields['inquiry_date'],
+          $fields['notes'] !== '' ? $fields['notes'] : null,
+          $created_by,
+        ]);
+        try {
+          $actor_name = isset($_SESSION['username']) ? trim((string)$_SESSION['username']) : '';
+          $new_id = (int)$pdo->lastInsertId();
+          $detail = 'Inquiry #' . $new_id . ' created for ' . $fields['customer_name'];
+          if ($fields['company_name'] !== '') {
+            $detail .= ' (' . $fields['company_name'] . ')';
+          }
+          log_admin_activity($pdo, $created_by, 'Customer Inquiry Created', $detail, $actor_name);
+        } catch (Throwable $e) {
+          // Non-blocking audit log write.
+        }
 
          $ins = $pdo->prepare(
            "INSERT INTO customer_phone_inquiries
