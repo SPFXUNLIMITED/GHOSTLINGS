@@ -272,7 +272,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $errors[] = 'Supplier information must be 500 characters or fewer.';
     }
     $po_unit_price_amount = validate_po_money($fields['po_unit_price'], 'Unit price', $errors);
-    $po_line_total_amount = validate_po_money($fields['po_line_total'], 'Line total', $errors);
+    $po_line_total_amount = $po_unit_price_amount !== null ? round($po_unit_price_amount * (int)$fields['quantity'], 2) : null;
     if ($fields['po_expected_delivery_date'] === '') {
       $errors[] = 'Expected delivery date is required for purchase orders.';
     } else {
@@ -299,12 +299,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $po_shipping_cost_amount = validate_po_money($fields['po_shipping_cost'], 'Shipping cost', $errors);
     $po_total_amount_amount = validate_po_money($fields['po_total_amount'], 'Total amount', $errors);
-    if ($po_unit_price_amount !== null && $po_line_total_amount !== null) {
-      $expected_line_total = round($po_unit_price_amount * (int)$fields['quantity'], 2);
-      if (abs($po_line_total_amount - $expected_line_total) > PRICE_COMPARISON_TOLERANCE) {
-        $errors[] = 'Line total must equal unit price × quantity (excluding shipping).';
-      }
-    }
   }
 
   if (!$errors) {
@@ -568,8 +562,8 @@ render_alibaba_workflow_banner('create_rfq');
              value="<?= h($fields['po_unit_price']) ?>" />
     </div>
     <div class="po-only">
-      <label>Line Total <span style="color:var(--d)">*</span></label>
-      <input type="number" name="po_line_total" min="0" step="0.01" data-required-on-type="PO"
+      <label>Line Total</label>
+      <input type="number" name="po_line_total" min="0" step="0.01" readonly
              value="<?= h($fields['po_line_total']) ?>" />
     </div>
     <div class="po-only">
@@ -781,6 +775,24 @@ render_alibaba_workflow_banner('create_rfq');
       requestTypeField.addEventListener('change', toggleSections);
     }
     toggleSections();
+
+    // Auto-calculate Line Total = Unit Price × Quantity
+    var unitPriceField = document.querySelector('input[name="po_unit_price"]');
+    var lineTotalField = document.querySelector('input[name="po_line_total"]');
+    var quantityField  = document.querySelector('input[name="quantity"]');
+    function recalcLineTotal() {
+      if (!unitPriceField || !lineTotalField || !quantityField) return;
+      var price = parseFloat(unitPriceField.value);
+      var qty   = parseInt(quantityField.value, 10);
+      if (!isNaN(price) && !isNaN(qty) && qty > 0) {
+        lineTotalField.value = (price * qty).toFixed(2);
+      } else {
+        lineTotalField.value = '';
+      }
+    }
+    if (unitPriceField) unitPriceField.addEventListener('input', recalcLineTotal);
+    if (quantityField)  quantityField.addEventListener('input', recalcLineTotal);
+    recalcLineTotal();
   })();
 </script>
 
