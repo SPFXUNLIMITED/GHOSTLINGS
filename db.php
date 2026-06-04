@@ -52,9 +52,14 @@ function app_settings_crypto_key(): string {
   if ($raw === '') {
     $generated_key = bin2hex(random_bytes(32));
     $pdo->prepare(
-      "INSERT IGNORE INTO integration_settings (setting_key, setting_val, is_encrypted)
-       VALUES ('app_settings_encryption_key', ?, 0)"
-    )->execute([$generated_key]);
+      "INSERT INTO integration_settings (setting_key, setting_val, is_encrypted)
+       VALUES ('app_settings_encryption_key', ?, 0)
+       ON DUPLICATE KEY UPDATE
+         setting_val = CASE
+           WHEN setting_val IS NULL OR TRIM(setting_val) = '' THEN ?
+           ELSE setting_val
+         END"
+    )->execute([$generated_key, $generated_key]);
 
     $stmt = $pdo->prepare("SELECT setting_val FROM integration_settings WHERE setting_key = 'app_settings_encryption_key' LIMIT 1");
     $stmt->execute();
