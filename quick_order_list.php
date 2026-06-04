@@ -237,7 +237,7 @@ if ($show_all) {
     "SELECT cpi.*, u.username AS created_by_username
      FROM customer_phone_inquiries cpi
      LEFT JOIN users u ON u.id = cpi.created_by
-    ORDER BY FIELD(cpi.status, 'pending', 'urgent', 'critical', 'ordered'), cpi.inquiry_date DESC, cpi.id DESC
+    ORDER BY FIELD(cpi.status, 'critical', 'urgent', 'pending', 'ordered'), cpi.inquiry_date DESC, cpi.id DESC
      LIMIT 200"
   );
   $inquiries = $stmt->fetchAll();
