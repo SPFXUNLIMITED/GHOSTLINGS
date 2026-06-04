@@ -4,7 +4,9 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_admin_or_moderator();
 
-const HUBSPOT_SYNC_MAX_PAGES = 50;
+const HUBSPOT_SYNC_PAGE_LIMIT = 50;
+const HUBSPOT_SYNC_TIMEOUT_SECONDS = 20;
+const HUBSPOT_UNKNOWN_CUSTOMER_NAME = 'Unknown';
 
 if (empty($_SESSION['customers_sync_csrf'])) {
   $_SESSION['customers_sync_csrf'] = bin2hex(random_bytes(24));
@@ -25,7 +27,7 @@ function hubspot_contact_name(array $props): string {
   $full = trim($first . ' ' . $last);
   if ($full !== '') return $full;
   $email = trim((string)($props['email'] ?? ''));
-  return $email !== '' ? $email : 'Unknown';
+  return $email !== '' ? $email : HUBSPOT_UNKNOWN_CUSTOMER_NAME;
 }
 
 function hubspot_to_datetime(?string $value): ?string {
@@ -62,11 +64,11 @@ function sync_customers_from_hubspot(PDO $pdo): array {
 
   $synced = 0;
   $pages = 0;
-  while ($url !== null) {
+  while ($url !== null && $pages < HUBSPOT_SYNC_PAGE_LIMIT) {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
       CURLOPT_RETURNTRANSFER => true,
-      CURLOPT_TIMEOUT => 20,
+      CURLOPT_TIMEOUT => HUBSPOT_SYNC_TIMEOUT_SECONDS,
       CURLOPT_HTTPHEADER => [
         'Authorization: Bearer ' . $token,
         'Content-Type: application/json',
@@ -123,10 +125,12 @@ function sync_customers_from_hubspot(PDO $pdo): array {
       ? 'https://api.hubapi.com/crm/v3/objects/contacts?limit=100&after=' . urlencode((string)$next_after) . '&properties=firstname,lastname,company,phone,email,lastmodifieddate'
       : null;
     $pages++;
-    if ($pages >= HUBSPOT_SYNC_MAX_PAGES) break;
   }
 
-  return ['synced' => $synced];
+  return [
+    'synced' => $synced,
+    'partial' => $url !== null,
+  ];
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -137,6 +141,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
       $result = sync_customers_from_hubspot($pdo);
       $success = 'HubSpot sync complete. Synced ' . (int)$result['synced'] . ' customer(s).';
+      if (!empty($result['partial'])) {
+        $success .= ' Page limit reached; click sync again to continue importing remaining contacts.';
+      }
       $_SESSION['customers_sync_csrf'] = bin2hex(random_bytes(24));
     } catch (Throwable $e) {
       $errors[] = $e->getMessage();
