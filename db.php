@@ -595,6 +595,13 @@ try {
   // Ignore – column may already be nullable.
 }
 
+// Allow rfq_orders to be created without a linked RFQ (standalone new purchase orders).
+try {
+  $pdo->exec("ALTER TABLE rfq_orders MODIFY rfq_request_id INT UNSIGNED NULL");
+} catch (PDOException $e) {
+  // Ignore – column may already be nullable.
+}
+
 // Migrate rfq_orders.order_status from legacy values to Alibaba 13-stage workflow values.
 $pdo->exec("ALTER TABLE rfq_orders MODIFY COLUMN order_status {$rfq_order_status_enum_with_legacy} NOT NULL DEFAULT 'create_rfq'");
 $pdo->exec("

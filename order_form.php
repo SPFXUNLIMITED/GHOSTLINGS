@@ -221,10 +221,8 @@ if (!$order && $source_quote && (string)($source_quote['request_status'] ?? '') 
   exit;
 }
 
-if (!$order && !$source_quote && !$direct_po_rfq) {
-  header('Location: order_tracker.php');
-  exit;
-}
+// When accessed directly with no order_id or rfq_id, show a blank new purchase order form at Step 5.
+$standalone_new_po = (!$order && !$source_quote && !$direct_po_rfq);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
@@ -391,7 +389,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
           );
           $insert->execute([
-            $rfq_id,
+            $rfq_id > 0 ? $rfq_id : null,
             $quote_id > 0 ? $quote_id : null,
             $order_status,
             normalize_nullable_text($order_date),
@@ -431,14 +429,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           record_order_stage_history($pdo, $saved_order_id, $previous_status, $order_status, (int)current_user_id());
         }
 
-        if ($is_new_order) {
+        if ($is_new_order && $rfq_id > 0) {
           // Only the first conversion to a purchase order should move the parent RFQ into ordered status.
           $rfq_status_update = $pdo->prepare("UPDATE rfq_requests SET request_status = 'ordered' WHERE id = ? AND request_status NOT IN ('ordered', 'closed')");
           $rfq_status_update->execute([$rfq_id]);
         }
 
         $pdo->commit();
-        header('Location: sourcing_rfq_submitted.php?rfq_id=' . (int)$saved_order_id);
+        if ($rfq_id > 0) {
+          header('Location: sourcing_rfq_submitted.php?rfq_id=' . (int)$saved_order_id);
+        } else {
+          header('Location: order_form.php?order_id=' . (int)$saved_order_id . '&saved=1');
+        }
         exit;
       } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
@@ -453,8 +455,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $order = array_merge($order ?? [], [
       'id' => $order['id'] ?? 0,
-      'rfq_request_id' => $rfq_id,
-      'rfq_quote_id' => $quote_id,
+      'rfq_request_id' => $rfq_id > 0 ? $rfq_id : null,
+      'rfq_quote_id' => $quote_id > 0 ? $quote_id : null,
       'request_title' => $order['request_title'] ?? ($source_quote['request_title'] ?? ''),
       'po_number' => $order['po_number'] ?? '',
       'order_status' => $order_status,
@@ -573,6 +575,42 @@ if (!$order && $direct_po_rfq) {
     'notes'                    => '',
   ];
 }
+
+if ($standalone_new_po) {
+  $order = [
+    'id'                       => 0,
+    'rfq_request_id'           => null,
+    'rfq_quote_id'             => null,
+    'request_title'            => '',
+    'po_number'                => PENDING_PO_NUMBER_PLACEHOLDER,
+    'order_status'             => 'send_purchase_order',
+    'order_date'               => date('Y-m-d'),
+    'expected_ready_date'      => '',
+    'expected_ship_date'       => '',
+    'supplier_name'            => '',
+    'model_name'               => '',
+    'sku'                      => '',
+    'quantity'                 => '1',
+    'unit_price'               => '',
+    'order_total'              => '',
+    'currency'                 => 'USD',
+    'deposit_percent'          => number_format(DEFAULT_DEPOSIT_PERCENT, 2, '.', ''),
+    'deposit_amount'           => '',
+    'balance_amount'           => '',
+    'payment_terms'            => format_percentage_label(DEFAULT_DEPOSIT_PERCENT) . '% deposit, ' . format_percentage_label(100 - DEFAULT_DEPOSIT_PERCENT) . '% balance before shipment',
+    'incoterm'                 => '',
+    'shipping_method'          => '',
+    'shipping_origin'          => '',
+    'destination_port'         => '',
+    'destination_address'      => '',
+    'production_lead_time_days'=> '',
+    'trade_assurance_order_no' => '',
+    'proforma_invoice_no'      => '',
+    'warranty_terms'           => '',
+    'included_accessories'     => '',
+    'notes'                    => '',
+  ];
+}
 $current_order_status = (string)order_value($order ?? [], 'order_status', 'create_rfq');
 
 render_header('Purchase Order Form');
@@ -596,7 +634,7 @@ if (($order['id'] ?? 0) > 0) {
     <div class="page-header-body">
       <h1 style="margin:0;">Purchase Order</h1>
       <p class="muted" style="margin:6px 0 0 0;">
-        <?= h((string)($order['po_number'] ?? PENDING_PO_NUMBER_PLACEHOLDER)) ?> · RFQ #<?= (int)$rfq_id ?>
+        <?= h((string)($order['po_number'] ?? PENDING_PO_NUMBER_PLACEHOLDER)) ?><?php if ($rfq_id > 0): ?> · RFQ #<?= (int)$rfq_id ?><?php endif; ?>
         <?php if ($quote_id > 0): ?> · Quote #<?= (int)$quote_id ?><?php endif; ?>
       </p>
     </div>
@@ -604,7 +642,7 @@ if (($order['id'] ?? 0) > 0) {
       <a class="btn" href="order_tracker.php">Order Tracker</a>
       <?php if ($quote_id > 0): ?>
         <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$rfq_id ?>">Back to RFQ Quotes</a>
-      <?php else: ?>
+      <?php elseif ($rfq_id > 0): ?>
         <a class="btn" href="sourcing_rfq_submitted.php?rfq_id=<?= (int)$rfq_id ?>">← Back to PO Submitted</a>
       <?php endif; ?>
     </div>
