@@ -116,7 +116,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'integrations') {
           ? 'HubSpot token removed.'
           : 'HubSpot token saved securely.';
       } catch (Throwable $e) {
-        $integrations_errors[] = 'Unable to save token. Please ensure APP_SETTINGS_ENCRYPTION_KEY is configured.';
+        error_log('Integrations token save failed: ' . $e->getMessage());
+        $integrations_errors[] = 'Unable to save token right now. Please try again. If this continues, check server error logs.';
       }
     }
   }
@@ -138,6 +139,13 @@ if ($section === 'canned_responses') {
 }
 
 if ($section === 'integrations') {
+  try {
+    app_settings_crypto_key();
+  } catch (Throwable $e) {
+    error_log('Integrations encryption initialization failed: ' . $e->getMessage());
+    $integrations_errors[] = 'Unable to initialize secure encryption for integration settings.';
+  }
+
   $row = $pdo->prepare(
     "SELECT setting_val, updated_at
      FROM integration_settings
