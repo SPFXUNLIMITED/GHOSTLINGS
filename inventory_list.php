@@ -11,9 +11,12 @@ $pdo->exec("
     item_name          VARCHAR(255) NOT NULL,
     description        TEXT NULL,
     category           ENUM('Machine','Part','Consumable') NOT NULL DEFAULT 'Part',
-    supplier           VARCHAR(255) NOT NULL DEFAULT '',
-    amazon_purchase_link VARCHAR(1000) NULL,
-    alibaba_purchase_link VARCHAR(1000) NULL,
+    supplier_1_name    VARCHAR(255) NOT NULL DEFAULT '',
+    supplier_1_url     VARCHAR(1000) NULL,
+    supplier_2_name    VARCHAR(255) NOT NULL DEFAULT '',
+    supplier_2_url     VARCHAR(1000) NULL,
+    supplier_3_name    VARCHAR(255) NOT NULL DEFAULT '',
+    supplier_3_url     VARCHAR(1000) NULL,
     cost_price         DECIMAL(12,2) NULL,
     retail_price       DECIMAL(12,2) NULL,
     wholesale_price    DECIMAL(12,2) NULL,
@@ -33,8 +36,12 @@ $pdo->exec("
 ");
 
 foreach ([
-  "ALTER TABLE inventory_items ADD COLUMN amazon_purchase_link VARCHAR(1000) NULL AFTER supplier",
-  "ALTER TABLE inventory_items ADD COLUMN alibaba_purchase_link VARCHAR(1000) NULL AFTER amazon_purchase_link",
+  "ALTER TABLE inventory_items ADD COLUMN supplier_1_name VARCHAR(255) NOT NULL DEFAULT '' AFTER category",
+  "ALTER TABLE inventory_items ADD COLUMN supplier_1_url VARCHAR(1000) NULL AFTER supplier_1_name",
+  "ALTER TABLE inventory_items ADD COLUMN supplier_2_name VARCHAR(255) NOT NULL DEFAULT '' AFTER supplier_1_url",
+  "ALTER TABLE inventory_items ADD COLUMN supplier_2_url VARCHAR(1000) NULL AFTER supplier_2_name",
+  "ALTER TABLE inventory_items ADD COLUMN supplier_3_name VARCHAR(255) NOT NULL DEFAULT '' AFTER supplier_2_url",
+  "ALTER TABLE inventory_items ADD COLUMN supplier_3_url VARCHAR(1000) NULL AFTER supplier_3_name",
 ] as $sql) {
   try {
     $pdo->exec($sql);
@@ -42,6 +49,28 @@ foreach ([
     if ($e->getCode() !== '42S21') {
       throw $e;
     }
+  }
+}
+
+try {
+  $pdo->exec("
+    UPDATE inventory_items
+    SET
+      supplier_1_name = CASE
+        WHEN supplier_1_name = '' THEN COALESCE(supplier, '')
+        ELSE supplier_1_name
+      END,
+      supplier_1_url = CASE
+        WHEN (supplier_1_url IS NULL OR supplier_1_url = '')
+          THEN COALESCE(NULLIF(amazon_purchase_link, ''), NULLIF(alibaba_purchase_link, ''))
+        ELSE supplier_1_url
+      END
+    WHERE
+      supplier_1_name = '' OR supplier_1_url IS NULL OR supplier_1_url = ''
+  ");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S22') {
+    throw $e;
   }
 }
 
@@ -128,7 +157,8 @@ if ($q !== '') {
   $like = '%' . $q . '%';
   $stmt = $pdo->prepare("
     SELECT
-      id, part_number, item_name, description, category, supplier,
+      id, part_number, item_name, description, category,
+      supplier_1_name, supplier_1_url, supplier_2_name, supplier_2_url, supplier_3_name, supplier_3_url,
       cost_price, retail_price, wholesale_price, minimum_price,
       current_stock, low_stock_alert, location,
       image_original_name, image_stored_name, image_mime_type
@@ -136,15 +166,18 @@ if ($q !== '') {
     WHERE part_number LIKE ?
        OR item_name LIKE ?
        OR category LIKE ?
-       OR supplier LIKE ?
+       OR supplier_1_name LIKE ?
+       OR supplier_2_name LIKE ?
+       OR supplier_3_name LIKE ?
        OR location LIKE ?
     ORDER BY item_name ASC, id DESC
   ");
-  $stmt->execute([$like, $like, $like, $like, $like]);
+  $stmt->execute([$like, $like, $like, $like, $like, $like, $like]);
 } else {
   $stmt = $pdo->query("
     SELECT
-      id, part_number, item_name, description, category, supplier,
+      id, part_number, item_name, description, category,
+      supplier_1_name, supplier_1_url, supplier_2_name, supplier_2_url, supplier_3_name, supplier_3_url,
       cost_price, retail_price, wholesale_price, minimum_price,
       current_stock, low_stock_alert, location,
       image_original_name, image_stored_name, image_mime_type
@@ -274,7 +307,7 @@ render_header('Inventory List');
 
 <div class="card">
   <form method="get" action="inventory_list.php" class="row" style="margin-bottom:4px;">
-    <input type="text" name="q" value="<?= h($q) ?>" placeholder="Search by part #, name, category, supplier, or location…" style="max-width:420px;" />
+    <input type="text" name="q" value="<?= h($q) ?>" placeholder="Search by part #, name, category, suppliers, or location…" style="max-width:420px;" />
     <button type="submit" class="btn">Search</button>
     <?php if ($q !== ''): ?><a class="btn" href="inventory_list.php">Clear</a><?php endif; ?>
   </form>
@@ -292,7 +325,7 @@ render_header('Inventory List');
         <th>Image</th>
         <th>Part # / Name</th>
         <th>Category</th>
-        <th>Supplier</th>
+        <th>Suppliers</th>
         <th>Cost</th>
         <th>Retail</th>
         <th>Wholesale</th>
@@ -333,7 +366,29 @@ render_header('Inventory List');
             <?php endif; ?>
           </td>
           <td><?= h((string)$item['category']) ?></td>
-          <td><?= $item['supplier'] !== '' ? h((string)$item['supplier']) : '<span class="muted">—</span>' ?></td>
+          <td>
+            <?php
+              $supplier_rows = [];
+              for ($supplier_number = 1; $supplier_number <= 3; $supplier_number++) {
+                $supplier_name = trim((string)($item['supplier_' . $supplier_number . '_name'] ?? ''));
+                $supplier_url = trim((string)($item['supplier_' . $supplier_number . '_url'] ?? ''));
+                if ($supplier_name === '' && $supplier_url === '') {
+                  continue;
+                }
+                if ($supplier_url !== '') {
+                  $supplier_label = $supplier_name !== '' ? $supplier_name : $supplier_url;
+                  $supplier_rows[] = '<a href="' . h($supplier_url) . '" target="_blank" rel="noopener noreferrer">' . h($supplier_label) . '</a>';
+                } else {
+                  $supplier_rows[] = h($supplier_name);
+                }
+              }
+            ?>
+            <?php if ($supplier_rows): ?>
+              <?= implode('<br />', $supplier_rows) ?>
+            <?php else: ?>
+              <span class="muted">—</span>
+            <?php endif; ?>
+          </td>
           <td class="inventory-price"><?= h(fmt_money($item['cost_price'])) ?></td>
           <td class="inventory-price"><?= h(fmt_money($item['retail_price'])) ?></td>
           <td class="inventory-price"><?= h(fmt_money($item['wholesale_price'])) ?></td>
