@@ -25,16 +25,18 @@ function hubspot_token(): string {
 }
 
 function app_env_value(string $key): string {
-  $value = getenv($key);
-  if (is_string($value)) {
-    $value = trim($value);
+  $candidates = [
+    getenv($key),
+    $_ENV[$key] ?? null,
+    $_SERVER[$key] ?? null,
+  ];
+
+  foreach ($candidates as $candidate) {
+    $value = trim((string)$candidate);
     if ($value !== '') return $value;
   }
 
-  $from_env = trim((string)($_ENV[$key] ?? ''));
-  if ($from_env !== '') return $from_env;
-
-  return trim((string)($_SERVER[$key] ?? ''));
+  return '';
 }
 
 function hubspot_contact_names(array $props): array {
