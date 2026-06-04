@@ -6,18 +6,16 @@ require_login();
 
 const MAX_NOTES_LENGTH = 10000;
 const INQUIRY_STATUS_OPTIONS = [
-  'new' => 'New',
-  'in_progress' => 'In Progress',
-  'purchased' => 'Purchased',
-  'completed' => 'Completed',
-  'archived' => 'Archived',
+  'pending'  => 'Pending',
+  'urgent'   => 'Urgent',
+  'critical' => 'Critical',
+  'ordered'  => 'Ordered',
 ];
 const INQUIRY_STATUS_BADGES = [
-  'new' => ['#dbeafe', '#1e40af'],
-  'in_progress' => ['#fef3c7', '#92400e'],
-  'purchased' => ['#e9d5ff', '#6b21a8'],
-  'completed' => ['#dcfce7', '#166534'],
-  'archived' => ['#e5e7eb', '#374151'],
+  'pending'  => ['#fef9c3', '#854d0e'],
+  'urgent'   => ['#ffedd5', '#9a3412'],
+  'critical' => ['#fee2e2', '#991b1b'],
+  'ordered'  => ['#dcfce7', '#166534'],
 ];
 const INQUIRY_TABLE_COLUMN_COUNT = 7;
 
@@ -237,7 +235,7 @@ if ($show_all) {
     "SELECT cpi.*, u.username AS created_by_username
      FROM customer_phone_inquiries cpi
      LEFT JOIN users u ON u.id = cpi.created_by
-     ORDER BY FIELD(cpi.status, 'new', 'in_progress', 'purchased', 'completed', 'archived'), cpi.inquiry_date DESC, cpi.id DESC
+    ORDER BY FIELD(cpi.status, 'pending', 'urgent', 'critical', 'ordered'), cpi.inquiry_date DESC, cpi.id DESC
      LIMIT 200"
   );
   $inquiries = $stmt->fetchAll();
@@ -270,11 +268,11 @@ if ($show_detail) {
     exit;
   }
 }
-render_header('Quick Order Form');
+render_header('Quick Order List');
 ?>
 
 <div class="card">
-  <h1 style="margin:0;">Quick Order Form</h1>
+  <h1 style="margin:0;">Quick Order List</h1>
   <p class="muted" style="margin:6px 0 0;">Log quick orders with contact details and notes.</p>
 </div>
 
@@ -303,8 +301,8 @@ render_header('Quick Order Form');
     </div>
   <?php endif; ?>
   <?php
-    $detail_status = (string)($detail_inquiry['status'] ?? 'new');
-    [$detail_badge_bg, $detail_badge_color] = INQUIRY_STATUS_BADGES[$detail_status] ?? ['#e5e7eb', '#374151'];
+    $detail_status = (string)($detail_inquiry['status'] ?? 'pending');
+    [$detail_badge_bg, $detail_badge_color] = INQUIRY_STATUS_BADGES[$detail_status] ?? ['#fef9c3', '#854d0e'];
     $detail_created_at_text = !empty($detail_inquiry['created_at']) ? ' • Created ' . (string)$detail_inquiry['created_at'] : '';
   ?>
   <div class="card">
@@ -324,7 +322,7 @@ render_header('Quick Order Form');
     <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px;">
       <h3 style="margin:0;">Quick Order Details</h3>
       <span style="display:inline-flex; align-items:center; border-radius:999px; padding:6px 12px; font-weight:600; background:<?= h($detail_badge_bg) ?>; color:<?= h($detail_badge_color) ?>;">
-        <?= h(INQUIRY_STATUS_OPTIONS[$detail_status] ?? 'New') ?>
+        <?= h(INQUIRY_STATUS_OPTIONS[$detail_status] ?? 'Pending') ?>
       </span>
     </div>
     <table>
@@ -421,11 +419,15 @@ render_header('Quick Order Form');
             <tr>
               <td style="white-space:nowrap;"><?= h($inquiry['inquiry_date']) ?></td>
               <td style="white-space:nowrap;">
+                <?php
+                  [$sb_bg, $sb_color] = INQUIRY_STATUS_BADGES[$status_key] ?? ['#fef9c3', '#854d0e'];
+                ?>
                 <form method="post" style="display:flex; gap:8px; align-items:center; margin:0;">
                   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quick_order_csrf']) ?>" />
                   <input type="hidden" name="action" value="status" />
                   <input type="hidden" name="row_id" value="<?= (int)$inquiry['id'] ?>" />
-                  <select name="status" aria-label="Status for inquiry dated <?= h($inquiry['inquiry_date']) ?>" style="min-width:150px;">
+                  <span class="qo-status-dot" style="display:inline-block; width:12px; height:12px; border-radius:50%; flex-shrink:0; background:<?= h($sb_color) ?>;"></span>
+                  <select name="status" aria-label="Status for inquiry dated <?= h($inquiry['inquiry_date']) ?>" style="min-width:130px; font-weight:600; background:<?= h($sb_bg) ?>; color:<?= h($sb_color) ?>; border-color:<?= h($sb_color) ?>;" onchange="qoSyncStatus(this)">
                     <?php foreach (INQUIRY_STATUS_OPTIONS as $option_key => $option_label): ?>
                       <option value="<?= h($option_key) ?>" <?= ($status_key === $option_key) ? 'selected' : '' ?>><?= h($option_label) ?></option>
                     <?php endforeach; ?>
@@ -486,4 +488,18 @@ render_header('Quick Order Form');
   </form>
 <?php endif; ?>
 
+<?php if ($show_all): ?>
+<script>
+var QO_STATUS_COLORS = <?= json_encode(array_map(fn($v) => ['bg' => $v[0], 'fg' => $v[1]], INQUIRY_STATUS_BADGES), JSON_UNESCAPED_UNICODE) ?>;
+function qoSyncStatus(sel) {
+  var c = QO_STATUS_COLORS[sel.value];
+  if (!c) return;
+  sel.style.background   = c.bg;
+  sel.style.color        = c.fg;
+  sel.style.borderColor  = c.fg;
+  var dot = sel.parentElement.querySelector('.qo-status-dot');
+  if (dot) dot.style.background = c.fg;
+}
+</script>
+<?php endif; ?>
 <?php render_footer(); ?>
