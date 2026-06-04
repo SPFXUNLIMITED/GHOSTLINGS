@@ -21,10 +21,7 @@ const INQUIRY_STATUS_BADGES = [
 ];
 const INQUIRY_TABLE_COLUMN_COUNT = 7;
 
-function customer_inquiry_status_redirect_url(int $row_id, string $redirect_view): string {
-  if ($redirect_view === 'detail' && $row_id > 0) {
-    return 'customer_inquiry_form.php?view=id&id=' . $row_id . '&status_updated=1';
-  }
+function customer_inquiry_status_redirect_url(): string {
   return 'customer_inquiry_form.php?view=all&status_updated=1';
 }
 
@@ -95,11 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $post_action = (string)($_POST['action'] ?? 'save');
   $should_process_form_save = $post_action === 'save';
   $post_row_id = (int)($_POST['row_id'] ?? 0);
-  $redirect_view = (string)($_POST['redirect_view'] ?? 'all');
-  $show_detail = $post_action === 'status' && $redirect_view === 'detail' && $post_row_id > 0;
-  if ($show_detail) {
-    $detail_id = $post_row_id;
-  }
+  $show_detail = false;
   $show_all = !$show_detail && ($post_action === 'status' || $post_action === 'delete');
   $saved = false;
   $updated = false;
@@ -118,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $upd = $pdo->prepare("UPDATE customer_phone_inquiries SET status = ? WHERE id = ?");
         $upd->execute([$next_status, $row_id]);
         $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
-        header('Location: ' . customer_inquiry_status_redirect_url($row_id, $redirect_view));
+        header('Location: ' . customer_inquiry_status_redirect_url());
         exit;
       }
     } elseif ($post_action === 'delete') {
@@ -374,25 +367,7 @@ render_header('Customer Inquiry Log');
   </div>
 
   <div class="card">
-    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap;">
-      <div style="flex:1 1 320px;">
-        <h3 style="margin-top:0;">Manage Inquiry</h3>
-        <form method="post" style="display:flex; gap:10px; align-items:end; flex-wrap:wrap; margin:0;">
-          <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customer_inquiry_csrf']) ?>" />
-          <input type="hidden" name="action" value="status" />
-          <input type="hidden" name="row_id" value="<?= (int)$detail_inquiry['id'] ?>" />
-          <input type="hidden" name="redirect_view" value="detail" />
-          <div>
-            <label for="status">Status</label>
-            <select id="status" name="status" style="min-width:180px;">
-              <?php foreach (INQUIRY_STATUS_OPTIONS as $status_key => $status_label): ?>
-                <option value="<?= h($status_key) ?>" <?= ($detail_status === $status_key) ? 'selected' : '' ?>><?= h($status_label) ?></option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-          <button type="submit" class="btn">Update Status</button>
-        </form>
-      </div>
+    <div style="display:flex; justify-content:flex-end; align-items:flex-start; gap:14px; flex-wrap:wrap;">
       <div style="flex:0 0 auto;">
         <form method="post" onsubmit="return confirm('Delete this inquiry? This cannot be undone.');">
           <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customer_inquiry_csrf']) ?>" />
@@ -449,9 +424,17 @@ render_header('Customer Inquiry Log');
             <tr>
               <td style="white-space:nowrap;"><?= h($inquiry['inquiry_date']) ?></td>
               <td style="white-space:nowrap;">
-                <span style="display:inline-flex; align-items:center; border-radius:999px; padding:6px 12px; font-weight:600; background:<?= h($badge_bg) ?>; color:<?= h($badge_color) ?>;">
-                  <?= h(INQUIRY_STATUS_OPTIONS[$status_key] ?? 'New') ?>
-                </span>
+                <form method="post" style="display:flex; gap:8px; align-items:center; margin:0;">
+                  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customer_inquiry_csrf']) ?>" />
+                  <input type="hidden" name="action" value="status" />
+                  <input type="hidden" name="row_id" value="<?= (int)$inquiry['id'] ?>" />
+                  <select name="status" style="min-width:150px; background:<?= h($badge_bg) ?>; color:<?= h($badge_color) ?>; font-weight:600;">
+                    <?php foreach (INQUIRY_STATUS_OPTIONS as $option_key => $option_label): ?>
+                      <option value="<?= h($option_key) ?>" <?= ($status_key === $option_key) ? 'selected' : '' ?>><?= h($option_label) ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                  <button type="submit" class="btn">Save</button>
+                </form>
               </td>
               <td><?= h($inquiry['customer_name']) ?></td>
               <td><?= h($inquiry['phone_number'] ?: '—') ?></td>
