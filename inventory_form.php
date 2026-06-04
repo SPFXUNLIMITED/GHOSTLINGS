@@ -15,9 +15,12 @@ $pdo->exec("
     item_name          VARCHAR(255) NOT NULL,
     description        TEXT NULL,
     category           ENUM('Machine','Part','Consumable') NOT NULL DEFAULT 'Part',
-    supplier           VARCHAR(255) NOT NULL DEFAULT '',
-    amazon_purchase_link VARCHAR(1000) NULL,
-    alibaba_purchase_link VARCHAR(1000) NULL,
+    supplier_1_name    VARCHAR(255) NOT NULL DEFAULT '',
+    supplier_1_url     VARCHAR(1000) NULL,
+    supplier_2_name    VARCHAR(255) NOT NULL DEFAULT '',
+    supplier_2_url     VARCHAR(1000) NULL,
+    supplier_3_name    VARCHAR(255) NOT NULL DEFAULT '',
+    supplier_3_url     VARCHAR(1000) NULL,
     cost_price         DECIMAL(12,2) NULL,
     retail_price       DECIMAL(12,2) NULL,
     wholesale_price    DECIMAL(12,2) NULL,
@@ -37,8 +40,12 @@ $pdo->exec("
 ");
 
 foreach ([
-  "ALTER TABLE inventory_items ADD COLUMN amazon_purchase_link VARCHAR(1000) NULL AFTER supplier",
-  "ALTER TABLE inventory_items ADD COLUMN alibaba_purchase_link VARCHAR(1000) NULL AFTER amazon_purchase_link",
+  "ALTER TABLE inventory_items ADD COLUMN supplier_1_name VARCHAR(255) NOT NULL DEFAULT '' AFTER category",
+  "ALTER TABLE inventory_items ADD COLUMN supplier_1_url VARCHAR(1000) NULL AFTER supplier_1_name",
+  "ALTER TABLE inventory_items ADD COLUMN supplier_2_name VARCHAR(255) NOT NULL DEFAULT '' AFTER supplier_1_url",
+  "ALTER TABLE inventory_items ADD COLUMN supplier_2_url VARCHAR(1000) NULL AFTER supplier_2_name",
+  "ALTER TABLE inventory_items ADD COLUMN supplier_3_name VARCHAR(255) NOT NULL DEFAULT '' AFTER supplier_2_url",
+  "ALTER TABLE inventory_items ADD COLUMN supplier_3_url VARCHAR(1000) NULL AFTER supplier_3_name",
 ] as $sql) {
   try {
     $pdo->exec($sql);
@@ -46,6 +53,28 @@ foreach ([
     if ($e->getCode() !== '42S21') {
       throw $e;
     }
+  }
+}
+
+try {
+  $pdo->exec("
+    UPDATE inventory_items
+    SET
+      supplier_1_name = CASE
+        WHEN supplier_1_name = '' THEN COALESCE(supplier, '')
+        ELSE supplier_1_name
+      END,
+      supplier_1_url = CASE
+        WHEN (supplier_1_url IS NULL OR supplier_1_url = '')
+          THEN COALESCE(NULLIF(amazon_purchase_link, ''), NULLIF(alibaba_purchase_link, ''))
+        ELSE supplier_1_url
+      END
+    WHERE
+      supplier_1_name = '' OR supplier_1_url IS NULL OR supplier_1_url = ''
+  ");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S22') {
+    throw $e;
   }
 }
 
@@ -194,9 +223,12 @@ $fields = [
   'item_name' => '',
   'description' => '',
   'category' => 'Part',
-  'supplier' => '',
-  'amazon_purchase_link' => '',
-  'alibaba_purchase_link' => '',
+  'supplier_1_name' => '',
+  'supplier_1_url' => '',
+  'supplier_2_name' => '',
+  'supplier_2_url' => '',
+  'supplier_3_name' => '',
+  'supplier_3_url' => '',
   'cost_price' => '',
   'retail_price' => '',
   'wholesale_price' => '',
@@ -215,8 +247,8 @@ $image_mime_type = null;
 if ($is_edit) {
   $stmt = $pdo->prepare("
     SELECT
-      id, part_number, item_name, description, category, supplier,
-      amazon_purchase_link, alibaba_purchase_link,
+      id, part_number, item_name, description, category,
+      supplier_1_name, supplier_1_url, supplier_2_name, supplier_2_url, supplier_3_name, supplier_3_url,
       cost_price, retail_price, wholesale_price, minimum_price,
       current_stock, low_stock_alert, location,
       image_original_name, image_stored_name, image_mime_type
@@ -265,14 +297,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_view) {
     if (!in_array($fields['category'], $categories, true)) {
       $errors[] = 'Category is invalid.';
     }
-    if (mb_strlen($fields['supplier']) > 255) {
-      $errors[] = 'Supplier must be 255 characters or fewer.';
+    $supplier_urls = [];
+    for ($supplier_number = 1; $supplier_number <= 3; $supplier_number++) {
+      $supplier_name_key = 'supplier_' . $supplier_number . '_name';
+      $supplier_url_key = 'supplier_' . $supplier_number . '_url';
+      if (mb_strlen($fields[$supplier_name_key]) > 255) {
+        $errors[] = 'Supplier ' . $supplier_number . ' name must be 255 characters or fewer.';
+      }
+      $supplier_urls[$supplier_number] = normalize_optional_url($fields[$supplier_url_key], 'Supplier ' . $supplier_number . ' Link', $errors);
+      if ($supplier_urls[$supplier_number] !== '' && $fields[$supplier_name_key] === '') {
+        $errors[] = 'Supplier ' . $supplier_number . ' name is required when a link is provided.';
+      }
     }
     if (mb_strlen($fields['location']) > 255) {
       $errors[] = 'Location must be 255 characters or fewer.';
     }
-    $amazon_purchase_link = normalize_optional_url($fields['amazon_purchase_link'], 'Amazon Purchase Link', $errors);
-    $alibaba_purchase_link = normalize_optional_url($fields['alibaba_purchase_link'], 'Alibaba Purchase Link', $errors);
 
     $cost_price = parse_money_field($fields['cost_price'], 'Cost Price', $errors);
     $retail_price = parse_money_field($fields['retail_price'], 'Retail Price', $errors);
@@ -355,8 +394,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_view) {
       if ($is_edit) {
         $upd = $pdo->prepare("
           UPDATE inventory_items SET
-            item_name = ?, description = ?, category = ?, supplier = ?,
-            amazon_purchase_link = ?, alibaba_purchase_link = ?,
+            item_name = ?, description = ?, category = ?,
+            supplier_1_name = ?, supplier_1_url = ?, supplier_2_name = ?, supplier_2_url = ?, supplier_3_name = ?, supplier_3_url = ?,
             cost_price = ?, retail_price = ?, wholesale_price = ?, minimum_price = ?,
             current_stock = ?, low_stock_alert = ?, location = ?,
             image_original_name = ?, image_stored_name = ?, image_mime_type = ?
@@ -366,9 +405,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_view) {
           $fields['item_name'],
           $fields['description'] !== '' ? $fields['description'] : null,
           $fields['category'],
-          $fields['supplier'],
-          $amazon_purchase_link !== '' ? $amazon_purchase_link : null,
-          $alibaba_purchase_link !== '' ? $alibaba_purchase_link : null,
+          $fields['supplier_1_name'],
+          $supplier_urls[1] !== '' ? $supplier_urls[1] : null,
+          $fields['supplier_2_name'],
+          $supplier_urls[2] !== '' ? $supplier_urls[2] : null,
+          $fields['supplier_3_name'],
+          $supplier_urls[3] !== '' ? $supplier_urls[3] : null,
           $cost_price,
           $retail_price,
           $wholesale_price,
@@ -405,21 +447,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_view) {
           $placeholder_part_number = 'TEMP-' . bin2hex(random_bytes(12));
           $ins = $pdo->prepare("
             INSERT INTO inventory_items (
-              part_number, item_name, description, category, supplier,
-              amazon_purchase_link, alibaba_purchase_link,
+              part_number, item_name, description, category,
+              supplier_1_name, supplier_1_url, supplier_2_name, supplier_2_url, supplier_3_name, supplier_3_url,
               cost_price, retail_price, wholesale_price, minimum_price,
               current_stock, low_stock_alert, location,
               image_original_name, image_stored_name, image_mime_type
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ");
           $ins->execute([
             $placeholder_part_number,
             $fields['item_name'],
             $fields['description'] !== '' ? $fields['description'] : null,
             $fields['category'],
-            $fields['supplier'],
-            $amazon_purchase_link !== '' ? $amazon_purchase_link : null,
-            $alibaba_purchase_link !== '' ? $alibaba_purchase_link : null,
+            $fields['supplier_1_name'],
+            $supplier_urls[1] !== '' ? $supplier_urls[1] : null,
+            $fields['supplier_2_name'],
+            $supplier_urls[2] !== '' ? $supplier_urls[2] : null,
+            $fields['supplier_3_name'],
+            $supplier_urls[3] !== '' ? $supplier_urls[3] : null,
             $cost_price,
             $retail_price,
             $wholesale_price,
@@ -534,17 +579,32 @@ render_header($page_title);
           <?php endforeach; ?>
         </select>
       </div>
-      <div>
-        <label>Supplier</label>
-        <input type="text" name="supplier" maxlength="255" value="<?= h($fields['supplier']) ?>" <?= $is_view ? 'readonly' : '' ?> />
+      <div class="full">
+        <label>Suppliers</label>
       </div>
       <div>
-        <label>Amazon Purchase Link</label>
-        <input type="url" name="amazon_purchase_link" maxlength="1000" placeholder="https://..." value="<?= h($fields['amazon_purchase_link']) ?>" <?= $is_view ? 'readonly' : '' ?> />
+        <label>Supplier 1</label>
+        <input type="text" name="supplier_1_name" maxlength="255" value="<?= h($fields['supplier_1_name']) ?>" <?= $is_view ? 'readonly' : '' ?> />
       </div>
       <div>
-        <label>Alibaba Purchase Link</label>
-        <input type="url" name="alibaba_purchase_link" maxlength="1000" placeholder="https://..." value="<?= h($fields['alibaba_purchase_link']) ?>" <?= $is_view ? 'readonly' : '' ?> />
+        <label>Supplier 1 Link</label>
+        <input type="url" name="supplier_1_url" maxlength="1000" placeholder="https://..." value="<?= h($fields['supplier_1_url']) ?>" <?= $is_view ? 'readonly' : '' ?> />
+      </div>
+      <div>
+        <label>Supplier 2</label>
+        <input type="text" name="supplier_2_name" maxlength="255" value="<?= h($fields['supplier_2_name']) ?>" <?= $is_view ? 'readonly' : '' ?> />
+      </div>
+      <div>
+        <label>Supplier 2 Link</label>
+        <input type="url" name="supplier_2_url" maxlength="1000" placeholder="https://..." value="<?= h($fields['supplier_2_url']) ?>" <?= $is_view ? 'readonly' : '' ?> />
+      </div>
+      <div>
+        <label>Supplier 3</label>
+        <input type="text" name="supplier_3_name" maxlength="255" value="<?= h($fields['supplier_3_name']) ?>" <?= $is_view ? 'readonly' : '' ?> />
+      </div>
+      <div>
+        <label>Supplier 3 Link</label>
+        <input type="url" name="supplier_3_url" maxlength="1000" placeholder="https://..." value="<?= h($fields['supplier_3_url']) ?>" <?= $is_view ? 'readonly' : '' ?> />
       </div>
       <div>
         <label>Cost Price</label>
@@ -583,18 +643,23 @@ render_header($page_title);
 
     <?php if ($is_view): ?>
       <div style="margin-top:14px;">
-        <div class="muted" style="margin-bottom:6px;">Purchase Links</div>
-        <div style="display:flex; flex-wrap:wrap; gap:8px;">
-          <?php if ($fields['amazon_purchase_link'] !== ''): ?>
-            <a class="btn" href="<?= h($fields['amazon_purchase_link']) ?>" target="_blank" rel="noopener noreferrer">Open Amazon Link</a>
-          <?php else: ?>
-            <span class="muted">Amazon: —</span>
-          <?php endif; ?>
-          <?php if ($fields['alibaba_purchase_link'] !== ''): ?>
-            <a class="btn" href="<?= h($fields['alibaba_purchase_link']) ?>" target="_blank" rel="noopener noreferrer">Open Alibaba Link</a>
-          <?php else: ?>
-            <span class="muted">Alibaba: —</span>
-          <?php endif; ?>
+        <div class="muted" style="margin-bottom:6px;">Supplier Links</div>
+        <div style="display:grid; gap:6px;">
+          <?php for ($supplier_number = 1; $supplier_number <= 3; $supplier_number++): ?>
+            <?php
+              $supplier_name = trim((string)($fields['supplier_' . $supplier_number . '_name'] ?? ''));
+              $supplier_url = trim((string)($fields['supplier_' . $supplier_number . '_url'] ?? ''));
+            ?>
+            <div>
+              <strong>Supplier <?= $supplier_number ?>:</strong>
+              <?= $supplier_name !== '' ? h($supplier_name) : '<span class="muted">—</span>' ?>
+              <?php if ($supplier_url !== ''): ?>
+                &nbsp;<a class="btn" href="<?= h($supplier_url) ?>" target="_blank" rel="noopener noreferrer">Open Link</a>
+              <?php else: ?>
+                <span class="muted">(no link)</span>
+              <?php endif; ?>
+            </div>
+          <?php endfor; ?>
         </div>
       </div>
     <?php endif; ?>
