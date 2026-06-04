@@ -1020,6 +1020,51 @@ if ($cpiOldEnum !== false) {
   $pdo->exec("ALTER TABLE customer_phone_inquiries MODIFY COLUMN status ENUM('pending','urgent','critical','ordered') NOT NULL DEFAULT 'pending'");
 }
 
+// Create quotes table for customer quotes and invoice conversion
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS quotes (
+    id                     INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    customer_id            INT UNSIGNED NULL,
+    customer_name          VARCHAR(255) NOT NULL,
+    company_name           VARCHAR(255) NULL,
+    phone_number           VARCHAR(100) NULL,
+    email                  VARCHAR(255) NULL,
+    quote_date             DATE NOT NULL,
+    status                 ENUM('draft','sent','converted') NOT NULL DEFAULT 'draft',
+    notes                  TEXT NULL,
+    subtotal_amount        DECIMAL(12,2) NOT NULL DEFAULT 0,
+    converted_invoice_no   VARCHAR(100) NULL,
+    converted_at           DATETIME NULL,
+    created_by             INT UNSIGNED NULL,
+    created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_quotes_status (status),
+    KEY idx_quotes_quote_date (quote_date),
+    KEY idx_quotes_created_at (created_at),
+    CONSTRAINT fk_quotes_customer FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE SET NULL,
+    CONSTRAINT fk_quotes_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// Create quote_items table for line items on quotes
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS quote_items (
+    id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    quote_id          INT UNSIGNED NOT NULL,
+    line_position     INT UNSIGNED NOT NULL DEFAULT 1,
+    description       VARCHAR(500) NOT NULL,
+    quantity          DECIMAL(12,2) NOT NULL DEFAULT 1.00,
+    unit_price        DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    line_total        DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_quote_items_quote_id (quote_id),
+    KEY idx_quote_items_line_position (line_position),
+    CONSTRAINT fk_quote_items_quote FOREIGN KEY (quote_id) REFERENCES quotes (id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 // Create shipping_rfq_requests table for freight/shipping quote requests
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS shipping_rfq_requests (

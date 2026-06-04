@@ -482,6 +482,7 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
     <?php render_menu_dropdown('Sourcing', [
       ['href' => 'vendors.php', 'file' => 'vendors.php', 'label' => 'Vendors', 'visible' => true],
       ['href' => 'customers.php', 'file' => 'customers.php', 'label' => 'Customers', 'visible' => true],
+      ['href' => 'quotes.php', 'file' => 'quotes.php', 'label' => 'Quotes', 'visible' => true],
       ['href' => 'freight_forwarders.php', 'file' => 'freight_forwarders.php', 'label' => 'Freight Forwarders', 'visible' => true],
       ['href' => 'sourcing_rfq_form.php', 'file' => 'sourcing_rfq_form.php', 'label' => 'Sourcing RFQ Form', 'visible' => true],
       ['href' => 'sourcing_rfq_tracker.php', 'file' => 'sourcing_rfq_tracker.php', 'label' => 'Sourcing RFQ Tracker', 'visible' => true],
