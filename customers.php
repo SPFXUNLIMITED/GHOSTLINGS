@@ -7,6 +7,8 @@ require_admin_or_moderator();
 const HUBSPOT_SYNC_PAGE_LIMIT = 50;
 const HUBSPOT_SYNC_TIMEOUT_SECONDS = 20;
 const HUBSPOT_UNKNOWN_CUSTOMER_NAME = 'Unknown';
+const HUBSPOT_CONTACT_PROPERTIES = 'firstname,lastname,company,phone,email,lastmodifieddate';
+const HUBSPOT_CONTACTS_API_BASE = 'https://api.hubapi.com/crm/v3/objects/contacts';
 
 if (empty($_SESSION['customers_sync_csrf'])) {
   $_SESSION['customers_sync_csrf'] = bin2hex(random_bytes(24));
@@ -50,7 +52,7 @@ function sync_customers_from_hubspot(PDO $pdo): array {
     throw new RuntimeException('Missing HubSpot token. Set HUBSPOT_PRIVATE_APP_TOKEN or HUBSPOT_ACCESS_TOKEN.');
   }
 
-  $url = 'https://api.hubapi.com/crm/v3/objects/contacts?limit=100&properties=firstname,lastname,company,phone,email,lastmodifieddate';
+  $url = HUBSPOT_CONTACTS_API_BASE . '?limit=100&properties=' . HUBSPOT_CONTACT_PROPERTIES;
   $upsert = $pdo->prepare(
     "INSERT INTO customers (hubspot_contact_id, customer_name, company, phone, email, last_updated)
      VALUES (?, ?, ?, ?, ?, ?)
@@ -122,7 +124,7 @@ function sync_customers_from_hubspot(PDO $pdo): array {
 
     $next_after = $payload['paging']['next']['after'] ?? null;
     $url = $next_after !== null
-      ? 'https://api.hubapi.com/crm/v3/objects/contacts?limit=100&after=' . urlencode((string)$next_after) . '&properties=firstname,lastname,company,phone,email,lastmodifieddate'
+      ? HUBSPOT_CONTACTS_API_BASE . '?limit=100&after=' . urlencode((string)$next_after) . '&properties=' . HUBSPOT_CONTACT_PROPERTIES
       : null;
     $pages++;
   }
