@@ -23,10 +23,36 @@ $fields = [
 
 $show_all = (string)($_GET['view'] ?? '') === 'all';
 $saved = isset($_GET['saved']) && $_GET['saved'] === '1';
+$updated = isset($_GET['updated']) && $_GET['updated'] === '1';
+
+// Load existing record when editing
+$edit_id = null;
+$edit_record = null;
+$raw_edit = $_GET['edit'] ?? $_POST['edit_id'] ?? null;
+if ($raw_edit !== null && (int)$raw_edit > 0) {
+  $edit_id = (int)$raw_edit;
+  $stmt = $pdo->prepare("SELECT * FROM customer_phone_inquiries WHERE id = ?");
+  $stmt->execute([$edit_id]);
+  $edit_record = $stmt->fetch();
+  if (!$edit_record) {
+    $edit_id = null; // record not found, treat as new
+  }
+}
+
+// Pre-fill fields when loading edit form via GET
+if ($edit_record && $_SERVER['REQUEST_METHOD'] === 'GET') {
+  $fields['customer_name'] = (string)($edit_record['customer_name'] ?? '');
+  $fields['company_name']  = (string)($edit_record['company_name'] ?? '');
+  $fields['phone_number']  = (string)($edit_record['phone_number'] ?? '');
+  $fields['email']         = (string)($edit_record['email'] ?? '');
+  $fields['inquiry_date']  = (string)($edit_record['inquiry_date'] ?? $today);
+  $fields['notes']         = (string)($edit_record['notes'] ?? '');
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $show_all = false;
   $saved = false;
+  $updated = false;
   $csrf = (string)($_POST['csrf_token'] ?? '');
   if (!hash_equals((string)$_SESSION['customer_inquiry_csrf'], $csrf)) {
     $errors[] = 'Security token mismatch. Please refresh and try again.';
@@ -65,29 +91,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errors) {
-      $created_by = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
-      if ($created_by !== null && $created_by <= 0) {
-        $created_by = null;
+      if ($edit_id !== null) {
+        // Update existing record
+        $upd = $pdo->prepare(
+          "UPDATE customer_phone_inquiries SET
+             customer_name = ?, company_name = ?, phone_number = ?,
+             email = ?, inquiry_date = ?, notes = ?
+           WHERE id = ?"
+        );
+        $upd->execute([
+          $fields['customer_name'],
+          $fields['company_name'] !== '' ? $fields['company_name'] : null,
+          $fields['phone_number'] !== '' ? $fields['phone_number'] : null,
+          $fields['email'] !== '' ? $fields['email'] : null,
+          $fields['inquiry_date'],
+          $fields['notes'] !== '' ? $fields['notes'] : null,
+          $edit_id,
+        ]);
+        $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
+        header('Location: customer_inquiry_form.php?view=all&updated=1');
+        exit;
+      } else {
+        // Insert new record
+        $created_by = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+        if ($created_by !== null && $created_by <= 0) {
+          $created_by = null;
+        }
+
+        $ins = $pdo->prepare(
+          "INSERT INTO customer_phone_inquiries
+             (customer_name, company_name, phone_number, email, inquiry_date, notes, created_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?)"
+        );
+        $ins->execute([
+          $fields['customer_name'],
+          $fields['company_name'] !== '' ? $fields['company_name'] : null,
+          $fields['phone_number'] !== '' ? $fields['phone_number'] : null,
+          $fields['email'] !== '' ? $fields['email'] : null,
+          $fields['inquiry_date'],
+          $fields['notes'] !== '' ? $fields['notes'] : null,
+          $created_by,
+        ]);
+
+        $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
+        header('Location: customer_inquiry_form.php?saved=1');
+        exit;
       }
-
-      $ins = $pdo->prepare(
-        "INSERT INTO customer_phone_inquiries
-           (customer_name, company_name, phone_number, email, inquiry_date, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?)"
-      );
-      $ins->execute([
-        $fields['customer_name'],
-        $fields['company_name'] !== '' ? $fields['company_name'] : null,
-        $fields['phone_number'] !== '' ? $fields['phone_number'] : null,
-        $fields['email'] !== '' ? $fields['email'] : null,
-        $fields['inquiry_date'],
-        $fields['notes'] !== '' ? $fields['notes'] : null,
-        $created_by,
-      ]);
-
-      $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
-      header('Location: customer_inquiry_form.php?saved=1');
-      exit;
     }
   }
 }
@@ -136,8 +185,13 @@ render_header('Customer Inquiry Log');
       <h2 style="margin:0;">All Customer Inquiries</h2>
       <a class="btn primary" href="customer_inquiry_form.php">New Inquiry</a>
     </div>
+    <?php if ($updated): ?>
+      <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">
+        Inquiry updated successfully.
+      </div>
+    <?php endif; ?>
     <div style="overflow-x:auto;">
-      <table style="min-width:840px;">
+      <table style="min-width:900px;">
         <thead>
           <tr>
             <th>Date</th>
@@ -147,11 +201,12 @@ render_header('Customer Inquiry Log');
             <th>Email</th>
             <th>Notes / What they want</th>
             <th>Logged By</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           <?php if (!$inquiries): ?>
-            <tr><td colspan="7" class="muted">No inquiries logged yet.</td></tr>
+            <tr><td colspan="8" class="muted">No inquiries logged yet.</td></tr>
           <?php endif; ?>
           <?php foreach ($inquiries as $inquiry): ?>
             <tr>
@@ -160,8 +215,11 @@ render_header('Customer Inquiry Log');
               <td><?= h($inquiry['company_name'] ?: '—') ?></td>
               <td><?= h($inquiry['phone_number'] ?: '—') ?></td>
               <td><?= h($inquiry['email'] ?: '—') ?></td>
-              <td style="white-space:pre-wrap; min-width:280px;"><?= h($inquiry['notes'] ?: '—') ?></td>
+              <td style="white-space:pre-wrap; min-width:220px;"><?= h($inquiry['notes'] ?: '—') ?></td>
               <td><?= h($inquiry['created_by_username'] ?: '—') ?></td>
+              <td style="white-space:nowrap;">
+                <a class="btn" href="customer_inquiry_form.php?edit=<?= (int)$inquiry['id'] ?>">Edit</a>
+              </td>
             </tr>
           <?php endforeach; ?>
         </tbody>
@@ -171,6 +229,10 @@ render_header('Customer Inquiry Log');
 <?php else: ?>
   <form method="post" class="card" style="max-width:960px;">
     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customer_inquiry_csrf']) ?>" />
+    <?php if ($edit_id !== null): ?>
+      <input type="hidden" name="edit_id" value="<?= $edit_id ?>" />
+      <h2 style="margin:0 0 14px;">Edit Inquiry</h2>
+    <?php endif; ?>
     <div class="form-grid">
       <div>
         <label for="customer_name">Customer Name <span style="color:var(--d)">*</span></label>
@@ -198,7 +260,7 @@ render_header('Customer Inquiry Log');
       </div>
     </div>
     <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
-      <button type="submit" class="btn primary" style="font-size:18px; padding:14px 22px;">Save Inquiry</button>
+      <button type="submit" class="btn primary" style="font-size:18px; padding:14px 22px;"><?= $edit_id !== null ? 'Update Inquiry' : 'Save Inquiry' ?></button>
       <a class="btn" href="customer_inquiry_form.php?view=all">View All Inquiries</a>
     </div>
   </form>
