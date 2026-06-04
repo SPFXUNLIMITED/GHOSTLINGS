@@ -122,6 +122,7 @@ render_header('Alibaba Quick Responses');
 (() => {
   const buttons = document.querySelectorAll('.js-copy-response');
   if (!buttons.length) return;
+  let fallbackWarned = false;
 
   const showStatus = (statusEl) => {
     if (!statusEl) return;
@@ -130,7 +131,10 @@ render_header('Alibaba Quick Responses');
   };
 
   const fallbackCopy = (field) => {
-    console.warn('Clipboard API unavailable; using legacy copy fallback for Alibaba responses.');
+    if (!fallbackWarned) {
+      console.warn('Clipboard API unavailable; using legacy copy fallback for Alibaba responses.');
+      fallbackWarned = true;
+    }
     field.focus();
     field.select();
     document.execCommand('copy');
