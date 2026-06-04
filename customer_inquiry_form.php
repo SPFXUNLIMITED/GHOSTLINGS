@@ -92,8 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $post_action = (string)($_POST['action'] ?? 'save');
   $should_process_form_save = $post_action === 'save';
   $post_row_id = (int)($_POST['row_id'] ?? 0);
-  $show_detail = false;
-  $show_all = !$show_detail && ($post_action === 'status' || $post_action === 'delete');
+  $show_all = $post_action === 'status' || $post_action === 'delete';
   $saved = false;
   $updated = false;
   $status_updated = false;
@@ -425,7 +424,7 @@ render_header('Customer Inquiry Log');
                   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customer_inquiry_csrf']) ?>" />
                   <input type="hidden" name="action" value="status" />
                   <input type="hidden" name="row_id" value="<?= (int)$inquiry['id'] ?>" />
-                  <select name="status" aria-label="Status for inquiry <?= (int)$inquiry['id'] ?>" style="min-width:150px;">
+                  <select name="status" aria-label="Status for inquiry ID <?= (int)$inquiry['id'] ?>" style="min-width:150px;">
                     <?php foreach (INQUIRY_STATUS_OPTIONS as $option_key => $option_label): ?>
                       <option value="<?= h($option_key) ?>" <?= ($status_key === $option_key) ? 'selected' : '' ?>><?= h($option_label) ?></option>
                     <?php endforeach; ?>
