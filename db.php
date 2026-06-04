@@ -24,12 +24,7 @@ function app_settings_crypto_key(): string {
   global $config;
   $raw = trim((string)(getenv('APP_SETTINGS_ENCRYPTION_KEY') ?: ($config['app_settings_encryption_key'] ?? '')));
   if ($raw === '') {
-    $raw = implode('|', [
-      (string)($config['db']['host'] ?? ''),
-      (string)($config['db']['name'] ?? ''),
-      (string)($config['db']['user'] ?? ''),
-      __DIR__,
-    ]);
+    throw new RuntimeException('Missing APP_SETTINGS_ENCRYPTION_KEY (or config app_settings_encryption_key).');
   }
 
   if (preg_match('/^[a-f0-9]{64}$/i', $raw)) {

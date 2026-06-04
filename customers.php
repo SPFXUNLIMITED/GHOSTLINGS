@@ -78,7 +78,7 @@ function format_customer_last_updated(?string $value): string {
 function sync_customers_from_hubspot(PDO $pdo): array {
   $token = hubspot_token($pdo);
   if ($token === '') {
-    throw new RuntimeException('Missing HubSpot token. Set HUBSPOT_PRIVATE_APP_TOKEN, HUBSPOT_ACCESS_TOKEN, or add it in Admin Backend > Integrations.');
+    throw new RuntimeException('Missing HubSpot token. Set HUBSPOT_PRIVATE_APP_TOKEN, HUBSPOT_ACCESS_TOKEN, or save one in integration settings.');
   }
 
   $url = HUBSPOT_CONTACTS_API_BASE . '?limit=' . HUBSPOT_SYNC_PAGE_SIZE . '&properties=' . HUBSPOT_CONTACT_PROPERTIES;
