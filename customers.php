@@ -4,6 +4,8 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_admin_or_moderator();
 
+const HUBSPOT_SYNC_MAX_PAGES = 50;
+
 if (empty($_SESSION['customers_sync_csrf'])) {
   $_SESSION['customers_sync_csrf'] = bin2hex(random_bytes(24));
 }
@@ -51,11 +53,11 @@ function sync_customers_from_hubspot(PDO $pdo): array {
     "INSERT INTO customers (hubspot_contact_id, customer_name, company, phone, email, last_updated)
      VALUES (?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
-       customer_name = VALUES(customer_name),
-       company = VALUES(company),
-       phone = VALUES(phone),
-       email = VALUES(email),
-       last_updated = VALUES(last_updated)"
+       customer_name = ?,
+       company = ?,
+       phone = ?,
+       email = ?,
+       last_updated = ?"
   );
 
   $synced = 0;
@@ -94,13 +96,23 @@ function sync_customers_from_hubspot(PDO $pdo): array {
         $id = trim((string)($row['id'] ?? ''));
         if ($id === '') continue;
         $props = is_array($row['properties'] ?? null) ? $row['properties'] : [];
+        $customer_name = hubspot_contact_name($props);
+        $company = trim((string)($props['company'] ?? ''));
+        $phone = trim((string)($props['phone'] ?? ''));
+        $email = trim((string)($props['email'] ?? ''));
+        $last_updated = hubspot_to_datetime($props['lastmodifieddate'] ?? null);
         $upsert->execute([
           $id,
-          hubspot_contact_name($props),
-          trim((string)($props['company'] ?? '')),
-          trim((string)($props['phone'] ?? '')),
-          trim((string)($props['email'] ?? '')),
-          hubspot_to_datetime($props['lastmodifieddate'] ?? null),
+          $customer_name,
+          $company,
+          $phone,
+          $email,
+          $last_updated,
+          $customer_name,
+          $company,
+          $phone,
+          $email,
+          $last_updated,
         ]);
         $synced++;
       }
@@ -111,7 +123,7 @@ function sync_customers_from_hubspot(PDO $pdo): array {
       ? 'https://api.hubapi.com/crm/v3/objects/contacts?limit=100&after=' . urlencode((string)$next_after) . '&properties=firstname,lastname,company,phone,email,lastmodifieddate'
       : null;
     $pages++;
-    if ($pages >= 50) break;
+    if ($pages >= HUBSPOT_SYNC_MAX_PAGES) break;
   }
 
   return ['synced' => $synced];
