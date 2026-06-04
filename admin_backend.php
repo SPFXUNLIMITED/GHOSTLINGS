@@ -18,7 +18,6 @@ $allowed_sections = [
   'dashboard',
   'users',
   'time_reports',
-  'activity_log',
   'canned_responses',
   'system_settings',
 ];
@@ -83,8 +82,6 @@ if ($section === 'canned_responses') {
 $total_users = 0;
 $total_inquiries = 0;
 $recent_activity = [];
-$activity_log_rows = [];
-$activity_log_error = '';
 
 if ($section === 'dashboard') {
   try {
@@ -145,30 +142,10 @@ if ($section === 'dashboard') {
   }
 }
 
-if ($section === 'activity_log') {
-  try {
-    $activity_log_rows = $pdo->query(
-      "SELECT
-         aal.created_at AS occurred_at,
-         COALESCE(NULLIF(TRIM(u.username), ''), NULLIF(TRIM(aal.user_label), ''), CONCAT('User #', aal.user_id), 'System') AS actor_name,
-         aal.action_name,
-         COALESCE(aal.details, '') AS details
-       FROM admin_activity_log aal
-       LEFT JOIN users u ON u.id = aal.user_id
-       ORDER BY aal.created_at DESC, aal.id DESC
-       LIMIT 200"
-    )->fetchAll();
-  } catch (Throwable $e) {
-    $activity_log_rows = [];
-    $activity_log_error = 'Unable to load activity log right now.';
-  }
-}
-
 $menu = [
   'dashboard' => ['label' => 'Dashboard', 'subtitle' => 'Overview'],
   'users' => ['label' => 'Users', 'subtitle' => 'Accounts & permissions'],
   'time_reports' => ['label' => 'Time Reports', 'subtitle' => 'Payroll and hour tracking'],
-  'activity_log' => ['label' => 'Activity Log', 'subtitle' => 'System activity feed'],
   'canned_responses' => ['label' => 'Canned Responses', 'subtitle' => 'RFQ quick responses'],
   'system_settings' => ['label' => 'System Settings', 'subtitle' => 'Configuration and controls'],
 ];
@@ -438,44 +415,6 @@ render_header('Admin Backend');
         <h2 style="margin-top:0;">Time Reports</h2>
         <p class="muted">Time reporting placeholder. This section will host reporting filters, export options, and summaries.</p>
         <a class="btn" href="time_report.php">Open Current Time Reports</a>
-      </div>
-
-    <?php elseif ($section === 'activity_log'): ?>
-
-      <div class="card">
-        <h2 style="margin-top:0;">Activity Log</h2>
-        <p class="muted">Most recent activity is shown first (up to 200 entries).</p>
-        <?php if ($activity_log_error !== ''): ?>
-          <div class="alert error" style="margin-top:12px;"><?= h($activity_log_error) ?></div>
-        <?php endif; ?>
-        <div style="overflow-x:auto;">
-          <table class="admin-recent-table" style="min-width:780px;">
-            <thead>
-              <tr>
-                <th>Date &amp; Time</th>
-                <th>User</th>
-                <th>Action</th>
-                <th>Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php if (!$activity_log_rows): ?>
-                <tr>
-                  <td colspan="4" class="muted">No activity has been recorded yet.</td>
-                </tr>
-              <?php else: ?>
-                <?php foreach ($activity_log_rows as $row): ?>
-                  <tr>
-                    <td style="white-space:nowrap;"><?= h($format_activity_datetime($row['occurred_at'])) ?></td>
-                    <td style="white-space:nowrap;"><?= h((string)$row['actor_name']) ?></td>
-                    <td style="white-space:nowrap;"><?= h((string)$row['action_name']) ?></td>
-                    <td><?= h((string)$row['details']) ?></td>
-                  </tr>
-                <?php endforeach; ?>
-              <?php endif; ?>
-            </tbody>
-          </table>
-        </div>
       </div>
 
     <?php elseif ($section === 'system_settings'): ?>
