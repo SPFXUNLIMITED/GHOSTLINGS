@@ -93,25 +93,6 @@ if ($section === 'dashboard') {
     $total_users = 0;
   }
 
-  if ($section === 'activity_log') {
-    try {
-      $activity_log_rows = $pdo->query(
-        "SELECT
-           aal.created_at AS occurred_at,
-           COALESCE(NULLIF(TRIM(u.username), ''), NULLIF(TRIM(aal.user_label), ''), CONCAT('User #', aal.user_id), 'System') AS actor_name,
-           aal.action_name,
-           COALESCE(aal.details, '') AS details
-         FROM admin_activity_log aal
-         LEFT JOIN users u ON u.id = aal.user_id
-         ORDER BY aal.created_at DESC, aal.id DESC
-         LIMIT 200"
-      )->fetchAll();
-    } catch (Throwable $e) {
-      $activity_log_rows = [];
-      $activity_log_error = 'Unable to load activity log right now.';
-    }
-  }
-
   try {
     $total_inquiries = (int)$pdo->query(
       'SELECT
@@ -161,6 +142,25 @@ if ($section === 'dashboard') {
     )->fetchAll();
   } catch (Throwable $e) {
     $recent_activity = [];
+  }
+}
+
+if ($section === 'activity_log') {
+  try {
+    $activity_log_rows = $pdo->query(
+      "SELECT
+         aal.created_at AS occurred_at,
+         COALESCE(NULLIF(TRIM(u.username), ''), NULLIF(TRIM(aal.user_label), ''), CONCAT('User #', aal.user_id), 'System') AS actor_name,
+         aal.action_name,
+         COALESCE(aal.details, '') AS details
+       FROM admin_activity_log aal
+       LEFT JOIN users u ON u.id = aal.user_id
+       ORDER BY aal.created_at DESC, aal.id DESC
+       LIMIT 200"
+    )->fetchAll();
+  } catch (Throwable $e) {
+    $activity_log_rows = [];
+    $activity_log_error = 'Unable to load activity log right now.';
   }
 }
 
