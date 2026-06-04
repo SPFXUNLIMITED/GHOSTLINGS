@@ -126,6 +126,7 @@ render_header('Alibaba Quick Responses');
 (() => {
   const buttons = document.querySelectorAll('.js-copy-response');
   if (!buttons.length) return;
+  const COPY_STATUS_DISPLAY_DURATION = 1400;
   const browserNote = document.getElementById('alibaba-copy-browser-note');
   let fallbackWarned = false;
 
@@ -133,10 +134,14 @@ render_header('Alibaba Quick Responses');
     browserNote.style.display = 'block';
   }
 
-  const showStatus = (statusEl) => {
+  const showStatus = (statusEl, message = 'Copied') => {
     if (!statusEl) return;
+    statusEl.textContent = message;
     statusEl.classList.add('show');
-    window.setTimeout(() => statusEl.classList.remove('show'), 1400);
+    window.setTimeout(() => {
+      statusEl.classList.remove('show');
+      statusEl.textContent = 'Copied';
+    }, COPY_STATUS_DISPLAY_DURATION);
   };
 
   const fallbackCopy = (field) => {
@@ -144,11 +149,16 @@ render_header('Alibaba Quick Responses');
       console.warn('Clipboard API unavailable; using legacy copy fallback for Alibaba responses.');
       fallbackWarned = true;
     }
-    field.focus();
-    field.select();
-    document.execCommand('copy');
-    field.setSelectionRange(0, 0);
-    field.blur();
+    try {
+      field.focus();
+      field.select();
+      const copied = document.execCommand('copy');
+      field.setSelectionRange(0, 0);
+      field.blur();
+      return copied;
+    } catch (error) {
+      return false;
+    }
   };
 
   buttons.forEach((button) => {
@@ -156,17 +166,26 @@ render_header('Alibaba Quick Responses');
       const field = document.getElementById(button.dataset.target || '');
       if (!field) return;
       const statusEl = document.getElementById(field.id + '-status');
+      let copied = false;
 
       try {
         if (navigator.clipboard && window.isSecureContext) {
           await navigator.clipboard.writeText(field.value);
+          copied = true;
         } else {
-          fallbackCopy(field);
+          copied = fallbackCopy(field);
         }
-        showStatus(statusEl);
       } catch (error) {
-        fallbackCopy(field);
-        showStatus(statusEl);
+        copied = fallbackCopy(field);
+      }
+
+      if (copied) {
+        showStatus(statusEl, 'Copied');
+      } else {
+        if (browserNote) browserNote.style.display = 'block';
+        field.focus();
+        field.select();
+        showStatus(statusEl, 'Press Ctrl/Cmd+C to copy');
       }
     });
   });
