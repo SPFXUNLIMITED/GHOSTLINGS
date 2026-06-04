@@ -417,10 +417,7 @@ render_header('Customer Inquiry Log');
             <tr><td colspan="<?= INQUIRY_TABLE_COLUMN_COUNT ?>" class="muted">No inquiries logged yet.</td></tr>
           <?php endif; ?>
           <?php foreach ($inquiries as $inquiry): ?>
-            <?php
-              $status_key = (string)($inquiry['status'] ?? 'new');
-              [$badge_bg, $badge_color] = INQUIRY_STATUS_BADGES[$status_key] ?? ['#e5e7eb', '#374151'];
-            ?>
+            <?php $status_key = (string)($inquiry['status'] ?? 'new'); ?>
             <tr>
               <td style="white-space:nowrap;"><?= h($inquiry['inquiry_date']) ?></td>
               <td style="white-space:nowrap;">
@@ -428,7 +425,7 @@ render_header('Customer Inquiry Log');
                   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customer_inquiry_csrf']) ?>" />
                   <input type="hidden" name="action" value="status" />
                   <input type="hidden" name="row_id" value="<?= (int)$inquiry['id'] ?>" />
-                  <select name="status" style="min-width:150px; background:<?= h($badge_bg) ?>; color:<?= h($badge_color) ?>; font-weight:600;">
+                  <select name="status" aria-label="Status for inquiry <?= (int)$inquiry['id'] ?>" style="min-width:150px;">
                     <?php foreach (INQUIRY_STATUS_OPTIONS as $option_key => $option_label): ?>
                       <option value="<?= h($option_key) ?>" <?= ($status_key === $option_key) ? 'selected' : '' ?>><?= h($option_label) ?></option>
                     <?php endforeach; ?>
