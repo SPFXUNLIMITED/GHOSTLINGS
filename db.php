@@ -660,6 +660,16 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+if (!defined('RFQ_CANNED_RESPONSE_SLOT_COUNT')) {
+  define('RFQ_CANNED_RESPONSE_SLOT_COUNT', 4);
+}
+if (!defined('RFQ_CANNED_RESPONSE_LEGACY_SLOT_COUNT')) {
+  define('RFQ_CANNED_RESPONSE_LEGACY_SLOT_COUNT', 6);
+}
+$rfq_canned_response_slots = range(1, RFQ_CANNED_RESPONSE_SLOT_COUNT);
+$rfq_canned_response_legacy_slots = range(1, RFQ_CANNED_RESPONSE_LEGACY_SLOT_COUNT);
+$rfq_canned_response_legacy_slot_list = implode(',', $rfq_canned_response_legacy_slots);
+
 $rfq_canned_response_defaults = [
   1 => [
     'label' => 'Machines - No Prototypes',
@@ -704,12 +714,12 @@ $legacy_rfq_canned_response_defaults = [
     'body' => 'Please share packaging dimensions and gross/net weight, and confirm whether export-grade wooden crate packing is included.',
   ],
 ];
-$rfq_canned_response_legacy_only_slots = array_values(array_diff(
-  range(1, 6),
+$rfq_canned_response_legacy_only_slots = array_map('intval', array_values(array_diff(
+  $rfq_canned_response_legacy_slots,
   array_keys($rfq_canned_response_defaults)
-));
+)));
 $rfq_canned_response_rows = $pdo->query(
-  "SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN (1,2,3,4,5,6) ORDER BY slot"
+  "SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN ($rfq_canned_response_legacy_slot_list) ORDER BY slot"
 )->fetchAll();
 $rfq_canned_response_by_slot = [];
 foreach ($rfq_canned_response_rows as $rfq_canned_response_row) {
