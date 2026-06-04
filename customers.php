@@ -25,8 +25,13 @@ function hubspot_token(): string {
 }
 
 function app_env_value(string $key): string {
+  $env_value = getenv($key);
+  if ($env_value === false) {
+    $env_value = null;
+  }
+
   $candidates = [
-    getenv($key),
+    $env_value,
     $_ENV[$key] ?? null,
     $_SERVER[$key] ?? null,
   ];
