@@ -79,6 +79,7 @@ render_header('Admin Backend');
     <a class="menu-link" href="time_report.php">Time Reports</a>
     <a class="menu-link" href="users.php">Users</a>
     <a class="menu-link" href="user_profiles.php">User Profiles</a>
+    <a class="menu-link <?= $section === 'activity_log' ? 'active' : '' ?>" href="admin_backend.php?section=activity_log">Activity Log</a>
     <a class="menu-link <?= $section === 'canned_responses' ? 'active' : '' ?>" href="admin_backend.php?section=canned_responses">Canned Responses</a>
   </div>
 
@@ -133,6 +134,10 @@ render_header('Admin Backend');
         </form>
       </div>
 
+    <?php elseif ($section === 'activity_log'): ?>
+
+      <?php require __DIR__ . '/activity_log.php'; ?>
+
     <?php else: ?>
 
       <div class="card">
@@ -141,6 +146,7 @@ render_header('Admin Backend');
           <a class="btn" href="time_report.php">Time Reports</a>
           <a class="btn" href="users.php">Users</a>
           <a class="btn" href="user_profiles.php">User Profiles</a>
+          <a class="btn" href="admin_backend.php?section=activity_log">Activity Log</a>
           <a class="btn" href="admin_backend.php?section=canned_responses">Canned Responses</a>
         </div>
       </div>
