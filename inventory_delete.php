@@ -41,7 +41,13 @@ $image_stored_name = trim((string)($item['image_stored_name'] ?? ''));
 if ($image_stored_name !== '') {
   $image_path = __DIR__ . '/uploads/inventory/' . basename($image_stored_name);
   if (is_file($image_path)) {
-    if (!@unlink($image_path)) {
+    set_error_handler(static function (): bool {
+      return true;
+    });
+    $image_deleted = unlink($image_path);
+    restore_error_handler();
+    if (!$image_deleted) {
+      error_log('Unable to delete inventory image file: ' . $image_path);
       inventory_delete_redirect('inventory_form.php?id=' . $id . '&delete_error=image');
     }
   }
@@ -62,7 +68,7 @@ try {
   }
   log_admin_activity($pdo, $actor_id, 'Inventory Item Deleted', $detail, $actor_name);
 } catch (Throwable $e) {
-  // Non-blocking audit log write.
+  error_log('Inventory delete audit log failed: ' . $e->getMessage());
 }
 
 inventory_delete_redirect('inventory_list.php?success=deleted');
