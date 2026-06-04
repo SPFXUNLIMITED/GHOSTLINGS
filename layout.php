@@ -481,8 +481,9 @@ $show_rfq_menu = $show_mod_menu;
       ['href' => 'form_admin.php', 'file' => 'form_admin.php', 'label' => 'Form Entries', 'visible' => $show_mod_menu],
     ], $current); ?>
     <?php render_menu_dropdown('Machine Inquiries', [
-      ['href' => 'machine_inquiry_form.php', 'file' => 'machine_inquiry_form.php', 'label' => 'Machine Inquiry Form', 'visible' => true],
       ['href' => 'customer_inquiry_form.php?view=all', 'file' => 'customer_inquiry_form.php', 'label' => 'Customer Inquiries', 'visible' => !empty($_SESSION['user_id'])],
+      ['href' => 'customer_inquiry_form.php', 'file' => 'customer_inquiry_form.php', 'label' => 'Quick Log Inquiry', 'visible' => !empty($_SESSION['user_id'])],
+      ['href' => 'machine_inquiry_form.php', 'file' => 'machine_inquiry_form.php', 'label' => 'Machine Inquiry Form', 'visible' => true],
       ['href' => 'machine_inquiry_admin.php', 'file' => 'machine_inquiry_admin.php', 'label' => 'Inquiry Admin', 'visible' => $show_mod_menu],
     ], $current); ?>
     <?php if ($show_mod_menu): ?>
