@@ -217,11 +217,41 @@ render_header('Customers');
       <?php endif; ?>
       <?php foreach ($customers as $row): ?>
         <tr>
-          <td><strong><?= $row['first_name'] !== '' ? h((string)$row['first_name']) : '<span class="muted">—</span>' ?></strong></td>
-          <td><strong><?= $row['last_name'] !== '' ? h((string)$row['last_name']) : '<span class="muted">—</span>' ?></strong></td>
-          <td><?= $row['company'] !== '' ? h((string)$row['company']) : '<span class="muted">—</span>' ?></td>
-          <td><?= $row['phone'] !== '' ? h((string)$row['phone']) : '<span class="muted">—</span>' ?></td>
-          <td><?= $row['email'] !== '' ? h((string)$row['email']) : '<span class="muted">—</span>' ?></td>
+          <td>
+            <?php if ($row['first_name'] !== ''): ?>
+              <strong><?= h((string)$row['first_name']) ?></strong>
+            <?php else: ?>
+              <span class="muted">—</span>
+            <?php endif; ?>
+          </td>
+          <td>
+            <?php if ($row['last_name'] !== ''): ?>
+              <strong><?= h((string)$row['last_name']) ?></strong>
+            <?php else: ?>
+              <span class="muted">—</span>
+            <?php endif; ?>
+          </td>
+          <td>
+            <?php if ($row['company'] !== ''): ?>
+              <?= h((string)$row['company']) ?>
+            <?php else: ?>
+              <span class="muted">—</span>
+            <?php endif; ?>
+          </td>
+          <td>
+            <?php if ($row['phone'] !== ''): ?>
+              <?= h((string)$row['phone']) ?>
+            <?php else: ?>
+              <span class="muted">—</span>
+            <?php endif; ?>
+          </td>
+          <td>
+            <?php if ($row['email'] !== ''): ?>
+              <?= h((string)$row['email']) ?>
+            <?php else: ?>
+              <span class="muted">—</span>
+            <?php endif; ?>
+          </td>
           <td class="muted"><?= h(format_customer_last_updated($row['last_updated'] ?? null)) ?></td>
         </tr>
       <?php endforeach; ?>
