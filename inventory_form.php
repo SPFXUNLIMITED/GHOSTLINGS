@@ -71,16 +71,24 @@ function normalize_inventory_part_numbers(PDO $pdo): void {
 }
 
 function inventory_part_number_index_exists(PDO $pdo): bool {
-  $stmt = $pdo->query("SHOW INDEX FROM inventory_items WHERE Key_name = 'uq_inventory_part_number'");
-  return $stmt->fetch() !== false;
+  $stmt = $pdo->prepare("
+    SELECT 1
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE()
+      AND table_name = 'inventory_items'
+      AND index_name = 'uq_inventory_part_number'
+    LIMIT 1
+  ");
+  $stmt->execute();
+  return $stmt->fetchColumn() !== false;
 }
 
 function generate_inventory_part_number(PDO $pdo, int $inventory_id): string {
   $seed = max(1, $inventory_id);
+  $stmt = $pdo->prepare("SELECT id FROM inventory_items WHERE part_number = ? AND id <> ? LIMIT 1");
   do {
     $candidate = sprintf('INV-%05d', $seed);
     $seed++;
-    $stmt = $pdo->prepare("SELECT id FROM inventory_items WHERE part_number = ? AND id <> ? LIMIT 1");
     $stmt->execute([$candidate, $inventory_id]);
   } while ($stmt->fetchColumn() !== false);
 
@@ -325,7 +333,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       } else {
         $pdo->beginTransaction();
         try {
-          $placeholder_part_number = 'INV-PENDING-' . bin2hex(random_bytes(8));
+          $placeholder_part_number = 'TEMP-' . bin2hex(random_bytes(12));
           $ins = $pdo->prepare("
             INSERT INTO inventory_items (
               part_number, item_name, description, category, supplier,

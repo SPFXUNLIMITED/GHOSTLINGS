@@ -67,8 +67,16 @@ function normalize_inventory_part_numbers(PDO $pdo): void {
 }
 
 function inventory_part_number_index_exists(PDO $pdo): bool {
-  $stmt = $pdo->query("SHOW INDEX FROM inventory_items WHERE Key_name = 'uq_inventory_part_number'");
-  return $stmt->fetch() !== false;
+  $stmt = $pdo->prepare("
+    SELECT 1
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE()
+      AND table_name = 'inventory_items'
+      AND index_name = 'uq_inventory_part_number'
+    LIMIT 1
+  ");
+  $stmt->execute();
+  return $stmt->fetchColumn() !== false;
 }
 
 if (!inventory_part_number_index_exists($pdo)) {
