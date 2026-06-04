@@ -16,16 +16,46 @@ $options = [
 $pdo = new PDO($dsn, $db['user'], $db['pass'], $options);
 const APP_ENCRYPTED_MIN_PAYLOAD_BYTES = 29; // 12-byte IV + 16-byte tag + minimum 1-byte ciphertext
 
+function app_ensure_integration_settings_table(PDO $pdo): void {
+  static $ready = false;
+  if ($ready) {
+    return;
+  }
+
+  $pdo->exec("
+    CREATE TABLE IF NOT EXISTS integration_settings (
+      setting_key   VARCHAR(100) NOT NULL,
+      setting_val   MEDIUMTEXT NULL,
+      is_encrypted  TINYINT(1) NOT NULL DEFAULT 0,
+      updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (setting_key)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  ");
+  $ready = true;
+}
+
 function app_settings_crypto_key(): string {
   static $key = null;
   if (is_string($key)) {
     return $key;
   }
 
-  global $config;
+  global $config, $pdo;
   $raw = trim((string)(getenv('APP_SETTINGS_ENCRYPTION_KEY') ?: ($config['app_settings_encryption_key'] ?? '')));
   if ($raw === '') {
-    throw new RuntimeException('Missing APP_SETTINGS_ENCRYPTION_KEY (or config app_settings_encryption_key).');
+    app_ensure_integration_settings_table($pdo);
+    $stmt = $pdo->prepare("SELECT setting_val FROM integration_settings WHERE setting_key = 'app_settings_encryption_key' LIMIT 1");
+    $stmt->execute();
+    $raw = trim((string)($stmt->fetchColumn() ?? ''));
+  }
+
+  if ($raw === '') {
+    $raw = bin2hex(random_bytes(32));
+    $pdo->prepare(
+      "INSERT INTO integration_settings (setting_key, setting_val, is_encrypted)
+       VALUES ('app_settings_encryption_key', ?, 0)
+       ON DUPLICATE KEY UPDATE setting_val = VALUES(setting_val), is_encrypted = 0"
+    )->execute([$raw]);
   }
 
   if (preg_match('/^[a-f0-9]{64}$/i', $raw)) {
@@ -1092,15 +1122,7 @@ $pdo->exec("
 ");
 
 // Create integration_settings table for admin-managed third-party integration credentials
-$pdo->exec("
-  CREATE TABLE IF NOT EXISTS integration_settings (
-    setting_key   VARCHAR(100) NOT NULL,
-    setting_val   MEDIUMTEXT NULL,
-    is_encrypted  TINYINT(1) NOT NULL DEFAULT 0,
-    updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (setting_key)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-");
+app_ensure_integration_settings_table($pdo);
 
 // Seed default promo text if not already set
 $pdo->exec("
