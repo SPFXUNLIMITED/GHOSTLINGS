@@ -25,10 +25,56 @@ $pdo->exec("
     created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    KEY idx_inventory_part_number (part_number),
+    UNIQUE KEY uq_inventory_part_number (part_number),
     KEY idx_inventory_item_name (item_name)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+function next_inventory_part_number_from_seed(int $seed, array &$used): string {
+  $suffix = max(1, $seed);
+  do {
+    $candidate = sprintf('INV-%05d', $suffix);
+    $suffix++;
+  } while (isset($used[strtolower($candidate)]));
+
+  $used[strtolower($candidate)] = true;
+  return $candidate;
+}
+
+function normalize_inventory_part_numbers(PDO $pdo): void {
+  $rows = $pdo->query("SELECT id, part_number FROM inventory_items ORDER BY id ASC")->fetchAll();
+  $used = [];
+  $updates = [];
+
+  foreach ($rows as $row) {
+    $id = (int)($row['id'] ?? 0);
+    $part_number = trim((string)($row['part_number'] ?? ''));
+    $key = strtolower($part_number);
+    if ($part_number !== '' && !isset($used[$key])) {
+      $used[$key] = true;
+      continue;
+    }
+
+    $updates[$id] = next_inventory_part_number_from_seed($id, $used);
+  }
+
+  if ($updates) {
+    $stmt = $pdo->prepare("UPDATE inventory_items SET part_number = ? WHERE id = ?");
+    foreach ($updates as $id => $part_number) {
+      $stmt->execute([$part_number, $id]);
+    }
+  }
+}
+
+normalize_inventory_part_numbers($pdo);
+
+try {
+  $pdo->exec("ALTER TABLE inventory_items ADD UNIQUE INDEX uq_inventory_part_number (part_number)");
+} catch (PDOException $e) {
+  if (!in_array((string)$e->getCode(), ['42000', '42S11'], true)) {
+    throw $e;
+  }
+}
 
 function fmt_money($value): string {
   if ($value === null || $value === '') {

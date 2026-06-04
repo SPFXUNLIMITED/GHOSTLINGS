@@ -29,10 +29,68 @@ $pdo->exec("
     created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    KEY idx_inventory_part_number (part_number),
+    UNIQUE KEY uq_inventory_part_number (part_number),
     KEY idx_inventory_item_name (item_name)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+function next_inventory_part_number_from_seed(int $seed, array &$used): string {
+  $suffix = max(1, $seed);
+  do {
+    $candidate = sprintf('INV-%05d', $suffix);
+    $suffix++;
+  } while (isset($used[strtolower($candidate)]));
+
+  $used[strtolower($candidate)] = true;
+  return $candidate;
+}
+
+function normalize_inventory_part_numbers(PDO $pdo): void {
+  $rows = $pdo->query("SELECT id, part_number FROM inventory_items ORDER BY id ASC")->fetchAll();
+  $used = [];
+  $updates = [];
+
+  foreach ($rows as $row) {
+    $id = (int)($row['id'] ?? 0);
+    $part_number = trim((string)($row['part_number'] ?? ''));
+    $key = strtolower($part_number);
+    if ($part_number !== '' && !isset($used[$key])) {
+      $used[$key] = true;
+      continue;
+    }
+
+    $updates[$id] = next_inventory_part_number_from_seed($id, $used);
+  }
+
+  if ($updates) {
+    $stmt = $pdo->prepare("UPDATE inventory_items SET part_number = ? WHERE id = ?");
+    foreach ($updates as $id => $part_number) {
+      $stmt->execute([$part_number, $id]);
+    }
+  }
+}
+
+function generate_inventory_part_number(PDO $pdo, int $inventory_id): string {
+  $seed = max(1, $inventory_id);
+  do {
+    $candidate = sprintf('INV-%05d', $seed);
+    $seed++;
+    $stmt = $pdo->prepare("SELECT id FROM inventory_items WHERE part_number = ? AND id <> ? LIMIT 1");
+    $stmt->execute([$candidate, $inventory_id]);
+  } while ($stmt->fetchColumn() !== false);
+
+  return $candidate;
+}
+
+normalize_inventory_part_numbers($pdo);
+
+try {
+  $pdo->exec("ALTER TABLE inventory_items ADD UNIQUE INDEX uq_inventory_part_number (part_number)");
+} catch (PDOException $e) {
+  if (!in_array((string)$e->getCode(), ['42000', '42S11'], true)) {
+    throw $e;
+  }
+}
 
 if (empty($_SESSION['inventory_form_csrf'])) {
   $_SESSION['inventory_form_csrf'] = bin2hex(random_bytes(24));
@@ -75,8 +133,8 @@ $image_mime_to_ext = [
   'image/webp' => 'webp',
 ];
 
+$part_number = '';
 $fields = [
-  'part_number' => '',
   'item_name' => '',
   'description' => '',
   'category' => 'Part',
@@ -117,6 +175,7 @@ if ($is_edit) {
     exit;
   }
 
+  $part_number = (string)($existing['part_number'] ?? '');
   foreach ($fields as $key => $_) {
     $fields[$key] = (string)($existing[$key] ?? '');
   }
@@ -132,12 +191,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   } else {
     foreach ($fields as $key => $_) {
       $fields[$key] = trim((string)($_POST[$key] ?? ''));
-    }
-
-    if ($fields['part_number'] === '') {
-      $errors[] = 'Part Number is required.';
-    } elseif (mb_strlen($fields['part_number']) > 120) {
-      $errors[] = 'Part Number must be 120 characters or fewer.';
     }
 
     if ($fields['item_name'] === '') {
@@ -237,14 +290,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($is_edit) {
         $upd = $pdo->prepare("
           UPDATE inventory_items SET
-            part_number = ?, item_name = ?, description = ?, category = ?, supplier = ?,
+            item_name = ?, description = ?, category = ?, supplier = ?,
             cost_price = ?, retail_price = ?, wholesale_price = ?, minimum_price = ?,
             current_stock = ?, low_stock_alert = ?, location = ?,
             image_original_name = ?, image_stored_name = ?, image_mime_type = ?
           WHERE id = ?
         ");
         $upd->execute([
-          $fields['part_number'],
           $fields['item_name'],
           $fields['description'] !== '' ? $fields['description'] : null,
           $fields['category'],
@@ -264,31 +316,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: inventory_list.php?success=updated');
         exit;
       } else {
-        $ins = $pdo->prepare("
-          INSERT INTO inventory_items (
-            part_number, item_name, description, category, supplier,
-            cost_price, retail_price, wholesale_price, minimum_price,
-            current_stock, low_stock_alert, location,
-            image_original_name, image_stored_name, image_mime_type
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $ins->execute([
-          $fields['part_number'],
-          $fields['item_name'],
-          $fields['description'] !== '' ? $fields['description'] : null,
-          $fields['category'],
-          $fields['supplier'],
-          $cost_price,
-          $retail_price,
-          $wholesale_price,
-          $minimum_price,
-          $current_stock,
-          $low_stock_alert,
-          $fields['location'],
-          $image_original_name,
-          $image_stored_name,
-          $image_mime_type,
-        ]);
+        $pdo->beginTransaction();
+        try {
+          $placeholder_part_number = 'INV-PENDING-' . bin2hex(random_bytes(8));
+          $ins = $pdo->prepare("
+            INSERT INTO inventory_items (
+              part_number, item_name, description, category, supplier,
+              cost_price, retail_price, wholesale_price, minimum_price,
+              current_stock, low_stock_alert, location,
+              image_original_name, image_stored_name, image_mime_type
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ");
+          $ins->execute([
+            $placeholder_part_number,
+            $fields['item_name'],
+            $fields['description'] !== '' ? $fields['description'] : null,
+            $fields['category'],
+            $fields['supplier'],
+            $cost_price,
+            $retail_price,
+            $wholesale_price,
+            $minimum_price,
+            $current_stock,
+            $low_stock_alert,
+            $fields['location'],
+            $image_original_name,
+            $image_stored_name,
+            $image_mime_type,
+          ]);
+
+          $new_id = (int)$pdo->lastInsertId();
+          $part_number = generate_inventory_part_number($pdo, $new_id);
+          $part_upd = $pdo->prepare("UPDATE inventory_items SET part_number = ? WHERE id = ?");
+          $part_upd->execute([$part_number, $new_id]);
+          $pdo->commit();
+        } catch (Throwable $e) {
+          if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+          }
+          throw $e;
+        }
         header('Location: inventory_list.php?success=created');
         exit;
       }
@@ -330,10 +397,14 @@ render_header($page_title);
     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['inventory_form_csrf']) ?>" />
 
     <div class="form-grid">
-      <div>
-        <label>Part Number <span style="color:var(--d);">*</span></label>
-        <input type="text" name="part_number" maxlength="120" required value="<?= h($fields['part_number']) ?>" />
-      </div>
+      <?php if ($is_edit): ?>
+        <div>
+          <label>Part Number</label>
+          <div class="input-like"><?= h($part_number) ?></div>
+        </div>
+      <?php else: ?>
+        <div class="full muted">Part Number will be generated automatically when this item is created.</div>
+      <?php endif; ?>
       <div>
         <label>Name <span style="color:var(--d);">*</span></label>
         <input type="text" name="item_name" maxlength="255" required value="<?= h($fields['item_name']) ?>" />
