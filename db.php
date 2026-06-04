@@ -704,6 +704,10 @@ $legacy_rfq_canned_response_defaults = [
     'body' => 'Please share packaging dimensions and gross/net weight, and confirm whether export-grade wooden crate packing is included.',
   ],
 ];
+$rfq_canned_response_legacy_only_slots = array_values(array_diff(
+  range(1, 6),
+  array_keys($rfq_canned_response_defaults)
+));
 $rfq_canned_response_rows = $pdo->query(
   "SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN (1,2,3,4,5,6) ORDER BY slot"
 )->fetchAll();
@@ -737,7 +741,11 @@ if ($replace_legacy_rfq_canned_defaults) {
   foreach ($rfq_canned_response_defaults as $slot => $response) {
     $rfq_canned_response_stmt->execute([$slot, $response['label'], $response['body']]);
   }
-  $pdo->exec("DELETE FROM rfq_canned_responses WHERE slot IN (5,6)");
+  if ($rfq_canned_response_legacy_only_slots) {
+    $pdo->exec(
+      "DELETE FROM rfq_canned_responses WHERE slot IN (" . implode(',', $rfq_canned_response_legacy_only_slots) . ")"
+    );
+  }
 }
 $rfq_canned_response_seed_stmt = $pdo->prepare(
   "INSERT IGNORE INTO rfq_canned_responses (slot, label, body) VALUES (?, ?, ?)"
