@@ -119,7 +119,7 @@ if ($section === 'dashboard') {
          UNION ALL
 
          SELECT
-           'Phone Inquiry' AS kind,
+           'Quick Order' AS kind,
            COALESCE(NULLIF(TRIM(customer_name), ''), 'Unknown caller') AS actor,
            COALESCE(NULLIF(TRIM(company_name), ''), 'Customer inquiry logged') AS details,
            created_at AS occurred_at

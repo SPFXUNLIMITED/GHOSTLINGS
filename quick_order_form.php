@@ -21,11 +21,11 @@ const INQUIRY_STATUS_BADGES = [
 ];
 const INQUIRY_TABLE_COLUMN_COUNT = 7;
 
-function customer_inquiry_status_redirect_url(): string {
-  return 'customer_inquiry_form.php?view=all&status_updated=1';
+function quick_order_status_redirect_url(): string {
+  return 'quick_order_form.php?view=all&status_updated=1';
 }
 
-function customer_inquiry_notes_preview(?string $notes, int $max_length = 120): string {
+function quick_order_notes_preview(?string $notes, int $max_length = 120): string {
   $notes = trim((string)$notes);
   if ($notes === '') {
     return '—';
@@ -40,8 +40,8 @@ function customer_inquiry_notes_preview(?string $notes, int $max_length = 120): 
     : $notes;
 }
 
-if (empty($_SESSION['customer_inquiry_csrf'])) {
-  $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
+if (empty($_SESSION['quick_order_csrf'])) {
+  $_SESSION['quick_order_csrf'] = bin2hex(random_bytes(24));
 }
 
 $today = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Y-m-d');
@@ -98,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $status_updated = false;
   $deleted = false;
   $csrf = (string)($_POST['csrf_token'] ?? '');
-  if (!hash_equals((string)$_SESSION['customer_inquiry_csrf'], $csrf)) {
+  if (!hash_equals((string)$_SESSION['quick_order_csrf'], $csrf)) {
     $errors[] = 'Security token mismatch. Please refresh and try again.';
   } else {
     if ($post_action === 'status') {
@@ -109,8 +109,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       } else {
         $upd = $pdo->prepare("UPDATE customer_phone_inquiries SET status = ? WHERE id = ?");
         $upd->execute([$next_status, $row_id]);
-        $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
-        header('Location: ' . customer_inquiry_status_redirect_url());
+        $_SESSION['quick_order_csrf'] = bin2hex(random_bytes(24));
+        header('Location: ' . quick_order_status_redirect_url());
         exit;
       }
     } elseif ($post_action === 'delete') {
@@ -120,8 +120,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       } else {
         $del = $pdo->prepare("DELETE FROM customer_phone_inquiries WHERE id = ?");
         $del->execute([$row_id]);
-        $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
-        header('Location: customer_inquiry_form.php?view=all&deleted=1');
+        $_SESSION['quick_order_csrf'] = bin2hex(random_bytes(24));
+        header('Location: quick_order_form.php?view=all&deleted=1');
         exit;
       }
     }
@@ -177,16 +177,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $actor_id = null;
           }
           $actor_name = isset($_SESSION['username']) ? trim((string)$_SESSION['username']) : '';
-          $detail = 'Inquiry #' . (int)$edit_id . ' updated for ' . $fields['customer_name'];
+          $detail = 'Quick Order #' . (int)$edit_id . ' updated for ' . $fields['customer_name'];
           if ($fields['company_name'] !== '') {
             $detail .= ' (' . $fields['company_name'] . ')';
           }
-          log_admin_activity($pdo, $actor_id, 'Customer Inquiry Updated', $detail, $actor_name);
+          log_admin_activity($pdo, $actor_id, 'Quick Order Updated', $detail, $actor_name);
         } catch (Throwable $e) {
           // Non-blocking audit log write.
         }
-        $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
-        header('Location: customer_inquiry_form.php?view=id&id=' . $edit_id . '&updated=1');
+        $_SESSION['quick_order_csrf'] = bin2hex(random_bytes(24));
+        header('Location: quick_order_form.php?view=id&id=' . $edit_id . '&updated=1');
         exit;
       } else {
         // Insert new record
@@ -213,17 +213,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
           $actor_name = isset($_SESSION['username']) ? trim((string)$_SESSION['username']) : '';
          if ($new_id > 0) {
-           $detail = 'Inquiry #' . $new_id . ' created for ' . $fields['customer_name'];
+           $detail = 'Quick Order #' . $new_id . ' created for ' . $fields['customer_name'];
            if ($fields['company_name'] !== '') {
              $detail .= ' (' . $fields['company_name'] . ')';
            }
-           log_admin_activity($pdo, $created_by, 'Customer Inquiry Created', $detail, $actor_name);
+           log_admin_activity($pdo, $created_by, 'Quick Order Created', $detail, $actor_name);
          }
        } catch (Throwable $e) {
          // Non-blocking audit log write.
        }
-       $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
-       header('Location: customer_inquiry_form.php?view=id&id=' . $new_id . '&saved=1');
+       $_SESSION['quick_order_csrf'] = bin2hex(random_bytes(24));
+       header('Location: quick_order_form.php?view=id&id=' . $new_id . '&saved=1');
        exit;
        }
      }
@@ -255,14 +255,14 @@ if ($show_detail) {
   $detail_inquiry = $stmt->fetch();
   if (!$detail_inquiry) {
     http_response_code(404);
-    render_header('Customer Inquiry Not Found');
+    render_header('Quick Order Not Found');
     ?>
     <div class="card">
-      <h1 style="margin-top:0;">Customer Inquiry Not Found</h1>
-      <p class="muted">We couldn’t find that customer inquiry record.</p>
+      <h1 style="margin-top:0;">Quick Order Not Found</h1>
+      <p class="muted">We couldn’t find that quick order record.</p>
       <div class="actions">
-        <a class="btn" href="customer_inquiry_form.php?view=all">Back to All Inquiries</a>
-        <a class="btn primary" href="customer_inquiry_form.php">New Inquiry</a>
+        <a class="btn" href="quick_order_form.php?view=all">Back to All Quick Orders</a>
+        <a class="btn primary" href="quick_order_form.php">New Quick Order</a>
       </div>
     </div>
     <?php
@@ -270,12 +270,12 @@ if ($show_detail) {
     exit;
   }
 }
-render_header('Customer Inquiry Log');
+render_header('Quick Order Form');
 ?>
 
 <div class="card">
-  <h1 style="margin:0;">Customer Phone Inquiry Log</h1>
-  <p class="muted" style="margin:6px 0 0;">Quickly log customers who call asking about machines.</p>
+  <h1 style="margin:0;">Quick Order Form</h1>
+  <p class="muted" style="margin:6px 0 0;">Log quick orders with contact details and notes.</p>
 </div>
 
 <?php if ($errors): ?>
@@ -289,17 +289,17 @@ render_header('Customer Inquiry Log');
 <?php if ($show_detail): ?>
   <?php if ($saved): ?>
     <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">
-      Inquiry saved successfully.
+      Quick order saved successfully.
     </div>
   <?php endif; ?>
   <?php if ($updated): ?>
     <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">
-      Inquiry updated successfully.
+      Quick order updated successfully.
     </div>
   <?php endif; ?>
   <?php if ($status_updated): ?>
     <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">
-      Inquiry status updated successfully.
+      Quick order status updated successfully.
     </div>
   <?php endif; ?>
   <?php
@@ -310,19 +310,19 @@ render_header('Customer Inquiry Log');
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
       <div>
-        <h2 style="margin:0;">Inquiry #<?= (int)$detail_inquiry['id'] ?> — <?= h($detail_inquiry['customer_name']) ?></h2>
+        <h2 style="margin:0;">Quick Order #<?= (int)$detail_inquiry['id'] ?> — <?= h($detail_inquiry['customer_name']) ?></h2>
         <p class="muted" style="margin:6px 0 0;">Logged on <?= h($detail_inquiry['inquiry_date']) ?><?= h($detail_created_at_text) ?></p>
       </div>
       <div class="actions">
-        <a class="btn" href="customer_inquiry_form.php?view=all">Back to All Inquiries</a>
-        <a class="btn primary" href="customer_inquiry_form.php?edit=<?= (int)$detail_inquiry['id'] ?>">Edit Inquiry</a>
+        <a class="btn" href="quick_order_form.php?view=all">Back to All Quick Orders</a>
+        <a class="btn primary" href="quick_order_form.php?edit=<?= (int)$detail_inquiry['id'] ?>">Edit Quick Order</a>
       </div>
     </div>
   </div>
 
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px;">
-      <h3 style="margin:0;">Inquiry Details</h3>
+      <h3 style="margin:0;">Quick Order Details</h3>
       <span style="display:inline-flex; align-items:center; border-radius:999px; padding:6px 12px; font-weight:600; background:<?= h($detail_badge_bg) ?>; color:<?= h($detail_badge_color) ?>;">
         <?= h(INQUIRY_STATUS_OPTIONS[$detail_status] ?? 'New') ?>
       </span>
@@ -368,12 +368,12 @@ render_header('Customer Inquiry Log');
   <div class="card">
     <div style="display:flex; justify-content:flex-end; align-items:flex-start; gap:14px; flex-wrap:wrap;">
       <div style="flex:0 0 auto;">
-        <h3 style="margin:0 0 12px;">Delete Inquiry</h3>
+        <h3 style="margin:0 0 12px;">Delete Quick Order</h3>
         <form method="post" onsubmit="return confirm('Delete this inquiry? This cannot be undone.');">
-          <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customer_inquiry_csrf']) ?>" />
+          <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quick_order_csrf']) ?>" />
           <input type="hidden" name="action" value="delete" />
           <input type="hidden" name="row_id" value="<?= (int)$detail_inquiry['id'] ?>" />
-          <button type="submit" class="btn" aria-label="Delete inquiry for <?= h($detail_inquiry['customer_name']) ?>" style="background:#fee2e2; border-color:#fecaca; color:#991b1b;">Delete Inquiry</button>
+          <button type="submit" class="btn" aria-label="Delete quick order for <?= h($detail_inquiry['customer_name']) ?>" style="background:#fee2e2; border-color:#fecaca; color:#991b1b;">Delete Quick Order</button>
         </form>
       </div>
     </div>
@@ -381,22 +381,22 @@ render_header('Customer Inquiry Log');
 <?php elseif ($show_all): ?>
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
-      <h2 style="margin:0;">All Customer Inquiries</h2>
-      <a class="btn primary" href="customer_inquiry_form.php">New Inquiry</a>
+      <h2 style="margin:0;">All Quick Orders</h2>
+      <a class="btn primary" href="quick_order_form.php">New Quick Order</a>
     </div>
     <?php if ($updated): ?>
       <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">
-        Inquiry updated successfully.
+        Quick order updated successfully.
       </div>
     <?php endif; ?>
     <?php if ($status_updated): ?>
       <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">
-        Inquiry status updated successfully.
+        Quick order status updated successfully.
       </div>
     <?php endif; ?>
     <?php if ($deleted): ?>
       <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">
-        Inquiry deleted successfully.
+        Quick order deleted successfully.
       </div>
     <?php endif; ?>
     <div style="overflow-x:auto;">
@@ -414,7 +414,7 @@ render_header('Customer Inquiry Log');
         </thead>
         <tbody>
           <?php if (!$inquiries): ?>
-            <tr><td colspan="<?= INQUIRY_TABLE_COLUMN_COUNT ?>" class="muted">No inquiries logged yet.</td></tr>
+            <tr><td colspan="<?= INQUIRY_TABLE_COLUMN_COUNT ?>" class="muted">No quick orders logged yet.</td></tr>
           <?php endif; ?>
           <?php foreach ($inquiries as $inquiry): ?>
             <?php $status_key = (string)($inquiry['status'] ?? 'new'); ?>
@@ -422,7 +422,7 @@ render_header('Customer Inquiry Log');
               <td style="white-space:nowrap;"><?= h($inquiry['inquiry_date']) ?></td>
               <td style="white-space:nowrap;">
                 <form method="post" style="display:flex; gap:8px; align-items:center; margin:0;">
-                  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customer_inquiry_csrf']) ?>" />
+                  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quick_order_csrf']) ?>" />
                   <input type="hidden" name="action" value="status" />
                   <input type="hidden" name="row_id" value="<?= (int)$inquiry['id'] ?>" />
                   <select name="status" aria-label="Status for inquiry dated <?= h($inquiry['inquiry_date']) ?>" style="min-width:150px;">
@@ -435,10 +435,10 @@ render_header('Customer Inquiry Log');
               </td>
               <td><?= h($inquiry['customer_name']) ?></td>
               <td><?= h($inquiry['phone_number'] ?: '—') ?></td>
-              <td style="min-width:240px; white-space:normal;"><?= h(customer_inquiry_notes_preview($inquiry['notes'] ?? null)) ?></td>
+              <td style="min-width:240px; white-space:normal;"><?= h(quick_order_notes_preview($inquiry['notes'] ?? null)) ?></td>
               <td><?= h($inquiry['created_by_username'] ?: '—') ?></td>
               <td style="white-space:nowrap;">
-                <a class="btn" href="customer_inquiry_form.php?view=id&id=<?= (int)$inquiry['id'] ?>">View</a>
+                <a class="btn" href="quick_order_form.php?view=id&id=<?= (int)$inquiry['id'] ?>">View</a>
               </td>
             </tr>
           <?php endforeach; ?>
@@ -448,10 +448,10 @@ render_header('Customer Inquiry Log');
   </div>
 <?php else: ?>
   <form method="post" class="card" style="max-width:960px;">
-    <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customer_inquiry_csrf']) ?>" />
+    <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quick_order_csrf']) ?>" />
     <?php if ($edit_id !== null): ?>
       <input type="hidden" name="edit_id" value="<?= $edit_id ?>" />
-      <h2 style="margin:0 0 14px;">Edit Inquiry</h2>
+      <h2 style="margin:0 0 14px;">Edit Quick Order</h2>
     <?php endif; ?>
     <div class="form-grid">
       <div>
@@ -480,8 +480,8 @@ render_header('Customer Inquiry Log');
       </div>
     </div>
     <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
-      <button type="submit" class="btn primary" style="font-size:18px; padding:14px 22px;"><?= $edit_id !== null ? 'Update Inquiry' : 'Save Inquiry' ?></button>
-      <a class="btn" href="<?= $edit_id !== null ? 'customer_inquiry_form.php?view=id&id=' . (int)$edit_id : 'customer_inquiry_form.php?view=all' ?>"><?= $edit_id !== null ? 'Back to Inquiry' : 'View All Inquiries' ?></a>
+      <button type="submit" class="btn primary" style="font-size:18px; padding:14px 22px;"><?= $edit_id !== null ? 'Update Quick Order' : 'Save Quick Order' ?></button>
+      <a class="btn" href="<?= $edit_id !== null ? 'quick_order_form.php?view=id&id=' . (int)$edit_id : 'quick_order_form.php?view=all' ?>"><?= $edit_id !== null ? 'Back to Quick Order' : 'View All Quick Orders' ?></a>
     </div>
   </form>
 <?php endif; ?>

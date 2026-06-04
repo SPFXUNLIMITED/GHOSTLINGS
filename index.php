@@ -116,10 +116,10 @@ render_alibaba_workflow_banner('create_rfq');
     </section>
 
     <section class="home-entry-grid" aria-label="Primary actions">
-      <a class="home-entry-card" href="customer_inquiry_form.php">
+      <a class="home-entry-card" href="quick_order_form.php">
         <span class="home-entry-icon" aria-hidden="true">CI</span>
-        <h2 class="home-entry-title">New Customer Inquiry</h2>
-        <p class="home-entry-text">Capture customer details, requirements, and notes for quick follow-up.</p>
+        <h2 class="home-entry-title">New Quick Order</h2>
+        <p class="home-entry-text">Capture customer details, order requirements, and notes for quick follow-up.</p>
       </a>
 
       <a class="home-entry-card" href="sourcing_rfq_form.php">
