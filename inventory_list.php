@@ -105,6 +105,8 @@ if ($success_param === 'created') {
   $success_message = 'Inventory item created.';
 } elseif ($success_param === 'updated') {
   $success_message = 'Inventory item updated.';
+} elseif ($success_param === 'deleted') {
+  $success_message = 'Inventory item deleted.';
 }
 
 if ($q !== '') {
