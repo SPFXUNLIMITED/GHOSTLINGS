@@ -141,6 +141,10 @@ render_header('Messages');
 <script>
 tinymce.init({
   selector: '#msg-body',
+  base_url: '/project/tinymce/js/tinymce',
+  suffix: '.min',
+  license_key: 'gpl',
+  content_css: '/project/tinymce/js/tinymce/skins/content/default/content.min.css',
   menubar: false,
   plugins: 'lists link',
   toolbar: 'bold italic underline | bullist numlist | link | removeformat',
