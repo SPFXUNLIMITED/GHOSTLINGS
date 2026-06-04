@@ -91,6 +91,7 @@ $fields = [
 ];
 
 $errors = [];
+$warnings = [];
 $success = '';
 $image_original_name = null;
 $image_stored_name = null;
@@ -209,7 +210,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   $old = __DIR__ . '/uploads/inventory/' . basename((string)$image_stored_name);
                   if (is_file($old)) {
                     if (!unlink($old)) {
-                      $errors[] = 'New image saved, but failed to remove the previous image file.';
+                      $warnings[] = 'New image uploaded, but the previous image file could not be removed.';
                     }
                   }
                 }
@@ -318,6 +319,14 @@ render_header($page_title);
   <?php if ($success): ?>
     <div class="alert" style="margin-bottom:14px; border-color:#bbf7d0; background:#f0fdf4; color:#166534;">
       <?= h($success) ?>
+    </div>
+  <?php endif; ?>
+
+  <?php if ($warnings): ?>
+    <div class="alert" style="margin-bottom:14px; border-color:#fde68a; background:#fffbeb; color:#92400e;">
+      <ul style="margin:0; padding-left:18px;">
+        <?php foreach ($warnings as $w): ?><li><?= h($w) ?></li><?php endforeach; ?>
+      </ul>
     </div>
   <?php endif; ?>
 
