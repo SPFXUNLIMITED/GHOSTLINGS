@@ -221,11 +221,6 @@ if (!$order && $source_quote && (string)($source_quote['request_status'] ?? '') 
   exit;
 }
 
-if (!$order && !$source_quote && !$direct_po_rfq) {
-  header('Location: order_tracker.php');
-  exit;
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
   $can_manage_stage = is_admin_or_moderator();
@@ -571,6 +566,42 @@ if (!$order && $direct_po_rfq) {
     'warranty_terms'           => '',
     'included_accessories'     => '',
     'notes'                    => '',
+  ];
+}
+
+if (!$order) {
+  $order = [
+    'id' => 0,
+    'rfq_request_id' => $rfq_id,
+    'rfq_quote_id' => $quote_id > 0 ? $quote_id : null,
+    'request_title' => '',
+    'po_number' => PENDING_PO_NUMBER_PLACEHOLDER,
+    'order_status' => 'create_rfq',
+    'order_date' => '',
+    'expected_ready_date' => '',
+    'expected_ship_date' => '',
+    'supplier_name' => '',
+    'model_name' => '',
+    'sku' => '',
+    'quantity' => '1',
+    'unit_price' => '',
+    'order_total' => '',
+    'currency' => 'USD',
+    'deposit_percent' => '',
+    'deposit_amount' => '',
+    'balance_amount' => '',
+    'payment_terms' => '',
+    'incoterm' => '',
+    'shipping_method' => '',
+    'shipping_origin' => '',
+    'destination_port' => '',
+    'destination_address' => '',
+    'production_lead_time_days' => '',
+    'trade_assurance_order_no' => '',
+    'proforma_invoice_no' => '',
+    'warranty_terms' => '',
+    'included_accessories' => '',
+    'notes' => '',
   ];
 }
 $current_order_status = (string)order_value($order ?? [], 'order_status', 'create_rfq');
