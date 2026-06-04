@@ -16,31 +16,52 @@ $options = [
 $pdo = new PDO($dsn, $db['user'], $db['pass'], $options);
 const APP_ENCRYPTED_MIN_PAYLOAD_BYTES = 29; // 12-byte IV + 16-byte tag + minimum 1-byte ciphertext
 
-function app_settings_crypto_key(): string {
+function app_settings_crypto_key(?string $raw_override = null): string {
   static $key = null;
-  if (is_string($key)) {
+  if ($raw_override === null && is_string($key)) {
     return $key;
   }
 
   global $config;
-  $raw = trim((string)(getenv('APP_SETTINGS_ENCRYPTION_KEY') ?: ($config['app_settings_encryption_key'] ?? '')));
+  $raw = trim((string)$raw_override);
   if ($raw === '') {
-    throw new RuntimeException('Missing APP_SETTINGS_ENCRYPTION_KEY (or config app_settings_encryption_key).');
+    global $pdo;
+    if (isset($pdo) && $pdo instanceof PDO) {
+      try {
+        $stmt = $pdo->prepare("SELECT setting_val FROM integration_settings WHERE setting_key = 'app_settings_encryption_key' LIMIT 1");
+        $stmt->execute();
+        $raw = trim((string)($stmt->fetchColumn() ?? ''));
+      } catch (Throwable $e) {
+        $raw = '';
+      }
+    }
+  }
+  if ($raw === '') {
+    $raw = trim((string)(getenv('APP_SETTINGS_ENCRYPTION_KEY') ?: ($config['app_settings_encryption_key'] ?? '')));
+  }
+  if ($raw === '') {
+    throw new RuntimeException('Missing app settings encryption key.');
   }
 
   if (preg_match('/^[a-f0-9]{64}$/i', $raw)) {
     $decoded = hex2bin($raw);
     if ($decoded !== false && strlen($decoded) === 32) {
-      $key = $decoded;
-      return $key;
+      if ($raw_override === null) {
+        $key = $decoded;
+        return $key;
+      }
+      return $decoded;
     }
   }
 
-  $key = hash('sha256', $raw, true);
-  return $key;
+  $resolved = hash('sha256', $raw, true);
+  if ($raw_override === null) {
+    $key = $resolved;
+  }
+  return $resolved;
 }
 
-function app_encrypt_setting_value(string $plaintext): string {
+function app_encrypt_setting_value(string $plaintext, ?string $raw_key_override = null): string {
   if ($plaintext === '') {
     return '';
   }
@@ -50,7 +71,7 @@ function app_encrypt_setting_value(string $plaintext): string {
   $ciphertext = openssl_encrypt(
     $plaintext,
     'aes-256-gcm',
-    app_settings_crypto_key(),
+    app_settings_crypto_key($raw_key_override),
     OPENSSL_RAW_DATA,
     $iv,
     $tag,

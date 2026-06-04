@@ -18,10 +18,35 @@ $errors = [];
 $success = '';
 $customer_table_columns = 6;
 
-function hubspot_token(): string {
+function hubspot_token(PDO $pdo): string {
   $token = app_env_value('HUBSPOT_PRIVATE_APP_TOKEN');
   if ($token !== '') return $token;
-  return app_env_value('HUBSPOT_ACCESS_TOKEN');
+  $token = app_env_value('HUBSPOT_ACCESS_TOKEN');
+  if ($token !== '') return $token;
+
+  $stmt = $pdo->prepare(
+    "SELECT setting_val, is_encrypted
+     FROM integration_settings
+     WHERE setting_key = 'hubspot_private_app_token'
+     LIMIT 1"
+  );
+  $stmt->execute();
+  $row = $stmt->fetch() ?: [];
+  $stored = trim((string)($row['setting_val'] ?? ''));
+  if ($stored === '') {
+    return '';
+  }
+  $is_encrypted = (int)($row['is_encrypted'] ?? 0) === 1;
+  if (!$is_encrypted) {
+    return $stored;
+  }
+
+  $decrypted = trim(app_decrypt_setting_value($stored));
+  if ($decrypted !== '') {
+    return $decrypted;
+  }
+
+  throw new RuntimeException('Unable to decrypt saved HubSpot token. Set or update the app settings encryption key in Admin Integrations.');
 }
 
 function app_env_value(string $key): string {
