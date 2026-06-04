@@ -152,6 +152,11 @@ $menu = [
   'system_settings' => ['label' => 'System Settings', 'subtitle' => 'Configuration and controls'],
 ];
 
+$format_activity_datetime = static function ($value): string {
+  $ts = strtotime((string)$value);
+  return $ts !== false ? date('M j, Y g:i A', $ts) : '—';
+};
+
 render_header('Admin Backend');
 ?>
 
@@ -259,6 +264,10 @@ render_header('Admin Backend');
     gap: 12px;
   }
 
+  .canned-item + .canned-item {
+    margin-top: 22px;
+  }
+
   @media (max-width: 980px) {
     .admin-shell {
       grid-template-columns: 1fr;
@@ -336,7 +345,7 @@ render_header('Admin Backend');
                   <td><?= h((string)$row['kind']) ?></td>
                   <td><?= h((string)$row['actor']) ?></td>
                   <td><?= h((string)$row['details']) ?></td>
-                  <td><?= h(date('M j, Y g:i A', strtotime((string)$row['occurred_at']))) ?></td>
+                  <td><?= h($format_activity_datetime($row['occurred_at'])) ?></td>
                 </tr>
               <?php endforeach; ?>
             </tbody>
@@ -370,18 +379,20 @@ render_header('Admin Backend');
           <input type="hidden" name="csrf_token" value="<?= h($_SESSION['admin_backend_csrf']) ?>" />
 
           <?php for ($i = 1; $i <= 6; $i++): ?>
-            <h3 class="form-section-heading" style="margin-top:<?= $i > 1 ? '22px' : '0' ?>;">Response <?= $i ?></h3>
-            <div class="admin-grid-two">
-              <div>
-                <label>Button Label</label>
-                <input type="text" name="cr_label_<?= $i ?>" maxlength="100"
-                       value="<?= h($canned[$i]['label']) ?>"
-                       placeholder="e.g. Standard Request" />
-              </div>
-              <div>
-                <label>Response Text</label>
-                <textarea name="cr_body_<?= $i ?>" rows="4" maxlength="2000"
-                          placeholder="Text to insert into Additional Notes..."><?= h($canned[$i]['body']) ?></textarea>
+            <div class="canned-item">
+              <h3 class="form-section-heading" style="margin-top:0;">Response <?= $i ?></h3>
+              <div class="admin-grid-two">
+                <div>
+                  <label>Button Label</label>
+                  <input type="text" name="cr_label_<?= $i ?>" maxlength="100"
+                         value="<?= h($canned[$i]['label']) ?>"
+                         placeholder="e.g. Standard Request" />
+                </div>
+                <div>
+                  <label>Response Text</label>
+                  <textarea name="cr_body_<?= $i ?>" rows="4" maxlength="2000"
+                            placeholder="Text to insert into Additional Notes..."><?= h($canned[$i]['body']) ?></textarea>
+                </div>
               </div>
             </div>
           <?php endfor; ?>
