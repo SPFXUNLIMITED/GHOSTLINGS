@@ -163,6 +163,11 @@ render_header('Inventory List');
     border: 1px solid var(--b);
     background: #fff;
   }
+  .inventory-add-btn {
+    padding: 12px 18px;
+    font-size: 1rem;
+    font-weight: 700;
+  }
 </style>
 
 <div class="card page-header">
@@ -170,7 +175,7 @@ render_header('Inventory List');
     <h1>Inventory <span class="muted" style="font-size:0.7em; font-weight:400;">(<?= count($items) ?>)</span></h1>
     <p class="muted">Track inventory details, pricing tiers, stock alerts, location, and images.</p>
   </div>
-  <a class="btn primary" href="inventory_form.php">+ Add Item</a>
+  <a class="btn primary inventory-add-btn" href="inventory_form.php">Add New Item</a>
 </div>
 
 <div class="card">

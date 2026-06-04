@@ -486,6 +486,7 @@ $show_rfq_menu = $show_mod_menu;
       ['href' => 'machine_inquiry_admin.php', 'file' => 'machine_inquiry_admin.php', 'label' => 'Inquiry Admin', 'visible' => $show_mod_menu],
     ], $current); ?>
     <?php if ($show_mod_menu): ?>
+    <a class="menu-link <?= in_array($current, ['inventory_list.php', 'inventory_form.php'], true) ? 'active' : '' ?>" href="inventory_list.php">Inventory</a>
     <span class="menu-spacer" aria-hidden="true"></span>
     <?php render_menu_dropdown('RFQ & Sourcing', [
       ['href' => 'vendors.php', 'file' => 'vendors.php', 'label' => 'Vendors', 'visible' => true],
