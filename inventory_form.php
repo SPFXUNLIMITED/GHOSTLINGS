@@ -189,7 +189,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$errors) {
           $uploads_dir = __DIR__ . '/uploads/inventory';
           if (!is_dir($uploads_dir)) {
-            @mkdir($uploads_dir, 0755, true);
+            if (!mkdir($uploads_dir, 0755, true) && !is_dir($uploads_dir)) {
+              $errors[] = 'Unable to create uploads/inventory directory.';
+            }
           }
           if (!is_dir($uploads_dir) || !is_writable($uploads_dir)) {
             $errors[] = 'uploads/inventory directory is missing or not writable.';
@@ -206,7 +208,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($is_edit && $image_stored_name) {
                   $old = __DIR__ . '/uploads/inventory/' . basename((string)$image_stored_name);
                   if (is_file($old)) {
-                    @unlink($old);
+                    if (!unlink($old)) {
+                      $errors[] = 'New image saved, but failed to remove the previous image file.';
+                    }
                   }
                 }
                 $image_original_name = $orig_name;
