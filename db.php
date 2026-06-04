@@ -52,6 +52,12 @@ function app_settings_crypto_key(): string {
   if ($raw === '') {
     $generated_key = bin2hex(random_bytes(32));
     $pdo->prepare(
+      "UPDATE integration_settings
+       SET setting_val = ?, is_encrypted = 0
+       WHERE setting_key = 'app_settings_encryption_key'
+         AND (setting_val IS NULL OR TRIM(setting_val) = '')"
+    )->execute([$generated_key]);
+    $pdo->prepare(
       "INSERT IGNORE INTO integration_settings (setting_key, setting_val, is_encrypted)
        VALUES ('app_settings_encryption_key', ?, 0)"
     )->execute([$generated_key]);
