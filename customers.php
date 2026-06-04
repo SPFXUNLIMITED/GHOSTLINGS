@@ -17,6 +17,7 @@ if (empty($_SESSION['customers_sync_csrf'])) {
 
 $errors = [];
 $success = '';
+$customer_table_columns = 5;
 
 function hubspot_token(): string {
   $token = trim((string)getenv('HUBSPOT_PRIVATE_APP_TOKEN'));
@@ -151,7 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   } else {
     try {
       $result = sync_customers_from_hubspot($pdo);
-      $success = 'HubSpot sync complete. Synced ' . (int)$result['synced'] . ' customer(s).';
+      $success = 'HubSpot sync complete. Synced ' . (int)$result['synced'] . ' contact(s).';
       if (!empty($result['partial'])) {
         $success .= ' Page limit reached; click sync again to continue importing remaining contacts.';
       }
@@ -165,7 +166,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $customers = $pdo->query(
   "SELECT customer_name, company, phone, email, last_updated, updated_at
    FROM customers
-   ORDER BY last_updated DESC, updated_at DESC, id DESC"
+   ORDER BY (last_updated IS NULL) ASC, last_updated DESC, updated_at DESC, id DESC"
 )->fetchAll();
 
 render_header('Customers');
@@ -210,7 +211,7 @@ render_header('Customers');
     <tbody>
       <?php if (!$customers): ?>
         <tr>
-          <td colspan="5" class="muted">No customers synced yet.</td>
+          <td colspan="<?= $customer_table_columns ?>" class="muted">No customers synced yet.</td>
         </tr>
       <?php endif; ?>
       <?php foreach ($customers as $row): ?>
