@@ -1,5 +1,14 @@
 <?php
-$activity_rows = $pdo->query("
+$activity_rows = [];
+$activity_error = '';
+$activity_limit = isset($_GET['activity_limit']) ? (int)$_GET['activity_limit'] : 200;
+$activity_limit = max(50, min(500, $activity_limit));
+
+if (!isset($pdo) || !($pdo instanceof PDO)) {
+  $activity_error = 'Activity log is unavailable.';
+} else {
+  try {
+    $activity_rows = $pdo->query("
   SELECT *
   FROM (
     SELECT
@@ -47,13 +56,23 @@ $activity_rows = $pdo->query("
     LEFT JOIN users u ON u.id = cpi.created_by
   ) AS activity_feed
   ORDER BY event_time DESC
-  LIMIT 200
+  LIMIT {$activity_limit}
 ")->fetchAll();
+  } catch (Throwable $e) {
+    $activity_error = 'Unable to load activity log right now.';
+  }
+}
 ?>
 
 <div class="card">
   <h2 style="margin-top:0;">Activity Log</h2>
-  <p class="muted" style="margin-top:0;">Most recent user activity across key workflows.</p>
+  <p class="muted" style="margin-top:0;">
+    Most recent user activity across key workflows (showing up to <?= (int)$activity_limit ?> records).
+  </p>
+
+  <?php if ($activity_error !== ''): ?>
+    <div class="alert error" style="margin-bottom:14px;"><?= h($activity_error) ?></div>
+  <?php endif; ?>
 
   <div style="overflow-x:auto;">
     <table style="min-width:900px;">
@@ -66,7 +85,7 @@ $activity_rows = $pdo->query("
         </tr>
       </thead>
       <tbody>
-        <?php if (!$activity_rows): ?>
+        <?php if (empty($activity_rows)): ?>
           <tr>
             <td colspan="4" class="muted">No activity logged yet.</td>
           </tr>
