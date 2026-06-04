@@ -64,7 +64,9 @@ render_alibaba_workflow_banner('create_rfq');
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .04em;
   margin-bottom: 14px;
   background: #eff6ff;
 }
@@ -81,6 +83,11 @@ render_alibaba_workflow_banner('create_rfq');
   color: #475569;
 }
 @media (max-width: 980px) {
+  .home-entry-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 768px) {
   .home-entry-grid {
     grid-template-columns: 1fr;
   }
@@ -103,19 +110,19 @@ render_alibaba_workflow_banner('create_rfq');
 
   <section class="home-entry-grid" aria-label="Primary actions">
     <a class="home-entry-card" href="customer_inquiry_form.php">
-      <span class="home-entry-icon" aria-hidden="true">📞</span>
+      <span class="home-entry-icon" aria-hidden="true">CI</span>
       <h2 class="home-entry-title">New Customer Inquiry</h2>
       <p class="home-entry-text">Capture customer details, requirements, and notes for quick follow-up.</p>
     </a>
 
     <a class="home-entry-card" href="sourcing_rfq_form.php">
-      <span class="home-entry-icon" aria-hidden="true">📄</span>
+      <span class="home-entry-icon" aria-hidden="true">RFQ</span>
       <h2 class="home-entry-title">New RFQ</h2>
       <p class="home-entry-text">Create a new sourcing request to collect supplier quotes and pricing.</p>
     </a>
 
     <a class="home-entry-card" href="order_form.php">
-      <span class="home-entry-icon" aria-hidden="true">🧾</span>
+      <span class="home-entry-icon" aria-hidden="true">PO</span>
       <h2 class="home-entry-title">New Purchase Order</h2>
       <p class="home-entry-text">Start a purchase order workflow and move it through fulfillment stages.</p>
     </a>
