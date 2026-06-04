@@ -93,8 +93,12 @@ render_header('Alibaba Quick Responses');
       <h1 style="margin:0 0 6px;">Alibaba Quick Responses</h1>
       <p class="muted" style="margin:0;">Ready-to-copy sourcing responses for the team.</p>
     </div>
-    <span class="badge new">5 Responses</span>
+    <span class="badge new"><?= count($responses) ?> Responses</span>
   </div>
+</div>
+
+<div class="alert" id="alibaba-copy-browser-note" style="display:none; border-color:#fde68a; background:#fffbeb; color:#92400e;">
+  Clipboard access is limited in this browser. Copy will use a legacy fallback if needed.
 </div>
 
 <div class="alibaba-grid">
@@ -122,7 +126,12 @@ render_header('Alibaba Quick Responses');
 (() => {
   const buttons = document.querySelectorAll('.js-copy-response');
   if (!buttons.length) return;
+  const browserNote = document.getElementById('alibaba-copy-browser-note');
   let fallbackWarned = false;
+
+  if ((!navigator.clipboard || !window.isSecureContext) && browserNote) {
+    browserNote.style.display = 'block';
+  }
 
   const showStatus = (statusEl) => {
     if (!statusEl) return;
