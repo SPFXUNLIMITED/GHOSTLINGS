@@ -90,6 +90,21 @@ render_header('Alibaba Quick Responses');
 .alibaba-copy-status.show {
   opacity:1;
 }
+.alibaba-top-notice {
+  margin:0 0 14px;
+  padding:12px 14px;
+  border:1px solid #bfdbfe;
+  border-radius:10px;
+  background:#eff6ff;
+  color:#1e3a8a;
+  font-weight:600;
+}
+.alibaba-copy-btn {
+  padding:12px 18px;
+  font-size:15px;
+  font-weight:700;
+  box-shadow:0 6px 14px rgba(29, 78, 216, 0.2);
+}
 @media (max-width: 640px) {
   .alibaba-response-actions {
     flex-direction:column;
@@ -99,6 +114,7 @@ render_header('Alibaba Quick Responses');
 </style>
 
 <div class="card">
+  <p class="alibaba-top-notice">Use these notices to prevent suppliers from sending prototypes, custom work, or changing prices after quoting.</p>
   <div class="alibaba-header">
     <div>
       <h1 style="margin:0 0 6px;">Alibaba Quick Responses</h1>
@@ -129,7 +145,7 @@ render_header('Alibaba Quick Responses');
         <span class="muted">Copy the exact notice text below.</span>
         <div class="actions">
           <span class="alibaba-copy-status" id="<?= h($field_id) ?>-status" aria-live="polite">Copied</span>
-          <button type="button" class="btn primary js-copy-response" data-target="<?= h($field_id) ?>">Copy Notice</button>
+          <button type="button" class="btn primary alibaba-copy-btn js-copy-response" data-target="<?= h($field_id) ?>">Copy Notice</button>
         </div>
       </div>
     </div>
