@@ -637,10 +637,12 @@ render_alibaba_workflow_banner('create_rfq');
       <script>
         (function () {
           var notes = document.querySelector('[name=additional_notes]');
-        if (notes === null) return;
-          var cannedButtons = document.querySelectorAll('[data-canned-body]');
-          var cannedBodies = Array.prototype.map.call(cannedButtons, function (btn) {
-            return btn.getAttribute('data-canned-body') || '';
+        if (notes === null) {
+          return;
+        }
+        var cannedButtons = document.querySelectorAll('[data-canned-body]');
+        var cannedBodies = Array.prototype.map.call(cannedButtons, function (btn) {
+          return btn.getAttribute('data-canned-body') || '';
           }).filter(function (body) {
             return body !== '';
           });

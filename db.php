@@ -748,10 +748,10 @@ foreach ($legacy_rfq_canned_response_defaults as $slot => $legacy_response) {
 if ($replace_legacy_rfq_canned_defaults) {
   $rfq_canned_response_stmt = $pdo->prepare(
     "INSERT INTO rfq_canned_responses (slot, label, body) VALUES (?, ?, ?)
-     ON DUPLICATE KEY UPDATE label = VALUES(label), body = VALUES(body)"
+     ON DUPLICATE KEY UPDATE label = ?, body = ?"
   );
   foreach ($rfq_canned_response_defaults as $slot => $response) {
-    $rfq_canned_response_stmt->execute([$slot, $response['label'], $response['body']]);
+    $rfq_canned_response_stmt->execute([$slot, $response['label'], $response['body'], $response['label'], $response['body']]);
   }
   if ($rfq_canned_response_legacy_only_slots) {
     $rfq_canned_response_cleanup_stmt = $pdo->prepare(

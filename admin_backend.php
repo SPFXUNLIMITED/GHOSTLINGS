@@ -56,8 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'canned_responses') {
         $body = trim((string)($_POST["cr_body_{$i}"] ?? ''));
         $pdo->prepare(
           "INSERT INTO rfq_canned_responses (slot, label, body) VALUES (?, ?, ?)
-           ON DUPLICATE KEY UPDATE label = VALUES(label), body = VALUES(body)"
-        )->execute([$i, $lbl, $body]);
+           ON DUPLICATE KEY UPDATE label = ?, body = ?"
+        )->execute([$i, $lbl, $body, $lbl, $body]);
       }
       $_SESSION['admin_backend_csrf'] = bin2hex(random_bytes(24));
       $cr_success = 'Canned responses saved.';
