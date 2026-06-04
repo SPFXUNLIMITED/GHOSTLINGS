@@ -5,6 +5,7 @@ require __DIR__ . '/auth.php';
 require_admin_or_moderator();
 
 const HUBSPOT_SYNC_PAGE_LIMIT = 50;
+const HUBSPOT_SYNC_PAGE_SIZE = 100;
 const HUBSPOT_SYNC_TIMEOUT_SECONDS = 20;
 const HUBSPOT_UNKNOWN_CUSTOMER_NAME = 'Unknown';
 const HUBSPOT_CONTACT_PROPERTIES = 'firstname,lastname,company,phone,email,lastmodifieddate';
@@ -35,7 +36,7 @@ function hubspot_contact_name(array $props): string {
 function hubspot_to_datetime(?string $value): ?string {
   $value = trim((string)$value);
   if ($value === '') return null;
-  if (ctype_digit($value)) {
+  if (is_numeric($value)) {
     $seconds = (int)floor(((float)$value) / 1000);
     if ($seconds > 0) {
       return gmdate('Y-m-d H:i:s', $seconds);
@@ -52,7 +53,7 @@ function sync_customers_from_hubspot(PDO $pdo): array {
     throw new RuntimeException('Missing HubSpot token. Set HUBSPOT_PRIVATE_APP_TOKEN or HUBSPOT_ACCESS_TOKEN.');
   }
 
-  $url = HUBSPOT_CONTACTS_API_BASE . '?limit=100&properties=' . HUBSPOT_CONTACT_PROPERTIES;
+  $url = HUBSPOT_CONTACTS_API_BASE . '?limit=' . HUBSPOT_SYNC_PAGE_SIZE . '&properties=' . HUBSPOT_CONTACT_PROPERTIES;
   $upsert = $pdo->prepare(
     "INSERT INTO customers (hubspot_contact_id, customer_name, company, phone, email, last_updated)
      VALUES (?, ?, ?, ?, ?, ?)
@@ -124,7 +125,7 @@ function sync_customers_from_hubspot(PDO $pdo): array {
 
     $next_after = $payload['paging']['next']['after'] ?? null;
     $url = $next_after !== null
-      ? HUBSPOT_CONTACTS_API_BASE . '?limit=100&after=' . urlencode((string)$next_after) . '&properties=' . HUBSPOT_CONTACT_PROPERTIES
+      ? HUBSPOT_CONTACTS_API_BASE . '?limit=' . HUBSPOT_SYNC_PAGE_SIZE . '&after=' . urlencode((string)$next_after) . '&properties=' . HUBSPOT_CONTACT_PROPERTIES
       : null;
     $pages++;
   }
@@ -154,7 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $customers = $pdo->query(
-  "SELECT customer_name, company, phone, email, last_updated
+  "SELECT customer_name, company, phone, email, last_updated, updated_at
    FROM customers
    ORDER BY COALESCE(last_updated, updated_at) DESC, id DESC"
 )->fetchAll();
