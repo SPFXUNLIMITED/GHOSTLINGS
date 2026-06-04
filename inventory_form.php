@@ -182,6 +182,16 @@ function parse_int_field(string $raw, string $label, array &$errors): int {
   return (int)$raw;
 }
 
+function fmt_inventory_money($value): string {
+  if ($value === null || $value === '') {
+    return '—';
+  }
+  if (!is_numeric($value)) {
+    return '—';
+  }
+  return '$' . number_format((float)$value, 2);
+}
+
 function normalize_optional_url(string $raw, string $label, array &$errors): string {
   $raw = trim($raw);
   if ($raw === '') {
@@ -545,133 +555,187 @@ render_header($page_title);
     </div>
   <?php endif; ?>
 
-  <form method="post" enctype="multipart/form-data" action="inventory_form.php<?= $is_edit ? '?id=' . (int)$id : '' ?>" novalidate>
-  <?php if (!$is_view): ?>
-    <input type="hidden" name="csrf_token" value="<?= h($_SESSION['inventory_form_csrf']) ?>" />
-    <?php if ($is_edit): ?>
-      <input type="hidden" name="id" value="<?= (int)$id ?>" />
-      <input type="hidden" name="delete_csrf_token" value="<?= h($_SESSION['inventory_delete_csrf']) ?>" />
-    <?php endif; ?>
-  <?php endif; ?>
-
-    <div class="form-grid">
-      <?php if ($is_edit): ?>
-        <div>
-          <label>Part Number</label>
-          <div style="min-height:44px; padding:10px 12px; border:1px solid var(--b); border-radius:10px; background:#f8fafc; color:#0f172a; display:flex; align-items:center;"><?= h($part_number) ?></div>
-        </div>
-      <?php else: ?>
-        <p class="full muted" role="status" aria-live="polite" style="margin:0;">Part Number will be generated automatically when this item is created.</p>
-      <?php endif; ?>
-      <div>
-        <label>Name <span style="color:var(--d);">*</span></label>
-        <input type="text" name="item_name" maxlength="255" <?= $is_view ? 'readonly' : 'required' ?> value="<?= h($fields['item_name']) ?>" />
-      </div>
-      <div class="full">
-        <label>Description</label>
-        <textarea name="description" rows="4" <?= $is_view ? 'readonly' : '' ?>><?= h($fields['description']) ?></textarea>
-      </div>
-      <div>
-        <label>Category <span style="color:var(--d);">*</span></label>
-        <select name="category" <?= $is_view ? 'disabled' : 'required' ?>>
-          <?php foreach ($categories as $cat): ?>
-            <option value="<?= h($cat) ?>" <?= $fields['category'] === $cat ? 'selected' : '' ?>><?= h($cat) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <div class="full">
-        <label>Suppliers</label>
-      </div>
-      <div>
-        <label>Supplier 1</label>
-        <input type="text" name="supplier_1_name" maxlength="255" value="<?= h($fields['supplier_1_name']) ?>" <?= $is_view ? 'readonly' : '' ?> />
-      </div>
-      <div>
-        <label>Supplier 1 Link</label>
-        <input type="url" name="supplier_1_url" maxlength="1000" placeholder="https://..." value="<?= h($fields['supplier_1_url']) ?>" <?= $is_view ? 'readonly' : '' ?> />
-      </div>
-      <div>
-        <label>Supplier 2</label>
-        <input type="text" name="supplier_2_name" maxlength="255" value="<?= h($fields['supplier_2_name']) ?>" <?= $is_view ? 'readonly' : '' ?> />
-      </div>
-      <div>
-        <label>Supplier 2 Link</label>
-        <input type="url" name="supplier_2_url" maxlength="1000" placeholder="https://..." value="<?= h($fields['supplier_2_url']) ?>" <?= $is_view ? 'readonly' : '' ?> />
-      </div>
-      <div>
-        <label>Supplier 3</label>
-        <input type="text" name="supplier_3_name" maxlength="255" value="<?= h($fields['supplier_3_name']) ?>" <?= $is_view ? 'readonly' : '' ?> />
-      </div>
-      <div>
-        <label>Supplier 3 Link</label>
-        <input type="url" name="supplier_3_url" maxlength="1000" placeholder="https://..." value="<?= h($fields['supplier_3_url']) ?>" <?= $is_view ? 'readonly' : '' ?> />
-      </div>
-      <div>
-        <label>Cost Price</label>
-        <input type="text" name="cost_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['cost_price']) ?>" <?= $is_view ? 'readonly' : '' ?> />
-      </div>
-      <div>
-        <label>Retail Price</label>
-        <input type="text" name="retail_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['retail_price']) ?>" <?= $is_view ? 'readonly' : '' ?> />
-      </div>
-      <div>
-        <label>Wholesale Price</label>
-        <input type="text" name="wholesale_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['wholesale_price']) ?>" <?= $is_view ? 'readonly' : '' ?> />
-      </div>
-      <div>
-        <label>Minimum Price</label>
-        <input type="text" name="minimum_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['minimum_price']) ?>" <?= $is_view ? 'readonly' : '' ?> />
-      </div>
-      <div>
-        <label>Current Stock</label>
-        <input type="text" name="current_stock" inputmode="numeric" value="<?= h($fields['current_stock']) ?>" <?= $is_view ? 'readonly' : '' ?> />
-      </div>
-      <div>
-        <label>Low Stock Alert</label>
-        <input type="text" name="low_stock_alert" inputmode="numeric" value="<?= h($fields['low_stock_alert']) ?>" <?= $is_view ? 'readonly' : '' ?> />
-      </div>
-      <div>
-        <label>Location</label>
-        <input type="text" name="location" maxlength="255" value="<?= h($fields['location']) ?>" <?= $is_view ? 'readonly' : '' ?> />
-      </div>
-      <div>
-        <label>Image Upload</label>
-        <input type="file" name="image" accept=".jpg,.jpeg,.png,.gif,.webp,image/*" <?= $is_view ? 'disabled' : '' ?> />
-        <div class="muted" style="margin-top:6px;">Accepted: JPG, PNG, GIF, WEBP (max 5 MB).</div>
-      </div>
-    </div>
-
-    <?php if ($is_view): ?>
-      <div style="margin-top:14px;">
-        <div class="muted" style="margin-bottom:6px;">Supplier Links</div>
-        <div style="display:grid; gap:6px;">
-          <?php for ($supplier_number = 1; $supplier_number <= 3; $supplier_number++): ?>
-            <?php
-              $supplier_name = trim((string)($fields['supplier_' . $supplier_number . '_name'] ?? ''));
-              $supplier_url = trim((string)($fields['supplier_' . $supplier_number . '_url'] ?? ''));
-            ?>
-            <div>
-              <strong>Supplier <?= $supplier_number ?>:</strong>
-              <?= $supplier_name !== '' ? h($supplier_name) : '<span class="muted">—</span>' ?>
-              <?php if ($supplier_url !== ''): ?>
-                &nbsp;<a class="btn" href="<?= h($supplier_url) ?>" target="_blank" rel="noopener noreferrer">Open Link</a>
-              <?php else: ?>
-                <span class="muted">(no link)</span>
-              <?php endif; ?>
+  <?php if ($is_view): ?>
+    <table>
+      <tbody>
+        <tr>
+          <th style="width:220px;">Part Number</th>
+          <td><?= h($part_number) ?></td>
+        </tr>
+        <tr>
+          <th>Name</th>
+          <td><?= h($fields['item_name']) ?></td>
+        </tr>
+        <tr>
+          <th>Description</th>
+          <td><?= $fields['description'] !== '' ? nl2br(h($fields['description'])) : '—' ?></td>
+        </tr>
+        <tr>
+          <th>Category</th>
+          <td><?= h($fields['category']) ?></td>
+        </tr>
+        <tr>
+          <th>Cost Price</th>
+          <td><?= fmt_inventory_money($fields['cost_price']) ?></td>
+        </tr>
+        <tr>
+          <th>Retail Price</th>
+          <td><?= fmt_inventory_money($fields['retail_price']) ?></td>
+        </tr>
+        <tr>
+          <th>Wholesale Price</th>
+          <td><?= fmt_inventory_money($fields['wholesale_price']) ?></td>
+        </tr>
+        <tr>
+          <th>Minimum Price</th>
+          <td><?= fmt_inventory_money($fields['minimum_price']) ?></td>
+        </tr>
+        <tr>
+          <th>Current Stock</th>
+          <td><?= (int)$fields['current_stock'] ?></td>
+        </tr>
+        <tr>
+          <th>Low Stock Alert</th>
+          <td><?= (int)$fields['low_stock_alert'] ?></td>
+        </tr>
+        <tr>
+          <th>Location</th>
+          <td><?= $fields['location'] !== '' ? h($fields['location']) : '—' ?></td>
+        </tr>
+        <tr>
+          <th>Suppliers</th>
+          <td>
+            <div style="display:grid; gap:8px;">
+              <?php for ($supplier_number = 1; $supplier_number <= 3; $supplier_number++): ?>
+                <?php
+                  $supplier_name = trim((string)($fields['supplier_' . $supplier_number . '_name'] ?? ''));
+                  $supplier_url = trim((string)($fields['supplier_' . $supplier_number . '_url'] ?? ''));
+                ?>
+                <div>
+                  <strong>Supplier <?= $supplier_number ?>:</strong>
+                  <?= $supplier_name !== '' ? h($supplier_name) : '—' ?>
+                  <?php if ($supplier_url !== ''): ?>
+                    &nbsp;<a href="<?= h($supplier_url) ?>" target="_blank" rel="noopener noreferrer">Open Link</a>
+                  <?php endif; ?>
+                </div>
+              <?php endfor; ?>
             </div>
-          <?php endfor; ?>
+          </td>
+        </tr>
+        <tr>
+          <th>Image</th>
+          <td>
+            <?php if ($image_url !== ''): ?>
+              <img src="<?= h($image_url) ?>" alt="Inventory image for <?= h($fields['item_name']) ?>" style="width:120px; height:120px; object-fit:cover; border-radius:8px; border:1px solid var(--b);" />
+            <?php else: ?>
+              —
+            <?php endif; ?>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  <?php else: ?>
+    <form method="post" enctype="multipart/form-data" action="inventory_form.php<?= $is_edit ? '?id=' . (int)$id : '' ?>" novalidate>
+      <input type="hidden" name="csrf_token" value="<?= h($_SESSION['inventory_form_csrf']) ?>" />
+      <?php if ($is_edit): ?>
+        <input type="hidden" name="id" value="<?= (int)$id ?>" />
+        <input type="hidden" name="delete_csrf_token" value="<?= h($_SESSION['inventory_delete_csrf']) ?>" />
+      <?php endif; ?>
+
+      <div class="form-grid">
+        <?php if ($is_edit): ?>
+          <div>
+            <label>Part Number</label>
+            <div style="min-height:44px; padding:10px 12px; border:1px solid var(--b); border-radius:10px; background:#f8fafc; color:#0f172a; display:flex; align-items:center;"><?= h($part_number) ?></div>
+          </div>
+        <?php else: ?>
+          <p class="full muted" role="status" aria-live="polite" style="margin:0;">Part Number will be generated automatically when this item is created.</p>
+        <?php endif; ?>
+        <div>
+          <label>Name <span style="color:var(--d);">*</span></label>
+          <input type="text" name="item_name" maxlength="255" required value="<?= h($fields['item_name']) ?>" />
+        </div>
+        <div class="full">
+          <label>Description</label>
+          <textarea name="description" rows="4"><?= h($fields['description']) ?></textarea>
+        </div>
+        <div>
+          <label>Category <span style="color:var(--d);">*</span></label>
+          <select name="category" required>
+            <?php foreach ($categories as $cat): ?>
+              <option value="<?= h($cat) ?>" <?= $fields['category'] === $cat ? 'selected' : '' ?>><?= h($cat) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="full">
+          <label>Suppliers</label>
+        </div>
+        <div>
+          <label>Supplier 1</label>
+          <input type="text" name="supplier_1_name" maxlength="255" value="<?= h($fields['supplier_1_name']) ?>" />
+        </div>
+        <div>
+          <label>Supplier 1 Link</label>
+          <input type="url" name="supplier_1_url" maxlength="1000" placeholder="https://..." value="<?= h($fields['supplier_1_url']) ?>" />
+        </div>
+        <div>
+          <label>Supplier 2</label>
+          <input type="text" name="supplier_2_name" maxlength="255" value="<?= h($fields['supplier_2_name']) ?>" />
+        </div>
+        <div>
+          <label>Supplier 2 Link</label>
+          <input type="url" name="supplier_2_url" maxlength="1000" placeholder="https://..." value="<?= h($fields['supplier_2_url']) ?>" />
+        </div>
+        <div>
+          <label>Supplier 3</label>
+          <input type="text" name="supplier_3_name" maxlength="255" value="<?= h($fields['supplier_3_name']) ?>" />
+        </div>
+        <div>
+          <label>Supplier 3 Link</label>
+          <input type="url" name="supplier_3_url" maxlength="1000" placeholder="https://..." value="<?= h($fields['supplier_3_url']) ?>" />
+        </div>
+        <div>
+          <label>Cost Price</label>
+          <input type="text" name="cost_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['cost_price']) ?>" />
+        </div>
+        <div>
+          <label>Retail Price</label>
+          <input type="text" name="retail_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['retail_price']) ?>" />
+        </div>
+        <div>
+          <label>Wholesale Price</label>
+          <input type="text" name="wholesale_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['wholesale_price']) ?>" />
+        </div>
+        <div>
+          <label>Minimum Price</label>
+          <input type="text" name="minimum_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['minimum_price']) ?>" />
+        </div>
+        <div>
+          <label>Current Stock</label>
+          <input type="text" name="current_stock" inputmode="numeric" value="<?= h($fields['current_stock']) ?>" />
+        </div>
+        <div>
+          <label>Low Stock Alert</label>
+          <input type="text" name="low_stock_alert" inputmode="numeric" value="<?= h($fields['low_stock_alert']) ?>" />
+        </div>
+        <div>
+          <label>Location</label>
+          <input type="text" name="location" maxlength="255" value="<?= h($fields['location']) ?>" />
+        </div>
+        <div>
+          <label>Image Upload</label>
+          <input type="file" name="image" accept=".jpg,.jpeg,.png,.gif,.webp,image/*" />
+          <div class="muted" style="margin-top:6px;">Accepted: JPG, PNG, GIF, WEBP (max 5 MB).</div>
         </div>
       </div>
-    <?php endif; ?>
 
-    <?php if ($image_url !== ''): ?>
-      <div style="margin-top:14px;">
-        <div class="muted" style="margin-bottom:6px;">Current Image</div>
-        <img src="<?= h($image_url) ?>" alt="Current inventory image" style="width:120px; height:120px; object-fit:cover; border-radius:8px; border:1px solid var(--b);" />
-      </div>
-    <?php endif; ?>
+      <?php if ($image_url !== ''): ?>
+        <div style="margin-top:14px;">
+          <div class="muted" style="margin-bottom:6px;">Current Image</div>
+          <img src="<?= h($image_url) ?>" alt="Current inventory image" style="width:120px; height:120px; object-fit:cover; border-radius:8px; border:1px solid var(--b);" />
+        </div>
+      <?php endif; ?>
 
-    <?php if (!$is_view): ?>
       <div style="margin-top:16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
         <button type="submit" class="btn primary"><?= $is_edit ? 'Save Changes' : 'Create Inventory Item' ?></button>
         <?php if ($is_edit): ?>
@@ -684,8 +748,8 @@ render_header($page_title);
                   style="background:#b91c1c; border-color:#991b1b; color:#fff;">Delete Item</button>
         <?php endif; ?>
       </div>
-    <?php endif; ?>
-  </form>
+    </form>
+  <?php endif; ?>
 </div>
 
 <?php render_footer(); ?>
