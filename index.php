@@ -2,194 +2,124 @@
 require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
-$trackerData = require __DIR__ . '/change_tracker.php';
-$changeTracker = is_array($trackerData) ? $trackerData : [];
-$version = isset($changeTracker['version']) && is_scalar($changeTracker['version']) ? (string)$changeTracker['version'] : 'unknown';
-$changes = [];
-if (isset($changeTracker['changes']) && is_array($changeTracker['changes'])) {
-    $changes = array_values(array_filter($changeTracker['changes'], 'is_scalar'));
-}
+
 require_login();
 
-$recent_comments = [];
-$recent_comments_limit = 100;
-$recent_comment_preview_max_chars = 140;
-$new_badge_duration_seconds = 24 * 60 * 60;
-$new_cutoff = time() - $new_badge_duration_seconds;
-$uid = current_user_id();
-if ($uid !== null) {
-    $recent_comments_limit = max(1, (int)$recent_comments_limit);
-    if (is_admin()) {
-        $stmt = $pdo->prepare("
-          SELECT
-            x.comment_type,
-            x.comment_id,
-            x.item_id,
-            x.item_title,
-            x.project_name,
-            x.body,
-            x.created_at
-          FROM (
-            SELECT
-              'task' AS comment_type,
-              tc.id AS comment_id,
-              t.id AS item_id,
-              t.title AS item_title,
-              p.name AS project_name,
-              tc.body,
-              tc.created_at
-            FROM task_comments tc
-            JOIN tasks t ON t.id = tc.task_id
-            JOIN projects p ON p.id = t.project_id
-            WHERE p.archived = 0
-
-            UNION ALL
-
-            SELECT
-              'project' AS comment_type,
-              pc.id AS comment_id,
-              p.id AS item_id,
-              p.name AS item_title,
-              p.name AS project_name,
-              pc.body,
-              pc.created_at
-            FROM project_comments pc
-            JOIN projects p ON p.id = pc.project_id
-            WHERE p.archived = 0
-          ) x
-          ORDER BY x.created_at DESC, x.comment_id DESC
-          LIMIT ?
-        ");
-        $stmt->bindValue(1, $recent_comments_limit, PDO::PARAM_INT);
-    } else {
-        $stmt = $pdo->prepare("
-          SELECT
-            x.comment_type,
-            x.comment_id,
-            x.item_id,
-            x.item_title,
-            x.project_name,
-            x.body,
-            x.created_at
-          FROM (
-            SELECT
-              'task' AS comment_type,
-              tc.id AS comment_id,
-              t.id AS item_id,
-              t.title AS item_title,
-              p.name AS project_name,
-              tc.body,
-              tc.created_at
-            FROM task_comments tc
-            JOIN tasks t ON t.id = tc.task_id
-            JOIN projects p ON p.id = t.project_id
-            WHERE t.assigned_to = ?
-              AND p.archived = 0
-
-            UNION ALL
-
-            SELECT
-              'project' AS comment_type,
-              pc.id AS comment_id,
-              p.id AS item_id,
-              p.name AS item_title,
-              p.name AS project_name,
-              pc.body,
-              pc.created_at
-            FROM project_comments pc
-            JOIN projects p ON p.id = pc.project_id
-            WHERE p.archived = 0
-              AND EXISTS (
-                SELECT 1
-                FROM tasks tx
-                WHERE tx.project_id = p.id
-                  AND tx.assigned_to = ?
-              )
-          ) x
-          ORDER BY x.created_at DESC, x.comment_id DESC
-          LIMIT ?
-        ");
-        $stmt->bindValue(1, (int)$uid, PDO::PARAM_INT);
-        $stmt->bindValue(2, (int)$uid, PDO::PARAM_INT);
-        $stmt->bindValue(3, $recent_comments_limit, PDO::PARAM_INT);
-    }
-    $stmt->execute();
-    $recent_comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
-
 render_header('Home');
+render_alibaba_workflow_banner('create_rfq');
 ?>
 
-<div class="card">
-  <h1 style="margin-top:0; margin-bottom:4px;">Home</h1>
-  <p class="muted" style="margin:0;">Welcome to Project Manager.</p>
-</div>
+<style>
+.home-hero-wrap {
+  margin: 0 auto;
+  max-width: 1100px;
+}
+.home-hero-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: linear-gradient(160deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  padding: 36px;
+  margin-bottom: 22px;
+}
+.home-hero-title {
+  margin: 0 0 10px;
+  font-size: 34px;
+  line-height: 1.2;
+  color: #0f172a;
+}
+.home-hero-subtitle {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.6;
+  color: #475569;
+  max-width: 760px;
+}
+.home-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.home-entry-card {
+  display: block;
+  text-decoration: none;
+  border: 1px solid #dbe3ef;
+  border-radius: 16px;
+  padding: 26px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.home-entry-card:hover,
+.home-entry-card:focus {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.16);
+  border-color: #93c5fd;
+  outline: none;
+}
+.home-entry-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  margin-bottom: 14px;
+  background: #eff6ff;
+}
+.home-entry-title {
+  margin: 0 0 8px;
+  font-size: 23px;
+  line-height: 1.3;
+  color: #0f172a;
+}
+.home-entry-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #475569;
+}
+@media (max-width: 980px) {
+  .home-entry-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 640px) {
+  .home-hero-card {
+    padding: 24px;
+  }
+  .home-hero-title {
+    font-size: 28px;
+  }
+}
+</style>
 
-<div class="card">
-  <h2 style="margin-top:0; margin-bottom:8px;">Recent Comments</h2>
-  <?php if ($recent_comments): ?>
-    <?php foreach ($recent_comments as $comment): ?>
-      <?php
-        $created_ts = !empty($comment['created_at']) ? strtotime((string)$comment['created_at']) : false;
-        $is_new = ($created_ts !== false) && ($created_ts >= $new_cutoff);
-        $link = ((string)$comment['comment_type'] === 'task')
-          ? ('task_details.php?id=' . (int)$comment['item_id'])
-          : ('project_details.php?id=' . (int)$comment['item_id']);
-        $comment_preview_raw = strip_tags((string)($comment['body'] ?? ''));
-        $comment_preview_raw = html_entity_decode($comment_preview_raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $comment_preview_raw = str_replace("\xC2\xA0", ' ', $comment_preview_raw);
-        $comment_preview = trim(preg_replace('/\s+/u', ' ', $comment_preview_raw));
-        if (function_exists('mb_strlen') && function_exists('mb_substr')) {
-          if (mb_strlen($comment_preview, 'UTF-8') > $recent_comment_preview_max_chars) {
-            $comment_preview = rtrim(mb_substr($comment_preview, 0, $recent_comment_preview_max_chars, 'UTF-8')) . '...';
-          }
-        } elseif (strlen($comment_preview) > $recent_comment_preview_max_chars) {
-          $comment_preview = rtrim(substr($comment_preview, 0, $recent_comment_preview_max_chars)) . '...';
-        }
-      ?>
-      <div style="padding:10px 0; border-bottom:1px solid #e5e7eb;">
-        <div class="row" style="justify-content:space-between; align-items:center;">
-          <div class="name-with-badge" style="margin-bottom:6px;">
-            <a href="<?= h($link) ?>">
-              <?= ((string)$comment['comment_type'] === 'task') ? 'Task' : 'Project' ?>:
-              <?= h($comment['item_title'] ?? '') ?>
-            </a>
-            <?php if ((string)$comment['comment_type'] === 'task' && !empty($comment['project_name'])): ?>
-              <span class="muted">in <?= h($comment['project_name']) ?></span>
-            <?php endif; ?>
-            <?php if ($is_new): ?>
-              <span class="badge new">New</span>
-            <?php endif; ?>
-          </div>
-          <div class="muted">
-            <?php
-              if ($created_ts !== false) {
-                echo h(date('m-d-Y H:i', $created_ts));
-              } else {
-                echo '—';
-              }
-            ?>
-          </div>
-        </div>
-        <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><?= h($comment_preview) ?></div>
-      </div>
-    <?php endforeach; ?>
-  <?php else: ?>
-    <div class="muted"><?= is_admin() ? 'No recent comments.' : 'No recent comments for your assigned work.' ?></div>
-  <?php endif; ?>
-</div>
+<div class="home-hero-wrap">
+  <section class="home-hero-card" aria-labelledby="home-dashboard-title">
+    <h1 id="home-dashboard-title" class="home-hero-title">Team Dashboard</h1>
+    <p class="home-hero-subtitle">Choose a workflow to start a new request. Use one of the options below to log customer inquiries, submit sourcing RFQs, or begin new purchase orders.</p>
+  </section>
 
-<div class="card">
-  <h2 style="margin-top:0; margin-bottom:8px;">Version</h2>
-  <p class="muted" style="margin-top:0;">
-    v<?= htmlspecialchars($version, ENT_QUOTES, 'UTF-8') ?>
-  </p>
-  <h3 style="margin-bottom:6px;">Changes</h3>
-  <ul style="margin:0; padding-left:18px;">
-    <?php foreach ($changes as $change): ?>
-      <li><?= htmlspecialchars((string)$change, ENT_QUOTES, 'UTF-8') ?></li>
-    <?php endforeach; ?>
-  </ul>
+  <section class="home-entry-grid" aria-label="Primary actions">
+    <a class="home-entry-card" href="customer_inquiry_form.php">
+      <span class="home-entry-icon" aria-hidden="true">📞</span>
+      <h2 class="home-entry-title">New Customer Inquiry</h2>
+      <p class="home-entry-text">Capture customer details, requirements, and notes for quick follow-up.</p>
+    </a>
+
+    <a class="home-entry-card" href="sourcing_rfq_form.php">
+      <span class="home-entry-icon" aria-hidden="true">📄</span>
+      <h2 class="home-entry-title">New RFQ</h2>
+      <p class="home-entry-text">Create a new sourcing request to collect supplier quotes and pricing.</p>
+    </a>
+
+    <a class="home-entry-card" href="order_form.php">
+      <span class="home-entry-icon" aria-hidden="true">🧾</span>
+      <h2 class="home-entry-title">New Purchase Order</h2>
+      <p class="home-entry-text">Start a purchase order workflow and move it through fulfillment stages.</p>
+    </a>
+  </section>
 </div>
 
 <?php render_footer(); ?>
