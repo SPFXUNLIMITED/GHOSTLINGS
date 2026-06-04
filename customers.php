@@ -19,9 +19,22 @@ $success = '';
 $customer_table_columns = 6;
 
 function hubspot_token(): string {
-  $token = trim((string)getenv('HUBSPOT_PRIVATE_APP_TOKEN'));
+  $token = app_env_value('HUBSPOT_PRIVATE_APP_TOKEN');
   if ($token !== '') return $token;
-  return trim((string)getenv('HUBSPOT_ACCESS_TOKEN'));
+  return app_env_value('HUBSPOT_ACCESS_TOKEN');
+}
+
+function app_env_value(string $key): string {
+  $value = getenv($key);
+  if (is_string($value)) {
+    $value = trim($value);
+    if ($value !== '') return $value;
+  }
+
+  $from_env = trim((string)($_ENV[$key] ?? ''));
+  if ($from_env !== '') return $from_env;
+
+  return trim((string)($_SERVER[$key] ?? ''));
 }
 
 function hubspot_contact_names(array $props): array {
