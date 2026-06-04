@@ -50,12 +50,15 @@ function app_settings_crypto_key(): string {
   }
 
   if ($raw === '') {
-    $raw = bin2hex(random_bytes(32));
+    $generated_key = bin2hex(random_bytes(32));
     $pdo->prepare(
-      "INSERT INTO integration_settings (setting_key, setting_val, is_encrypted)
-       VALUES ('app_settings_encryption_key', ?, 0)
-       ON DUPLICATE KEY UPDATE setting_val = VALUES(setting_val), is_encrypted = 0"
-    )->execute([$raw]);
+      "INSERT IGNORE INTO integration_settings (setting_key, setting_val, is_encrypted)
+       VALUES ('app_settings_encryption_key', ?, 0)"
+    )->execute([$generated_key]);
+
+    $stmt = $pdo->prepare("SELECT setting_val FROM integration_settings WHERE setting_key = 'app_settings_encryption_key' LIMIT 1");
+    $stmt->execute();
+    $raw = trim((string)($stmt->fetchColumn() ?? ''));
   }
 
   if (preg_match('/^[a-f0-9]{64}$/i', $raw)) {
