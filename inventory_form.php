@@ -186,7 +186,7 @@ function fmt_inventory_money($value): string {
   if ($value === null || $value === '') {
     return '—';
   }
-  if (!is_numeric((string)$value)) {
+  if (!is_numeric($value)) {
     return '—';
   }
   return '$' . number_format((float)$value, 2);
@@ -576,19 +576,19 @@ render_header($page_title);
         </tr>
         <tr>
           <th>Cost Price</th>
-          <td><?= h(fmt_inventory_money($fields['cost_price'])) ?></td>
+          <td><?= fmt_inventory_money($fields['cost_price']) ?></td>
         </tr>
         <tr>
           <th>Retail Price</th>
-          <td><?= h(fmt_inventory_money($fields['retail_price'])) ?></td>
+          <td><?= fmt_inventory_money($fields['retail_price']) ?></td>
         </tr>
         <tr>
           <th>Wholesale Price</th>
-          <td><?= h(fmt_inventory_money($fields['wholesale_price'])) ?></td>
+          <td><?= fmt_inventory_money($fields['wholesale_price']) ?></td>
         </tr>
         <tr>
           <th>Minimum Price</th>
-          <td><?= h(fmt_inventory_money($fields['minimum_price'])) ?></td>
+          <td><?= fmt_inventory_money($fields['minimum_price']) ?></td>
         </tr>
         <tr>
           <th>Current Stock</th>
