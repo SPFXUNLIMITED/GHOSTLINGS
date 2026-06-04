@@ -492,8 +492,6 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
     <?php if ($show_admin_menu): ?>
     <a class="menu-link <?= $current === 'admin_backend.php' ? 'active' : '' ?>" href="admin_backend.php">Admin Backend</a>
     <?php endif; ?>
-    <?php elseif ($is_logged_in): ?>
-    <a class="menu-link <?= $current === 'user_page.php' ? 'active' : '' ?>" href="user_page.php">My Profile</a>
     <?php endif; ?>
   </div>
 </nav>
