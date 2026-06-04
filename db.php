@@ -15,6 +15,95 @@ $options = [
 
 $pdo = new PDO($dsn, $db['user'], $db['pass'], $options);
 
+function app_settings_crypto_key(): string {
+  static $key = null;
+  if (is_string($key)) {
+    return $key;
+  }
+
+  global $config;
+  $raw = trim((string)(getenv('APP_SETTINGS_ENCRYPTION_KEY') ?: ($config['app_settings_encryption_key'] ?? '')));
+  if ($raw === '') {
+    $raw = implode('|', [
+      (string)($config['db']['host'] ?? ''),
+      (string)($config['db']['name'] ?? ''),
+      (string)($config['db']['user'] ?? ''),
+      __DIR__,
+    ]);
+  }
+
+  if (preg_match('/^[a-f0-9]{64}$/i', $raw)) {
+    $decoded = hex2bin($raw);
+    if ($decoded !== false) {
+      $key = $decoded;
+      return $key;
+    }
+  }
+
+  $key = hash('sha256', $raw, true);
+  return $key;
+}
+
+function app_encrypt_setting_value(string $plaintext): string {
+  if ($plaintext === '') {
+    return '';
+  }
+
+  $iv = random_bytes(12);
+  $tag = '';
+  $ciphertext = openssl_encrypt(
+    $plaintext,
+    'aes-256-gcm',
+    app_settings_crypto_key(),
+    OPENSSL_RAW_DATA,
+    $iv,
+    $tag,
+    '',
+    16
+  );
+
+  if ($ciphertext === false) {
+    throw new RuntimeException('Unable to encrypt setting value.');
+  }
+
+  return base64_encode('v1' . "\0" . $iv . $tag . $ciphertext);
+}
+
+function app_decrypt_setting_value(?string $encoded): string {
+  $encoded = trim((string)$encoded);
+  if ($encoded === '') {
+    return '';
+  }
+
+  $raw = base64_decode($encoded, true);
+  if ($raw === false || strncmp($raw, 'v1' . "\0", 3) !== 0) {
+    return '';
+  }
+
+  $payload = substr($raw, 3);
+  if ($payload === false || strlen($payload) < 29) {
+    return '';
+  }
+
+  $iv = substr($payload, 0, 12);
+  $tag = substr($payload, 12, 16);
+  $ciphertext = substr($payload, 28);
+  if ($iv === false || $tag === false || $ciphertext === false || $ciphertext === '') {
+    return '';
+  }
+
+  $plaintext = openssl_decrypt(
+    $ciphertext,
+    'aes-256-gcm',
+    app_settings_crypto_key(),
+    OPENSSL_RAW_DATA,
+    $iv,
+    $tag
+  );
+
+  return $plaintext === false ? '' : (string)$plaintext;
+}
+
 // Add playbook column to projects if it does not exist yet
 try {
   $pdo->exec("ALTER TABLE projects ADD COLUMN playbook TINYINT(1) NOT NULL DEFAULT 0");
@@ -1002,6 +1091,17 @@ $pdo->exec("
     setting_key  VARCHAR(100)  NOT NULL,
     setting_val  MEDIUMTEXT    NULL,
     updated_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (setting_key)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// Create integration_settings table for admin-managed third-party integration credentials
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS integration_settings (
+    setting_key   VARCHAR(100) NOT NULL,
+    setting_val   MEDIUMTEXT NULL,
+    is_encrypted  TINYINT(1) NOT NULL DEFAULT 0,
+    updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (setting_key)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");

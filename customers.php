@@ -18,10 +18,32 @@ $errors = [];
 $success = '';
 $customer_table_columns = 6;
 
-function hubspot_token(): string {
+function hubspot_token(PDO $pdo): string {
   $token = trim((string)getenv('HUBSPOT_PRIVATE_APP_TOKEN'));
   if ($token !== '') return $token;
-  return trim((string)getenv('HUBSPOT_ACCESS_TOKEN'));
+  $token = trim((string)getenv('HUBSPOT_ACCESS_TOKEN'));
+  if ($token !== '') return $token;
+
+  try {
+    $stmt = $pdo->prepare(
+      "SELECT setting_val, is_encrypted
+       FROM integration_settings
+       WHERE setting_key = 'hubspot_private_app_token'
+       LIMIT 1"
+    );
+    $stmt->execute();
+    $row = $stmt->fetch() ?: [];
+    $stored = (string)($row['setting_val'] ?? '');
+    if ($stored === '') {
+      return '';
+    }
+    if (!empty($row['is_encrypted'])) {
+      return trim(app_decrypt_setting_value($stored));
+    }
+    return trim($stored);
+  } catch (Throwable $e) {
+    return '';
+  }
 }
 
 function hubspot_contact_names(array $props): array {
@@ -54,9 +76,9 @@ function format_customer_last_updated(?string $value): string {
 }
 
 function sync_customers_from_hubspot(PDO $pdo): array {
-  $token = hubspot_token();
+  $token = hubspot_token($pdo);
   if ($token === '') {
-    throw new RuntimeException('Missing HubSpot token. Set HUBSPOT_PRIVATE_APP_TOKEN or HUBSPOT_ACCESS_TOKEN.');
+    throw new RuntimeException('Missing HubSpot token. Set HUBSPOT_PRIVATE_APP_TOKEN, HUBSPOT_ACCESS_TOKEN, or add it in Admin Backend > Integrations.');
   }
 
   $url = HUBSPOT_CONTACTS_API_BASE . '?limit=' . HUBSPOT_SYNC_PAGE_SIZE . '&properties=' . HUBSPOT_CONTACT_PROPERTIES;
