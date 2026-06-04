@@ -368,7 +368,7 @@ render_header('Customer Inquiry Log');
   <div class="card">
     <div style="display:flex; justify-content:flex-end; align-items:flex-start; gap:14px; flex-wrap:wrap;">
       <div style="flex:0 0 auto;">
-        <h3 style="margin:0 0 12px;">Actions</h3>
+        <h3 style="margin:0 0 12px;">Delete Inquiry</h3>
         <form method="post" onsubmit="return confirm('Delete this inquiry? This cannot be undone.');">
           <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customer_inquiry_csrf']) ?>" />
           <input type="hidden" name="action" value="delete" />
@@ -425,7 +425,7 @@ render_header('Customer Inquiry Log');
                   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customer_inquiry_csrf']) ?>" />
                   <input type="hidden" name="action" value="status" />
                   <input type="hidden" name="row_id" value="<?= (int)$inquiry['id'] ?>" />
-                  <select name="status" aria-label="Status for inquiry ID <?= (int)$inquiry['id'] ?>" style="min-width:150px;">
+                  <select name="status" aria-label="Status for inquiry dated <?= h($inquiry['inquiry_date']) ?>" style="min-width:150px;">
                     <?php foreach (INQUIRY_STATUS_OPTIONS as $option_key => $option_label): ?>
                       <option value="<?= h($option_key) ?>" <?= ($status_key === $option_key) ? 'selected' : '' ?>><?= h($option_label) ?></option>
                     <?php endforeach; ?>
