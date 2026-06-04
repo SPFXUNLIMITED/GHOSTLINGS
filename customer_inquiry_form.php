@@ -39,7 +39,7 @@ function customer_inquiry_notes_preview(?string $notes, int $max_length = 120): 
       : $notes;
   }
   return strlen($notes) > $max_length
-    ? substr($notes, 0, $max_length - 3) . '...'
+    ? substr($notes, 0, $max_length - 1) . '…'
     : $notes;
 }
 
@@ -220,11 +220,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $new_id = (int)$pdo->lastInsertId();
         try {
           $actor_name = isset($_SESSION['username']) ? trim((string)$_SESSION['username']) : '';
-          $detail = 'Inquiry #' . $new_id . ' created for ' . $fields['customer_name'];
-          if ($fields['company_name'] !== '') {
-            $detail .= ' (' . $fields['company_name'] . ')';
-          }
-          log_admin_activity($pdo, $created_by, 'Customer Inquiry Created', $detail, $actor_name);
+         if ($new_id > 0) {
+           $detail = 'Inquiry #' . $new_id . ' created for ' . $fields['customer_name'];
+           if ($fields['company_name'] !== '') {
+             $detail .= ' (' . $fields['company_name'] . ')';
+           }
+           log_admin_activity($pdo, $created_by, 'Customer Inquiry Created', $detail, $actor_name);
+         }
        } catch (Throwable $e) {
          // Non-blocking audit log write.
        }
@@ -311,12 +313,13 @@ render_header('Customer Inquiry Log');
   <?php
     $detail_status = (string)($detail_inquiry['status'] ?? 'new');
     [$detail_badge_bg, $detail_badge_color] = INQUIRY_STATUS_BADGES[$detail_status] ?? ['#e5e7eb', '#374151'];
+    $detail_created_at_text = !empty($detail_inquiry['created_at']) ? ' • Created ' . (string)$detail_inquiry['created_at'] : '';
   ?>
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
       <div>
         <h2 style="margin:0;">Inquiry #<?= (int)$detail_inquiry['id'] ?> — <?= h($detail_inquiry['customer_name']) ?></h2>
-        <p class="muted" style="margin:6px 0 0;">Logged on <?= h($detail_inquiry['inquiry_date']) ?><?= !empty($detail_inquiry['created_at']) ? ' • Created ' . h((string)$detail_inquiry['created_at']) : '' ?></p>
+        <p class="muted" style="margin:6px 0 0;">Logged on <?= h($detail_inquiry['inquiry_date']) ?><?= h($detail_created_at_text) ?></p>
       </div>
       <div class="actions">
         <a class="btn" href="customer_inquiry_form.php?view=all">Back to All Inquiries</a>
