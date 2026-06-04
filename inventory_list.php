@@ -12,6 +12,8 @@ $pdo->exec("
     description        TEXT NULL,
     category           ENUM('Machine','Part','Consumable') NOT NULL DEFAULT 'Part',
     supplier           VARCHAR(255) NOT NULL DEFAULT '',
+    amazon_purchase_link VARCHAR(1000) NULL,
+    alibaba_purchase_link VARCHAR(1000) NULL,
     cost_price         DECIMAL(12,2) NULL,
     retail_price       DECIMAL(12,2) NULL,
     wholesale_price    DECIMAL(12,2) NULL,
@@ -29,6 +31,19 @@ $pdo->exec("
     KEY idx_inventory_item_name (item_name)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+foreach ([
+  "ALTER TABLE inventory_items ADD COLUMN amazon_purchase_link VARCHAR(1000) NULL AFTER supplier",
+  "ALTER TABLE inventory_items ADD COLUMN alibaba_purchase_link VARCHAR(1000) NULL AFTER amazon_purchase_link",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    if ($e->getCode() !== '42S21') {
+      throw $e;
+    }
+  }
+}
 
 function next_inventory_part_number_from_seed(int $seed, array &$used): string {
   $suffix = max(1, $seed);
@@ -330,6 +345,7 @@ render_header('Inventory List');
           </td>
           <td><?= $item['location'] !== '' ? h((string)$item['location']) : '<span class="muted">—</span>' ?></td>
           <td class="actions">
+            <a class="btn" href="inventory_form.php?id=<?= (int)$item['id'] ?>&view=1">View</a>
             <a class="btn" href="inventory_form.php?id=<?= (int)$item['id'] ?>">Edit</a>
           </td>
         </tr>

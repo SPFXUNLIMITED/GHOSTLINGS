@@ -16,6 +16,8 @@ $pdo->exec("
     description        TEXT NULL,
     category           ENUM('Machine','Part','Consumable') NOT NULL DEFAULT 'Part',
     supplier           VARCHAR(255) NOT NULL DEFAULT '',
+    amazon_purchase_link VARCHAR(1000) NULL,
+    alibaba_purchase_link VARCHAR(1000) NULL,
     cost_price         DECIMAL(12,2) NULL,
     retail_price       DECIMAL(12,2) NULL,
     wholesale_price    DECIMAL(12,2) NULL,
@@ -33,6 +35,19 @@ $pdo->exec("
     KEY idx_inventory_item_name (item_name)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+foreach ([
+  "ALTER TABLE inventory_items ADD COLUMN amazon_purchase_link VARCHAR(1000) NULL AFTER supplier",
+  "ALTER TABLE inventory_items ADD COLUMN alibaba_purchase_link VARCHAR(1000) NULL AFTER amazon_purchase_link",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    if ($e->getCode() !== '42S21') {
+      throw $e;
+    }
+  }
+}
 
 function next_inventory_part_number_from_seed(int $seed, array &$used): string {
   $suffix = max(1, $seed);
@@ -138,8 +153,31 @@ function parse_int_field(string $raw, string $label, array &$errors): int {
   return (int)$raw;
 }
 
+function normalize_optional_url(string $raw, string $label, array &$errors): string {
+  $raw = trim($raw);
+  if ($raw === '') {
+    return '';
+  }
+  if (mb_strlen($raw) > 1000) {
+    $errors[] = $label . ' must be 1000 characters or fewer.';
+    return '';
+  }
+  if (!filter_var($raw, FILTER_VALIDATE_URL)) {
+    $errors[] = $label . ' must be a valid URL.';
+    return '';
+  }
+  $parts = parse_url($raw);
+  $scheme = strtolower((string)($parts['scheme'] ?? ''));
+  if (!in_array($scheme, ['http', 'https'], true)) {
+    $errors[] = $label . ' must start with http:// or https://.';
+    return '';
+  }
+  return $raw;
+}
+
 $id = (int)($_GET['id'] ?? 0);
 $is_edit = $id > 0;
+$is_view = $is_edit && (string)($_GET['view'] ?? '') === '1';
 $categories = ['Machine', 'Part', 'Consumable'];
 $max_image_bytes = 5 * 1024 * 1024;
 $allowed_image_exts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
@@ -157,6 +195,8 @@ $fields = [
   'description' => '',
   'category' => 'Part',
   'supplier' => '',
+  'amazon_purchase_link' => '',
+  'alibaba_purchase_link' => '',
   'cost_price' => '',
   'retail_price' => '',
   'wholesale_price' => '',
@@ -176,6 +216,7 @@ if ($is_edit) {
   $stmt = $pdo->prepare("
     SELECT
       id, part_number, item_name, description, category, supplier,
+      amazon_purchase_link, alibaba_purchase_link,
       cost_price, retail_price, wholesale_price, minimum_price,
       current_stock, low_stock_alert, location,
       image_original_name, image_stored_name, image_mime_type
@@ -206,7 +247,7 @@ if ($is_edit && (string)($_GET['delete_error'] ?? '') === 'image') {
   $errors[] = 'Unable to remove the stored image file, so the inventory item was not deleted.';
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_view) {
   $csrf = (string)($_POST['csrf_token'] ?? '');
   if (!hash_equals((string)$_SESSION['inventory_form_csrf'], $csrf)) {
     $errors[] = 'Security token mismatch. Please refresh and try again.';
@@ -230,6 +271,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (mb_strlen($fields['location']) > 255) {
       $errors[] = 'Location must be 255 characters or fewer.';
     }
+    $amazon_purchase_link = normalize_optional_url($fields['amazon_purchase_link'], 'Amazon Purchase Link', $errors);
+    $alibaba_purchase_link = normalize_optional_url($fields['alibaba_purchase_link'], 'Alibaba Purchase Link', $errors);
 
     $cost_price = parse_money_field($fields['cost_price'], 'Cost Price', $errors);
     $retail_price = parse_money_field($fields['retail_price'], 'Retail Price', $errors);
@@ -313,6 +356,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $upd = $pdo->prepare("
           UPDATE inventory_items SET
             item_name = ?, description = ?, category = ?, supplier = ?,
+            amazon_purchase_link = ?, alibaba_purchase_link = ?,
             cost_price = ?, retail_price = ?, wholesale_price = ?, minimum_price = ?,
             current_stock = ?, low_stock_alert = ?, location = ?,
             image_original_name = ?, image_stored_name = ?, image_mime_type = ?
@@ -323,6 +367,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $fields['description'] !== '' ? $fields['description'] : null,
           $fields['category'],
           $fields['supplier'],
+          $amazon_purchase_link !== '' ? $amazon_purchase_link : null,
+          $alibaba_purchase_link !== '' ? $alibaba_purchase_link : null,
           $cost_price,
           $retail_price,
           $wholesale_price,
@@ -360,6 +406,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $ins = $pdo->prepare("
             INSERT INTO inventory_items (
               part_number, item_name, description, category, supplier,
+              amazon_purchase_link, alibaba_purchase_link,
               cost_price, retail_price, wholesale_price, minimum_price,
               current_stock, low_stock_alert, location,
               image_original_name, image_stored_name, image_mime_type
@@ -371,6 +418,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $fields['description'] !== '' ? $fields['description'] : null,
             $fields['category'],
             $fields['supplier'],
+            $amazon_purchase_link !== '' ? $amazon_purchase_link : null,
+            $alibaba_purchase_link !== '' ? $alibaba_purchase_link : null,
             $cost_price,
             $retail_price,
             $wholesale_price,
@@ -416,7 +465,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 }
 
-$page_title = $is_edit ? 'Edit Inventory Item' : 'Add Inventory Item';
+$page_title = $is_view ? 'View Inventory Item' : ($is_edit ? 'Edit Inventory Item' : 'Add Inventory Item');
 $image_url = $image_stored_name ? 'uploads/inventory/' . rawurlencode((string)$image_stored_name) : '';
 render_header($page_title);
 ?>
@@ -424,9 +473,14 @@ render_header($page_title);
 <div class="card page-header">
   <div class="page-header-body">
     <h1><?= h($page_title) ?></h1>
-    <p class="muted">Manage inventory details, pricing tiers, stock levels, and product image.</p>
+    <p class="muted">Manage inventory details, pricing tiers, stock levels, purchase links, and product image.</p>
   </div>
-  <a class="btn" href="inventory_list.php">← Back to Inventory</a>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <?php if ($is_view): ?>
+      <a class="btn" href="inventory_form.php?id=<?= (int)$id ?>">Edit Item</a>
+    <?php endif; ?>
+    <a class="btn" href="inventory_list.php">← Back to Inventory</a>
+  </div>
 </div>
 
 <div class="card">
@@ -447,11 +501,13 @@ render_header($page_title);
   <?php endif; ?>
 
   <form method="post" enctype="multipart/form-data" action="inventory_form.php<?= $is_edit ? '?id=' . (int)$id : '' ?>" novalidate>
+  <?php if (!$is_view): ?>
     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['inventory_form_csrf']) ?>" />
     <?php if ($is_edit): ?>
       <input type="hidden" name="id" value="<?= (int)$id ?>" />
       <input type="hidden" name="delete_csrf_token" value="<?= h($_SESSION['inventory_delete_csrf']) ?>" />
     <?php endif; ?>
+  <?php endif; ?>
 
     <div class="form-grid">
       <?php if ($is_edit): ?>
@@ -464,15 +520,15 @@ render_header($page_title);
       <?php endif; ?>
       <div>
         <label>Name <span style="color:var(--d);">*</span></label>
-        <input type="text" name="item_name" maxlength="255" required value="<?= h($fields['item_name']) ?>" />
+        <input type="text" name="item_name" maxlength="255" <?= $is_view ? 'readonly' : 'required' ?> value="<?= h($fields['item_name']) ?>" />
       </div>
       <div class="full">
         <label>Description</label>
-        <textarea name="description" rows="4"><?= h($fields['description']) ?></textarea>
+        <textarea name="description" rows="4" <?= $is_view ? 'readonly' : '' ?>><?= h($fields['description']) ?></textarea>
       </div>
       <div>
         <label>Category <span style="color:var(--d);">*</span></label>
-        <select name="category" required>
+        <select name="category" <?= $is_view ? 'disabled' : 'required' ?>>
           <?php foreach ($categories as $cat): ?>
             <option value="<?= h($cat) ?>" <?= $fields['category'] === $cat ? 'selected' : '' ?>><?= h($cat) ?></option>
           <?php endforeach; ?>
@@ -480,42 +536,68 @@ render_header($page_title);
       </div>
       <div>
         <label>Supplier</label>
-        <input type="text" name="supplier" maxlength="255" value="<?= h($fields['supplier']) ?>" />
+        <input type="text" name="supplier" maxlength="255" value="<?= h($fields['supplier']) ?>" <?= $is_view ? 'readonly' : '' ?> />
+      </div>
+      <div>
+        <label>Amazon Purchase Link</label>
+        <input type="url" name="amazon_purchase_link" maxlength="1000" placeholder="https://..." value="<?= h($fields['amazon_purchase_link']) ?>" <?= $is_view ? 'readonly' : '' ?> />
+      </div>
+      <div>
+        <label>Alibaba Purchase Link</label>
+        <input type="url" name="alibaba_purchase_link" maxlength="1000" placeholder="https://..." value="<?= h($fields['alibaba_purchase_link']) ?>" <?= $is_view ? 'readonly' : '' ?> />
       </div>
       <div>
         <label>Cost Price</label>
-        <input type="text" name="cost_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['cost_price']) ?>" />
+        <input type="text" name="cost_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['cost_price']) ?>" <?= $is_view ? 'readonly' : '' ?> />
       </div>
       <div>
         <label>Retail Price</label>
-        <input type="text" name="retail_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['retail_price']) ?>" />
+        <input type="text" name="retail_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['retail_price']) ?>" <?= $is_view ? 'readonly' : '' ?> />
       </div>
       <div>
         <label>Wholesale Price</label>
-        <input type="text" name="wholesale_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['wholesale_price']) ?>" />
+        <input type="text" name="wholesale_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['wholesale_price']) ?>" <?= $is_view ? 'readonly' : '' ?> />
       </div>
       <div>
         <label>Minimum Price</label>
-        <input type="text" name="minimum_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['minimum_price']) ?>" />
+        <input type="text" name="minimum_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['minimum_price']) ?>" <?= $is_view ? 'readonly' : '' ?> />
       </div>
       <div>
         <label>Current Stock</label>
-        <input type="text" name="current_stock" inputmode="numeric" value="<?= h($fields['current_stock']) ?>" />
+        <input type="text" name="current_stock" inputmode="numeric" value="<?= h($fields['current_stock']) ?>" <?= $is_view ? 'readonly' : '' ?> />
       </div>
       <div>
         <label>Low Stock Alert</label>
-        <input type="text" name="low_stock_alert" inputmode="numeric" value="<?= h($fields['low_stock_alert']) ?>" />
+        <input type="text" name="low_stock_alert" inputmode="numeric" value="<?= h($fields['low_stock_alert']) ?>" <?= $is_view ? 'readonly' : '' ?> />
       </div>
       <div>
         <label>Location</label>
-        <input type="text" name="location" maxlength="255" value="<?= h($fields['location']) ?>" />
+        <input type="text" name="location" maxlength="255" value="<?= h($fields['location']) ?>" <?= $is_view ? 'readonly' : '' ?> />
       </div>
       <div>
         <label>Image Upload</label>
-        <input type="file" name="image" accept=".jpg,.jpeg,.png,.gif,.webp,image/*" />
+        <input type="file" name="image" accept=".jpg,.jpeg,.png,.gif,.webp,image/*" <?= $is_view ? 'disabled' : '' ?> />
         <div class="muted" style="margin-top:6px;">Accepted: JPG, PNG, GIF, WEBP (max 5 MB).</div>
       </div>
     </div>
+
+    <?php if ($is_view): ?>
+      <div style="margin-top:14px;">
+        <div class="muted" style="margin-bottom:6px;">Purchase Links</div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          <?php if ($fields['amazon_purchase_link'] !== ''): ?>
+            <a class="btn" href="<?= h($fields['amazon_purchase_link']) ?>" target="_blank" rel="noopener noreferrer">Open Amazon Link</a>
+          <?php else: ?>
+            <span class="muted">Amazon: —</span>
+          <?php endif; ?>
+          <?php if ($fields['alibaba_purchase_link'] !== ''): ?>
+            <a class="btn" href="<?= h($fields['alibaba_purchase_link']) ?>" target="_blank" rel="noopener noreferrer">Open Alibaba Link</a>
+          <?php else: ?>
+            <span class="muted">Alibaba: —</span>
+          <?php endif; ?>
+        </div>
+      </div>
+    <?php endif; ?>
 
     <?php if ($image_url !== ''): ?>
       <div style="margin-top:14px;">
@@ -524,18 +606,20 @@ render_header($page_title);
       </div>
     <?php endif; ?>
 
-    <div style="margin-top:16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
-      <button type="submit" class="btn primary"><?= $is_edit ? 'Save Changes' : 'Create Inventory Item' ?></button>
-      <?php if ($is_edit): ?>
-        <button type="submit"
-                class="btn"
-                formaction="inventory_delete.php"
-                formmethod="post"
-                formnovalidate
-                onclick="return confirm('Delete this inventory item permanently? This cannot be undone.');"
-                style="background:#b91c1c; border-color:#991b1b; color:#fff;">Delete Item</button>
-      <?php endif; ?>
-    </div>
+    <?php if (!$is_view): ?>
+      <div style="margin-top:16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+        <button type="submit" class="btn primary"><?= $is_edit ? 'Save Changes' : 'Create Inventory Item' ?></button>
+        <?php if ($is_edit): ?>
+          <button type="submit"
+                  class="btn"
+                  formaction="inventory_delete.php"
+                  formmethod="post"
+                  formnovalidate
+                  onclick="return confirm('Delete this inventory item permanently? This cannot be undone.');"
+                  style="background:#b91c1c; border-color:#991b1b; color:#fff;">Delete Item</button>
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
   </form>
 </div>
 
