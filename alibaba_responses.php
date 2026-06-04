@@ -25,7 +25,21 @@ $responses = [
     'title' => 'No Price Changes After Quote',
     'body' => 'Important notice: Once you provide a quote, the quoted price must remain firm. We will not accept any price increases, revisions, or changes after the quote has been issued.',
   ],
+  [
+    'title' => 'No Used or Refurbished',
+    'body' => 'We only purchase brand new machines and parts. We will not accept any used, refurbished, or previously installed equipment.',
+  ],
+  [
+    'title' => 'Exact Match Required',
+    'body' => 'All items must match the exact specifications, brand, and model listed in our inquiry. Substitutions or "equivalent" items will not be accepted.',
+  ],
+  [
+    'title' => 'No Sample Fees',
+    'body' => 'Please do not request any sample fees, mold fees, or customization deposits. We only work with suppliers who can provide accurate quoting without upfront fees.',
+  ],
 ];
+
+$response_count = count($responses);
 
 render_header('Alibaba Quick Responses');
 ?>
@@ -120,7 +134,7 @@ render_header('Alibaba Quick Responses');
       <h1 style="margin:0 0 6px;">Alibaba Quick Responses</h1>
       <p class="muted" style="margin:0;">Clean, copy-ready sourcing notices for the team to use in supplier conversations.</p>
     </div>
-    <span class="badge new"><?= count($responses) ?> Responses</span>
+    <span class="badge new"><?= $response_count ?> Responses</span>
   </div>
 </div>
 
