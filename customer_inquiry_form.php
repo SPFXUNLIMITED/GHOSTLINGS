@@ -108,6 +108,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $fields['notes'] !== '' ? $fields['notes'] : null,
           $edit_id,
         ]);
+        try {
+          $actor_id = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+          if ($actor_id !== null && $actor_id <= 0) {
+            $actor_id = null;
+          }
+          $actor_name = isset($_SESSION['username']) ? trim((string)$_SESSION['username']) : '';
+          $detail = 'Inquiry #' . (int)$edit_id . ' updated for ' . $fields['customer_name'];
+          if ($fields['company_name'] !== '') {
+            $detail .= ' (' . $fields['company_name'] . ')';
+          }
+          log_admin_activity($pdo, $actor_id, 'Customer Inquiry Updated', $detail, $actor_name);
+        } catch (Throwable $e) {
+          // Non-blocking audit log write.
+        }
         $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
         header('Location: customer_inquiry_form.php?view=all&updated=1');
         exit;
@@ -132,6 +146,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $fields['notes'] !== '' ? $fields['notes'] : null,
           $created_by,
         ]);
+        try {
+          $actor_name = isset($_SESSION['username']) ? trim((string)$_SESSION['username']) : '';
+          $new_id = (int)$pdo->lastInsertId();
+          $detail = 'Inquiry #' . $new_id . ' created for ' . $fields['customer_name'];
+          if ($fields['company_name'] !== '') {
+            $detail .= ' (' . $fields['company_name'] . ')';
+          }
+          log_admin_activity($pdo, $created_by, 'Customer Inquiry Created', $detail, $actor_name);
+        } catch (Throwable $e) {
+          // Non-blocking audit log write.
+        }
 
         $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
         header('Location: customer_inquiry_form.php?saved=1');
