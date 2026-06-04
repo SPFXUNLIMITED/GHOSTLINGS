@@ -130,6 +130,7 @@ render_header('Alibaba Quick Responses');
   };
 
   const fallbackCopy = (field) => {
+    console.warn('Clipboard API unavailable; using legacy copy fallback for Alibaba responses.');
     field.focus();
     field.select();
     document.execCommand('copy');
