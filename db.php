@@ -795,7 +795,8 @@ $pdo->exec("
   CREATE TABLE IF NOT EXISTS customers (
     id                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
     hubspot_contact_id  VARCHAR(64)  NOT NULL,
-    customer_name       VARCHAR(255) NOT NULL DEFAULT '',
+    first_name          VARCHAR(255) NOT NULL DEFAULT '',
+    last_name           VARCHAR(255) NOT NULL DEFAULT '',
     company             VARCHAR(255) NOT NULL DEFAULT '',
     phone               VARCHAR(100) NOT NULL DEFAULT '',
     email               VARCHAR(255) NOT NULL DEFAULT '',
@@ -809,6 +810,54 @@ $pdo->exec("
     KEY idx_customers_last_updated (last_updated)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+$hasCustomersFirstName = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'customers'
+    AND COLUMN_NAME = 'first_name'
+")->fetchColumn();
+if ($hasCustomersFirstName === 0) {
+  $pdo->exec("ALTER TABLE customers ADD COLUMN first_name VARCHAR(255) NOT NULL DEFAULT '' AFTER hubspot_contact_id");
+}
+
+$hasCustomersLastName = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'customers'
+    AND COLUMN_NAME = 'last_name'
+")->fetchColumn();
+if ($hasCustomersLastName === 0) {
+  $pdo->exec("ALTER TABLE customers ADD COLUMN last_name VARCHAR(255) NOT NULL DEFAULT '' AFTER first_name");
+}
+
+$hasLegacyCustomerName = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'customers'
+    AND COLUMN_NAME = 'customer_name'
+")->fetchColumn();
+if ($hasLegacyCustomerName > 0) {
+  $pdo->exec("
+    UPDATE customers
+    SET
+      first_name = CASE
+        WHEN TRIM(first_name) <> '' THEN first_name
+        WHEN TRIM(customer_name) = '' THEN ''
+        WHEN INSTR(TRIM(customer_name), ' ') > 0 THEN SUBSTRING_INDEX(TRIM(customer_name), ' ', 1)
+        ELSE TRIM(customer_name)
+      END,
+      last_name = CASE
+        WHEN TRIM(last_name) <> '' THEN last_name
+        WHEN TRIM(customer_name) = '' OR INSTR(TRIM(customer_name), ' ') = 0 THEN ''
+        ELSE TRIM(SUBSTRING(TRIM(customer_name), LENGTH(SUBSTRING_INDEX(TRIM(customer_name), ' ', 1)) + 1))
+      END
+  ");
+  $pdo->exec("ALTER TABLE customers DROP COLUMN customer_name");
+}
 
 try {
   $pdo->exec("ALTER TABLE vendors ADD COLUMN alibaba_store VARCHAR(255) NOT NULL DEFAULT ''");

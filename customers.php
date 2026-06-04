@@ -7,7 +7,6 @@ require_admin_or_moderator();
 const HUBSPOT_SYNC_PAGE_LIMIT = 50;
 const HUBSPOT_SYNC_PAGE_SIZE = 100;
 const HUBSPOT_SYNC_TIMEOUT_SECONDS = 20;
-const HUBSPOT_UNKNOWN_CUSTOMER_NAME = 'Unknown';
 const HUBSPOT_CONTACT_PROPERTIES = 'firstname,lastname,company,phone,email,lastmodifieddate';
 const HUBSPOT_CONTACTS_API_BASE = 'https://api.hubapi.com/crm/v3/objects/contacts';
 
@@ -17,7 +16,7 @@ if (empty($_SESSION['customers_sync_csrf'])) {
 
 $errors = [];
 $success = '';
-$customer_table_columns = 5;
+$customer_table_columns = 6;
 
 function hubspot_token(): string {
   $token = trim((string)getenv('HUBSPOT_PRIVATE_APP_TOKEN'));
@@ -25,13 +24,11 @@ function hubspot_token(): string {
   return trim((string)getenv('HUBSPOT_ACCESS_TOKEN'));
 }
 
-function hubspot_contact_name(array $props): string {
-  $first = trim((string)($props['firstname'] ?? ''));
-  $last = trim((string)($props['lastname'] ?? ''));
-  $full = trim($first . ' ' . $last);
-  if ($full !== '') return $full;
-  $email = trim((string)($props['email'] ?? ''));
-  return $email !== '' ? $email : HUBSPOT_UNKNOWN_CUSTOMER_NAME;
+function hubspot_contact_names(array $props): array {
+  return [
+    trim((string)($props['firstname'] ?? '')),
+    trim((string)($props['lastname'] ?? '')),
+  ];
 }
 
 function hubspot_to_datetime(?string $value): ?string {
@@ -64,10 +61,11 @@ function sync_customers_from_hubspot(PDO $pdo): array {
 
   $url = HUBSPOT_CONTACTS_API_BASE . '?limit=' . HUBSPOT_SYNC_PAGE_SIZE . '&properties=' . HUBSPOT_CONTACT_PROPERTIES;
   $upsert = $pdo->prepare(
-    "INSERT INTO customers (hubspot_contact_id, customer_name, company, phone, email, last_updated)
-     VALUES (?, ?, ?, ?, ?, ?)
+    "INSERT INTO customers (hubspot_contact_id, first_name, last_name, company, phone, email, last_updated)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
-       customer_name = ?,
+       first_name = ?,
+       last_name = ?,
        company = ?,
        phone = ?,
        email = ?,
@@ -110,19 +108,21 @@ function sync_customers_from_hubspot(PDO $pdo): array {
         $id = trim((string)($row['id'] ?? ''));
         if ($id === '') continue;
         $props = is_array($row['properties'] ?? null) ? $row['properties'] : [];
-        $customer_name = hubspot_contact_name($props);
+        [$first_name, $last_name] = hubspot_contact_names($props);
         $company = trim((string)($props['company'] ?? ''));
         $phone = trim((string)($props['phone'] ?? ''));
         $email = trim((string)($props['email'] ?? ''));
         $last_updated = hubspot_to_datetime($props['lastmodifieddate'] ?? null);
         $upsert->execute([
           $id,
-          $customer_name,
+          $first_name,
+          $last_name,
           $company,
           $phone,
           $email,
           $last_updated,
-          $customer_name,
+          $first_name,
+          $last_name,
           $company,
           $phone,
           $email,
@@ -164,7 +164,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $customers = $pdo->query(
-  "SELECT customer_name, company, phone, email, last_updated, updated_at
+  "SELECT first_name, last_name, company, phone, email, last_updated, updated_at
    FROM customers
    ORDER BY (last_updated IS NULL) ASC, last_updated DESC, updated_at DESC, id DESC"
 )->fetchAll();
@@ -201,7 +201,8 @@ render_header('Customers');
   <table>
     <thead>
       <tr>
-        <th>Customer Name</th>
+        <th>First Name</th>
+        <th>Last Name</th>
         <th>Company</th>
         <th>Phone</th>
         <th>Email</th>
@@ -216,7 +217,8 @@ render_header('Customers');
       <?php endif; ?>
       <?php foreach ($customers as $row): ?>
         <tr>
-          <td><strong><?= h((string)$row['customer_name']) ?></strong></td>
+          <td><strong><?= $row['first_name'] !== '' ? h((string)$row['first_name']) : '<span class="muted">—</span>' ?></strong></td>
+          <td><strong><?= $row['last_name'] !== '' ? h((string)$row['last_name']) : '<span class="muted">—</span>' ?></strong></td>
           <td><?= $row['company'] !== '' ? h((string)$row['company']) : '<span class="muted">—</span>' ?></td>
           <td><?= $row['phone'] !== '' ? h((string)$row['phone']) : '<span class="muted">—</span>' ?></td>
           <td><?= $row['email'] !== '' ? h((string)$row['email']) : '<span class="muted">—</span>' ?></td>
