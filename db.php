@@ -742,9 +742,10 @@ if ($replace_legacy_rfq_canned_defaults) {
     $rfq_canned_response_stmt->execute([$slot, $response['label'], $response['body']]);
   }
   if ($rfq_canned_response_legacy_only_slots) {
-    $pdo->exec(
-      "DELETE FROM rfq_canned_responses WHERE slot IN (" . implode(',', $rfq_canned_response_legacy_only_slots) . ")"
+    $rfq_canned_response_cleanup_stmt = $pdo->prepare(
+      "DELETE FROM rfq_canned_responses WHERE slot IN (" . implode(',', array_fill(0, count($rfq_canned_response_legacy_only_slots), '?')) . ")"
     );
+    $rfq_canned_response_cleanup_stmt->execute($rfq_canned_response_legacy_only_slots);
   }
 }
 $rfq_canned_response_seed_stmt = $pdo->prepare(
