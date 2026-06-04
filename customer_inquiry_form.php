@@ -12,6 +12,7 @@ const INQUIRY_STATUS_OPTIONS = [
   'completed' => 'Completed',
   'archived' => 'Archived',
 ];
+const INQUIRY_TABLE_COLUMN_COUNT = 9;
 
 if (empty($_SESSION['customer_inquiry_csrf'])) {
   $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
@@ -60,6 +61,7 @@ if ($edit_record && $_SERVER['REQUEST_METHOD'] === 'GET') {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $post_action = (string)($_POST['action'] ?? 'save');
+  $should_process_form_save = $post_action === 'save';
   $show_all = $post_action === 'status' || $post_action === 'delete';
   $saved = false;
   $updated = false;
@@ -94,107 +96,104 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
     }
 
-    if ($errors) {
-      goto render_page;
-    }
+    if ($should_process_form_save) {
+     foreach (array_keys($fields) as $key) {
+       $fields[$key] = trim((string)($_POST[$key] ?? ''));
+     }
 
-    foreach (array_keys($fields) as $key) {
-      $fields[$key] = trim((string)($_POST[$key] ?? ''));
-    }
+     if ($fields['customer_name'] === '') {
+       $errors[] = 'Customer Name is required.';
+     } elseif (strlen($fields['customer_name']) > 255) {
+       $errors[] = 'Customer Name must be 255 characters or fewer.';
+     }
 
-    if ($fields['customer_name'] === '') {
-      $errors[] = 'Customer Name is required.';
-    } elseif (strlen($fields['customer_name']) > 255) {
-      $errors[] = 'Customer Name must be 255 characters or fewer.';
-    }
+     if ($fields['company_name'] !== '' && strlen($fields['company_name']) > 255) {
+       $errors[] = 'Company Name must be 255 characters or fewer.';
+     }
+     if ($fields['phone_number'] !== '' && strlen($fields['phone_number']) > 50) {
+       $errors[] = 'Phone Number must be 50 characters or fewer.';
+     }
+     if ($fields['email'] !== '' && strlen($fields['email']) > 255) {
+       $errors[] = 'Email must be 255 characters or fewer.';
+     }
+     if ($fields['email'] !== '' && !filter_var($fields['email'], FILTER_VALIDATE_EMAIL)) {
+       $errors[] = 'Please enter a valid email address.';
+     }
+     if ($fields['notes'] !== '' && strlen($fields['notes']) > MAX_NOTES_LENGTH) {
+       $errors[] = 'Notes must be ' . MAX_NOTES_LENGTH . ' characters or fewer.';
+     }
 
-    if ($fields['company_name'] !== '' && strlen($fields['company_name']) > 255) {
-      $errors[] = 'Company Name must be 255 characters or fewer.';
-    }
-    if ($fields['phone_number'] !== '' && strlen($fields['phone_number']) > 50) {
-      $errors[] = 'Phone Number must be 50 characters or fewer.';
-    }
-    if ($fields['email'] !== '' && strlen($fields['email']) > 255) {
-      $errors[] = 'Email must be 255 characters or fewer.';
-    }
-    if ($fields['email'] !== '' && !filter_var($fields['email'], FILTER_VALIDATE_EMAIL)) {
-      $errors[] = 'Please enter a valid email address.';
-    }
-    if ($fields['notes'] !== '' && strlen($fields['notes']) > MAX_NOTES_LENGTH) {
-      $errors[] = 'Notes must be ' . MAX_NOTES_LENGTH . ' characters or fewer.';
-    }
+     $date = DateTime::createFromFormat('Y-m-d', $fields['inquiry_date']);
+     if (!$date || $date->format('Y-m-d') !== $fields['inquiry_date']) {
+       $errors[] = 'Please provide a valid inquiry date.';
+     } elseif ($date > new DateTime('now', new DateTimeZone(APP_TZ))) {
+       $errors[] = 'Date of Inquiry cannot be in the future.';
+     }
 
-    $date = DateTime::createFromFormat('Y-m-d', $fields['inquiry_date']);
-    if (!$date || $date->format('Y-m-d') !== $fields['inquiry_date']) {
-      $errors[] = 'Please provide a valid inquiry date.';
-    } elseif ($date > new DateTime('now', new DateTimeZone(APP_TZ))) {
-      $errors[] = 'Date of Inquiry cannot be in the future.';
-    }
+     if (!$errors) {
+       if ($edit_id !== null) {
+         // Update existing record
+         $upd = $pdo->prepare(
+           "UPDATE customer_phone_inquiries SET
+              customer_name = ?, company_name = ?, phone_number = ?,
+              email = ?, inquiry_date = ?, notes = ?
+            WHERE id = ?"
+         );
+         $upd->execute([
+           $fields['customer_name'],
+           $fields['company_name'] !== '' ? $fields['company_name'] : null,
+           $fields['phone_number'] !== '' ? $fields['phone_number'] : null,
+           $fields['email'] !== '' ? $fields['email'] : null,
+           $fields['inquiry_date'],
+           $fields['notes'] !== '' ? $fields['notes'] : null,
+           $edit_id,
+         ]);
+         $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
+         header('Location: customer_inquiry_form.php?view=all&updated=1');
+         exit;
+       } else {
+         // Insert new record
+         $created_by = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+         if ($created_by !== null && $created_by <= 0) {
+           $created_by = null;
+         }
 
-    if (!$errors) {
-      if ($edit_id !== null) {
-        // Update existing record
-        $upd = $pdo->prepare(
-          "UPDATE customer_phone_inquiries SET
-             customer_name = ?, company_name = ?, phone_number = ?,
-             email = ?, inquiry_date = ?, notes = ?
-           WHERE id = ?"
-        );
-        $upd->execute([
-          $fields['customer_name'],
-          $fields['company_name'] !== '' ? $fields['company_name'] : null,
-          $fields['phone_number'] !== '' ? $fields['phone_number'] : null,
-          $fields['email'] !== '' ? $fields['email'] : null,
-          $fields['inquiry_date'],
-          $fields['notes'] !== '' ? $fields['notes'] : null,
-          $edit_id,
-        ]);
-        $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
-        header('Location: customer_inquiry_form.php?view=all&updated=1');
-        exit;
-      } else {
-        // Insert new record
-        $created_by = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
-        if ($created_by !== null && $created_by <= 0) {
-          $created_by = null;
-        }
+         $ins = $pdo->prepare(
+           "INSERT INTO customer_phone_inquiries
+              (customer_name, company_name, phone_number, email, inquiry_date, notes, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?)"
+         );
+         $ins->execute([
+           $fields['customer_name'],
+           $fields['company_name'] !== '' ? $fields['company_name'] : null,
+           $fields['phone_number'] !== '' ? $fields['phone_number'] : null,
+           $fields['email'] !== '' ? $fields['email'] : null,
+           $fields['inquiry_date'],
+           $fields['notes'] !== '' ? $fields['notes'] : null,
+           $created_by,
+         ]);
 
-        $ins = $pdo->prepare(
-          "INSERT INTO customer_phone_inquiries
-             (customer_name, company_name, phone_number, email, inquiry_date, notes, created_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?)"
-        );
-        $ins->execute([
-          $fields['customer_name'],
-          $fields['company_name'] !== '' ? $fields['company_name'] : null,
-          $fields['phone_number'] !== '' ? $fields['phone_number'] : null,
-          $fields['email'] !== '' ? $fields['email'] : null,
-          $fields['inquiry_date'],
-          $fields['notes'] !== '' ? $fields['notes'] : null,
-          $created_by,
-        ]);
-
-        $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
-        header('Location: customer_inquiry_form.php?saved=1');
-        exit;
-      }
+         $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
+         header('Location: customer_inquiry_form.php?saved=1');
+         exit;
+       }
+     }
     }
   }
 }
 
 $inquiries = [];
 if ($show_all) {
+  $status_sort_sql = implode("','", array_keys(INQUIRY_STATUS_OPTIONS));
   $stmt = $pdo->query(
     "SELECT cpi.*, u.username AS created_by_username
      FROM customer_phone_inquiries cpi
      LEFT JOIN users u ON u.id = cpi.created_by
-     ORDER BY FIELD(cpi.status, 'new', 'in_progress', 'purchased', 'completed', 'archived'), cpi.inquiry_date DESC, cpi.id DESC
+     ORDER BY FIELD(cpi.status, '{$status_sort_sql}'), cpi.inquiry_date DESC, cpi.id DESC
      LIMIT 200"
   );
   $inquiries = $stmt->fetchAll();
 }
-
-render_page:
 render_header('Customer Inquiry Log');
 ?>
 
@@ -259,7 +258,7 @@ render_header('Customer Inquiry Log');
         </thead>
         <tbody>
           <?php if (!$inquiries): ?>
-            <tr><td colspan="9" class="muted">No inquiries logged yet.</td></tr>
+            <tr><td colspan="<?= INQUIRY_TABLE_COLUMN_COUNT ?>" class="muted">No inquiries logged yet.</td></tr>
           <?php endif; ?>
           <?php foreach ($inquiries as $inquiry): ?>
             <tr>
@@ -274,7 +273,7 @@ render_header('Customer Inquiry Log');
                       <option value="<?= h($status_key) ?>" <?= ((string)($inquiry['status'] ?? 'new') === $status_key) ? 'selected' : '' ?>><?= h($status_label) ?></option>
                     <?php endforeach; ?>
                   </select>
-                  <button type="submit" class="btn">Update</button>
+                  <button type="submit" class="btn" aria-label="Update status for <?= h($inquiry['customer_name']) ?>">Update</button>
                 </form>
               </td>
               <td><?= h($inquiry['customer_name']) ?></td>
@@ -289,7 +288,7 @@ render_header('Customer Inquiry Log');
                   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customer_inquiry_csrf']) ?>" />
                   <input type="hidden" name="action" value="delete" />
                   <input type="hidden" name="row_id" value="<?= (int)$inquiry['id'] ?>" />
-                  <button type="submit" class="btn" style="background:#fee2e2; border-color:#fecaca; color:#991b1b;">Delete</button>
+                  <button type="submit" class="btn" aria-label="Delete inquiry for <?= h($inquiry['customer_name']) ?>" style="background:#fee2e2; border-color:#fecaca; color:#991b1b;">Delete</button>
                 </form>
               </td>
             </tr>
