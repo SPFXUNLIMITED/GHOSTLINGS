@@ -189,7 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$errors) {
           $uploads_dir = __DIR__ . '/uploads/inventory';
           if (!is_dir($uploads_dir)) {
-            @mkdir($uploads_dir, 0750, true);
+            @mkdir($uploads_dir, 0755, true);
           }
           if (!is_dir($uploads_dir) || !is_writable($uploads_dir)) {
             $errors[] = 'uploads/inventory directory is missing or not writable.';
@@ -199,20 +199,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $errors[] = 'Unable to resolve image extension.';
             } else {
               $stored = 'inv_' . bin2hex(random_bytes(16)) . '.' . $stored_ext;
-            $dest = $uploads_dir . '/' . $stored;
-            if (!move_uploaded_file($tmp_path, $dest)) {
-              $errors[] = 'Failed to store uploaded image.';
-            } else {
-              if ($is_edit && $image_stored_name) {
-                $old = __DIR__ . '/uploads/inventory/' . basename((string)$image_stored_name);
-                if (is_file($old)) {
-                  @unlink($old);
+              $dest = $uploads_dir . '/' . $stored;
+              if (!move_uploaded_file($tmp_path, $dest)) {
+                $errors[] = 'Failed to store uploaded image.';
+              } else {
+                if ($is_edit && $image_stored_name) {
+                  $old = __DIR__ . '/uploads/inventory/' . basename((string)$image_stored_name);
+                  if (is_file($old)) {
+                    @unlink($old);
+                  }
                 }
+                $image_original_name = $orig_name;
+                $image_stored_name = $stored;
+                $image_mime_type = $mime;
               }
-              $image_original_name = $orig_name;
-              $image_stored_name = $stored;
-              $image_mime_type = $mime;
-            }
             }
           }
         }
