@@ -184,12 +184,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $inquiries = [];
 if ($show_all) {
-  $status_sort_sql = implode("','", array_keys(INQUIRY_STATUS_OPTIONS));
   $stmt = $pdo->query(
     "SELECT cpi.*, u.username AS created_by_username
      FROM customer_phone_inquiries cpi
      LEFT JOIN users u ON u.id = cpi.created_by
-     ORDER BY FIELD(cpi.status, '{$status_sort_sql}'), cpi.inquiry_date DESC, cpi.id DESC
+     ORDER BY FIELD(cpi.status, 'new', 'in_progress', 'purchased', 'completed', 'archived'), cpi.inquiry_date DESC, cpi.id DESC
      LIMIT 200"
   );
   $inquiries = $stmt->fetchAll();
