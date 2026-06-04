@@ -14,6 +14,7 @@ $options = [
 ];
 
 $pdo = new PDO($dsn, $db['user'], $db['pass'], $options);
+const APP_ENCRYPTED_MIN_PAYLOAD_BYTES = 29; // 12-byte IV + 16-byte tag + minimum 1-byte ciphertext
 
 function app_settings_crypto_key(): string {
   static $key = null;
@@ -29,7 +30,7 @@ function app_settings_crypto_key(): string {
 
   if (preg_match('/^[a-f0-9]{64}$/i', $raw)) {
     $decoded = hex2bin($raw);
-    if ($decoded !== false) {
+    if ($decoded !== false && strlen($decoded) === 32) {
       $key = $decoded;
       return $key;
     }
@@ -76,14 +77,14 @@ function app_decrypt_setting_value(?string $encoded): string {
   }
 
   $payload = substr($raw, 3);
-  if ($payload === false || strlen($payload) < 29) {
+  if (strlen($payload) < APP_ENCRYPTED_MIN_PAYLOAD_BYTES) {
     return '';
   }
 
   $iv = substr($payload, 0, 12);
   $tag = substr($payload, 12, 16);
   $ciphertext = substr($payload, 28);
-  if ($iv === false || $tag === false || $ciphertext === false || $ciphertext === '') {
+  if (strlen($iv) !== 12 || strlen($tag) !== 16 || $ciphertext === '') {
     return '';
   }
 

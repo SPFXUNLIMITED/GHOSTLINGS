@@ -51,7 +51,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'canned_responses') {
       if (strlen($lbl) > CR_LABEL_MAX) {
         $cr_errors[] = "Response {$i} label must be " . CR_LABEL_MAX . ' characters or fewer.';
       }
-
       if (strlen($body) > CR_BODY_MAX) {
         $cr_errors[] = "Response {$i} body must be " . CR_BODY_MAX . ' characters or fewer.';
       }
@@ -70,53 +69,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'canned_responses') {
       $cr_success = 'Canned responses saved.';
     }
   }
+}
 
-  if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'integrations') {
-    $csrf = (string)($_POST['csrf_token'] ?? '');
-    if (!hash_equals((string)$_SESSION['admin_backend_csrf'], $csrf)) {
-      $integrations_errors[] = 'Security token mismatch. Please refresh and try again.';
-    } else {
-      $submitted_hubspot_token = trim((string)($_POST['hubspot_private_app_token'] ?? ''));
-      $clear_hubspot_token = !empty($_POST['clear_hubspot_token']);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'integrations') {
+  $csrf = (string)($_POST['csrf_token'] ?? '');
+  if (!hash_equals((string)$_SESSION['admin_backend_csrf'], $csrf)) {
+    $integrations_errors[] = 'Security token mismatch. Please refresh and try again.';
+  } else {
+    $submitted_hubspot_token = trim((string)($_POST['hubspot_private_app_token'] ?? ''));
+    $clear_hubspot_token = !empty($_POST['clear_hubspot_token']);
 
-      if (strlen($submitted_hubspot_token) > HUBSPOT_TOKEN_MAX) {
-        $integrations_errors[] = 'HubSpot token must be ' . HUBSPOT_TOKEN_MAX . ' characters or fewer.';
-      }
+    if (strlen($submitted_hubspot_token) > HUBSPOT_TOKEN_MAX) {
+      $integrations_errors[] = 'HubSpot token must be ' . HUBSPOT_TOKEN_MAX . ' characters or fewer.';
+    }
 
-      if (!$integrations_errors) {
-        try {
-          $existing_row = $pdo->prepare("SELECT setting_val FROM integration_settings WHERE setting_key = 'hubspot_private_app_token' LIMIT 1");
-          $existing_row->execute();
-          $existing_value = (string)($existing_row->fetchColumn() ?? '');
+    if (!$integrations_errors) {
+      try {
+        $existing_stmt = $pdo->prepare("SELECT setting_val FROM integration_settings WHERE setting_key = 'hubspot_private_app_token' LIMIT 1");
+        $existing_stmt->execute();
+        $existing_value = (string)($existing_stmt->fetchColumn() ?? '');
 
-          $value_to_store = $existing_value;
-          $is_encrypted = 1;
+        $value_to_store = $existing_value;
+        $is_encrypted = 1;
 
-          if ($submitted_hubspot_token !== '') {
-            $value_to_store = app_encrypt_setting_value($submitted_hubspot_token);
-          } elseif ($clear_hubspot_token) {
-            $value_to_store = '';
-            $is_encrypted = 0;
-          }
-
-          $pdo->prepare(
-            "INSERT INTO integration_settings (setting_key, setting_val, is_encrypted)
-             VALUES ('hubspot_private_app_token', ?, ?)
-             ON DUPLICATE KEY UPDATE setting_val = ?, is_encrypted = ?"
-          )->execute([
-            $value_to_store === '' ? null : $value_to_store,
-            $is_encrypted,
-            $value_to_store === '' ? null : $value_to_store,
-            $is_encrypted,
-          ]);
-
-          $_SESSION['admin_backend_csrf'] = bin2hex(random_bytes(24));
-          $integrations_success = $clear_hubspot_token && $submitted_hubspot_token === ''
-            ? 'HubSpot token removed.'
-            : 'HubSpot token saved securely.';
-        } catch (Throwable $e) {
-          $integrations_errors[] = 'Unable to save token. Please ensure APP_SETTINGS_ENCRYPTION_KEY is configured.';
+        if ($submitted_hubspot_token !== '') {
+          $value_to_store = app_encrypt_setting_value($submitted_hubspot_token);
+        } elseif ($clear_hubspot_token) {
+          $value_to_store = '';
+          $is_encrypted = 0;
         }
+
+        $db_value_to_store = $value_to_store === '' ? null : $value_to_store;
+        $pdo->prepare(
+          "INSERT INTO integration_settings (setting_key, setting_val, is_encrypted)
+           VALUES ('hubspot_private_app_token', ?, ?)
+           ON DUPLICATE KEY UPDATE setting_val = ?, is_encrypted = ?"
+        )->execute([
+          $db_value_to_store,
+          $is_encrypted,
+          $db_value_to_store,
+          $is_encrypted,
+        ]);
+
+        $_SESSION['admin_backend_csrf'] = bin2hex(random_bytes(24));
+        $integrations_success = $clear_hubspot_token && $submitted_hubspot_token === ''
+          ? 'HubSpot token removed.'
+          : 'HubSpot token saved securely.';
+      } catch (Throwable $e) {
+        $integrations_errors[] = 'Unable to save token. Please ensure APP_SETTINGS_ENCRYPTION_KEY is configured.';
       }
     }
   }
@@ -135,19 +135,19 @@ if ($section === 'canned_responses') {
       $canned[$i] = ['slot' => $i, 'label' => '', 'body' => ''];
     }
   }
+}
 
-  if ($section === 'integrations') {
-    $row = $pdo->prepare(
-      "SELECT setting_val, updated_at
-       FROM integration_settings
-       WHERE setting_key = 'hubspot_private_app_token'
-       LIMIT 1"
-    );
-    $row->execute();
-    $integration = $row->fetch() ?: [];
-    $hubspot_token_is_set = trim((string)($integration['setting_val'] ?? '')) !== '';
-    $hubspot_token_updated_at = trim((string)($integration['updated_at'] ?? ''));
-  }
+if ($section === 'integrations') {
+  $row = $pdo->prepare(
+    "SELECT setting_val, updated_at
+     FROM integration_settings
+     WHERE setting_key = 'hubspot_private_app_token'
+     LIMIT 1"
+  );
+  $row->execute();
+  $integration = $row->fetch() ?: [];
+  $hubspot_token_is_set = trim((string)($integration['setting_val'] ?? '')) !== '';
+  $hubspot_token_updated_at = trim((string)($integration['updated_at'] ?? ''));
 }
 
 $total_users = 0;
@@ -500,9 +500,9 @@ render_header('Admin Backend');
           <input type="hidden" name="csrf_token" value="<?= h($_SESSION['admin_backend_csrf']) ?>" />
 
           <div style="max-width:560px;">
-            <label>HubSpot Private App Token</label>
-            <input type="password" name="hubspot_private_app_token" maxlength="<?= HUBSPOT_TOKEN_MAX ?>" autocomplete="new-password" placeholder="<?= $hubspot_token_is_set ? 'Saved token is hidden. Enter a new token to replace it.' : 'Enter HubSpot token' ?>" />
-            <p class="muted" style="margin:6px 0 0; font-size:12px;">
+            <label for="hubspot_private_app_token">HubSpot Private App Token</label>
+            <input id="hubspot_private_app_token" type="password" name="hubspot_private_app_token" maxlength="<?= HUBSPOT_TOKEN_MAX ?>" autocomplete="new-password" aria-describedby="hubspot_private_app_token_help" placeholder="<?= $hubspot_token_is_set ? 'Saved token is hidden. Enter a new token to replace it.' : 'Enter HubSpot token' ?>" />
+            <p id="hubspot_private_app_token_help" class="muted" style="margin:6px 0 0; font-size:12px;">
               <?= $hubspot_token_is_set ? 'A token is currently saved and encrypted in the database.' : 'No token saved yet.' ?>
               <?php if ($hubspot_token_updated_at !== ''): ?>
                 Last updated: <?= h($format_activity_datetime($hubspot_token_updated_at)) ?>.
