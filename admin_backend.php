@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'integrations') {
           : 'HubSpot token saved securely.';
       } catch (Throwable $e) {
         error_log('Integrations token save failed: ' . $e->getMessage());
-        $integrations_errors[] = 'Unable to save token right now. Please try again.';
+        $integrations_errors[] = 'Unable to save token right now. Please try again. If this continues, check server error logs.';
       }
     }
   }

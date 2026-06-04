@@ -62,7 +62,7 @@ function app_settings_crypto_key(): string {
   }
 
   if ($raw === '') {
-    throw new RuntimeException('Unable to initialize app settings encryption key.');
+    throw new RuntimeException('Failed to persist or retrieve app settings encryption key from integration settings.');
   }
 
   if (preg_match('/^[a-f0-9]{64}$/i', $raw)) {
