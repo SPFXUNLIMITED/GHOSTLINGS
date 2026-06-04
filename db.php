@@ -954,7 +954,7 @@ $pdo->exec("
     phone_number     VARCHAR(50) NULL,
     email            VARCHAR(255) NULL,
     inquiry_date     DATE NOT NULL,
-    status           ENUM('new','in_progress','purchased','completed','archived') NOT NULL DEFAULT 'new',
+    status           ENUM('pending','urgent','critical','ordered') NOT NULL DEFAULT 'pending',
     notes            TEXT NULL,
     created_by       INT UNSIGNED NULL,
     created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -977,9 +977,27 @@ $hasCpiStatus = (int)$pdo->query("
 if ($hasCpiStatus === 0) {
   $pdo->exec("
     ALTER TABLE customer_phone_inquiries
-    ADD COLUMN status ENUM('new','in_progress','purchased','completed','archived') NOT NULL DEFAULT 'new' AFTER inquiry_date
+    ADD COLUMN status ENUM('pending','urgent','critical','ordered') NOT NULL DEFAULT 'pending' AFTER inquiry_date
   ");
   $pdo->exec("ALTER TABLE customer_phone_inquiries ADD KEY idx_cpi_status (status)");
+}
+
+// Migrate customer_phone_inquiries status ENUM from old values (new/in_progress/purchased/completed/archived) to new ones
+$cpiOldEnum = $pdo->query("
+  SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME   = 'customer_phone_inquiries'
+    AND COLUMN_NAME  = 'status'
+    AND COLUMN_TYPE LIKE \"%'new'%\"
+")->fetchColumn();
+if ($cpiOldEnum !== false) {
+  // Widen to VARCHAR so all old values are valid during the transition
+  $pdo->exec("ALTER TABLE customer_phone_inquiries MODIFY COLUMN status VARCHAR(20) NOT NULL DEFAULT 'pending'");
+  // Map old statuses to new ones
+  $pdo->exec("UPDATE customer_phone_inquiries SET status = 'pending'  WHERE status IN ('new', 'in_progress')");
+  $pdo->exec("UPDATE customer_phone_inquiries SET status = 'ordered'  WHERE status IN ('purchased', 'completed', 'archived')");
+  // Apply the new ENUM definition
+  $pdo->exec("ALTER TABLE customer_phone_inquiries MODIFY COLUMN status ENUM('pending','urgent','critical','ordered') NOT NULL DEFAULT 'pending'");
 }
 
 // Create shipping_rfq_requests table for freight/shipping quote requests
