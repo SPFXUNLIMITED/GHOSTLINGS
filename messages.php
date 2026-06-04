@@ -4,6 +4,8 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_login();
 
+const MAX_MESSAGE_LENGTH = 200000;
+
 $current_user_id = (int)$_SESSION['user_id'];
 
 // Find the other user (the only other user in the system)
@@ -35,9 +37,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $errors[] = 'Security token mismatch. Please refresh and try again.';
   } else {
     $body = trim((string)($_POST['body'] ?? ''));
-    if ($body === '' || $body === '<p></p>' || $body === '<p><br></p>' || $body === '<p><br data-mce-bogus="1"></p>') {
+    if (trim(strip_tags($body)) === '') {
       $errors[] = 'Message body cannot be empty.';
-    } elseif (strlen($body) > 200000) {
+    } elseif (strlen($body) > MAX_MESSAGE_LENGTH) {
       $errors[] = 'Message is too long.';
     } else {
       $ins = $pdo->prepare(
