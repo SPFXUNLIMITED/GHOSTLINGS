@@ -418,7 +418,7 @@ render_header($page_title);
           <div style="min-height:44px; padding:10px 12px; border:1px solid var(--b); border-radius:10px; background:#f8fafc; color:#0f172a; display:flex; align-items:center;"><?= h($part_number) ?></div>
         </div>
       <?php else: ?>
-        <div class="full muted">Part Number will be generated automatically when this item is created.</div>
+        <p class="full muted" role="status" aria-live="polite" style="margin:0;">Part Number will be generated automatically when this item is created.</p>
       <?php endif; ?>
       <div>
         <label>Name <span style="color:var(--d);">*</span></label>
