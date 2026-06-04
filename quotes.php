@@ -13,11 +13,34 @@ if (empty($_SESSION['quotes_csrf'])) {
 }
 
 function quote_invoice_number(int $quote_id): string {
-  return 'INV-' . date('Ymd') . '-' . str_pad((string)$quote_id, 5, '0', STR_PAD_LEFT);
+  $stamp = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Ymd');
+  return 'INV-' . $stamp . '-' . str_pad((string)$quote_id, 5, '0', STR_PAD_LEFT);
 }
 
 function quote_format_money($value): string {
   return number_format((float)$value, 2);
+}
+
+function quote_mail_domain(): string {
+  $configured = trim((string)getenv('APP_MAIL_FROM_DOMAIN'));
+  if ($configured !== '' && preg_match('/^[a-z0-9.-]+$/i', $configured)) {
+    return strtolower($configured);
+  }
+
+  $host = strtolower(trim((string)($_SERVER['SERVER_NAME'] ?? 'localhost')));
+  if ($host !== '' && preg_match('/^[a-z0-9.-]+$/', $host)) {
+    return $host;
+  }
+
+  return 'localhost';
+}
+
+function quote_escape_like(string $value, string $escape = '\\'): string {
+  return str_replace(
+    [$escape, '%', '_'],
+    [$escape . $escape, $escape . '%', $escape . '_'],
+    $value
+  );
 }
 
 function quote_send_email(array $quote, array $items): bool {
@@ -41,12 +64,17 @@ function quote_send_email(array $quote, array $items): bool {
     . "Subtotal: $" . quote_format_money($quote['subtotal_amount']) . "\r\n\r\n"
     . "Thank you.\r\n";
 
-  $headers = "From: no-reply@" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "\r\n"
-    . "Reply-To: no-reply@" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "\r\n"
+  $mail_domain = quote_mail_domain();
+  $headers = "From: no-reply@" . $mail_domain . "\r\n"
+    . "Reply-To: no-reply@" . $mail_domain . "\r\n"
     . "X-Mailer: PHP/" . phpversion() . "\r\n"
     . "Content-Type: text/plain; charset=UTF-8\r\n";
 
-  return (bool)@mail($to, $subject, $body, $headers);
+  $sent = mail($to, $subject, $body, $headers);
+  if (!$sent) {
+    error_log('Quote email send failed for quote #' . (int)($quote['id'] ?? 0) . ' to ' . $to);
+  }
+  return (bool)$sent;
 }
 
 function quote_send_twilio_sms_placeholder(array $quote): string {
@@ -66,17 +94,26 @@ function quote_send_twilio_sms_placeholder(array $quote): string {
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
   header('Content-Type: application/json; charset=utf-8');
 
-  $query = trim((string)($_GET['q'] ?? ''));
-  if ($query === '' || strlen($query) < 1) {
+  $csrf = trim((string)($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
+  if ($csrf === '' || !hash_equals((string)$_SESSION['quotes_csrf'], $csrf)) {
+    http_response_code(403);
     echo json_encode([]);
     exit;
   }
 
-  $like = '%' . $query . '%';
+  $query = trim((string)($_GET['q'] ?? ''));
+  if ($query === '') {
+    echo json_encode([]);
+    exit;
+  }
+
+  $like = '%' . quote_escape_like($query) . '%';
   $stmt = $pdo->prepare(
     "SELECT id, customer_name, company, phone, email
      FROM customers
-     WHERE customer_name LIKE ? OR company LIKE ? OR email LIKE ?
+     WHERE customer_name LIKE ? ESCAPE '\\\\'
+        OR company LIKE ? ESCAPE '\\\\'
+        OR email LIKE ? ESCAPE '\\\\'
      ORDER BY customer_name ASC, id DESC
      LIMIT 8"
   );
@@ -161,12 +198,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
            SET status = 'converted',
                converted_invoice_no = COALESCE(converted_invoice_no, ?),
                converted_at = COALESCE(converted_at, NOW())
-           WHERE id = ?"
+           WHERE id = ? AND status <> 'converted'"
         );
         $stmt->execute([$inv_no, $row_id]);
-        $_SESSION['quotes_csrf'] = bin2hex(random_bytes(24));
-        header('Location: quotes.php?view=id&id=' . $row_id . '&invoice_converted=1');
-        exit;
+        if ($stmt->rowCount() < 1) {
+          $errors[] = 'This quote is already converted to an invoice.';
+        } else {
+          $_SESSION['quotes_csrf'] = bin2hex(random_bytes(24));
+          header('Location: quotes.php?view=id&id=' . $row_id . '&invoice_converted=1');
+          exit;
+        }
       }
     } elseif ($action === 'send_email') {
       $row_id = (int)($_POST['row_id'] ?? 0);
@@ -247,6 +288,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $posted_price = $_POST['item_price'] ?? [];
       if (!is_array($posted_desc) || !is_array($posted_qty) || !is_array($posted_price)) {
         $errors[] = 'Line item data is invalid.';
+      } elseif (count($posted_desc) !== count($posted_qty) || count($posted_desc) !== count($posted_price)) {
+        $errors[] = 'Line item data is malformed. Please reload and try again.';
       } else {
         $line_items = [];
         $line_count = min(count($posted_desc), count($posted_qty), count($posted_price), QUOTE_MAX_LINE_ITEMS);
@@ -705,10 +748,14 @@ render_header('Quotes');
           btn.style.borderBottom = '1px solid #e5e7eb';
           btn.style.background = '#fff';
           btn.style.padding = '10px 12px';
-          btn.innerHTML = '<strong>' + (row.customer_name || '') + '</strong>'
-            + '<div class="muted" style="margin-top:3px;">'
-            + (row.company || '—') + ' • ' + (row.phone || '—') + ' • ' + (row.email || '—')
-            + '</div>';
+          const title = document.createElement('strong');
+          title.textContent = row.customer_name || '';
+          btn.appendChild(title);
+          const meta = document.createElement('div');
+          meta.className = 'muted';
+          meta.style.marginTop = '3px';
+          meta.textContent = (row.company || '—') + ' • ' + (row.phone || '—') + ' • ' + (row.email || '—');
+          btn.appendChild(meta);
           btn.addEventListener('click', () => {
             customerNameInput.value = row.customer_name || '';
             customerIdInput.value = row.id || '';
@@ -735,7 +782,11 @@ render_header('Quotes');
         }
 
         debounceTimer = setTimeout(() => {
-          fetch('quotes.php?customer_search=1&q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+          const searchUrl = 'quotes.php?customer_search=1&q=' + encodeURIComponent(q);
+          fetch(searchUrl, {
+            credentials: 'same-origin',
+            headers: { 'X-CSRF-Token': '<?= h($_SESSION['quotes_csrf']) ?>' }
+          })
             .then((res) => res.ok ? res.json() : [])
             .then((rows) => renderSuggestions(Array.isArray(rows) ? rows : []))
             .catch(() => hideSuggestions());
