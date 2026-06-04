@@ -467,7 +467,7 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
     <a class="menu-link <?= $current === 'messages.php' ? 'active' : '' ?>" href="messages.php">Messages</a>
     <a class="menu-link <?= $current === 'time_clock.php' ? 'active' : '' ?>" href="time_clock.php">Time Clock</a>
     <?php render_menu_dropdown('Quick Orders', [
-      ['href' => 'quick_order_form.php?view=all', 'file' => 'quick_order_form.php', 'label' => 'Quick Orders', 'visible' => true],
+      ['href' => 'quick_order_list.php', 'file' => 'quick_order_list.php', 'label' => 'Quick Orders', 'visible' => true],
       ['href' => 'quick_order_form.php', 'file' => 'quick_order_form.php', 'label' => 'Quick Order Form', 'visible' => true],
       ['href' => 'machine_inquiry_form.php', 'file' => 'machine_inquiry_form.php', 'label' => 'Machine Inquiry Form', 'visible' => true],
       ['href' => 'machine_inquiry_admin.php', 'file' => 'machine_inquiry_admin.php', 'label' => 'Inquiry Admin', 'visible' => true],
