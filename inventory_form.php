@@ -110,6 +110,9 @@ if (!inventory_part_number_index_exists($pdo)) {
 if (empty($_SESSION['inventory_form_csrf'])) {
   $_SESSION['inventory_form_csrf'] = bin2hex(random_bytes(24));
 }
+if (empty($_SESSION['inventory_delete_csrf'])) {
+  $_SESSION['inventory_delete_csrf'] = bin2hex(random_bytes(24));
+}
 
 function parse_money_field(string $raw, string $label, array &$errors): ?string {
   $raw = trim($raw);
@@ -197,6 +200,10 @@ if ($is_edit) {
   $image_original_name = $existing['image_original_name'] ?? null;
   $image_stored_name = $existing['image_stored_name'] ?? null;
   $image_mime_type = $existing['image_mime_type'] ?? null;
+}
+
+if ($is_edit && (string)($_GET['delete_error'] ?? '') === 'image') {
+  $errors[] = 'Unable to remove the stored image file, so the inventory item was not deleted.';
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -441,6 +448,10 @@ render_header($page_title);
 
   <form method="post" enctype="multipart/form-data" action="inventory_form.php<?= $is_edit ? '?id=' . (int)$id : '' ?>" novalidate>
     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['inventory_form_csrf']) ?>" />
+    <?php if ($is_edit): ?>
+      <input type="hidden" name="id" value="<?= (int)$id ?>" />
+      <input type="hidden" name="delete_csrf_token" value="<?= h($_SESSION['inventory_delete_csrf']) ?>" />
+    <?php endif; ?>
 
     <div class="form-grid">
       <?php if ($is_edit): ?>
@@ -513,8 +524,17 @@ render_header($page_title);
       </div>
     <?php endif; ?>
 
-    <div style="margin-top:16px;">
+    <div style="margin-top:16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
       <button type="submit" class="btn primary"><?= $is_edit ? 'Save Changes' : 'Create Inventory Item' ?></button>
+      <?php if ($is_edit): ?>
+        <button type="submit"
+                class="btn"
+                formaction="inventory_delete.php"
+                formmethod="post"
+                formnovalidate
+                onclick="return confirm('Delete this inventory item permanently? This cannot be undone.');"
+                style="background:#b91c1c; border-color:#991b1b; color:#fff;">Delete Item</button>
+      <?php endif; ?>
     </div>
   </form>
 </div>
