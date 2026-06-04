@@ -14,6 +14,9 @@ render_alibaba_workflow_banner('create_rfq');
   margin: 0 auto;
   max-width: 1100px;
 }
+.home-dashboard-card {
+  padding: 20px;
+}
 .home-hero-card {
   border: 1px solid #e5e7eb;
   border-radius: 16px;
@@ -93,6 +96,9 @@ render_alibaba_workflow_banner('create_rfq');
   }
 }
 @media (max-width: 640px) {
+  .home-dashboard-card {
+    padding: 14px;
+  }
   .home-hero-card {
     padding: 24px;
   }
@@ -102,31 +108,33 @@ render_alibaba_workflow_banner('create_rfq');
 }
 </style>
 
-<div class="home-hero-wrap">
-  <section class="home-hero-card" aria-labelledby="home-dashboard-title">
-    <h1 id="home-dashboard-title" class="home-hero-title">Team Dashboard</h1>
-    <p class="home-hero-subtitle">Choose a workflow to start a new request. Use one of the options below to log customer inquiries, submit sourcing RFQs, or begin new purchase orders.</p>
-  </section>
+<div class="card home-dashboard-card">
+  <div class="home-hero-wrap">
+    <section class="home-hero-card" aria-labelledby="home-dashboard-title">
+      <h1 id="home-dashboard-title" class="home-hero-title">Team Dashboard</h1>
+      <p class="home-hero-subtitle">Choose a workflow to start a new request. Use one of the options below to log customer inquiries, submit sourcing RFQs, or begin new purchase orders.</p>
+    </section>
 
-  <section class="home-entry-grid" aria-label="Primary actions">
-    <a class="home-entry-card" href="customer_inquiry_form.php">
-      <span class="home-entry-icon" aria-hidden="true">CI</span>
-      <h2 class="home-entry-title">New Customer Inquiry</h2>
-      <p class="home-entry-text">Capture customer details, requirements, and notes for quick follow-up.</p>
-    </a>
+    <section class="home-entry-grid" aria-label="Primary actions">
+      <a class="home-entry-card" href="customer_inquiry_form.php">
+        <span class="home-entry-icon" aria-hidden="true">CI</span>
+        <h2 class="home-entry-title">New Customer Inquiry</h2>
+        <p class="home-entry-text">Capture customer details, requirements, and notes for quick follow-up.</p>
+      </a>
 
-    <a class="home-entry-card" href="sourcing_rfq_form.php">
-      <span class="home-entry-icon" aria-hidden="true">RFQ</span>
-      <h2 class="home-entry-title">New RFQ</h2>
-      <p class="home-entry-text">Create a new sourcing request to collect supplier quotes and pricing.</p>
-    </a>
+      <a class="home-entry-card" href="sourcing_rfq_form.php">
+        <span class="home-entry-icon" aria-hidden="true">RFQ</span>
+        <h2 class="home-entry-title">New RFQ</h2>
+        <p class="home-entry-text">Create a new sourcing request to collect supplier quotes and pricing.</p>
+      </a>
 
-    <a class="home-entry-card" href="order_form.php">
-      <span class="home-entry-icon" aria-hidden="true">PO</span>
-      <h2 class="home-entry-title">New Purchase Order</h2>
-      <p class="home-entry-text">Start a purchase order workflow and move it through fulfillment stages.</p>
-    </a>
-  </section>
+      <a class="home-entry-card" href="order_form.php">
+        <span class="home-entry-icon" aria-hidden="true">PO</span>
+        <h2 class="home-entry-title">New Purchase Order</h2>
+        <p class="home-entry-text">Start a purchase order workflow and move it through fulfillment stages.</p>
+      </a>
+    </section>
+  </div>
 </div>
 
 <?php render_footer(); ?>
