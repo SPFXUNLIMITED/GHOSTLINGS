@@ -6,6 +6,7 @@ require_admin();
 
 const CR_LABEL_MAX = 100;
 const CR_BODY_MAX  = 2000;
+const CR_SLOT_COUNT = 4;
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
@@ -38,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'canned_responses') {
   if (!hash_equals((string)$_SESSION['admin_backend_csrf'], $csrf)) {
     $cr_errors[] = 'Security token mismatch. Please refresh and try again.';
   } else {
-    for ($i = 1; $i <= 6; $i++) {
+    for ($i = 1; $i <= CR_SLOT_COUNT; $i++) {
       $lbl  = trim((string)($_POST["cr_label_{$i}"] ?? ''));
       $body = trim((string)($_POST["cr_body_{$i}"] ?? ''));
       if (strlen($lbl) > CR_LABEL_MAX) {
@@ -50,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'canned_responses') {
     }
 
     if (!$cr_errors) {
-      for ($i = 1; $i <= 6; $i++) {
+      for ($i = 1; $i <= CR_SLOT_COUNT; $i++) {
         $lbl  = trim((string)($_POST["cr_label_{$i}"] ?? ''));
         $body = trim((string)($_POST["cr_body_{$i}"] ?? ''));
         $pdo->prepare(
@@ -67,12 +68,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'canned_responses') {
 $canned = [];
 if ($section === 'canned_responses') {
   $rows = $pdo->query(
-    'SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN (1,2,3,4,5,6) ORDER BY slot'
+    'SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN (1,2,3,4) ORDER BY slot'
   )->fetchAll();
   foreach ($rows as $r) {
     $canned[(int)$r['slot']] = $r;
   }
-  for ($i = 1; $i <= 6; $i++) {
+  for ($i = 1; $i <= CR_SLOT_COUNT; $i++) {
     if (!isset($canned[$i])) {
       $canned[$i] = ['slot' => $i, 'label' => '', 'body' => ''];
     }
@@ -379,7 +380,7 @@ render_header('Admin Backend');
         <form method="post" action="admin_backend.php?section=canned_responses" novalidate>
           <input type="hidden" name="csrf_token" value="<?= h($_SESSION['admin_backend_csrf']) ?>" />
 
-          <?php for ($i = 1; $i <= 6; $i++): ?>
+          <?php for ($i = 1; $i <= CR_SLOT_COUNT; $i++): ?>
             <div class="canned-item">
               <h3 class="form-section-heading" style="margin-top:0;">Response <?= $i ?></h3>
               <div class="admin-grid-two">
