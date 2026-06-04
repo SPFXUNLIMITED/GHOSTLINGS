@@ -47,6 +47,14 @@ function hubspot_to_datetime(?string $value): ?string {
   return gmdate('Y-m-d H:i:s', $ts);
 }
 
+function format_customer_last_updated(?string $value): string {
+  $value = trim((string)$value);
+  if ($value === '') return '—';
+  $ts = strtotime($value);
+  if ($ts === false) return $value;
+  return date('m/d/Y g:i A', $ts);
+}
+
 function sync_customers_from_hubspot(PDO $pdo): array {
   $token = hubspot_token();
   if ($token === '') {
@@ -157,7 +165,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $customers = $pdo->query(
   "SELECT customer_name, company, phone, email, last_updated, updated_at
    FROM customers
-   ORDER BY COALESCE(last_updated, updated_at) DESC, id DESC"
+   ORDER BY last_updated DESC, updated_at DESC, id DESC"
 )->fetchAll();
 
 render_header('Customers');
@@ -211,7 +219,7 @@ render_header('Customers');
           <td><?= $row['company'] !== '' ? h((string)$row['company']) : '<span class="muted">—</span>' ?></td>
           <td><?= $row['phone'] !== '' ? h((string)$row['phone']) : '<span class="muted">—</span>' ?></td>
           <td><?= $row['email'] !== '' ? h((string)$row['email']) : '<span class="muted">—</span>' ?></td>
-          <td class="muted"><?= $row['last_updated'] !== null ? h((string)$row['last_updated']) : '—' ?></td>
+          <td class="muted"><?= h(format_customer_last_updated($row['last_updated'] ?? null)) ?></td>
         </tr>
       <?php endforeach; ?>
     </tbody>
