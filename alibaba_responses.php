@@ -37,6 +37,10 @@ $responses = [
     'title' => 'No Sample Fees',
     'body' => 'Please do not request any sample fees, mold fees, or customization deposits. We only work with suppliers who can provide accurate quoting without upfront fees.',
   ],
+  [
+    'title' => 'No Used Parts or Custom Builds',
+    'body' => 'We only accept brand new machines with all original factory parts. We will not accept any custom-built machines or machines containing used, refurbished, or previously installed parts (including laser heads, power supplies, or rails).',
+  ],
 ];
 
 $response_count = count($responses);
