@@ -668,7 +668,7 @@ if (!defined('RFQ_CANNED_RESPONSE_LEGACY_SLOT_COUNT')) {
 }
 $rfq_canned_response_slots = range(1, RFQ_CANNED_RESPONSE_SLOT_COUNT);
 $rfq_canned_response_legacy_slots = range(1, RFQ_CANNED_RESPONSE_LEGACY_SLOT_COUNT);
-$rfq_canned_response_legacy_slot_list = implode(',', $rfq_canned_response_legacy_slots);
+$rfq_canned_response_legacy_slot_placeholders = implode(',', array_fill(0, count($rfq_canned_response_legacy_slots), '?'));
 
 $rfq_canned_response_defaults = [
   1 => [
@@ -718,9 +718,11 @@ $rfq_canned_response_legacy_only_slots = array_map('intval', array_values(array_
   $rfq_canned_response_legacy_slots,
   array_keys($rfq_canned_response_defaults)
 )));
-$rfq_canned_response_rows = $pdo->query(
-  "SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN ($rfq_canned_response_legacy_slot_list) ORDER BY slot"
-)->fetchAll();
+$rfq_canned_response_rows_stmt = $pdo->prepare(
+  "SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN ($rfq_canned_response_legacy_slot_placeholders) ORDER BY slot"
+);
+$rfq_canned_response_rows_stmt->execute($rfq_canned_response_legacy_slots);
+$rfq_canned_response_rows = $rfq_canned_response_rows_stmt->fetchAll();
 $rfq_canned_response_by_slot = [];
 foreach ($rfq_canned_response_rows as $rfq_canned_response_row) {
   $rfq_canned_response_by_slot[(int)$rfq_canned_response_row['slot']] = [
@@ -731,7 +733,7 @@ foreach ($rfq_canned_response_rows as $rfq_canned_response_row) {
 $replace_legacy_rfq_canned_defaults = true;
 foreach ($legacy_rfq_canned_response_defaults as $slot => $legacy_response) {
   if (!isset($rfq_canned_response_by_slot[$slot])) {
-    if ($slot <= 4) {
+    if ($slot <= RFQ_CANNED_RESPONSE_SLOT_COUNT) {
       $replace_legacy_rfq_canned_defaults = false;
       break;
     }
