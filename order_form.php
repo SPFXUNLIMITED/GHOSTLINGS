@@ -16,7 +16,7 @@ if (empty($_SESSION['rfq_order_csrf'])) {
 }
 
 $order_statuses = [
-  'create_rfq' => 'Create RFQ',
+  'create_rfq' => 'Create Purchase Order',
   'receive_quotes' => 'Receive Quotes',
   'evaluate_select_quote' => 'Evaluate and Select Best Quote',
   'negotiate_terms' => 'Negotiate Terms',
@@ -686,7 +686,7 @@ if (($order['id'] ?? 0) > 0) {
     <div>
       <label>Order Status</label>
       <input id="order-status-label" type="text" value="<?= h((string)($order_statuses[$current_order_status] ?? $current_order_status)) ?>" readonly>
-      <?php if (!$can_manage_stage): ?>
+      <?php if (!$can_manage_stage && (int)($order['id'] ?? 0) > 0): ?>
         <div class="muted" style="font-size:12px; margin-top:4px;">Only admins and moderators can update workflow stages.</div>
       <?php endif; ?>
     </div>
