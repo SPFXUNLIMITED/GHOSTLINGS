@@ -68,6 +68,12 @@ $categories = ['Machine', 'Part', 'Consumable'];
 $max_image_bytes = 5 * 1024 * 1024;
 $allowed_image_exts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 $allowed_image_mimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+$image_mime_to_ext = [
+  'image/jpeg' => 'jpg',
+  'image/png' => 'png',
+  'image/gif' => 'gif',
+  'image/webp' => 'webp',
+];
 
 $fields = [
   'part_number' => '',
@@ -160,8 +166,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $errors[] = 'Image exceeds 5 MB maximum size.';
         }
 
-        $ext = strtolower((string)pathinfo($orig_name, PATHINFO_EXTENSION));
-        if (!in_array($ext, $allowed_image_exts, true)) {
+        $uploaded_ext = strtolower((string)pathinfo($orig_name, PATHINFO_EXTENSION));
+        if ($uploaded_ext === 'jpeg') {
+          $uploaded_ext = 'jpg';
+        }
+        if (!in_array($uploaded_ext, $allowed_image_exts, true)) {
           $errors[] = 'Image type not allowed. Allowed: ' . implode(', ', $allowed_image_exts) . '.';
         }
 
@@ -173,19 +182,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             finfo_close($fi);
           }
         }
-        if ($mime !== null && !in_array($mime, $allowed_image_mimes, true)) {
+        if ($mime === null || !in_array($mime, $allowed_image_mimes, true)) {
           $errors[] = 'Uploaded image content type is not allowed.';
         }
 
         if (!$errors) {
           $uploads_dir = __DIR__ . '/uploads/inventory';
           if (!is_dir($uploads_dir)) {
-            @mkdir($uploads_dir, 0755, true);
+            @mkdir($uploads_dir, 0750, true);
           }
           if (!is_dir($uploads_dir) || !is_writable($uploads_dir)) {
             $errors[] = 'uploads/inventory directory is missing or not writable.';
           } else {
-            $stored = 'inv_' . bin2hex(random_bytes(16)) . '.' . $ext;
+            $stored_ext = $image_mime_to_ext[$mime] ?? '';
+            if ($stored_ext === '') {
+              $errors[] = 'Unable to resolve image extension.';
+            } else {
+              $stored = 'inv_' . bin2hex(random_bytes(16)) . '.' . $stored_ext;
             $dest = $uploads_dir . '/' . $stored;
             if (!move_uploaded_file($tmp_path, $dest)) {
               $errors[] = 'Failed to store uploaded image.';
@@ -199,6 +212,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $image_original_name = $orig_name;
               $image_stored_name = $stored;
               $image_mime_type = $mime;
+            }
             }
           }
         }
