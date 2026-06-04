@@ -41,7 +41,11 @@ $q = trim((string)($_GET['q'] ?? ''));
 if ($q !== '') {
   $like = '%' . $q . '%';
   $stmt = $pdo->prepare("
-    SELECT *
+    SELECT
+      id, part_number, item_name, description, category, supplier,
+      cost_price, retail_price, wholesale_price, minimum_price,
+      current_stock, low_stock_alert, location,
+      image_original_name, image_stored_name, image_mime_type
     FROM inventory_items
     WHERE part_number LIKE ?
        OR item_name LIKE ?
@@ -52,7 +56,15 @@ if ($q !== '') {
   ");
   $stmt->execute([$like, $like, $like, $like, $like]);
 } else {
-  $stmt = $pdo->query("SELECT * FROM inventory_items ORDER BY item_name ASC, id DESC");
+  $stmt = $pdo->query("
+    SELECT
+      id, part_number, item_name, description, category, supplier,
+      cost_price, retail_price, wholesale_price, minimum_price,
+      current_stock, low_stock_alert, location,
+      image_original_name, image_stored_name, image_mime_type
+    FROM inventory_items
+    ORDER BY item_name ASC, id DESC
+  ");
 }
 $items = $stmt->fetchAll();
 

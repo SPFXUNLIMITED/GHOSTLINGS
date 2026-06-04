@@ -98,7 +98,16 @@ $image_stored_name = null;
 $image_mime_type = null;
 
 if ($is_edit) {
-  $stmt = $pdo->prepare("SELECT * FROM inventory_items WHERE id = ? LIMIT 1");
+  $stmt = $pdo->prepare("
+    SELECT
+      id, part_number, item_name, description, category, supplier,
+      cost_price, retail_price, wholesale_price, minimum_price,
+      current_stock, low_stock_alert, location,
+      image_original_name, image_stored_name, image_mime_type
+    FROM inventory_items
+    WHERE id = ?
+    LIMIT 1
+  ");
   $stmt->execute([$id]);
   $existing = $stmt->fetch();
   if (!$existing) {
