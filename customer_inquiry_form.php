@@ -12,7 +12,36 @@ const INQUIRY_STATUS_OPTIONS = [
   'completed' => 'Completed',
   'archived' => 'Archived',
 ];
-const INQUIRY_TABLE_COLUMN_COUNT = 9;
+const INQUIRY_STATUS_BADGES = [
+  'new' => ['#dbeafe', '#1e40af'],
+  'in_progress' => ['#fef3c7', '#92400e'],
+  'purchased' => ['#e9d5ff', '#6b21a8'],
+  'completed' => ['#dcfce7', '#166534'],
+  'archived' => ['#e5e7eb', '#374151'],
+];
+const INQUIRY_TABLE_COLUMN_COUNT = 7;
+
+function customer_inquiry_status_redirect_url(int $row_id, string $redirect_view): string {
+  if ($redirect_view === 'detail' && $row_id > 0) {
+    return 'customer_inquiry_form.php?view=id&id=' . $row_id . '&status_updated=1';
+  }
+  return 'customer_inquiry_form.php?view=all&status_updated=1';
+}
+
+function customer_inquiry_notes_preview(?string $notes, int $max_length = 120): string {
+  $notes = trim((string)$notes);
+  if ($notes === '') {
+    return '—';
+  }
+  if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+    return mb_strlen($notes) > $max_length
+      ? mb_substr($notes, 0, $max_length - 1) . '…'
+      : $notes;
+  }
+  return strlen($notes) > $max_length
+    ? substr($notes, 0, $max_length - 3) . '...'
+    : $notes;
+}
 
 if (empty($_SESSION['customer_inquiry_csrf'])) {
   $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
@@ -29,7 +58,10 @@ $fields = [
   'notes' => '',
 ];
 
-$show_all = (string)($_GET['view'] ?? '') === 'all';
+$view = (string)($_GET['view'] ?? '');
+$show_all = $view === 'all';
+$detail_id = $view === 'id' ? (int)($_GET['id'] ?? 0) : 0;
+$show_detail = $detail_id > 0;
 $saved = isset($_GET['saved']) && $_GET['saved'] === '1';
 $updated = isset($_GET['updated']) && $_GET['updated'] === '1';
 $status_updated = isset($_GET['status_updated']) && $_GET['status_updated'] === '1';
@@ -62,7 +94,13 @@ if ($edit_record && $_SERVER['REQUEST_METHOD'] === 'GET') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $post_action = (string)($_POST['action'] ?? 'save');
   $should_process_form_save = $post_action === 'save';
-  $show_all = $post_action === 'status' || $post_action === 'delete';
+  $post_row_id = (int)($_POST['row_id'] ?? 0);
+  $redirect_view = (string)($_POST['redirect_view'] ?? 'all');
+  $show_detail = $post_action === 'status' && $redirect_view === 'detail' && $post_row_id > 0;
+  if ($show_detail) {
+    $detail_id = $post_row_id;
+  }
+  $show_all = !$show_detail && ($post_action === 'status' || $post_action === 'delete');
   $saved = false;
   $updated = false;
   $status_updated = false;
@@ -72,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $errors[] = 'Security token mismatch. Please refresh and try again.';
   } else {
     if ($post_action === 'status') {
-      $row_id = (int)($_POST['row_id'] ?? 0);
+      $row_id = $post_row_id;
       $next_status = (string)($_POST['status'] ?? '');
       if ($row_id <= 0 || !isset(INQUIRY_STATUS_OPTIONS[$next_status])) {
         $errors[] = 'Invalid status update request.';
@@ -80,7 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $upd = $pdo->prepare("UPDATE customer_phone_inquiries SET status = ? WHERE id = ?");
         $upd->execute([$next_status, $row_id]);
         $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
-        header('Location: customer_inquiry_form.php?view=all&status_updated=1');
+        header('Location: ' . customer_inquiry_status_redirect_url($row_id, $redirect_view));
         exit;
       }
     } elseif ($post_action === 'delete') {
@@ -156,7 +194,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           // Non-blocking audit log write.
         }
         $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
-        header('Location: customer_inquiry_form.php?view=all&updated=1');
+        header('Location: customer_inquiry_form.php?view=id&id=' . $edit_id . '&updated=1');
         exit;
       } else {
         // Insert new record
@@ -179,36 +217,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $fields['notes'] !== '' ? $fields['notes'] : null,
           $created_by,
         ]);
+        $new_id = (int)$pdo->lastInsertId();
         try {
           $actor_name = isset($_SESSION['username']) ? trim((string)$_SESSION['username']) : '';
-          $new_id = (int)$pdo->lastInsertId();
           $detail = 'Inquiry #' . $new_id . ' created for ' . $fields['customer_name'];
           if ($fields['company_name'] !== '') {
             $detail .= ' (' . $fields['company_name'] . ')';
           }
           log_admin_activity($pdo, $created_by, 'Customer Inquiry Created', $detail, $actor_name);
-        } catch (Throwable $e) {
-          // Non-blocking audit log write.
-        }
-
-         $ins = $pdo->prepare(
-           "INSERT INTO customer_phone_inquiries
-              (customer_name, company_name, phone_number, email, inquiry_date, notes, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?)"
-         );
-         $ins->execute([
-           $fields['customer_name'],
-           $fields['company_name'] !== '' ? $fields['company_name'] : null,
-           $fields['phone_number'] !== '' ? $fields['phone_number'] : null,
-           $fields['email'] !== '' ? $fields['email'] : null,
-           $fields['inquiry_date'],
-           $fields['notes'] !== '' ? $fields['notes'] : null,
-           $created_by,
-         ]);
-
-         $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
-         header('Location: customer_inquiry_form.php?saved=1');
-         exit;
+       } catch (Throwable $e) {
+         // Non-blocking audit log write.
+       }
+       $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
+       header('Location: customer_inquiry_form.php?view=id&id=' . $new_id . '&saved=1');
+       exit;
        }
      }
     }
@@ -226,6 +248,34 @@ if ($show_all) {
   );
   $inquiries = $stmt->fetchAll();
 }
+$detail_inquiry = null;
+if ($show_detail) {
+  $stmt = $pdo->prepare(
+    "SELECT cpi.*, u.username AS created_by_username
+     FROM customer_phone_inquiries cpi
+     LEFT JOIN users u ON u.id = cpi.created_by
+     WHERE cpi.id = ?
+     LIMIT 1"
+  );
+  $stmt->execute([$detail_id]);
+  $detail_inquiry = $stmt->fetch();
+  if (!$detail_inquiry) {
+    http_response_code(404);
+    render_header('Customer Inquiry Not Found');
+    ?>
+    <div class="card">
+      <h1 style="margin-top:0;">Customer Inquiry Not Found</h1>
+      <p class="muted">We couldn’t find that customer inquiry record.</p>
+      <div class="actions">
+        <a class="btn" href="customer_inquiry_form.php?view=all">Back to All Inquiries</a>
+        <a class="btn primary" href="customer_inquiry_form.php">New Inquiry</a>
+      </div>
+    </div>
+    <?php
+    render_footer();
+    exit;
+  }
+}
 render_header('Customer Inquiry Log');
 ?>
 
@@ -242,14 +292,112 @@ render_header('Customer Inquiry Log');
   </div>
 <?php endif; ?>
 
-<?php if ($saved): ?>
-  <div class="card" style="max-width:760px; text-align:center;">
+<?php if ($show_detail): ?>
+  <?php if ($saved): ?>
     <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">
       Inquiry saved successfully.
     </div>
-    <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
-      <a class="btn primary" href="customer_inquiry_form.php" style="font-size:16px; padding:12px 18px;">New Inquiry</a>
-      <a class="btn" href="customer_inquiry_form.php?view=all" style="font-size:16px; padding:12px 18px;">View All Inquiries</a>
+  <?php endif; ?>
+  <?php if ($updated): ?>
+    <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">
+      Inquiry updated successfully.
+    </div>
+  <?php endif; ?>
+  <?php if ($status_updated): ?>
+    <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">
+      Inquiry status updated successfully.
+    </div>
+  <?php endif; ?>
+  <?php
+    $detail_status = (string)($detail_inquiry['status'] ?? 'new');
+    [$detail_badge_bg, $detail_badge_color] = INQUIRY_STATUS_BADGES[$detail_status] ?? ['#e5e7eb', '#374151'];
+  ?>
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+      <div>
+        <h2 style="margin:0;">Inquiry #<?= (int)$detail_inquiry['id'] ?> — <?= h($detail_inquiry['customer_name']) ?></h2>
+        <p class="muted" style="margin:6px 0 0;">Logged on <?= h($detail_inquiry['inquiry_date']) ?><?= !empty($detail_inquiry['created_at']) ? ' • Created ' . h((string)$detail_inquiry['created_at']) : '' ?></p>
+      </div>
+      <div class="actions">
+        <a class="btn" href="customer_inquiry_form.php?view=all">Back to All Inquiries</a>
+        <a class="btn primary" href="customer_inquiry_form.php?edit=<?= (int)$detail_inquiry['id'] ?>">Edit Inquiry</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px;">
+      <h3 style="margin:0;">Inquiry Details</h3>
+      <span style="display:inline-flex; align-items:center; border-radius:999px; padding:6px 12px; font-weight:600; background:<?= h($detail_badge_bg) ?>; color:<?= h($detail_badge_color) ?>;">
+        <?= h(INQUIRY_STATUS_OPTIONS[$detail_status] ?? 'New') ?>
+      </span>
+    </div>
+    <table>
+      <tbody>
+        <tr>
+          <th style="width:220px;">Customer Name</th>
+          <td><?= h($detail_inquiry['customer_name']) ?></td>
+        </tr>
+        <tr>
+          <th>Company Name</th>
+          <td><?= h($detail_inquiry['company_name'] ?: '—') ?></td>
+        </tr>
+        <tr>
+          <th>Phone Number</th>
+          <td><?= h($detail_inquiry['phone_number'] ?: '—') ?></td>
+        </tr>
+        <tr>
+          <th>Email</th>
+          <td><?= h($detail_inquiry['email'] ?: '—') ?></td>
+        </tr>
+        <tr>
+          <th>Date of Inquiry</th>
+          <td><?= h($detail_inquiry['inquiry_date']) ?></td>
+        </tr>
+        <tr>
+          <th>Logged By</th>
+          <td><?= h($detail_inquiry['created_by_username'] ?: '—') ?></td>
+        </tr>
+        <tr>
+          <th>Created At</th>
+          <td><?= h($detail_inquiry['created_at'] ?: '—') ?></td>
+        </tr>
+        <tr>
+          <th>Notes / What they want</th>
+          <td style="white-space:pre-wrap;"><?= h($detail_inquiry['notes'] ?: '—') ?></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap;">
+      <div style="flex:1 1 320px;">
+        <h3 style="margin-top:0;">Manage Inquiry</h3>
+        <form method="post" style="display:flex; gap:10px; align-items:end; flex-wrap:wrap; margin:0;">
+          <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customer_inquiry_csrf']) ?>" />
+          <input type="hidden" name="action" value="status" />
+          <input type="hidden" name="row_id" value="<?= (int)$detail_inquiry['id'] ?>" />
+          <input type="hidden" name="redirect_view" value="detail" />
+          <div>
+            <label for="status">Status</label>
+            <select id="status" name="status" style="min-width:180px;">
+              <?php foreach (INQUIRY_STATUS_OPTIONS as $status_key => $status_label): ?>
+                <option value="<?= h($status_key) ?>" <?= ($detail_status === $status_key) ? 'selected' : '' ?>><?= h($status_label) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <button type="submit" class="btn">Update Status</button>
+        </form>
+      </div>
+      <div style="flex:0 0 auto;">
+        <form method="post" onsubmit="return confirm('Delete this inquiry? This cannot be undone.');">
+          <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customer_inquiry_csrf']) ?>" />
+          <input type="hidden" name="action" value="delete" />
+          <input type="hidden" name="row_id" value="<?= (int)$detail_inquiry['id'] ?>" />
+          <button type="submit" class="btn" aria-label="Delete inquiry for <?= h($detail_inquiry['customer_name']) ?>" style="background:#fee2e2; border-color:#fecaca; color:#991b1b;">Delete Inquiry</button>
+        </form>
+      </div>
     </div>
   </div>
 <?php elseif ($show_all): ?>
@@ -274,18 +422,16 @@ render_header('Customer Inquiry Log');
       </div>
     <?php endif; ?>
     <div style="overflow-x:auto;">
-      <table style="min-width:900px;">
+      <table style="min-width:760px;">
         <thead>
           <tr>
             <th>Date</th>
             <th>Status</th>
             <th>Customer Name</th>
-            <th>Company Name</th>
             <th>Phone Number</th>
-            <th>Email</th>
             <th>Notes / What they want</th>
             <th>Logged By</th>
-            <th></th>
+            <th>View</th>
           </tr>
         </thead>
         <tbody>
@@ -293,35 +439,23 @@ render_header('Customer Inquiry Log');
             <tr><td colspan="<?= INQUIRY_TABLE_COLUMN_COUNT ?>" class="muted">No inquiries logged yet.</td></tr>
           <?php endif; ?>
           <?php foreach ($inquiries as $inquiry): ?>
+            <?php
+              $status_key = (string)($inquiry['status'] ?? 'new');
+              [$badge_bg, $badge_color] = INQUIRY_STATUS_BADGES[$status_key] ?? ['#e5e7eb', '#374151'];
+            ?>
             <tr>
               <td style="white-space:nowrap;"><?= h($inquiry['inquiry_date']) ?></td>
               <td style="white-space:nowrap;">
-                <form method="post" style="display:flex; gap:8px; align-items:center; margin:0;">
-                  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customer_inquiry_csrf']) ?>" />
-                  <input type="hidden" name="action" value="status" />
-                  <input type="hidden" name="row_id" value="<?= (int)$inquiry['id'] ?>" />
-                  <select name="status" style="min-width:140px;">
-                    <?php foreach (INQUIRY_STATUS_OPTIONS as $status_key => $status_label): ?>
-                      <option value="<?= h($status_key) ?>" <?= ((string)($inquiry['status'] ?? 'new') === $status_key) ? 'selected' : '' ?>><?= h($status_label) ?></option>
-                    <?php endforeach; ?>
-                  </select>
-                  <button type="submit" class="btn" aria-label="Update status for <?= h($inquiry['customer_name']) ?>">Update</button>
-                </form>
+                <span style="display:inline-flex; align-items:center; border-radius:999px; padding:6px 12px; font-weight:600; background:<?= h($badge_bg) ?>; color:<?= h($badge_color) ?>;">
+                  <?= h(INQUIRY_STATUS_OPTIONS[$status_key] ?? 'New') ?>
+                </span>
               </td>
               <td><?= h($inquiry['customer_name']) ?></td>
-              <td><?= h($inquiry['company_name'] ?: '—') ?></td>
               <td><?= h($inquiry['phone_number'] ?: '—') ?></td>
-              <td><?= h($inquiry['email'] ?: '—') ?></td>
-              <td style="white-space:pre-wrap; min-width:220px;"><?= h($inquiry['notes'] ?: '—') ?></td>
+              <td style="min-width:240px; white-space:normal;"><?= h(customer_inquiry_notes_preview($inquiry['notes'] ?? null)) ?></td>
               <td><?= h($inquiry['created_by_username'] ?: '—') ?></td>
               <td style="white-space:nowrap;">
-                <a class="btn" href="customer_inquiry_form.php?edit=<?= (int)$inquiry['id'] ?>">Edit</a>
-                <form method="post" style="display:inline-block; margin-left:6px;" onsubmit="return confirm('Delete this inquiry? This cannot be undone.');">
-                  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customer_inquiry_csrf']) ?>" />
-                  <input type="hidden" name="action" value="delete" />
-                  <input type="hidden" name="row_id" value="<?= (int)$inquiry['id'] ?>" />
-                  <button type="submit" class="btn" aria-label="Delete inquiry for <?= h($inquiry['customer_name']) ?>" style="background:#fee2e2; border-color:#fecaca; color:#991b1b;">Delete</button>
-                </form>
+                <a class="btn" href="customer_inquiry_form.php?view=id&id=<?= (int)$inquiry['id'] ?>">View</a>
               </td>
             </tr>
           <?php endforeach; ?>
@@ -364,7 +498,7 @@ render_header('Customer Inquiry Log');
     </div>
     <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
       <button type="submit" class="btn primary" style="font-size:18px; padding:14px 22px;"><?= $edit_id !== null ? 'Update Inquiry' : 'Save Inquiry' ?></button>
-      <a class="btn" href="customer_inquiry_form.php?view=all">View All Inquiries</a>
+      <a class="btn" href="<?= $edit_id !== null ? 'customer_inquiry_form.php?view=id&id=' . (int)$edit_id : 'customer_inquiry_form.php?view=all' ?>"><?= $edit_id !== null ? 'Back to Inquiry' : 'View All Inquiries' ?></a>
     </div>
   </form>
 <?php endif; ?>
