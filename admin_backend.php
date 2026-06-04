@@ -85,6 +85,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'integrations') {
 
     if (!$integrations_errors) {
       try {
+        app_ensure_integration_settings_table($pdo);
+        app_settings_crypto_key();
+
         $existing_stmt = $pdo->prepare("SELECT setting_val FROM integration_settings WHERE setting_key = 'hubspot_private_app_token' LIMIT 1");
         $existing_stmt->execute();
         $existing_value = (string)($existing_stmt->fetchColumn() ?? '');
@@ -140,6 +143,7 @@ if ($section === 'canned_responses') {
 
 if ($section === 'integrations') {
   try {
+    app_ensure_integration_settings_table($pdo);
     app_settings_crypto_key();
   } catch (Throwable $e) {
     error_log('Integrations encryption initialization failed: ' . $e->getMessage());
