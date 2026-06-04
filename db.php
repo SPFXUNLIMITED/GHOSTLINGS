@@ -955,3 +955,18 @@ $pdo->exec("
     KEY idx_order_documents_doc_type (doc_type)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+// Create messages table for internal two-user messaging
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS messages (
+    id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    sender_id    INT UNSIGNED NOT NULL,
+    recipient_id INT UNSIGNED NOT NULL,
+    body         MEDIUMTEXT   NOT NULL,
+    is_read      TINYINT(1)   NOT NULL DEFAULT 0,
+    created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_messages_recipient_read (recipient_id, is_read),
+    KEY idx_messages_created_at (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");

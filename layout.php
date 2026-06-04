@@ -344,6 +344,7 @@ function render_header(string $title): void {
     ? trim((string)($_GET['q'] ?? ''))
     : '';
   $clock_status_badge = '';
+  $unread_messages_badge = '';
   $user_id = (int)($_SESSION['user_id'] ?? 0);
   global $pdo;
   if ($user_id > 0 && isset($pdo) && $pdo instanceof PDO) {
@@ -358,6 +359,16 @@ function render_header(string $title): void {
     $clock_status_badge = $open_stmt->fetch()
       ? '<span class="badge clocked-in">● Clocked In</span>'
       : '<span class="badge clocked-out">○ Clocked Out</span>';
+
+    $unread_stmt = $pdo->prepare("SELECT COUNT(*) FROM messages WHERE recipient_id = ? AND is_read = 0");
+    $unread_stmt->execute([$user_id]);
+    $unread_count = (int)$unread_stmt->fetchColumn();
+    if ($unread_count > 0) {
+      $unread_messages_badge = '<a href="messages.php" style="text-decoration:none;" aria-label="' . $unread_count . ' unread message' . ($unread_count === 1 ? '' : 's') . '">'
+        . '<span style="display:inline-flex;align-items:center;justify-content:center;background:#dc2626;color:#fff;border-radius:999px;font-size:11px;font-weight:700;min-width:18px;height:18px;padding:0 5px;line-height:1;vertical-align:middle;" title="' . $unread_count . ' unread message' . ($unread_count === 1 ? '' : 's') . '">'
+        . $unread_count
+        . '</span></a>';
+    }
   }
 ?>
 <!doctype html>
@@ -390,7 +401,7 @@ function render_header(string $title): void {
 		  <?php if ($username): ?>
             <?= $clock_status_badge ?>
 		    <span class="muted topbar-clock-label">LA: <strong id="clock"></strong></span>
-		    <span class="muted">Signed in as <strong><?= h($username) ?></strong></span>
+		    <span class="muted">Signed in as <strong><?= h($username) ?></strong><?= $unread_messages_badge ?></span>
 		    <a class="btn" href="logout.php">Logout</a>
 		  <?php else: ?>
 		    <a class="btn" href="login.php">Login</a>
@@ -449,6 +460,7 @@ $show_rfq_menu = $show_mod_menu;
     <?php if (!empty($_SESSION['user_id'])): ?>
     <a class="menu-link <?= $current === 'index.php' ? 'active' : '' ?>" href="index.php">Home</a>
     <a class="menu-link <?= $current === 'user_page.php' ? 'active' : '' ?>" href="user_page.php">My Profile</a>
+    <a class="menu-link <?= $current === 'messages.php' ? 'active' : '' ?>" href="messages.php">Messages</a>
     <?php render_menu_dropdown('Bug Reporting', [
       ['href' => 'app_request_form.php', 'file' => 'app_request_form.php', 'label' => 'Bug Reporting', 'visible' => true],
       ['href' => 'app_request_tracker.php', 'file' => 'app_request_tracker.php', 'label' => 'Bug Tracker', 'visible' => $show_mod_menu],
