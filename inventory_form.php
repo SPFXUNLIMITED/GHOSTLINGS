@@ -92,7 +92,6 @@ $fields = [
 
 $errors = [];
 $warnings = [];
-$success = '';
 $image_original_name = null;
 $image_stored_name = null;
 $image_mime_type = null;
@@ -261,7 +260,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $image_mime_type,
           $id,
         ]);
-        $success = 'Inventory item updated.';
+        header('Location: inventory_list.php?success=updated');
+        exit;
       } else {
         $ins = $pdo->prepare("
           INSERT INTO inventory_items (
@@ -288,17 +288,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $image_stored_name,
           $image_mime_type,
         ]);
-        $id = (int)$pdo->lastInsertId();
-        $is_edit = true;
-        $success = 'Inventory item created.';
+        header('Location: inventory_list.php?success=created');
+        exit;
       }
-      $_SESSION['inventory_form_csrf'] = bin2hex(random_bytes(24));
-      $fields['cost_price'] = $cost_price ?? '';
-      $fields['retail_price'] = $retail_price ?? '';
-      $fields['wholesale_price'] = $wholesale_price ?? '';
-      $fields['minimum_price'] = $minimum_price ?? '';
-      $fields['current_stock'] = (string)$current_stock;
-      $fields['low_stock_alert'] = (string)$low_stock_alert;
     }
   }
 }
@@ -322,12 +314,6 @@ render_header($page_title);
       <ul style="margin:0; padding-left:18px;">
         <?php foreach ($errors as $e): ?><li><?= h($e) ?></li><?php endforeach; ?>
       </ul>
-    </div>
-  <?php endif; ?>
-
-  <?php if ($success): ?>
-    <div class="alert" style="margin-bottom:14px; border-color:#bbf7d0; background:#f0fdf4; color:#166534;">
-      <?= h($success) ?>
     </div>
   <?php endif; ?>
 
