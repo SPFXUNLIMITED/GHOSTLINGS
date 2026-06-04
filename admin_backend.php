@@ -14,7 +14,23 @@ if (empty($_SESSION['admin_backend_csrf'])) {
   $_SESSION['admin_backend_csrf'] = bin2hex(random_bytes(24));
 }
 
-$section = (string)($_GET['section'] ?? 'overview');
+$allowed_sections = [
+  'dashboard',
+  'users',
+  'time_reports',
+  'activity_log',
+  'canned_responses',
+  'system_settings',
+];
+
+$section = (string)($_GET['section'] ?? 'dashboard');
+if ($section === 'overview') {
+  $section = 'dashboard';
+}
+if (!in_array($section, $allowed_sections, true)) {
+  $section = 'dashboard';
+}
+
 $cr_success = '';
 $cr_errors  = [];
 
@@ -27,12 +43,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'canned_responses') {
       $lbl  = trim((string)($_POST["cr_label_{$i}"] ?? ''));
       $body = trim((string)($_POST["cr_body_{$i}"] ?? ''));
       if (strlen($lbl) > CR_LABEL_MAX) {
-        $cr_errors[] = "Response {$i} label must be " . CR_LABEL_MAX . " characters or fewer.";
+        $cr_errors[] = "Response {$i} label must be " . CR_LABEL_MAX . ' characters or fewer.';
       }
       if (strlen($body) > CR_BODY_MAX) {
-        $cr_errors[] = "Response {$i} body must be " . CR_BODY_MAX . " characters or fewer.";
+        $cr_errors[] = "Response {$i} body must be " . CR_BODY_MAX . ' characters or fewer.';
       }
     }
+
     if (!$cr_errors) {
       for ($i = 1; $i <= 6; $i++) {
         $lbl  = trim((string)($_POST["cr_label_{$i}"] ?? ''));
@@ -48,11 +65,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'canned_responses') {
   }
 }
 
-// Load canned responses when that section is active
 $canned = [];
 if ($section === 'canned_responses') {
   $rows = $pdo->query(
-    "SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN (1,2,3,4,5,6) ORDER BY slot"
+    'SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN (1,2,3,4,5,6) ORDER BY slot'
   )->fetchAll();
   foreach ($rows as $r) {
     $canned[(int)$r['slot']] = $r;
@@ -64,34 +80,285 @@ if ($section === 'canned_responses') {
   }
 }
 
+$total_users = 0;
+$total_inquiries = 0;
+$recent_activity = [];
+
+if ($section === 'dashboard') {
+  try {
+    $total_users = (int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
+  } catch (Throwable $e) {
+    $total_users = 0;
+  }
+
+  try {
+    $total_inquiries = (int)$pdo->query(
+      'SELECT
+        (SELECT COUNT(*) FROM customer_phone_inquiries)
+      + (SELECT COUNT(*) FROM machine_inquiries)
+      + (SELECT COUNT(*) FROM rfq_requests)
+      + (SELECT COUNT(*) FROM shipping_rfq_requests)
+      + (SELECT COUNT(*) FROM app_requests) AS total_inquiries'
+    )->fetchColumn();
+  } catch (Throwable $e) {
+    $total_inquiries = 0;
+  }
+
+  try {
+    $recent_activity = $pdo->query(
+      "SELECT kind, actor, details, occurred_at
+       FROM (
+         SELECT
+           'Time Entry' AS kind,
+           COALESCE(u.username, CONCAT('User #', te.user_id)) AS actor,
+           COALESCE(NULLIF(TRIM(te.description), ''), 'Clock activity recorded') AS details,
+           te.created_at AS occurred_at
+         FROM time_entries te
+         LEFT JOIN users u ON u.id = te.user_id
+
+         UNION ALL
+
+         SELECT
+           'Phone Inquiry' AS kind,
+           COALESCE(NULLIF(TRIM(customer_name), ''), 'Unknown caller') AS actor,
+           COALESCE(NULLIF(TRIM(company_name), ''), 'Customer inquiry logged') AS details,
+           created_at AS occurred_at
+         FROM customer_phone_inquiries
+
+         UNION ALL
+
+         SELECT
+           'App Request' AS kind,
+           COALESCE(u.username, CONCAT('User #', ar.requested_by)) AS actor,
+           COALESCE(NULLIF(TRIM(ar.request_title), ''), 'Request submitted') AS details,
+           ar.created_at AS occurred_at
+         FROM app_requests ar
+         LEFT JOIN users u ON u.id = ar.requested_by
+       ) activity
+       ORDER BY occurred_at DESC
+       LIMIT 8"
+    )->fetchAll();
+  } catch (Throwable $e) {
+    $recent_activity = [];
+  }
+}
+
+$menu = [
+  'dashboard' => ['label' => 'Dashboard', 'subtitle' => 'Overview'],
+  'users' => ['label' => 'Users', 'subtitle' => 'Accounts & permissions'],
+  'time_reports' => ['label' => 'Time Reports', 'subtitle' => 'Payroll and hour tracking'],
+  'activity_log' => ['label' => 'Activity Log', 'subtitle' => 'System activity feed'],
+  'canned_responses' => ['label' => 'Canned Responses', 'subtitle' => 'RFQ quick responses'],
+  'system_settings' => ['label' => 'System Settings', 'subtitle' => 'Configuration and controls'],
+];
+
+$format_activity_datetime = static function ($value): string {
+  $ts = strtotime((string)$value);
+  return $ts !== false ? date('M j, Y g:i A', $ts) : '—';
+};
+
 render_header('Admin Backend');
 ?>
 
-<div class="card">
-  <h1 style="margin-top:0;">Admin Backend</h1>
-  <p class="muted">Admin-only tools and management pages.</p>
+<style>
+  .admin-shell {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+  }
+
+  .admin-sidebar {
+    position: sticky;
+    top: 12px;
+    padding: 12px;
+  }
+
+  .admin-brand {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--m);
+    margin: 4px 0 12px;
+  }
+
+  .admin-nav-link {
+    display: block;
+    text-decoration: none;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    color: #334155;
+    background: #f8fafc;
+    transition: border-color .15s ease, background .15s ease;
+  }
+
+  .admin-nav-link:last-child {
+    margin-bottom: 0;
+  }
+
+  .admin-nav-link:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+  }
+
+  .admin-nav-link.active {
+    background: #eff6ff;
+    border-color: #93c5fd;
+    color: #1d4ed8;
+  }
+
+  .admin-nav-label {
+    display: block;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .admin-nav-subtitle {
+    display: block;
+    font-size: 12px;
+    color: var(--m);
+    margin-top: 2px;
+  }
+
+  .admin-main {
+    min-width: 0;
+  }
+
+  .admin-page-title {
+    margin: 0;
+    font-size: 1.45rem;
+  }
+
+  .admin-placeholder {
+    text-align: center;
+    padding: 30px 16px;
+  }
+
+  .admin-recent-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .admin-recent-table th,
+  .admin-recent-table td {
+    border-bottom: 1px solid var(--b);
+    padding: 10px 8px;
+    text-align: left;
+    font-size: 13px;
+    vertical-align: top;
+  }
+
+  .admin-recent-table th {
+    color: var(--m);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    font-weight: 700;
+  }
+
+  .admin-grid-two {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .canned-item + .canned-item {
+    margin-top: 22px;
+  }
+
+  @media (max-width: 980px) {
+    .admin-shell {
+      grid-template-columns: 1fr;
+    }
+
+    .admin-sidebar {
+      position: static;
+    }
+  }
+
+  @media (max-width: 700px) {
+    .admin-grid-two {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="card page-head">
+  <div class="page-head-main">
+    <h1 class="admin-page-title">Admin Area</h1>
+    <p class="muted">Centralized management for operations, users, reporting, and system controls.</p>
+  </div>
 </div>
 
-<div class="admin-layout">
+<div class="admin-shell">
+  <aside class="card admin-sidebar">
+    <div class="admin-brand">Administration</div>
+    <?php foreach ($menu as $key => $item): ?>
+      <a class="admin-nav-link <?= $section === $key ? 'active' : '' ?>" href="admin_backend.php?section=<?= h($key) ?>">
+        <span class="admin-nav-label"><?= h($item['label']) ?></span>
+        <span class="admin-nav-subtitle"><?= h($item['subtitle']) ?></span>
+      </a>
+    <?php endforeach; ?>
+  </aside>
 
-  <div class="admin-left card">
-    <a class="menu-link <?= $section === 'overview' ? 'active' : '' ?>" href="admin_backend.php">Overview</a>
-    <a class="menu-link" href="time_report.php">Time Reports</a>
-    <a class="menu-link" href="users.php">Users</a>
-    <a class="menu-link" href="user_profiles.php">User Profiles</a>
-    <a class="menu-link <?= $section === 'activity_log' ? 'active' : '' ?>" href="admin_backend.php?section=activity_log">Activity Log</a>
-    <a class="menu-link <?= $section === 'canned_responses' ? 'active' : '' ?>" href="admin_backend.php?section=canned_responses">Canned Responses</a>
-  </div>
+  <main class="admin-main">
+    <?php if ($section === 'dashboard'): ?>
+      <div class="card">
+        <h2 style="margin-top:0;">Dashboard Overview</h2>
+        <p class="muted">High-level visibility into team activity and incoming requests.</p>
 
-  <div class="admin-right">
+        <div class="stat-grid" style="margin-top:14px;">
+          <div class="stat-card">
+            <div class="stat-value"><?= number_format($total_users) ?></div>
+            <div class="stat-label">Total Users</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value"><?= number_format($total_inquiries) ?></div>
+            <div class="stat-label">Total Inquiries</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value"><?= number_format(count($recent_activity)) ?></div>
+            <div class="stat-label">Recent Activity Items</div>
+          </div>
+        </div>
+      </div>
 
-    <?php if ($section === 'canned_responses'): ?>
+      <div class="card">
+        <h3 style="margin-top:0;">Recent Activity</h3>
+        <?php if (!$recent_activity): ?>
+          <p class="muted" style="margin:0;">No activity has been recorded yet.</p>
+        <?php else: ?>
+          <table class="admin-recent-table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Actor</th>
+                <th>Details</th>
+                <th>When</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($recent_activity as $row): ?>
+                <tr>
+                  <td><?= h((string)$row['kind']) ?></td>
+                  <td><?= h((string)$row['actor']) ?></td>
+                  <td><?= h((string)$row['details']) ?></td>
+                  <td><?= h($format_activity_datetime($row['occurred_at'])) ?></td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        <?php endif; ?>
+      </div>
+
+    <?php elseif ($section === 'canned_responses'): ?>
 
       <div class="card">
         <h2 style="margin-top:0;">Canned Responses</h2>
         <p class="muted" style="margin-bottom:16px;">
-          These responses appear as quick-fill buttons on the RFQ Form's Additional Notes field.
-          Set a button label and the text it will insert.
+          Configure quick-fill response buttons for the RFQ additional notes field.
         </p>
 
         <?php if ($cr_errors): ?>
@@ -112,19 +379,21 @@ render_header('Admin Backend');
           <input type="hidden" name="csrf_token" value="<?= h($_SESSION['admin_backend_csrf']) ?>" />
 
           <?php for ($i = 1; $i <= 6; $i++): ?>
-            <h3 style="margin-top:<?= $i > 1 ? '20px' : '0' ?>; margin-bottom:10px; font-size:.9rem; text-transform:uppercase; letter-spacing:.04em; color:var(--m);">
-              Response <?= $i ?>
-            </h3>
-            <div>
-              <label>Button Label</label>
-              <input type="text" name="cr_label_<?= $i ?>" maxlength="100"
-                     value="<?= h($canned[$i]['label']) ?>"
-                     placeholder="e.g. Standard Request" />
-            </div>
-            <div>
-              <label>Response Text</label>
-              <textarea name="cr_body_<?= $i ?>" rows="4" maxlength="2000"
-                        placeholder="Text to insert into Additional Notes..."><?= h($canned[$i]['body']) ?></textarea>
+            <div class="canned-item">
+              <h3 class="form-section-heading" style="margin-top:0;">Response <?= $i ?></h3>
+              <div class="admin-grid-two">
+                <div>
+                  <label>Button Label</label>
+                  <input type="text" name="cr_label_<?= $i ?>" maxlength="100"
+                         value="<?= h($canned[$i]['label']) ?>"
+                         placeholder="e.g. Standard Request" />
+                </div>
+                <div>
+                  <label>Response Text</label>
+                  <textarea name="cr_body_<?= $i ?>" rows="4" maxlength="2000"
+                            placeholder="Text to insert into Additional Notes..."><?= h($canned[$i]['body']) ?></textarea>
+                </div>
+              </div>
             </div>
           <?php endfor; ?>
 
@@ -134,27 +403,38 @@ render_header('Admin Backend');
         </form>
       </div>
 
+    <?php elseif ($section === 'users'): ?>
+
+      <div class="card admin-placeholder">
+        <h2 style="margin-top:0;">Users</h2>
+        <p class="muted">User management panel placeholder. This section will include account controls and role management.</p>
+        <a class="btn" href="users.php">Open Current Users Page</a>
+      </div>
+
+    <?php elseif ($section === 'time_reports'): ?>
+
+      <div class="card admin-placeholder">
+        <h2 style="margin-top:0;">Time Reports</h2>
+        <p class="muted">Time reporting placeholder. This section will host reporting filters, export options, and summaries.</p>
+        <a class="btn" href="time_report.php">Open Current Time Reports</a>
+      </div>
+
     <?php elseif ($section === 'activity_log'): ?>
 
-      <?php require __DIR__ . '/activity_log.php'; ?>
+      <div class="card admin-placeholder">
+        <h2 style="margin-top:0;">Activity Log</h2>
+        <p class="muted">Activity log placeholder. This section will provide auditing and timeline visibility across admin actions.</p>
+      </div>
 
-    <?php else: ?>
+    <?php elseif ($section === 'system_settings'): ?>
 
-      <div class="card">
-        <h2 style="margin-top:0;">Quick Links</h2>
-        <div class="row" style="gap:10px; flex-wrap:wrap;">
-          <a class="btn" href="time_report.php">Time Reports</a>
-          <a class="btn" href="users.php">Users</a>
-          <a class="btn" href="user_profiles.php">User Profiles</a>
-          <a class="btn" href="admin_backend.php?section=activity_log">Activity Log</a>
-          <a class="btn" href="admin_backend.php?section=canned_responses">Canned Responses</a>
-        </div>
+      <div class="card admin-placeholder">
+        <h2 style="margin-top:0;">System Settings</h2>
+        <p class="muted">System settings placeholder. This section will include global configuration and maintenance controls.</p>
       </div>
 
     <?php endif; ?>
-
-  </div>
-
+  </main>
 </div>
 
 <?php render_footer(); ?>
