@@ -61,6 +61,10 @@ function app_settings_crypto_key(): string {
     $raw = trim((string)($stmt->fetchColumn() ?? ''));
   }
 
+  if ($raw === '') {
+    throw new RuntimeException('Unable to initialize app settings encryption key.');
+  }
+
   if (preg_match('/^[a-f0-9]{64}$/i', $raw)) {
     $decoded = hex2bin($raw);
     if ($decoded !== false && strlen($decoded) === 32) {
