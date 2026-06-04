@@ -107,7 +107,7 @@ $profile_delivery_address = '';
 
 // Load canned responses for quick-fill buttons
 $canned_responses = $pdo->query(
-  "SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN (1,2,3,4,5,6) AND label != '' AND body != '' ORDER BY slot"
+  "SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN (1,2,3,4) AND label != '' AND body != '' ORDER BY slot"
 )->fetchAll();
 
 if (current_user_id() !== null) {
@@ -444,6 +444,13 @@ render_alibaba_workflow_banner('create_rfq');
   <div class="info-banner">
     ℹ️ Company and contact details are pre-filled from your <a href="user_page.php">profile</a>. Update your profile to change these defaults.
   </div>
+  <?php if ($canned_responses): ?>
+  <div style="margin:12px 0 16px;">
+    <button type="button" class="btn primary" data-canned-all="1" style="font-weight:700;">
+      Add All Notices
+    </button>
+  </div>
+  <?php endif; ?>
   <h2 class="form-section-heading">Request Details</h2>
 
   <div class="form-grid">
@@ -630,11 +637,28 @@ render_alibaba_workflow_banner('create_rfq');
       <script>
         (function () {
           var notes = document.querySelector('[name=additional_notes]');
-          document.querySelectorAll('[data-canned-body]').forEach(function (btn) {
+        if (notes === null) {
+          return;
+        }
+        var cannedButtons = document.querySelectorAll('[data-canned-body]');
+        var cannedBodies = Array.prototype.map.call(cannedButtons, function (btn) {
+          return btn.getAttribute('data-canned-body') || '';
+          }).filter(function (body) {
+            return body !== '';
+          });
+          cannedButtons.forEach(function (btn) {
             btn.addEventListener('click', function () {
               notes.value = btn.getAttribute('data-canned-body');
+              notes.focus();
             });
           });
+          var addAllButton = document.querySelector('[data-canned-all]');
+          if (addAllButton) {
+            addAllButton.addEventListener('click', function () {
+              notes.value = cannedBodies.join('\n\n');
+              notes.focus();
+            });
+          }
         })();
       </script>
       <?php endif; ?>

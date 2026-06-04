@@ -7,23 +7,23 @@ require_admin_or_moderator();
 $responses = [
   [
     'title' => 'Machines - No Prototypes',
-    'body' => "Thank you for your message. At this time, we do not purchase prototype machines. We only source production-ready machines from established manufacturers with a proven build history.",
+    'body' => 'Important notice: We will not accept any prototypes, first builds, or newly developed machines. We only want machines that you have already produced and successfully delivered to multiple customers. Do not quote any custom machines.',
   ],
   [
     'title' => 'Parts - Manufacturer Only',
-    'body' => "Thank you. For parts orders, we only purchase directly from the original manufacturer. We are not placing parts orders through trading companies or third-party resellers.",
+    'body' => 'Important: We only purchase parts directly from original manufacturers. We will not accept parts that are sourced or resold by trading companies or third-party suppliers.',
   ],
   [
     'title' => 'No Custom Voltage / Specs',
-    'body' => "Thank you for the quote. We are not requesting custom voltage, custom specifications, or special configuration changes for this order. Please quote your standard production version only.",
+    'body' => 'We will only accept items that are already manufactured in the exact specification we request. We will not accept custom modifications, voltage changes, or "special orders".',
   ],
   [
     'title' => 'Stock Items Only',
-    'body' => "We are only considering items that are currently in stock and ready for normal lead-time shipment. We are not reviewing made-to-order or future-production availability for this request.",
+    'body' => 'We only purchase items that you already have in stock and have successfully sold to other customers. Please do not quote any made-to-order or customized items.',
   ],
   [
     'title' => 'No Price Changes After Quote',
-    'body' => "Please note that once a quote is provided, we expect the quoted pricing to remain unchanged throughout the order process. We are not accepting price increases after the quote has been issued.",
+    'body' => 'Important notice: Once you provide a quote, the quoted price must remain firm. We will not accept any price increases, revisions, or changes after the quote has been issued.',
   ],
 ];
 
@@ -49,6 +49,17 @@ render_header('Alibaba Quick Responses');
   padding:16px;
   background:linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
   box-shadow:0 10px 24px rgba(15, 23, 42, 0.06);
+}
+.alibaba-response-label {
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:10px;
+  color:#1d4ed8;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:.08em;
+  text-transform:uppercase;
 }
 .alibaba-response-title {
   margin:0 0 8px;
@@ -91,7 +102,7 @@ render_header('Alibaba Quick Responses');
   <div class="alibaba-header">
     <div>
       <h1 style="margin:0 0 6px;">Alibaba Quick Responses</h1>
-      <p class="muted" style="margin:0;">Ready-to-copy sourcing responses for the team.</p>
+      <p class="muted" style="margin:0;">Clean, copy-ready sourcing notices for the team to use in supplier conversations.</p>
     </div>
     <span class="badge new"><?= count($responses) ?> Responses</span>
   </div>
@@ -104,18 +115,21 @@ render_header('Alibaba Quick Responses');
 <div class="alibaba-grid">
   <?php foreach ($responses as $index => $response): ?>
     <?php $field_id = 'alibaba-response-' . ($index + 1); ?>
-    <div class="alibaba-response-card">
-      <h2 class="alibaba-response-title"><?= h($response['title']) ?></h2>
+    <?php $label_id = $field_id . '-label'; ?>
+    <?php $title_id = $field_id . '-title'; ?>
+    <div class="alibaba-response-card" role="group" aria-labelledby="<?= h($label_id . ' ' . $title_id) ?>">
+      <div class="alibaba-response-label" id="<?= h($label_id) ?>"><span>Notice <?= $index + 1 ?></span></div>
+      <h2 class="alibaba-response-title" id="<?= h($title_id) ?>"><?= h($response['title']) ?></h2>
       <textarea
         id="<?= h($field_id) ?>"
         class="alibaba-response-text"
         readonly
       ><?= h($response['body']) ?></textarea>
       <div class="alibaba-response-actions">
-        <span class="muted">One click to copy.</span>
+        <span class="muted">Copy the exact notice text below.</span>
         <div class="actions">
           <span class="alibaba-copy-status" id="<?= h($field_id) ?>-status" aria-live="polite">Copied</span>
-          <button type="button" class="btn primary js-copy-response" data-target="<?= h($field_id) ?>">Copy Response</button>
+          <button type="button" class="btn primary js-copy-response" data-target="<?= h($field_id) ?>">Copy Notice</button>
         </div>
       </div>
     </div>

@@ -660,16 +660,117 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
-// Seed 6 default slots if they do not exist yet
-$pdo->exec("
-  INSERT IGNORE INTO rfq_canned_responses (slot, label, body) VALUES
-    (1, 'Standard Request',  'Please provide pricing, lead time, and shipping cost for the specified quantity. Include warranty terms and after-sales support availability.'),
-    (2, 'Sample Order',      'We would like to order a sample unit first before committing to the full quantity. Please quote for a single unit including shipping to the US.'),
-    (3, 'Bulk Discount',     'We are interested in bulk pricing for this order. Please provide tiered pricing for 1, 5, and 10 units along with lead time for each tier.'),
-    (4, 'Certification',     'Please confirm all available certifications and compliance documents for this machine model, including any region-specific requirements.'),
-    (5, 'Payment Terms',     'Please provide your accepted payment terms, deposit requirements, and any available trade assurance or payment protection options.'),
-    (6, 'Packaging Details', 'Please share packaging dimensions and gross/net weight, and confirm whether export-grade wooden crate packing is included.')
-");
+if (!defined('RFQ_CANNED_RESPONSE_SLOT_COUNT')) {
+  define('RFQ_CANNED_RESPONSE_SLOT_COUNT', 4);
+}
+if (!defined('RFQ_CANNED_RESPONSE_LEGACY_SLOT_COUNT')) {
+  define('RFQ_CANNED_RESPONSE_LEGACY_SLOT_COUNT', 6);
+}
+$rfq_canned_response_slots = range(1, RFQ_CANNED_RESPONSE_SLOT_COUNT);
+$rfq_canned_response_legacy_slots = range(1, RFQ_CANNED_RESPONSE_LEGACY_SLOT_COUNT);
+$rfq_canned_response_legacy_slot_placeholders = implode(',', array_fill(0, count($rfq_canned_response_legacy_slots), '?'));
+
+$rfq_canned_response_defaults = [
+  1 => [
+    'label' => 'Machines - No Prototypes',
+    'body' => 'Important notice: We will not accept any prototypes, first builds, or newly developed machines. We only want machines that you have already produced and successfully delivered to multiple customers. Do not quote any custom machines.',
+  ],
+  2 => [
+    'label' => 'Parts - Manufacturer Only',
+    'body' => 'Important: We only purchase parts directly from original manufacturers. We will not accept parts that are sourced or resold by trading companies or third-party suppliers.',
+  ],
+  3 => [
+    'label' => 'No Custom Voltage / Specs',
+    'body' => 'We will only accept items that are already manufactured in the exact specification we request. We will not accept custom modifications, voltage changes, or "special orders".',
+  ],
+  4 => [
+    'label' => 'Stock Items Only',
+    'body' => 'We only purchase items that you already have in stock and have successfully sold to other customers. Please do not quote any made-to-order or customized items.',
+  ],
+];
+$legacy_rfq_canned_response_defaults = [
+  1 => [
+    'label' => 'Standard Request',
+    'body' => 'Please provide pricing, lead time, and shipping cost for the specified quantity. Include warranty terms and after-sales support availability.',
+  ],
+  2 => [
+    'label' => 'Sample Order',
+    'body' => 'We would like to order a sample unit first before committing to the full quantity. Please quote for a single unit including shipping to the US.',
+  ],
+  3 => [
+    'label' => 'Bulk Discount',
+    'body' => 'We are interested in bulk pricing for this order. Please provide tiered pricing for 1, 5, and 10 units along with lead time for each tier.',
+  ],
+  4 => [
+    'label' => 'Certification',
+    'body' => 'Please confirm all available certifications and compliance documents for this machine model, including any region-specific requirements.',
+  ],
+  5 => [
+    'label' => 'Payment Terms',
+    'body' => 'Please provide your accepted payment terms, deposit requirements, and any available trade assurance or payment protection options.',
+  ],
+  6 => [
+    'label' => 'Packaging Details',
+    'body' => 'Please share packaging dimensions and gross/net weight, and confirm whether export-grade wooden crate packing is included.',
+  ],
+];
+$rfq_canned_response_new_slots = array_keys($rfq_canned_response_defaults);
+$rfq_canned_response_legacy_only_slot_numbers = array_diff(
+  $rfq_canned_response_legacy_slots,
+  $rfq_canned_response_new_slots
+);
+$rfq_canned_response_legacy_only_slots = array_map(
+  'intval',
+  array_values($rfq_canned_response_legacy_only_slot_numbers)
+);
+$rfq_canned_response_rows_stmt = $pdo->prepare(
+  "SELECT slot, label, body FROM rfq_canned_responses WHERE slot IN ($rfq_canned_response_legacy_slot_placeholders) ORDER BY slot"
+);
+$rfq_canned_response_rows_stmt->execute($rfq_canned_response_legacy_slots);
+$rfq_canned_response_rows = $rfq_canned_response_rows_stmt->fetchAll();
+$rfq_canned_response_by_slot = [];
+foreach ($rfq_canned_response_rows as $rfq_canned_response_row) {
+  $rfq_canned_response_by_slot[(int)$rfq_canned_response_row['slot']] = [
+    'label' => (string)$rfq_canned_response_row['label'],
+    'body' => (string)$rfq_canned_response_row['body'],
+  ];
+}
+$should_migrate_legacy_rfq_canned_responses = true;
+foreach ($legacy_rfq_canned_response_defaults as $slot => $legacy_response) {
+  if (!isset($rfq_canned_response_by_slot[$slot])) {
+    if ($slot <= RFQ_CANNED_RESPONSE_SLOT_COUNT) {
+      $should_migrate_legacy_rfq_canned_responses = false;
+      break;
+    }
+    continue;
+  }
+  if ($rfq_canned_response_by_slot[$slot]['label'] !== $legacy_response['label']
+      || $rfq_canned_response_by_slot[$slot]['body'] !== $legacy_response['body']) {
+    $should_migrate_legacy_rfq_canned_responses = false;
+    break;
+  }
+}
+if ($should_migrate_legacy_rfq_canned_responses) {
+  $rfq_canned_response_stmt = $pdo->prepare(
+    "INSERT INTO rfq_canned_responses (slot, label, body) VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE label = ?, body = ?"
+  );
+  foreach ($rfq_canned_response_defaults as $slot => $response) {
+    $rfq_canned_response_stmt->execute([$slot, $response['label'], $response['body'], $response['label'], $response['body']]);
+  }
+  if ($rfq_canned_response_legacy_only_slots) {
+    $rfq_canned_response_cleanup_stmt = $pdo->prepare(
+      "DELETE FROM rfq_canned_responses WHERE slot IN (" . implode(',', array_fill(0, count($rfq_canned_response_legacy_only_slots), '?')) . ")"
+    );
+    $rfq_canned_response_cleanup_stmt->execute($rfq_canned_response_legacy_only_slots);
+  }
+}
+$rfq_canned_response_seed_stmt = $pdo->prepare(
+  "INSERT IGNORE INTO rfq_canned_responses (slot, label, body) VALUES (?, ?, ?)"
+);
+foreach ($rfq_canned_response_defaults as $slot => $response) {
+  $rfq_canned_response_seed_stmt->execute([$slot, $response['label'], $response['body']]);
+}
 
 // Create vendors table if it does not exist yet
 $pdo->exec("
