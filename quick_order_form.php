@@ -268,11 +268,11 @@ if ($show_detail) {
     exit;
   }
 }
-render_header('Quick Order Form');
+render_header('Quick Order List');
 ?>
 
 <div class="card">
-  <h1 style="margin:0;">Quick Order Form</h1>
+  <h1 style="margin:0;">Quick Order List</h1>
   <p class="muted" style="margin:6px 0 0;">Log quick orders with contact details and notes.</p>
 </div>
 
