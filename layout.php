@@ -452,20 +452,26 @@ function render_header(string $title): void {
 $current = basename($_SERVER['PHP_SELF']);
 $show_mod_menu = !empty($_SESSION['is_admin']) || !empty($_SESSION['is_moderator']);
 $show_admin_menu = !empty($_SESSION['is_admin']);
-$show_rfq_menu = $show_mod_menu;
+$is_logged_in = !empty($_SESSION['user_id']);
+$is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
 ?>	
 
 <nav class="menubar card">
   <div class="menubar-inner">
-    <?php if (!empty($_SESSION['user_id'])): ?>
+    <?php if ($is_regular_user): ?>
+    <a class="menu-link <?= $current === 'user_page.php' ? 'active' : '' ?>" href="user_page.php">My Profile</a>
+    <a class="menu-link <?= $current === 'machine_inquiry_form.php' ? 'active' : '' ?>" href="machine_inquiry_form.php">Machine Inquiry Form</a>
+    <?php elseif ($show_mod_menu): ?>
     <a class="menu-link <?= $current === 'index.php' ? 'active' : '' ?>" href="index.php">Home</a>
     <a class="menu-link <?= $current === 'user_page.php' ? 'active' : '' ?>" href="user_page.php">My Profile</a>
     <a class="menu-link <?= $current === 'messages.php' ? 'active' : '' ?>" href="messages.php">Messages</a>
-    <?php render_menu_dropdown('Bug Reporting', [
-      ['href' => 'app_request_form.php', 'file' => 'app_request_form.php', 'label' => 'Bug Reporting', 'visible' => true],
-      ['href' => 'app_request_tracker.php', 'file' => 'app_request_tracker.php', 'label' => 'Bug Tracker', 'visible' => $show_mod_menu],
+    <a class="menu-link <?= $current === 'time_clock.php' ? 'active' : '' ?>" href="time_clock.php">Time Clock</a>
+    <?php render_menu_dropdown('Customer Inquiries', [
+      ['href' => 'customer_inquiry_form.php?view=all', 'file' => 'customer_inquiry_form.php', 'label' => 'Customer Inquiries', 'visible' => true],
+      ['href' => 'customer_inquiry_form.php', 'file' => 'customer_inquiry_form.php', 'label' => 'Quick Log Inquiry', 'visible' => true],
+      ['href' => 'machine_inquiry_form.php', 'file' => 'machine_inquiry_form.php', 'label' => 'Machine Inquiry Form', 'visible' => true],
+      ['href' => 'machine_inquiry_admin.php', 'file' => 'machine_inquiry_admin.php', 'label' => 'Inquiry Admin', 'visible' => true],
     ], $current); ?>
-    <?php if (($_SESSION['role'] ?? '') !== 'user'): ?>
     <?php render_menu_dropdown('Projects', [
       ['href' => 'projects.php', 'file' => 'projects.php', 'label' => 'Projects', 'visible' => true],
       ['href' => 'documents.php', 'file' => 'documents.php', 'label' => 'Documents', 'visible' => true],
@@ -473,34 +479,21 @@ $show_rfq_menu = $show_mod_menu;
       ['href' => 'playbooks.php', 'file' => 'playbooks.php', 'label' => 'Playbooks', 'visible' => true],
       ['href' => 'archives.php', 'file' => 'archives.php', 'label' => 'Archives', 'visible' => true],
     ], $current); ?>
-    <a class="menu-link <?= $current === 'time_clock.php' ? 'active' : '' ?>" href="time_clock.php">Time Clock</a>
-    <?php endif; ?>
-    <?php endif; ?>
-    <?php render_menu_dropdown('Service Requests', [
-      ['href' => 'service_request_form.php', 'file' => 'service_request_form.php', 'label' => 'Service Request Form', 'visible' => true],
-      ['href' => 'form_admin.php', 'file' => 'form_admin.php', 'label' => 'Form Entries', 'visible' => $show_mod_menu],
-    ], $current); ?>
-    <?php render_menu_dropdown('Machine Inquiries', [
-      ['href' => 'customer_inquiry_form.php?view=all', 'file' => 'customer_inquiry_form.php', 'label' => 'Customer Inquiries', 'visible' => !empty($_SESSION['user_id'])],
-      ['href' => 'customer_inquiry_form.php', 'file' => 'customer_inquiry_form.php', 'label' => 'Quick Log Inquiry', 'visible' => !empty($_SESSION['user_id'])],
-      ['href' => 'machine_inquiry_form.php', 'file' => 'machine_inquiry_form.php', 'label' => 'Machine Inquiry Form', 'visible' => true],
-      ['href' => 'machine_inquiry_admin.php', 'file' => 'machine_inquiry_admin.php', 'label' => 'Inquiry Admin', 'visible' => $show_mod_menu],
-    ], $current); ?>
-    <?php if ($show_mod_menu): ?>
-    <a class="menu-link <?= in_array($current, ['inventory_list.php', 'inventory_form.php'], true) ? 'active' : '' ?>" href="inventory_list.php">Inventory</a>
-    <span class="menu-spacer" aria-hidden="true"></span>
-    <?php render_menu_dropdown('RFQ & Sourcing', [
+    <?php render_menu_dropdown('Sourcing', [
       ['href' => 'vendors.php', 'file' => 'vendors.php', 'label' => 'Vendors', 'visible' => true],
       ['href' => 'freight_forwarders.php', 'file' => 'freight_forwarders.php', 'label' => 'Freight Forwarders', 'visible' => true],
-      ['href' => 'sourcing_rfq_form.php', 'file' => 'sourcing_rfq_form.php', 'label' => 'Sourcing RFQ Form', 'visible' => $show_rfq_menu],
-      ['href' => 'sourcing_rfq_tracker.php', 'file' => 'sourcing_rfq_tracker.php', 'label' => 'Sourcing RFQ Tracker', 'visible' => $show_rfq_menu],
-      ['href' => 'shipping_rfq_form.php', 'file' => 'shipping_rfq_form.php', 'label' => 'Shipping RFQ Form', 'visible' => $show_rfq_menu],
-      ['href' => 'shipping_rfq_tracker.php', 'file' => 'shipping_rfq_tracker.php', 'label' => 'Shipping RFQ Tracker', 'visible' => $show_rfq_menu],
-      ['href' => 'order_tracker.php', 'file' => 'order_tracker.php', 'label' => 'Order Tracker', 'visible' => $show_rfq_menu],
+      ['href' => 'sourcing_rfq_form.php', 'file' => 'sourcing_rfq_form.php', 'label' => 'Sourcing RFQ Form', 'visible' => true],
+      ['href' => 'sourcing_rfq_tracker.php', 'file' => 'sourcing_rfq_tracker.php', 'label' => 'Sourcing RFQ Tracker', 'visible' => true],
+      ['href' => 'shipping_rfq_form.php', 'file' => 'shipping_rfq_form.php', 'label' => 'Shipping RFQ Form', 'visible' => true],
+      ['href' => 'shipping_rfq_tracker.php', 'file' => 'shipping_rfq_tracker.php', 'label' => 'Shipping RFQ Tracker', 'visible' => true],
+      ['href' => 'order_tracker.php', 'file' => 'order_tracker.php', 'label' => 'Order Tracker', 'visible' => true],
     ], $current); ?>
-    <?php endif; ?>
+    <a class="menu-link <?= in_array($current, ['inventory_list.php', 'inventory_form.php'], true) ? 'active' : '' ?>" href="inventory_list.php">Inventory</a>
     <?php if ($show_admin_menu): ?>
     <a class="menu-link <?= $current === 'admin_backend.php' ? 'active' : '' ?>" href="admin_backend.php">Admin Backend</a>
+    <?php endif; ?>
+    <?php elseif ($is_logged_in): ?>
+    <a class="menu-link <?= $current === 'user_page.php' ? 'active' : '' ?>" href="user_page.php">My Profile</a>
     <?php endif; ?>
   </div>
 </nav>
