@@ -790,6 +790,26 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Create customers table for HubSpot sync if it does not exist yet
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS customers (
+    id                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    hubspot_contact_id  VARCHAR(64)  NOT NULL,
+    customer_name       VARCHAR(255) NOT NULL DEFAULT '',
+    company             VARCHAR(255) NOT NULL DEFAULT '',
+    phone               VARCHAR(100) NOT NULL DEFAULT '',
+    email               VARCHAR(255) NOT NULL DEFAULT '',
+    last_updated        DATETIME     NULL,
+    created_at          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uniq_customers_hubspot_contact_id (hubspot_contact_id),
+    KEY idx_customers_company (company(191)),
+    KEY idx_customers_email (email(191)),
+    KEY idx_customers_last_updated (last_updated)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 try {
   $pdo->exec("ALTER TABLE vendors ADD COLUMN alibaba_store VARCHAR(255) NOT NULL DEFAULT ''");
 } catch (PDOException $e) {
