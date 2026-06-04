@@ -1,7 +1,7 @@
 <?php
 /**
  * user_page.php – Authenticated user's personal page.
- * Provides a profile details form for updating contact information.
+ * Displays and updates the user's profile information.
  */
 require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
