@@ -5,6 +5,14 @@ require __DIR__ . '/auth.php';
 require_login();
 
 const MAX_NOTES_LENGTH = 10000;
+const INQUIRY_STATUS_OPTIONS = [
+  'new' => 'New',
+  'in_progress' => 'In Progress',
+  'purchased' => 'Purchased',
+  'completed' => 'Completed',
+  'archived' => 'Archived',
+];
+const INQUIRY_TABLE_COLUMN_COUNT = 9;
 
 if (empty($_SESSION['customer_inquiry_csrf'])) {
   $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
@@ -24,6 +32,8 @@ $fields = [
 $show_all = (string)($_GET['view'] ?? '') === 'all';
 $saved = isset($_GET['saved']) && $_GET['saved'] === '1';
 $updated = isset($_GET['updated']) && $_GET['updated'] === '1';
+$status_updated = isset($_GET['status_updated']) && $_GET['status_updated'] === '1';
+$deleted = isset($_GET['deleted']) && $_GET['deleted'] === '1';
 
 // Load existing record when editing
 $edit_id = null;
@@ -50,45 +60,68 @@ if ($edit_record && $_SERVER['REQUEST_METHOD'] === 'GET') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $show_all = false;
+  $post_action = (string)($_POST['action'] ?? 'save');
+  $should_process_form_save = $post_action === 'save';
+  $show_all = $post_action === 'status' || $post_action === 'delete';
   $saved = false;
   $updated = false;
+  $status_updated = false;
+  $deleted = false;
   $csrf = (string)($_POST['csrf_token'] ?? '');
   if (!hash_equals((string)$_SESSION['customer_inquiry_csrf'], $csrf)) {
     $errors[] = 'Security token mismatch. Please refresh and try again.';
   } else {
-    foreach (array_keys($fields) as $key) {
-      $fields[$key] = trim((string)($_POST[$key] ?? ''));
+    if ($post_action === 'status') {
+      $row_id = (int)($_POST['row_id'] ?? 0);
+      $next_status = (string)($_POST['status'] ?? '');
+      if ($row_id <= 0 || !isset(INQUIRY_STATUS_OPTIONS[$next_status])) {
+        $errors[] = 'Invalid status update request.';
+      } else {
+        $upd = $pdo->prepare("UPDATE customer_phone_inquiries SET status = ? WHERE id = ?");
+        $upd->execute([$next_status, $row_id]);
+        $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
+        header('Location: customer_inquiry_form.php?view=all&status_updated=1');
+        exit;
+      }
+    } elseif ($post_action === 'delete') {
+      $row_id = (int)($_POST['row_id'] ?? 0);
+      if ($row_id <= 0) {
+        $errors[] = 'Invalid delete request.';
+      } else {
+        $del = $pdo->prepare("DELETE FROM customer_phone_inquiries WHERE id = ?");
+        $del->execute([$row_id]);
+        $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
+        header('Location: customer_inquiry_form.php?view=all&deleted=1');
+        exit;
+      }
     }
 
-    if ($fields['customer_name'] === '') {
-      $errors[] = 'Customer Name is required.';
-    } elseif (strlen($fields['customer_name']) > 255) {
-      $errors[] = 'Customer Name must be 255 characters or fewer.';
-    }
+    if ($should_process_form_save) {
+     foreach (array_keys($fields) as $key) {
+       $fields[$key] = trim((string)($_POST[$key] ?? ''));
+     }
 
-    if ($fields['company_name'] !== '' && strlen($fields['company_name']) > 255) {
-      $errors[] = 'Company Name must be 255 characters or fewer.';
-    }
-    if ($fields['phone_number'] !== '' && strlen($fields['phone_number']) > 50) {
-      $errors[] = 'Phone Number must be 50 characters or fewer.';
-    }
-    if ($fields['email'] !== '' && strlen($fields['email']) > 255) {
-      $errors[] = 'Email must be 255 characters or fewer.';
-    }
-    if ($fields['email'] !== '' && !filter_var($fields['email'], FILTER_VALIDATE_EMAIL)) {
-      $errors[] = 'Please enter a valid email address.';
-    }
-    if ($fields['notes'] !== '' && strlen($fields['notes']) > MAX_NOTES_LENGTH) {
-      $errors[] = 'Notes must be ' . MAX_NOTES_LENGTH . ' characters or fewer.';
-    }
+     if ($fields['customer_name'] === '') {
+       $errors[] = 'Customer Name is required.';
+     } elseif (strlen($fields['customer_name']) > 255) {
+       $errors[] = 'Customer Name must be 255 characters or fewer.';
+     }
 
-    $date = DateTime::createFromFormat('Y-m-d', $fields['inquiry_date']);
-    if (!$date || $date->format('Y-m-d') !== $fields['inquiry_date']) {
-      $errors[] = 'Please provide a valid inquiry date.';
-    } elseif ($date > new DateTime('now', new DateTimeZone(APP_TZ))) {
-      $errors[] = 'Date of Inquiry cannot be in the future.';
-    }
+     if ($fields['company_name'] !== '' && strlen($fields['company_name']) > 255) {
+       $errors[] = 'Company Name must be 255 characters or fewer.';
+     }
+     if ($fields['phone_number'] !== '' && strlen($fields['phone_number']) > 50) {
+       $errors[] = 'Phone Number must be 50 characters or fewer.';
+     }
+     if ($fields['email'] !== '' && strlen($fields['email']) > 255) {
+       $errors[] = 'Email must be 255 characters or fewer.';
+     }
+     if ($fields['email'] !== '' && !filter_var($fields['email'], FILTER_VALIDATE_EMAIL)) {
+       $errors[] = 'Please enter a valid email address.';
+     }
+     if ($fields['notes'] !== '' && strlen($fields['notes']) > MAX_NOTES_LENGTH) {
+       $errors[] = 'Notes must be ' . MAX_NOTES_LENGTH . ' characters or fewer.';
+     }
 
     if (!$errors) {
       if ($edit_id !== null) {
@@ -158,10 +191,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           // Non-blocking audit log write.
         }
 
-        $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
-        header('Location: customer_inquiry_form.php?saved=1');
-        exit;
-      }
+         $ins = $pdo->prepare(
+           "INSERT INTO customer_phone_inquiries
+              (customer_name, company_name, phone_number, email, inquiry_date, notes, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?)"
+         );
+         $ins->execute([
+           $fields['customer_name'],
+           $fields['company_name'] !== '' ? $fields['company_name'] : null,
+           $fields['phone_number'] !== '' ? $fields['phone_number'] : null,
+           $fields['email'] !== '' ? $fields['email'] : null,
+           $fields['inquiry_date'],
+           $fields['notes'] !== '' ? $fields['notes'] : null,
+           $created_by,
+         ]);
+
+         $_SESSION['customer_inquiry_csrf'] = bin2hex(random_bytes(24));
+         header('Location: customer_inquiry_form.php?saved=1');
+         exit;
+       }
+     }
     }
   }
 }
@@ -172,12 +221,11 @@ if ($show_all) {
     "SELECT cpi.*, u.username AS created_by_username
      FROM customer_phone_inquiries cpi
      LEFT JOIN users u ON u.id = cpi.created_by
-     ORDER BY cpi.inquiry_date DESC, cpi.id DESC
+     ORDER BY FIELD(cpi.status, 'new', 'in_progress', 'purchased', 'completed', 'archived'), cpi.inquiry_date DESC, cpi.id DESC
      LIMIT 200"
   );
   $inquiries = $stmt->fetchAll();
 }
-
 render_header('Customer Inquiry Log');
 ?>
 
@@ -215,11 +263,22 @@ render_header('Customer Inquiry Log');
         Inquiry updated successfully.
       </div>
     <?php endif; ?>
+    <?php if ($status_updated): ?>
+      <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">
+        Inquiry status updated successfully.
+      </div>
+    <?php endif; ?>
+    <?php if ($deleted): ?>
+      <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">
+        Inquiry deleted successfully.
+      </div>
+    <?php endif; ?>
     <div style="overflow-x:auto;">
       <table style="min-width:900px;">
         <thead>
           <tr>
             <th>Date</th>
+            <th>Status</th>
             <th>Customer Name</th>
             <th>Company Name</th>
             <th>Phone Number</th>
@@ -231,11 +290,24 @@ render_header('Customer Inquiry Log');
         </thead>
         <tbody>
           <?php if (!$inquiries): ?>
-            <tr><td colspan="8" class="muted">No inquiries logged yet.</td></tr>
+            <tr><td colspan="<?= INQUIRY_TABLE_COLUMN_COUNT ?>" class="muted">No inquiries logged yet.</td></tr>
           <?php endif; ?>
           <?php foreach ($inquiries as $inquiry): ?>
             <tr>
               <td style="white-space:nowrap;"><?= h($inquiry['inquiry_date']) ?></td>
+              <td style="white-space:nowrap;">
+                <form method="post" style="display:flex; gap:8px; align-items:center; margin:0;">
+                  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customer_inquiry_csrf']) ?>" />
+                  <input type="hidden" name="action" value="status" />
+                  <input type="hidden" name="row_id" value="<?= (int)$inquiry['id'] ?>" />
+                  <select name="status" style="min-width:140px;">
+                    <?php foreach (INQUIRY_STATUS_OPTIONS as $status_key => $status_label): ?>
+                      <option value="<?= h($status_key) ?>" <?= ((string)($inquiry['status'] ?? 'new') === $status_key) ? 'selected' : '' ?>><?= h($status_label) ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                  <button type="submit" class="btn" aria-label="Update status for <?= h($inquiry['customer_name']) ?>">Update</button>
+                </form>
+              </td>
               <td><?= h($inquiry['customer_name']) ?></td>
               <td><?= h($inquiry['company_name'] ?: '—') ?></td>
               <td><?= h($inquiry['phone_number'] ?: '—') ?></td>
@@ -244,6 +316,12 @@ render_header('Customer Inquiry Log');
               <td><?= h($inquiry['created_by_username'] ?: '—') ?></td>
               <td style="white-space:nowrap;">
                 <a class="btn" href="customer_inquiry_form.php?edit=<?= (int)$inquiry['id'] ?>">Edit</a>
+                <form method="post" style="display:inline-block; margin-left:6px;" onsubmit="return confirm('Delete this inquiry? This cannot be undone.');">
+                  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customer_inquiry_csrf']) ?>" />
+                  <input type="hidden" name="action" value="delete" />
+                  <input type="hidden" name="row_id" value="<?= (int)$inquiry['id'] ?>" />
+                  <button type="submit" class="btn" aria-label="Delete inquiry for <?= h($inquiry['customer_name']) ?>" style="background:#fee2e2; border-color:#fecaca; color:#991b1b;">Delete</button>
+                </form>
               </td>
             </tr>
           <?php endforeach; ?>
