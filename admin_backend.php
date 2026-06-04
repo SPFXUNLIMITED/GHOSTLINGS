@@ -175,7 +175,10 @@ $menu = [
 
 $format_activity_datetime = static function ($value): string {
   $ts = strtotime((string)$value);
-  return $ts !== false ? date('M j, Y g:i A', $ts) : '—';
+  if ($ts === false) return '—';
+  $dt = new DateTime('@' . $ts);
+  $dt->setTimezone(new DateTimeZone('America/Los_Angeles'));
+  return $dt->format('M j, Y g:i A') . ' PT';
 };
 
 render_header('Admin Backend');
