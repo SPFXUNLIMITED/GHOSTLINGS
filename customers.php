@@ -18,32 +18,30 @@ $errors = [];
 $success = '';
 $customer_table_columns = 6;
 
-function hubspot_token(PDO $pdo): string {
-  $token = trim((string)getenv('HUBSPOT_PRIVATE_APP_TOKEN'));
+function hubspot_token(): string {
+  $token = app_env_value('HUBSPOT_PRIVATE_APP_TOKEN');
   if ($token !== '') return $token;
-  $token = trim((string)getenv('HUBSPOT_ACCESS_TOKEN'));
-  if ($token !== '') return $token;
+  return app_env_value('HUBSPOT_ACCESS_TOKEN');
+}
 
-  try {
-    $stmt = $pdo->prepare(
-      "SELECT setting_val, is_encrypted
-       FROM integration_settings
-       WHERE setting_key = 'hubspot_private_app_token'
-       LIMIT 1"
-    );
-    $stmt->execute();
-    $row = $stmt->fetch() ?: [];
-    $stored = (string)($row['setting_val'] ?? '');
-    if ($stored === '') {
-      return '';
-    }
-    if (!empty($row['is_encrypted'])) {
-      return trim(app_decrypt_setting_value($stored));
-    }
-    return trim($stored);
-  } catch (Throwable $e) {
-    return '';
+function app_env_value(string $key): string {
+  $env_value = getenv($key);
+  if ($env_value === false) {
+    $env_value = null;
   }
+
+  $candidates = [
+    $env_value,
+    $_ENV[$key] ?? null,
+    $_SERVER[$key] ?? null,
+  ];
+
+  foreach ($candidates as $candidate) {
+    $value = trim((string)$candidate);
+    if ($value !== '') return $value;
+  }
+
+  return '';
 }
 
 function hubspot_contact_names(array $props): array {
