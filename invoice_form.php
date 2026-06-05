@@ -208,6 +208,11 @@ function invoice_field_lock_attrs(bool $is_view_mode): string {
   return $is_view_mode ? invoice_readonly_attrs() : '';
 }
 
+function invoice_quote_date_value(?array $quote, string $fallback): string {
+  $quote_date = trim((string)($quote['quote_date'] ?? ''));
+  return $quote_date !== '' ? $quote_date : $fallback;
+}
+
 $quote_id_param = trim((string)($_GET['id'] ?? ''));
 $has_quote_id = $quote_id_param !== '';
 $quote_id = $has_quote_id ? (int)$quote_id_param : 0;
@@ -266,7 +271,7 @@ $fields = [
   'company_name' => (string)($quote['company_name'] ?? ''),
   'phone_number' => (string)($quote['phone_number'] ?? ''),
   'email' => (string)($quote['email'] ?? ''),
-  'invoice_date' => (string)(($quote['quote_date'] ?? null) ?? $today),
+  'invoice_date' => invoice_quote_date_value($quote, $today),
   'notes' => (string)($quote['notes'] ?? ''),
 ];
 
@@ -491,7 +496,7 @@ render_header($invoice_heading);
       + '<td><input type="number" step="0.01" min="0.01" name="item_qty[]" value="' + defaultQty + '" /></td>'
       + '<td><input type="number" step="0.01" min="0" name="item_cost[]" value="' + defaultCost + '" /></td>'
       + '<td><input type="number" step="0.01" min="0" name="item_markup[]" value="' + defaultMarkup + '" /></td>'
-      + '<td><input type="number" step="0.01" min="0" name="item_price[]" value="' + defaultPrice + '" readonly style="<?= h(invoice_readonly_style()) ?>" /></td>'
+      + '<td><input type="number" step="0.01" min="0" name="item_price[]" value="' + defaultPrice + '" readonly style="<?= invoice_readonly_style() ?>" /></td>'
       + '<td class="line-total" style="white-space:nowrap;">$0.00</td>'
       + '<td><button type="button" class="btn remove-line">×</button></td>';
     lineItemsBody.appendChild(tr);

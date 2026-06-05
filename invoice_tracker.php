@@ -5,6 +5,7 @@ require __DIR__ . '/auth.php';
 require_admin_or_moderator();
 
 const INVOICE_TRACKER_TABLE_COLUMN_COUNT = 4;
+const INVOICE_TRACKER_BASE_FILTER = "((converted_invoice_no IS NOT NULL AND converted_invoice_no <> '') OR status = 'converted')";
 
 function invoice_tracker_format_money($value): string {
   return number_format((float)$value, 2);
@@ -43,9 +44,18 @@ function invoice_tracker_status_style(string $status): array {
   return $styles[$status] ?? ['#e2e8f0', '#334155'];
 }
 
-$invoice_now = new DateTime('now', new DateTimeZone(APP_TZ));
-$invoice_number_stamp = $invoice_now->format('Ymd');
-$current_month = $invoice_now->format('Y-m');
+function invoice_tracker_effective_date(array $invoice): string {
+  $invoice_date = trim((string)($invoice['quote_date'] ?? ''));
+  if ($invoice_date !== '') {
+    return $invoice_date;
+  }
+
+  return substr(trim((string)($invoice['created_at'] ?? '')), 0, 10);
+}
+
+$now = new DateTime('now', new DateTimeZone(APP_TZ));
+$invoice_number_stamp = $now->format('Ymd');
+$current_month = $now->format('Y-m');
 
 $search = trim((string)($_GET['q'] ?? ''));
 $status_filter = trim((string)($_GET['status'] ?? ''));
@@ -55,9 +65,7 @@ $invoice_statuses = [
   'draft' => 'Draft',
 ];
 
-$where_parts = [
-  "((converted_invoice_no IS NOT NULL AND converted_invoice_no <> '') OR status = 'converted')",
-];
+$where_parts = [INVOICE_TRACKER_BASE_FILTER];
 $params = [];
 
 if ($search !== '') {
@@ -90,9 +98,7 @@ $hero_customer_keys = [];
 foreach ($invoices as $invoice) {
   $hero_total_billed += (float)($invoice['subtotal_amount'] ?? 0);
 
-  $invoice_date = trim((string)($invoice['quote_date'] ?? ''));
-  $created_at = trim((string)($invoice['created_at'] ?? ''));
-  $hero_date = $invoice_date !== '' ? $invoice_date : substr($created_at, 0, 10);
+  $hero_date = invoice_tracker_effective_date($invoice);
   if ($hero_date !== '' && substr($hero_date, 0, 7) === $current_month) {
     $hero_month_invoices++;
   }
@@ -203,7 +209,7 @@ render_header('Invoice Tracker');
             $customer_name = trim((string)($invoice['customer_name'] ?? ''));
             $company_name = trim((string)($invoice['company_name'] ?? ''));
             $customer_display = $customer_name !== '' ? $customer_name : '—';
-            $invoice_date = trim((string)($invoice['quote_date'] ?? ''));
+            $invoice_date = invoice_tracker_effective_date($invoice);
             $status_raw = trim((string)($invoice['status'] ?? ''));
             $status_label = invoice_tracker_status_label($status_raw);
             [$status_bg, $status_color] = invoice_tracker_status_style($status_raw);
