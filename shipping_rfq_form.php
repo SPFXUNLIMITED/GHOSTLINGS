@@ -328,6 +328,8 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form
   <a class="btn" href="shipping_rfq_tracker.php">Shipping RFQ Tracker →</a>
 </div>
 
+<?php render_alibaba_workflow_banner('shipping'); ?>
+
 <?php if ($errors): ?>
   <div class="alert error">
     <ul style="margin:0; padding-left:18px;">
