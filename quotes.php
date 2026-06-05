@@ -2,6 +2,9 @@
 require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
+require_once __DIR__ . '/lib/PHPMailer/src/Exception.php';
+require_once __DIR__ . '/lib/PHPMailer/src/PHPMailer.php';
+require_once __DIR__ . '/lib/PHPMailer/src/SMTP.php';
 require_admin_or_moderator();
 
 const QUOTE_MAX_NOTES_LENGTH = 10000;
@@ -65,6 +68,26 @@ function quote_is_development(): bool {
   }
 
   return preg_match('/(\.local|\.test)$/', $host) === 1;
+}
+
+function quote_env_value(string $key): string {
+  $env_value = getenv($key);
+  if ($env_value === false) {
+    $env_value = null;
+  }
+
+  $candidates = [
+    $env_value,
+    $_ENV[$key] ?? null,
+    $_SERVER[$key] ?? null,
+  ];
+
+  foreach ($candidates as $candidate) {
+    $value = trim((string)$candidate);
+    if ($value !== '') return $value;
+  }
+
+  return '';
 }
 
 function quote_escape_like(string $value, string $escape = '\\'): string {
@@ -211,32 +234,110 @@ function quote_send_email(array $quote, array $items): bool {
     return false;
   }
 
-  $subject = 'Quote #' . (int)$quote['id'];
-  $lines = [];
-  foreach ($items as $item) {
-    $lines[] = '- ' . (string)$item['description'] . ' | Qty: ' . quote_format_money($item['quantity']) . ' | Price: $' . quote_format_money($item['unit_price']) . ' | Total: $' . quote_format_money($item['line_total']);
+  $smtp_host = quote_env_value('SMTP_HOST');
+  $smtp_port = (int)quote_env_value('SMTP_PORT');
+  $smtp_username = quote_env_value('SMTP_USERNAME');
+  $smtp_password = quote_env_value('SMTP_PASSWORD');
+  $smtp_from_email = quote_env_value('SMTP_FROM_EMAIL');
+  $smtp_from_name = quote_env_value('SMTP_FROM_NAME');
+
+  if (
+    $smtp_host === ''
+    || $smtp_port <= 0
+    || $smtp_username === ''
+    || $smtp_password === ''
+    || $smtp_from_email === ''
+    || !filter_var($smtp_from_email, FILTER_VALIDATE_EMAIL)
+  ) {
+    error_log('Quote email send failed due to missing or invalid SMTP configuration.');
+    return false;
   }
 
-  $body = "Hello,\r\n\r\n"
-    . "Here is your quote #" . (int)$quote['id'] . ".\r\n"
-    . "Customer: " . (string)$quote['customer_name'] . "\r\n"
-    . "Quote Date: " . (string)$quote['quote_date'] . "\r\n\r\n"
+  $subject = 'Quote #' . (int)$quote['id'];
+  $rows_html = [];
+  $rows_text = [];
+  foreach ($items as $item) {
+    $description = trim((string)($item['description'] ?? ''));
+    $quantity = quote_format_money($item['quantity'] ?? 0);
+    $unit_price = quote_format_money($item['unit_price'] ?? 0);
+    $line_total = quote_format_money($item['line_total'] ?? 0);
+    $rows_html[] = '<tr>'
+      . '<td style="padding:8px;border:1px solid #ddd;">' . htmlspecialchars($description, ENT_QUOTES, 'UTF-8') . '</td>'
+      . '<td style="padding:8px;border:1px solid #ddd;text-align:right;">' . htmlspecialchars($quantity, ENT_QUOTES, 'UTF-8') . '</td>'
+      . '<td style="padding:8px;border:1px solid #ddd;text-align:right;">$' . htmlspecialchars($unit_price, ENT_QUOTES, 'UTF-8') . '</td>'
+      . '<td style="padding:8px;border:1px solid #ddd;text-align:right;">$' . htmlspecialchars($line_total, ENT_QUOTES, 'UTF-8') . '</td>'
+      . '</tr>';
+    $rows_text[] = '- ' . $description . ' | Qty: ' . $quantity . ' | Price: $' . $unit_price . ' | Total: $' . $line_total;
+  }
+
+  if (!$rows_html) {
+    $rows_html[] = '<tr><td colspan="4" style="padding:8px;border:1px solid #ddd;text-align:center;">No line items.</td></tr>';
+    $rows_text[] = '- No line items.';
+  }
+
+  $quote_id = (int)($quote['id'] ?? 0);
+  $customer_name = trim((string)($quote['customer_name'] ?? ''));
+  $quote_date = trim((string)($quote['quote_date'] ?? ''));
+  $subtotal = quote_format_money($quote['subtotal_amount'] ?? 0);
+
+  $html_body = '<!doctype html><html><body style="margin:0;padding:0;background:#f7f7f7;">'
+    . '<div style="max-width:700px;margin:24px auto;padding:24px;background:#ffffff;border:1px solid #e5e5e5;border-radius:6px;font-family:Arial,sans-serif;color:#222;">'
+    . '<h2 style="margin:0 0 12px;">Quote #' . htmlspecialchars((string)$quote_id, ENT_QUOTES, 'UTF-8') . '</h2>'
+    . '<p style="margin:0 0 8px;">Hello,</p>'
+    . '<p style="margin:0 0 16px;">Here is your quote summary.</p>'
+    . '<p style="margin:0 0 6px;"><strong>Customer:</strong> ' . htmlspecialchars($customer_name, ENT_QUOTES, 'UTF-8') . '</p>'
+    . '<p style="margin:0 0 16px;"><strong>Quote Date:</strong> ' . htmlspecialchars($quote_date, ENT_QUOTES, 'UTF-8') . '</p>'
+    . '<table style="width:100%;border-collapse:collapse;margin:0 0 16px;">'
+    . '<thead><tr>'
+    . '<th style="padding:8px;border:1px solid #ddd;background:#fafafa;text-align:left;">Description</th>'
+    . '<th style="padding:8px;border:1px solid #ddd;background:#fafafa;text-align:right;">Qty</th>'
+    . '<th style="padding:8px;border:1px solid #ddd;background:#fafafa;text-align:right;">Unit Price</th>'
+    . '<th style="padding:8px;border:1px solid #ddd;background:#fafafa;text-align:right;">Total</th>'
+    . '</tr></thead><tbody>'
+    . implode('', $rows_html)
+    . '</tbody></table>'
+    . '<p style="margin:0 0 12px;"><strong>Subtotal:</strong> $' . htmlspecialchars($subtotal, ENT_QUOTES, 'UTF-8') . '</p>'
+    . '<p style="margin:0;">Thank you.</p>'
+    . '</div></body></html>';
+
+  $text_body = "Hello,\r\n\r\n"
+    . "Here is your quote #{$quote_id}.\r\n"
+    . "Customer: {$customer_name}\r\n"
+    . "Quote Date: {$quote_date}\r\n\r\n"
     . "Line Items:\r\n"
-    . implode("\r\n", $lines) . "\r\n\r\n"
-    . "Subtotal: $" . quote_format_money($quote['subtotal_amount']) . "\r\n\r\n"
+    . implode("\r\n", $rows_text) . "\r\n\r\n"
+    . "Subtotal: \${$subtotal}\r\n\r\n"
     . "Thank you.\r\n";
 
-  $mail_domain = quote_mail_domain();
-  $headers = "From: no-reply@" . $mail_domain . "\r\n"
-    . "Reply-To: no-reply@" . $mail_domain . "\r\n"
-    . "X-Mailer: PHP/" . phpversion() . "\r\n"
-    . "Content-Type: text/plain; charset=UTF-8\r\n";
-
-  $sent = mail($to, $subject, $body, $headers);
-  if (!$sent) {
-    error_log('Quote email send failed for quote #' . (int)($quote['id'] ?? 0) . ' to ' . $to);
+  try {
+    $mailer = new \PHPMailer\PHPMailer\PHPMailer(true);
+    $mailer->isSMTP();
+    $mailer->Host = $smtp_host;
+    $mailer->Port = $smtp_port;
+    $mailer->SMTPAuth = true;
+    $mailer->Username = $smtp_username;
+    $mailer->Password = $smtp_password;
+    if ($smtp_port === 465) {
+      $mailer->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+    } else {
+      $mailer->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+    }
+    $mailer->CharSet = 'UTF-8';
+    $mailer->setFrom($smtp_from_email, $smtp_from_name);
+    $mailer->addAddress($to);
+    $mailer->Subject = $subject;
+    $mailer->isHTML(true);
+    $mailer->Body = $html_body;
+    $mailer->AltBody = $text_body;
+    return $mailer->send();
+  } catch (Throwable $e) {
+    error_log(
+      'Quote email send failed for quote #' . $quote_id
+      . ' to ' . $to
+      . ': ' . $e->getMessage()
+    );
+    return false;
   }
-  return (bool)$sent;
 }
 
 function quote_send_twilio_sms_placeholder(array $quote): string {
