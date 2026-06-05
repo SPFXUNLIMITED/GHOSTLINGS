@@ -60,12 +60,20 @@ function quote_is_development(): bool {
     return false;
   }
 
-  $host = preg_replace('/:\d+$/', '', $host);
+  $normalized_host = preg_replace('/:\d+$/', '', $host);
+  if (is_string($normalized_host) && $normalized_host !== '') {
+    $host = $normalized_host;
+  }
   if ($host === 'localhost' || $host === '127.0.0.1' || $host === '::1') {
     return true;
   }
 
-  return preg_match('/(\.local|\.test)$/', $host) === 1;
+  $is_dev_host = preg_match('/(\.local|\.test)$/', $host);
+  if ($is_dev_host === false) {
+    return false;
+  }
+
+  return $is_dev_host === 1;
 }
 
 function quote_escape_like(string $value, string $escape = '\\'): string {
