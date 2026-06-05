@@ -1143,27 +1143,29 @@ render_header('Sourcing RFQ Tracker');
             <tr>
               <td>
                 <?php
+                  $rfq_id = (int)$r['id'];
                   $has_thumb_image = (string)($r['image_thumb'] ?? '') !== '';
                   $has_full_image = (string)($r['image_path'] ?? '') !== '';
                   $has_rfq_image = $has_thumb_image || $has_full_image;
                   $thumb_url = $has_rfq_image
-                    ? 'sourcing_rfq_image.php?rfq_id=' . (int)$r['id'] . '&type=' . ($has_thumb_image ? 'thumb' : 'full')
+                    ? 'sourcing_rfq_image.php?rfq_id=' . $rfq_id . '&type=' . ($has_thumb_image ? 'thumb' : 'full')
                     : '';
-                  $full_url = $has_rfq_image ? 'sourcing_rfq_image.php?rfq_id=' . (int)$r['id'] . '&type=full' : '';
+                  $full_url = $has_rfq_image ? 'sourcing_rfq_image.php?rfq_id=' . $rfq_id . '&type=full' : '';
+                  $download_url = $has_rfq_image ? 'sourcing_rfq_image.php?rfq_id=' . $rfq_id . '&type=full&download=1' : '';
                 ?>
                 <?php if ($has_rfq_image): ?>
                   <button type="button"
                           class="attachment-open-link rfq-thumb-modal-button"
-                          data-attachment-name="<?= h('RFQ #' . (int)$r['id'] . ' Image') ?>"
-                          data-attachment-file="<?= h($full_url . '&download=1') ?>"
+                          data-attachment-name="<?= h('RFQ #' . $rfq_id . ' Image') ?>"
+                          data-attachment-file="<?= h($download_url) ?>"
                           data-attachment-preview="<?= h($full_url) ?>"
                           data-attachment-previewable="1"
                           data-attachment-image="1"
-                          aria-label="<?= h('View RFQ #' . (int)$r['id'] . ' image in modal') ?>"
+                          aria-label="<?= h('View RFQ #' . $rfq_id . ' image in modal') ?>"
                           title="View RFQ image">
                     <img class="rfq-thumb-modal-image"
                          src="<?= h($thumb_url) ?>"
-                         alt="<?= h('RFQ #' . (int)$r['id'] . ' image') ?>"
+                         alt="<?= h('RFQ #' . $rfq_id . ' image') ?>"
                          />
                   </button>
                 <?php else: ?>
