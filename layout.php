@@ -324,18 +324,17 @@ function is_menu_item_active(array $item, string $current): bool {
 
   $href = (string)($item['href'] ?? '');
   $href_query = parse_url($href, PHP_URL_QUERY);
-  if ($href_query === null || $href_query === '') {
+  if ($href_query === null || $href_query === '' || $href_query === false) {
     return true;
   }
 
   $item_query = [];
   parse_str($href_query, $item_query);
 
-  $current_query = [];
-  parse_str((string)($_SERVER['QUERY_STRING'] ?? ''), $current_query);
+  $current_query = $_GET;
 
   foreach ($item_query as $key => $value) {
-    if (!array_key_exists($key, $current_query) || (string)$current_query[$key] !== (string)$value) {
+    if (!array_key_exists($key, $current_query) || is_array($current_query[$key]) || (string)$current_query[$key] !== (string)$value) {
       return false;
     }
   }
