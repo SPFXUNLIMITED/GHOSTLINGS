@@ -1088,6 +1088,7 @@ render_header('Sourcing RFQ Tracker');
 <?php endif; ?>
 
 <?php if (!$selected_rfq): ?>
+  <?= render_attachment_modal_assets() ?>
   <div class="card">
     <div class="table-wrap" style="overflow-x:auto;">
       <table class="table-auto" style="min-width:720px;">
@@ -1117,7 +1118,6 @@ render_header('Sourcing RFQ Tracker');
                   $full_url = $has_rfq_image ? 'sourcing_rfq_image.php?rfq_id=' . (int)$r['id'] . '&type=full' : '';
                 ?>
                 <?php if ($has_rfq_image): ?>
-                  <?= render_attachment_modal_assets() ?>
                   <button type="button"
                           class="attachment-open-link"
                           data-attachment-name="<?= h('RFQ #' . (int)$r['id'] . ' Image') ?>"
