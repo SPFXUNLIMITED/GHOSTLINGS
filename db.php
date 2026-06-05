@@ -31,6 +31,31 @@ function app_ensure_integration_settings_table(PDO $pdo): void {
       PRIMARY KEY (setting_key)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   ");
+
+  $has_is_encrypted = $pdo->query("SHOW COLUMNS FROM integration_settings LIKE 'is_encrypted'");
+  if ($has_is_encrypted === false || $has_is_encrypted->fetch(PDO::FETCH_ASSOC) === false) {
+    try {
+      $pdo->exec("ALTER TABLE integration_settings ADD COLUMN is_encrypted TINYINT(1) NOT NULL DEFAULT 0");
+    } catch (Throwable $e) {
+      $recheck_is_encrypted = $pdo->query("SHOW COLUMNS FROM integration_settings LIKE 'is_encrypted'");
+      if ($recheck_is_encrypted === false || $recheck_is_encrypted->fetch(PDO::FETCH_ASSOC) === false) {
+        throw $e;
+      }
+    }
+  }
+
+  $has_updated_at = $pdo->query("SHOW COLUMNS FROM integration_settings LIKE 'updated_at'");
+  if ($has_updated_at === false || $has_updated_at->fetch(PDO::FETCH_ASSOC) === false) {
+    try {
+      $pdo->exec("ALTER TABLE integration_settings ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+    } catch (Throwable $e) {
+      $recheck_updated_at = $pdo->query("SHOW COLUMNS FROM integration_settings LIKE 'updated_at'");
+      if ($recheck_updated_at === false || $recheck_updated_at->fetch(PDO::FETCH_ASSOC) === false) {
+        throw $e;
+      }
+    }
+  }
+
   $ready = true;
 }
 
