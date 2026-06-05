@@ -448,7 +448,7 @@ render_header('Freight Quote Tracker');
     </div>
   </div>
   <div class="shipping-rfq-hero-actions">
-    <a class="btn primary" href="shipping_rfq_form.php">+ New Freight Quote</a>
+    <a class="btn primary" href="freight_quote_form.php">+ New Freight Quote</a>
     <button type="button" class="btn" id="focus-srfq-filters">Explore Pipeline</button>
   </div>
 </div>
@@ -491,7 +491,7 @@ render_header('Freight Quote Tracker');
     <div class="row">
       <button type="submit" class="btn primary">Filter</button>
       <a class="btn" href="shipping_rfq_tracker.php">Clear</a>
-      <a class="btn" href="shipping_rfq_form.php">New RFQ</a>
+      <a class="btn" href="freight_quote_form.php">New RFQ</a>
     </div>
   </form>
 </div>
@@ -592,7 +592,7 @@ render_header('Freight Quote Tracker');
               <td class="col-actions">
                 <a class="btn" href="shipping_rfq_tracker.php?rfq_id=<?= (int)$r['id'] ?>">Quotes</a>
                 <a class="btn" href="shipping_rfq_tracker.php?rfq_text_id=<?= (int)$r['id'] ?>">Email Text</a>
-                <a class="btn" href="shipping_rfq_form.php?edit_id=<?= (int)$r['id'] ?>">Edit</a>
+                <a class="btn" href="freight_quote_form.php?edit_id=<?= (int)$r['id'] ?>">Edit</a>
                 <form method="post" style="display:inline;"
                       onsubmit="return confirm('Delete this Freight Quote and all its quotes? This cannot be undone.');">
                   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['srfq_tracker_csrf']) ?>" />
@@ -626,7 +626,7 @@ render_header('Freight Quote Tracker');
       <div class="row" style="flex-shrink:0;">
         <a class="btn" href="shipping_rfq_tracker.php<?= $search !== '' || $status_filter !== '' ? '?' . http_build_query(array_filter(['q' => $search, 'status' => $status_filter])) : '' ?>">← All RFQs</a>
         <a class="btn" href="shipping_rfq_tracker.php?rfq_text_id=<?= (int)$selected_rfq['id'] ?>">Email Text</a>
-        <a class="btn" href="shipping_rfq_form.php?edit_id=<?= (int)$selected_rfq['id'] ?>">Edit RFQ</a>
+        <a class="btn" href="freight_quote_form.php?edit_id=<?= (int)$selected_rfq['id'] ?>">Edit RFQ</a>
       </div>
     </div>
 
