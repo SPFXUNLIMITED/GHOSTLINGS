@@ -4,7 +4,7 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_admin_or_moderator();
 
-const INVOICE_TRACKER_TABLE_COLUMN_COUNT = 5;
+const INVOICE_TRACKER_TABLE_COLUMN_COUNT = 6;
 
 function invoice_tracker_format_money($value): string {
   return number_format((float)$value, 2);
@@ -63,6 +63,7 @@ render_header('Invoice Tracker');
           <th>Date</th>
           <th>Total</th>
           <th>Status</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -94,6 +95,10 @@ render_header('Invoice Tracker');
               <span style="display:inline-block; padding:4px 10px; border-radius:999px; font-size:0.82em; font-weight:600; letter-spacing:0.02em; background:<?= h($status_bg) ?>; color:<?= h($status_color) ?>;">
                 <?= h($status_label) ?>
               </span>
+            </td>
+            <td style="white-space:nowrap;">
+              <a class="btn" href="invoice_form.php?id=<?= (int)$invoice['id'] ?>">View</a>
+              <a class="btn" href="invoice_form.php?id=<?= (int)$invoice['id'] ?>" style="margin-left:6px;">Edit</a>
             </td>
           </tr>
         <?php endforeach; ?>
