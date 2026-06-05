@@ -172,7 +172,7 @@ function build_order_email_text_submitted(array $order, array $order_statuses): 
 
 $order_id = max(0, (int)($_GET['order_id'] ?? 0));
 if ($order_id === 0) {
-  header('Location: order_form.php');
+  header('Location: order_tracker.php');
   exit;
 }
 
@@ -191,7 +191,7 @@ $stmt->execute([$order_id]);
 $order = $stmt->fetch();
 
 if (!$order) {
-  header('Location: order_form.php');
+  header('Location: order_tracker.php');
   exit;
 }
 
