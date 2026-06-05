@@ -284,7 +284,52 @@ function quote_backfill_customer(PDO $pdo, ?int $customer_id, array $fields): vo
   $update_stmt->execute($params);
 }
 
-function quote_send_email(array $quote, array $items, ?string &$error_message = null): bool {
+function quote_sender_profile(PDO $pdo, array $quote): array {
+  $profile = [
+    'company_name' => '',
+    'address' => '',
+    'phone' => '',
+    'email' => '',
+  ];
+
+  $candidate_ids = [];
+  $created_by = (int)($quote['created_by'] ?? 0);
+  if ($created_by > 0) {
+    $candidate_ids[] = $created_by;
+  }
+  $session_user_id = (int)($_SESSION['user_id'] ?? 0);
+  if ($session_user_id > 0 && !in_array($session_user_id, $candidate_ids, true)) {
+    $candidate_ids[] = $session_user_id;
+  }
+
+  if (!$candidate_ids) {
+    return $profile;
+  }
+
+  $stmt = $pdo->prepare(
+    "SELECT company_name, delivery_address, contact_phone, email
+     FROM users
+     WHERE id = ?
+     LIMIT 1"
+  );
+  foreach ($candidate_ids as $user_id) {
+    $stmt->execute([$user_id]);
+    $row = $stmt->fetch();
+    if (!$row) {
+      continue;
+    }
+
+    $profile['company_name'] = trim((string)($row['company_name'] ?? ''));
+    $profile['address'] = trim((string)($row['delivery_address'] ?? ''));
+    $profile['phone'] = trim((string)($row['contact_phone'] ?? ''));
+    $profile['email'] = trim((string)($row['email'] ?? ''));
+    break;
+  }
+
+  return $profile;
+}
+
+function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_message = null): bool {
   $error_message = null;
   $to = trim((string)($quote['email'] ?? ''));
   if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
@@ -311,6 +356,15 @@ function quote_send_email(array $quote, array $items, ?string &$error_message = 
     error_log('Quote email send failed due to missing or invalid SMTP configuration: ' . implode(', ', $smtp_errors));
     return false;
   }
+
+  $sender_profile = quote_sender_profile($pdo, $quote);
+  $sender_company_name = $sender_profile['company_name'] !== '' ? $sender_profile['company_name'] : $smtp_from_name;
+  if ($sender_company_name === '') {
+    $sender_company_name = 'Our Company';
+  }
+  $sender_address = $sender_profile['address'];
+  $sender_phone = $sender_profile['phone'];
+  $sender_email = $sender_profile['email'] !== '' ? $sender_profile['email'] : $smtp_from_email;
 
   $subject = 'Quote #' . (int)$quote['id'];
   $rows_html = [];
@@ -341,6 +395,7 @@ function quote_send_email(array $quote, array $items, ?string &$error_message = 
 
   $html_body = '<!doctype html><html><body style="margin:0;padding:0;background:#f7f7f7;">'
     . '<div style="max-width:700px;margin:24px auto;padding:24px;background:#ffffff;border:1px solid #e5e5e5;border-radius:6px;font-family:Arial,sans-serif;color:#222;">'
+    . '<p style="margin:0 0 10px;font-size:20px;font-weight:700;">' . htmlspecialchars($sender_company_name, ENT_QUOTES, 'UTF-8') . '</p>'
     . '<h2 style="margin:0 0 12px;">Quote #' . htmlspecialchars((string)$quote_id, ENT_QUOTES, 'UTF-8') . '</h2>'
     . '<p style="margin:0 0 8px;">Hello,</p>'
     . '<p style="margin:0 0 16px;">Here is your quote summary.</p>'
@@ -356,10 +411,28 @@ function quote_send_email(array $quote, array $items, ?string &$error_message = 
     . implode('', $rows_html)
     . '</tbody></table>'
     . '<p style="margin:0 0 12px;"><strong>Subtotal:</strong> $' . htmlspecialchars($subtotal, ENT_QUOTES, 'UTF-8') . '</p>'
-    . '<p style="margin:0;">Thank you.</p>'
-    . '</div></body></html>';
+    . '<p style="margin:0;">Thank you.</p>';
 
-  $text_body = "Hello,\r\n\r\n"
+  $footer_html_lines = [];
+  if ($sender_address !== '') {
+    $footer_html_lines[] = '<p style="margin:0 0 4px;"><strong>Address:</strong> ' . nl2br(htmlspecialchars($sender_address, ENT_QUOTES, 'UTF-8')) . '</p>';
+  }
+  if ($sender_phone !== '') {
+    $footer_html_lines[] = '<p style="margin:0 0 4px;"><strong>Phone:</strong> ' . htmlspecialchars($sender_phone, ENT_QUOTES, 'UTF-8') . '</p>';
+  }
+  if ($sender_email !== '') {
+    $footer_html_lines[] = '<p style="margin:0;"><strong>Email:</strong> <a href="mailto:' . htmlspecialchars($sender_email, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($sender_email, ENT_QUOTES, 'UTF-8') . '</a></p>';
+  }
+  if ($footer_html_lines) {
+    $html_body .= '<div style="margin-top:18px;padding-top:12px;border-top:1px solid #e5e5e5;">'
+      . implode('', $footer_html_lines)
+      . '</div>';
+  }
+
+  $html_body .= '</div></body></html>';
+
+  $text_body = $sender_company_name . "\r\n\r\n"
+    . "Hello,\r\n\r\n"
     . "Here is your quote #{$quote_id}.\r\n"
     . "Customer: {$customer_name}\r\n"
     . "Quote Date: {$quote_date}\r\n\r\n"
@@ -367,6 +440,20 @@ function quote_send_email(array $quote, array $items, ?string &$error_message = 
     . implode("\r\n", $rows_text) . "\r\n\r\n"
     . "Subtotal: \${$subtotal}\r\n\r\n"
     . "Thank you.\r\n";
+
+  $footer_text_lines = [];
+  if ($sender_address !== '') {
+    $footer_text_lines[] = 'Address: ' . preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ', ', $sender_address));
+  }
+  if ($sender_phone !== '') {
+    $footer_text_lines[] = 'Phone: ' . $sender_phone;
+  }
+  if ($sender_email !== '') {
+    $footer_text_lines[] = 'Email: ' . $sender_email;
+  }
+  if ($footer_text_lines) {
+    $text_body .= "\r\n" . implode("\r\n", $footer_text_lines) . "\r\n";
+  }
 
   try {
     $mailer = new \PHPMailer\PHPMailer\PHPMailer(true);
@@ -588,7 +675,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $errors[] = 'Cannot send email: quote has no line items.';
         } else {
           $email_error = null;
-          if (!quote_send_email($quote, $items, $email_error)) {
+          if (!quote_send_email($pdo, $quote, $items, $email_error)) {
             $errors[] = $email_error !== null && $email_error !== '' ? $email_error : 'Email was not sent.';
           } else {
             $pdo->prepare("UPDATE quotes SET status = CASE WHEN status = 'draft' THEN 'sent' ELSE status END WHERE id = ?")->execute([$row_id]);
