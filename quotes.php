@@ -55,25 +55,19 @@ function quote_is_development(): bool {
     }
   }
 
-  $host = strtolower(trim((string)($_SERVER['SERVER_NAME'] ?? $_SERVER['HTTP_HOST'] ?? '')));
+  $host = strtolower(trim((string)($_SERVER['SERVER_NAME'] ?? '')));
   if ($host === '') {
     return false;
   }
 
-  $normalized_host = preg_replace('/:\d+$/', '', $host);
-  if (is_string($normalized_host) && $normalized_host !== '') {
-    $host = $normalized_host;
+  if (preg_match('/:\d+$/', $host) === 1) {
+    $host = (string)substr($host, 0, (int)strrpos($host, ':'));
   }
   if ($host === 'localhost' || $host === '127.0.0.1' || $host === '::1') {
     return true;
   }
 
-  $is_dev_host = preg_match('/(\.local|\.test)$/', $host);
-  if ($is_dev_host === false) {
-    return false;
-  }
-
-  return $is_dev_host === 1;
+  return preg_match('/(\.local|\.test)$/', $host) === 1;
 }
 
 function quote_escape_like(string $value, string $escape = '\\'): string {
