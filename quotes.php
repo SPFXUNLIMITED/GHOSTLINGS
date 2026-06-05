@@ -139,9 +139,18 @@ $line_items = [
 ];
 
 $view = (string)($_GET['view'] ?? 'all');
-$show_all = $view === 'all';
+if (!in_array($view, ['all', 'id', 'new'], true)) {
+  $view = 'all';
+}
+
 $detail_id = $view === 'id' ? (int)($_GET['id'] ?? 0) : 0;
-$show_detail = $detail_id > 0;
+if ($view === 'id' && $detail_id <= 0) {
+  $view = 'all';
+  $detail_id = 0;
+}
+
+$show_new_form = $view === 'new';
+$show_detail = $view === 'id' && $detail_id > 0;
 $saved = isset($_GET['saved']) && $_GET['saved'] === '1';
 $updated = isset($_GET['updated']) && $_GET['updated'] === '1';
 $invoice_converted = isset($_GET['invoice_converted']) && $_GET['invoice_converted'] === '1';
@@ -178,6 +187,9 @@ if ($raw_edit !== null && (int)$raw_edit > 0) {
         ];
       }
     }
+
+    $show_all = $view === 'all' && $edit_id === null;
+    $show_form = $show_new_form || $edit_id !== null;
   }
 }
 
@@ -482,7 +494,7 @@ render_header('Quotes');
     <?php if (!$show_all): ?>
       <a class="btn" href="quotes.php?view=all">Back to Quotes</a>
     <?php endif; ?>
-    <a class="btn primary" href="quotes.php">New Quote</a>
+    <a class="btn primary" href="quotes.php?view=new">New Quote</a>
   </div>
 </div>
 
@@ -639,7 +651,7 @@ render_header('Quotes');
     </table>
   </div>
 
-<?php else: ?>
+<?php elseif ($show_form): ?>
   <form method="post" class="card" style="max-width:1100px; position:relative;">
     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
     <?php if ($edit_id !== null): ?>
