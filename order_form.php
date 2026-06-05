@@ -433,7 +433,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $pdo->commit();
-        header('Location: sourcing_rfq_submitted.php?rfq_id=' . (int)$saved_order_id);
+        header('Location: order_tracker.php?order_text_id=' . (int)$saved_order_id);
         exit;
       } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
