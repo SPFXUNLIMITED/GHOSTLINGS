@@ -533,19 +533,21 @@ render_header('Freight Quote Tracker');
 <?php if (!$selected_rfq): ?>
   <div class="card">
     <div class="table-wrap" style="overflow-x:auto;">
-      <table class="table-auto" style="min-width:700px;">
+      <table class="table-auto" style="min-width:980px;">
         <thead>
           <tr>
             <th>#</th>
-            <th>RFQ</th>
-            <th>Shipping</th>
+            <th>Freight Quote</th>
+            <th>Machine</th>
+            <th>Route</th>
             <th>Status</th>
+            <th>Quotes</th>
             <th class="col-actions">Actions</th>
           </tr>
         </thead>
         <tbody>
           <?php if (!$rfqs): ?>
-            <tr><td colspan="5" class="muted">No freight quote requests found.</td></tr>
+            <tr><td colspan="7" class="muted">No freight quote requests found.</td></tr>
           <?php endif; ?>
           <?php foreach ($rfqs as $r): ?>
             <?php
@@ -556,15 +558,16 @@ render_header('Freight Quote Tracker');
               <td class="muted"><?= (int)$r['id'] ?></td>
               <td>
                 <strong><?= h($r['request_title']) ?></strong><br>
-                <span class="muted"><?= h($r['machine_model']) ?>
-                  <?php if ($r['machine_weight_kg'] !== null): ?>
-                    · <?= h(rtrim(rtrim((string)$r['machine_weight_kg'], '0'), '.')) ?> kg
-                  <?php endif; ?>
-                  · Quotes: <?= (int)$r['quote_count'] ?>
-                </span>
+                <span class="muted">Model: <?= h((string)($r['machine_model'] ?? '—')) ?></span>
+              </td>
+              <td>
+                <strong><?= h((string)($r['machine_model'] ?? '—')) ?></strong>
+                <?php if ($r['machine_weight_kg'] !== null): ?>
+                  <br><span class="muted"><?= h(rtrim(rtrim((string)$r['machine_weight_kg'], '0'), '.')) ?> kg</span>
+                <?php endif; ?>
               </td>
               <td class="muted">
-                <?= h($r['port_of_loading']) ?> → <?= h($dest_label) ?><br>
+                <?= h((string)($r['port_of_loading'] ?? '—')) ?> → <?= h($dest_label) ?><br>
                 <span style="font-weight:600;"><?= h((string)($r['shipment_type'] ?? 'LCL')) ?></span>
               </td>
               <td>
@@ -585,6 +588,7 @@ render_header('Freight Quote Tracker');
                   <button type="submit" class="btn">Save</button>
                 </form>
               </td>
+              <td class="muted"><?= (int)$r['quote_count'] ?></td>
               <td class="col-actions">
                 <a class="btn" href="shipping_rfq_tracker.php?rfq_id=<?= (int)$r['id'] ?>">Quotes</a>
                 <a class="btn" href="shipping_rfq_tracker.php?rfq_text_id=<?= (int)$r['id'] ?>">Email Text</a>
