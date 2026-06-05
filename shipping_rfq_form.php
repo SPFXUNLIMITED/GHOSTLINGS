@@ -16,6 +16,8 @@ $success = '';
 
 $edit_id     = max(0, (int)(($_SERVER['REQUEST_METHOD'] === 'POST') ? ($_POST['edit_id'] ?? 0) : ($_GET['edit_id'] ?? 0)));
 $is_edit     = $edit_id > 0;
+$order_id    = max(0, (int)(($_SERVER['REQUEST_METHOD'] === 'POST') ? ($_POST['order_id'] ?? 0) : ($_GET['order_id'] ?? 0)));
+$prefill_order = null;
 
 // China ports of loading (common ones)
 $china_ports = [
@@ -119,6 +121,79 @@ if ($is_edit && $_SERVER['REQUEST_METHOD'] !== 'POST') {
           'gross_weight_kg' => $cr['gross_weight_kg'] !== null ? rtrim(rtrim((string)$cr['gross_weight_kg'], '0'), '.') : '',
           'quantity'        => (string)($cr['quantity'] ?? '1'),
         ];
+      }
+    }
+
+    // Pre-fill from order when creating a new shipping record from Order Tracker.
+    if (!$is_edit && $_SERVER['REQUEST_METHOD'] !== 'POST' && $order_id > 0) {
+      $os = $pdo->prepare(
+        "SELECT id, po_number, supplier_name, model_name, shipping_method, shipping_origin, destination_port, destination_address, notes
+         FROM rfq_orders
+         WHERE id = ?
+         LIMIT 1"
+      );
+      $os->execute([$order_id]);
+      $prefill_order = $os->fetch();
+      if ($prefill_order) {
+        $prefill_origin = trim((string)($prefill_order['shipping_origin'] ?? ''));
+        if ($prefill_origin !== '') {
+          if (in_array($prefill_origin, $china_ports, true)) {
+            $fields['port_of_loading'] = $prefill_origin;
+            $fields['port_of_loading_other'] = '';
+          } else {
+            $fields['port_of_loading'] = 'Other';
+            $fields['port_of_loading_other'] = $prefill_origin;
+          }
+        }
+
+        $prefill_dest_address = trim((string)($prefill_order['destination_address'] ?? ''));
+        if ($prefill_dest_address !== '') {
+          $fields['destination_type'] = 'door_delivery';
+          $fields['destination_address'] = $prefill_dest_address;
+        }
+
+        $prefill_method = strtoupper(trim((string)($prefill_order['shipping_method'] ?? '')));
+        if (str_contains($prefill_method, 'FCL')) {
+          $fields['shipment_type'] = 'FCL';
+        } elseif (str_contains($prefill_method, 'LCL')) {
+          $fields['shipment_type'] = 'LCL';
+        }
+
+        $po_number = trim((string)($prefill_order['po_number'] ?? ''));
+        $supplier_name = trim((string)($prefill_order['supplier_name'] ?? ''));
+        $model_name = trim((string)($prefill_order['model_name'] ?? ''));
+
+        if ($po_number !== '') {
+          $fields['request_title'] = 'Shipping for PO ' . $po_number;
+        } else {
+          $fields['request_title'] = 'Shipping for Order #' . (int)$prefill_order['id'];
+        }
+        if ($supplier_name !== '') {
+          $fields['request_title'] .= ' (' . $supplier_name . ')';
+        }
+        if (mb_strlen($fields['request_title']) > 255) {
+          $fields['request_title'] = mb_substr($fields['request_title'], 0, 255);
+        }
+
+        if ($model_name !== '') {
+          $fields['machine_model'] = $model_name;
+        }
+
+        $note_lines = [
+          'Source Order ID: ' . (int)$prefill_order['id'],
+        ];
+        $destination_port = trim((string)($prefill_order['destination_port'] ?? ''));
+        if ($destination_port !== '') {
+          $note_lines[] = 'Destination Port: ' . $destination_port;
+        }
+        $order_notes = trim((string)($prefill_order['notes'] ?? ''));
+        if ($order_notes !== '') {
+          $note_lines[] = 'Order Notes: ' . $order_notes;
+        }
+        $fields['additional_notes'] = trim(implode("\n", $note_lines));
+      } else {
+        $errors[] = 'Order not found for shipping pre-fill.';
+        $order_id = 0;
       }
     }
   }
@@ -349,6 +424,14 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form
   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['shipping_rfq_form_csrf']) ?>" />
   <?php if ($is_edit): ?>
     <input type="hidden" name="edit_id" value="<?= (int)$edit_id ?>" />
+  <?php elseif ($order_id > 0): ?>
+    <input type="hidden" name="order_id" value="<?= (int)$order_id ?>" />
+  <?php endif; ?>
+
+  <?php if (!$is_edit && $prefill_order): ?>
+    <div class="info-banner" style="margin-bottom:10px;">
+      ℹ️ Shipment details were pre-filled from Order #<?= (int)$prefill_order['id'] ?>.
+    </div>
   <?php endif; ?>
 
   <div class="info-banner">
