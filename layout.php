@@ -528,12 +528,15 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
       ['href' => 'freight_forwarders.php', 'files' => ['freight_forwarders.php', 'freight_forwarder_form.php', 'freight_forwarder_details.php'], 'label' => 'Freight Forwarders'],
       ['href' => 'alibaba_responses.php', 'file' => 'alibaba_responses.php', 'label' => 'Alibaba Responses'],
       ['type' => 'separator'],
-      ['type' => 'section', 'label' => 'RFQ & Shipping'],
-      ['href' => 'sourcing_rfq_form.php', 'file' => 'sourcing_rfq_form.php', 'label' => 'Sourcing RFQ Form'],
-      ['href' => 'sourcing_rfq_tracker.php', 'files' => ['sourcing_rfq_tracker.php', 'sourcing_rfq_submitted.php', 'sourcing_rfq_image.php'], 'label' => 'Sourcing RFQ Tracker'],
-      ['href' => 'shipping_rfq_form.php', 'file' => 'shipping_rfq_form.php', 'label' => 'Shipping RFQ Form'],
-      ['href' => 'shipping_rfq_tracker.php', 'file' => 'shipping_rfq_tracker.php', 'label' => 'Shipping RFQ Tracker'],
-      ['href' => 'order_tracker.php', 'files' => ['order_tracker.php', 'order_form.php', 'order_document_file.php', 'order_document_upload.php'], 'label' => 'Order Tracker'],
+      ['type' => 'section', 'label' => 'RFQs'],
+      ['href' => 'sourcing_rfq_form.php', 'file' => 'sourcing_rfq_form.php', 'label' => 'RFQ Form'],
+      ['href' => 'sourcing_rfq_tracker.php', 'files' => ['sourcing_rfq_tracker.php', 'sourcing_rfq_submitted.php', 'sourcing_rfq_image.php'], 'label' => 'RFQ Tracker'],
+      ['type' => 'section', 'label' => 'POs'],
+      ['href' => 'sourcing_rfq_form.php', 'file' => 'sourcing_rfq_form.php', 'label' => 'PO Form'],
+      ['href' => 'sourcing_rfq_tracker.php', 'files' => ['sourcing_rfq_tracker.php', 'sourcing_rfq_submitted.php', 'sourcing_rfq_image.php'], 'label' => 'PO Tracker'],
+      ['type' => 'section', 'label' => 'Shipping'],
+      ['href' => 'shipping_rfq_form.php', 'file' => 'shipping_rfq_form.php', 'label' => 'Shipping Form'],
+      ['href' => 'shipping_rfq_tracker.php', 'file' => 'shipping_rfq_tracker.php', 'label' => 'Shipping Tracker'],
     ], $current); ?>
     <?php render_menu_link(['href' => 'inventory_list.php', 'files' => ['inventory_list.php', 'inventory_form.php'], 'label' => 'Inventory'], $current); ?>
     <?php if ($show_admin_menu): ?>
