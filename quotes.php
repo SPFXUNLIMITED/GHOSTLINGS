@@ -119,7 +119,7 @@ function quote_resolve_customer_id(PDO $pdo, array $fields): ?int {
   $top_score = (int)reset($scores);
   $top_ids = array_keys(array_filter($scores, static fn($score): bool => (int)$score === $top_score));
   if (count($top_ids) !== 1) {
-    error_log('Quote customer backfill match ambiguity for customer "' . $customer_name . '"');
+    error_log('Quote customer backfill match ambiguity.');
     return null;
   }
 
@@ -885,9 +885,9 @@ render_header('Quotes');
         }
 
         rows.forEach((row) => {
-          const rowCompany = row.company_name || row.company || '';
-          const rowPhone = row.phone || row.phone_number || row.contact_phone || '';
-          const rowEmail = row.email || row.contact_email || '';
+          const rowCompany = row.company_name || '';
+          const rowPhone = row.phone || '';
+          const rowEmail = row.email || '';
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'btn';
