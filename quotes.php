@@ -71,6 +71,45 @@ function quote_is_development(): bool {
 }
 
 function quote_env_value(string $key): string {
+  static $dotenv_values = null;
+
+  if ($dotenv_values === null) {
+    $dotenv_values = [];
+    $dotenv_path = __DIR__ . '/.env';
+    if (is_file($dotenv_path) && is_readable($dotenv_path)) {
+      $lines = file($dotenv_path, FILE_IGNORE_NEW_LINES);
+      if (is_array($lines)) {
+        foreach ($lines as $line) {
+          $line = trim((string)$line);
+          if ($line === '' || str_starts_with($line, '#')) {
+            continue;
+          }
+
+          $separator_pos = strpos($line, '=');
+          if ($separator_pos === false) {
+            continue;
+          }
+
+          $name = trim(substr($line, 0, $separator_pos));
+          if ($name === '' || !preg_match('/^[A-Z0-9_]+$/i', $name)) {
+            continue;
+          }
+
+          $value = trim(substr($line, $separator_pos + 1));
+          if (strlen($value) >= 2) {
+            $first = $value[0];
+            $last = $value[strlen($value) - 1];
+            if (($first === '"' && $last === '"') || ($first === "'" && $last === "'")) {
+              $value = substr($value, 1, -1);
+            }
+          }
+
+          $dotenv_values[$name] = $value;
+        }
+      }
+    }
+  }
+
   $env_value = getenv($key);
   if ($env_value === false) {
     $env_value = null;
@@ -80,6 +119,7 @@ function quote_env_value(string $key): string {
     $env_value,
     $_ENV[$key] ?? null,
     $_SERVER[$key] ?? null,
+    $dotenv_values[$key] ?? null,
   ];
 
   foreach ($candidates as $candidate) {
