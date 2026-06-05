@@ -599,7 +599,7 @@ render_header('Order Tracker');
   </div>
 </div>
 
-<?php render_alibaba_workflow_banner($timeline_current_stage); ?>
+<?php render_alibaba_workflow_banner('send_purchase_order'); ?>
 
 <?php if ($errors): ?>
   <div class="alert error">
