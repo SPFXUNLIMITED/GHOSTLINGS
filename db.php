@@ -1259,6 +1259,8 @@ $pdo->exec("
     line_position     INT UNSIGNED NOT NULL DEFAULT 1,
     description       VARCHAR(500) NOT NULL,
     quantity          DECIMAL(12,2) NOT NULL DEFAULT 1.00,
+    cost              DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    markup_percent    DECIMAL(8,2) NOT NULL DEFAULT 20.00,
     unit_price        DECIMAL(12,2) NOT NULL DEFAULT 0.00,
     line_total        DECIMAL(12,2) NOT NULL DEFAULT 0.00,
     created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1268,6 +1270,28 @@ $pdo->exec("
     CONSTRAINT fk_quote_items_quote FOREIGN KEY (quote_id) REFERENCES quotes (id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+$_qi_cost_col = $pdo->query("SHOW COLUMNS FROM quote_items LIKE 'cost'");
+if ($_qi_cost_col === false || $_qi_cost_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quote_items ADD COLUMN cost DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER quantity");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quote_items LIKE 'cost'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_qi_cost_col);
+
+$_qi_markup_col = $pdo->query("SHOW COLUMNS FROM quote_items LIKE 'markup_percent'");
+if ($_qi_markup_col === false || $_qi_markup_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quote_items ADD COLUMN markup_percent DECIMAL(8,2) NOT NULL DEFAULT 20.00 AFTER cost");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quote_items LIKE 'markup_percent'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_qi_markup_col);
 
 // Create shipping_rfq_requests table for freight/shipping quote requests
 $pdo->exec("
