@@ -313,15 +313,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 }
 
-render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping RFQ Form');
+render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping Form');
 ?>
 
 <div class="card page-header">
   <div class="page-header-body">
-    <h1><?= $is_edit ? ('Edit Shipping RFQ #' . (int)$edit_id) : 'Shipping RFQ Form' ?></h1>
+    <h1><?= $is_edit ? ('Edit Shipping RFQ #' . (int)$edit_id) : 'Shipping Form' ?></h1>
     <p class="muted">
       <?= $is_edit
-        ? 'Update the shipping RFQ request details below.'
+        ? 'Update the shipping request details below.'
         : 'Request freight shipping quotes for machines or cargo from China to Los Angeles (port or door delivery).' ?>
     </p>
   </div>

@@ -414,21 +414,21 @@ if ($rfq_text_id > 0) {
   }
 }
 
-render_header('Shipping RFQ Tracker');
+render_header('Shipping Tracker');
 ?>
 
 <div class="card shipping-rfq-hero page-header">
   <div class="shipping-rfq-hero-glow" aria-hidden="true"></div>
   <div class="page-header-body shipping-rfq-hero-body">
     <span class="shipping-rfq-hero-tag">Ocean + Air Freight Command Center</span>
-    <h1>Shipping RFQ Tracker <span class="shipping-rfq-hero-count">(<?= (int)$hero_total_rfqs ?>)</span></h1>
+    <h1>Shipping Tracker <span class="shipping-rfq-hero-count">(<?= (int)$hero_total_rfqs ?>)</span></h1>
     <p class="muted">Orchestrate every shipment request, compare carrier bids faster, and keep cargo moving with confidence.</p>
-    <ul class="shipping-rfq-hero-pills" aria-label="Shipping RFQ highlights">
+    <ul class="shipping-rfq-hero-pills" aria-label="Shipping Tracker highlights">
       <li class="shipping-rfq-hero-pill"><span aria-hidden="true">📦</span> Live quote pipeline</li>
       <li class="shipping-rfq-hero-pill"><span aria-hidden="true">🌍</span> Global route visibility</li>
       <li class="shipping-rfq-hero-pill"><span aria-hidden="true">⚡</span> Faster booking decisions</li>
     </ul>
-    <div class="shipping-rfq-hero-stats" aria-label="Shipping RFQ summary">
+    <div class="shipping-rfq-hero-stats" aria-label="Shipping Tracker summary">
       <div class="shipping-rfq-hero-stat">
         <strong><?= (int)$hero_total_rfqs ?></strong>
         <span>Total RFQs</span>
