@@ -196,8 +196,16 @@ function invoice_default_number(): string {
   return 'INV-' . $stamp . '-NEW';
 }
 
+function invoice_readonly_style(): string {
+  return 'background:var(--surface,#f8fafc); color:var(--muted,#64748b);';
+}
+
+function invoice_readonly_attrs(): string {
+  return ' readonly style="' . invoice_readonly_style() . '"';
+}
+
 function invoice_field_lock_attrs(bool $is_view_mode): string {
-  return $is_view_mode ? ' readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);"' : '';
+  return $is_view_mode ? invoice_readonly_attrs() : '';
 }
 
 $quote_id_param = trim((string)($_GET['id'] ?? ''));
@@ -258,7 +266,7 @@ $fields = [
   'company_name' => (string)($quote['company_name'] ?? ''),
   'phone_number' => (string)($quote['phone_number'] ?? ''),
   'email' => (string)($quote['email'] ?? ''),
-  'invoice_date' => (string)($quote['quote_date'] ?? $today),
+  'invoice_date' => (string)(($quote['quote_date'] ?? null) ?? $today),
   'notes' => (string)($quote['notes'] ?? ''),
 ];
 
@@ -320,7 +328,7 @@ render_header($invoice_heading);
     <div style="display:grid; gap:14px; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));">
       <div>
         <label for="invoice_number">Invoice #</label>
-        <input id="invoice_number" type="text" name="invoice_number" value="<?= h($fields['invoice_number']) ?>" readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);" />
+        <input id="invoice_number" type="text" name="invoice_number" value="<?= h($fields['invoice_number']) ?>"<?= invoice_readonly_attrs() ?> />
       </div>
       <div>
         <label for="invoice_date">Invoice Date</label>
@@ -328,7 +336,7 @@ render_header($invoice_heading);
       </div>
       <div>
         <label for="source_quote_label">Source Quote</label>
-        <input id="source_quote_label" type="text" value="<?= h($quote ? 'Quote #' . (int)$quote_id : 'Standalone Invoice') ?>" readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);" />
+        <input id="source_quote_label" type="text" value="<?= h($quote ? 'Quote #' . (int)$quote_id : 'Standalone Invoice') ?>"<?= invoice_readonly_attrs() ?> />
       </div>
     </div>
 
@@ -371,7 +379,7 @@ render_header($invoice_heading);
               <td><input type="number" step="0.01" min="0.01" name="item_qty[]" value="<?= h((string)$row['quantity']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> /></td>
               <td><input type="number" step="0.01" min="0" name="item_cost[]" value="<?= h((string)$row['cost']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> /></td>
               <td><input type="number" step="0.01" min="0" name="item_markup[]" value="<?= h((string)$row['markup_percent']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> /></td>
-              <td><input type="number" step="0.01" min="0" name="item_price[]" value="<?= h((string)$row['unit_price']) ?>" readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);" /></td>
+              <td><input type="number" step="0.01" min="0" name="item_price[]" value="<?= h((string)$row['unit_price']) ?>"<?= invoice_readonly_attrs() ?> /></td>
               <td class="line-total" style="white-space:nowrap;">$<?= h((string)$row['line_total']) ?></td>
               <td>
                 <?php if (!$is_view_mode): ?>
@@ -483,7 +491,7 @@ render_header($invoice_heading);
       + '<td><input type="number" step="0.01" min="0.01" name="item_qty[]" value="' + defaultQty + '" /></td>'
       + '<td><input type="number" step="0.01" min="0" name="item_cost[]" value="' + defaultCost + '" /></td>'
       + '<td><input type="number" step="0.01" min="0" name="item_markup[]" value="' + defaultMarkup + '" /></td>'
-      + '<td><input type="number" step="0.01" min="0" name="item_price[]" value="' + defaultPrice + '" readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);" /></td>'
+      + '<td><input type="number" step="0.01" min="0" name="item_price[]" value="' + defaultPrice + '" readonly style="<?= h(invoice_readonly_style()) ?>" /></td>'
       + '<td class="line-total" style="white-space:nowrap;">$0.00</td>'
       + '<td><button type="button" class="btn remove-line">×</button></td>';
     lineItemsBody.appendChild(tr);
