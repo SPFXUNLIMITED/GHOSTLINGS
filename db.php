@@ -1416,6 +1416,18 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Add image columns to rfq_requests if they do not exist yet
+foreach ([
+  "ALTER TABLE rfq_requests ADD COLUMN image_path  VARCHAR(255) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN image_thumb VARCHAR(255) NULL",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    if ($e->getCode() !== '42S21') throw $e;
+  }
+}
+
 if (!function_exists('log_admin_activity')) {
   function log_admin_activity(PDO $pdo, ?int $user_id, string $action_name, string $details = '', ?string $fallback_user = null): void {
     $safe_user_id = $user_id !== null && $user_id > 0 ? $user_id : null;

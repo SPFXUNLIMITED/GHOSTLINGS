@@ -96,6 +96,8 @@ $fields = [
   'po_shipping_method' => '',
   'po_shipping_cost' => '',
   'po_total_amount' => '',
+  'image_path'  => '',
+  'image_thumb' => '',
 ];
 $profile_contact_fields = [
   'contact_name'  => '',
@@ -138,7 +140,7 @@ if ($is_edit_mode && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     "SELECT id, request_category, acquisition_purpose, urgency, buyer_name, buyer_company, buyer_email, buyer_phone,
             request_title, machine_size, laser_watts, tube_type, part_category, part_specs, quantity, required_features, additional_notes,
             po_supplier_info, po_unit_price, po_line_total, po_expected_delivery_date, po_delivery_address, po_payment_terms,
-            po_shipping_method, po_shipping_cost, po_total_amount
+            po_shipping_method, po_shipping_cost, po_total_amount, image_path, image_thumb
      FROM rfq_requests
      WHERE id = ?
      LIMIT 1"
@@ -188,6 +190,8 @@ if ($is_edit_mode && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     $fields['po_shipping_method'] = (string)($editing_rfq['po_shipping_method'] ?? '');
     $fields['po_shipping_cost'] = $editing_rfq['po_shipping_cost'] !== null ? (string)$editing_rfq['po_shipping_cost'] : '';
     $fields['po_total_amount'] = $editing_rfq['po_total_amount'] !== null ? (string)$editing_rfq['po_total_amount'] : '';
+    $fields['image_path']  = (string)($editing_rfq['image_path']  ?? '');
+    $fields['image_thumb'] = (string)($editing_rfq['image_thumb'] ?? '');
   }
 }
 
@@ -302,6 +306,105 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 
   if (!$errors) {
+    // Handle image upload
+    $new_image_path  = null;
+    $new_image_thumb = null;
+    $image_upload_error = '';
+    if (isset($_FILES['rfq_image']) && $_FILES['rfq_image']['error'] !== UPLOAD_ERR_NO_FILE) {
+      $fup = $_FILES['rfq_image'];
+      if ($fup['error'] !== UPLOAD_ERR_OK) {
+        $errors[] = 'Image upload failed (code ' . (int)$fup['error'] . ').';
+      } else {
+        $allowed_mimes = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif'];
+        $tmp_path = (string)($fup['tmp_name'] ?? '');
+        $detected_mime = '';
+        if (is_file($tmp_path) && function_exists('finfo_open')) {
+          $fi = finfo_open(FILEINFO_MIME_TYPE);
+          if ($fi) {
+            $detected_mime = (string)(finfo_file($fi, $tmp_path) ?: '');
+            finfo_close($fi);
+          }
+        }
+        if (!isset($allowed_mimes[$detected_mime])) {
+          $errors[] = 'Image must be a JPG, PNG, or GIF file.';
+        } else {
+          $uploadsDir = __DIR__ . '/uploads';
+          if (!is_dir($uploadsDir)) @mkdir($uploadsDir, 0775, true);
+          if (!is_dir($uploadsDir) || !is_writable($uploadsDir)) {
+            $errors[] = 'Uploads directory is not writable.';
+          } else {
+            $ext = $allowed_mimes[$detected_mime];
+            $base_name = 'rfq_img_' . bin2hex(random_bytes(12));
+            $stored_full  = $base_name . '.' . $ext;
+            $stored_thumb = $base_name . '_thumb.' . $ext;
+            if (!move_uploaded_file($tmp_path, $uploadsDir . '/' . $stored_full)) {
+              $errors[] = 'Failed to save uploaded image.';
+            } else {
+              // Create thumbnail (max 200×200)
+              $thumb_ok = false;
+              $src_path = $uploadsDir . '/' . $stored_full;
+              if ($detected_mime === 'image/jpeg') {
+                $src_img = @imagecreatefromjpeg($src_path);
+              } elseif ($detected_mime === 'image/png') {
+                $src_img = @imagecreatefrompng($src_path);
+              } else {
+                $src_img = @imagecreatefromgif($src_path);
+              }
+              if ($src_img !== false) {
+                $src_w = imagesx($src_img);
+                $src_h = imagesy($src_img);
+                $max_side = 200;
+                if ($src_w > $max_side || $src_h > $max_side) {
+                  $ratio = min($max_side / $src_w, $max_side / $src_h);
+                  $dst_w = (int)round($src_w * $ratio);
+                  $dst_h = (int)round($src_h * $ratio);
+                } else {
+                  $dst_w = $src_w;
+                  $dst_h = $src_h;
+                }
+                $thumb_img = imagecreatetruecolor($dst_w, $dst_h);
+                if ($thumb_img !== false) {
+                  if ($detected_mime === 'image/png') {
+                    imagealphablending($thumb_img, false);
+                    imagesavealpha($thumb_img, true);
+                    $transparent = imagecolorallocatealpha($thumb_img, 255, 255, 255, 127);
+                    imagefill($thumb_img, 0, 0, $transparent);
+                  } elseif ($detected_mime === 'image/gif') {
+                    $trans_idx = imagecolortransparent($src_img);
+                    if ($trans_idx >= 0 && $trans_idx < imagecolorstotal($src_img)) {
+                      $trans_color = imagecolorsforindex($src_img, $trans_idx);
+                      $new_trans = imagecolorallocate($thumb_img, $trans_color['red'], $trans_color['green'], $trans_color['blue']);
+                      imagefill($thumb_img, 0, 0, $new_trans);
+                      imagecolortransparent($thumb_img, $new_trans);
+                    }
+                  }
+                  imagecopyresampled($thumb_img, $src_img, 0, 0, 0, 0, $dst_w, $dst_h, $src_w, $src_h);
+                  $thumb_path = $uploadsDir . '/' . $stored_thumb;
+                  if ($detected_mime === 'image/jpeg') {
+                    $thumb_ok = imagejpeg($thumb_img, $thumb_path, 85);
+                  } elseif ($detected_mime === 'image/png') {
+                    $thumb_ok = imagepng($thumb_img, $thumb_path);
+                  } else {
+                    $thumb_ok = imagegif($thumb_img, $thumb_path);
+                  }
+                  imagedestroy($thumb_img);
+                }
+                imagedestroy($src_img);
+              }
+              // Fall back to full image as thumb if GD failed
+              if (!$thumb_ok) {
+                $stored_thumb = $stored_full;
+              }
+              $new_image_path  = $stored_full;
+              $new_image_thumb = $stored_thumb;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (!$errors) {
     $stored_request_category = $fields['request_type'] === 'PO' ? 'po' : $fields['request_category'];
     $full_request_title = $fields['request_type'] . ': ' . $fields['request_title'];
     if ($is_edit_mode) {
@@ -310,7 +413,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           request_category = ?, acquisition_purpose = ?, urgency = ?, buyer_name = ?, buyer_company = ?, buyer_email = ?, buyer_phone = ?,
           request_title = ?, machine_size = ?, laser_watts = ?, tube_type = ?, part_category = ?, part_specs = ?,
           quantity = ?, required_features = ?, additional_notes = ?, po_supplier_info = ?, po_unit_price = ?, po_line_total = ?,
-          po_expected_delivery_date = ?, po_delivery_address = ?, po_payment_terms = ?, po_shipping_method = ?, po_shipping_cost = ?, po_total_amount = ?
+          po_expected_delivery_date = ?, po_delivery_address = ?, po_payment_terms = ?, po_shipping_method = ?, po_shipping_cost = ?, po_total_amount = ?,
+          image_path = COALESCE(?, image_path), image_thumb = COALESCE(?, image_thumb)
          WHERE id = ?"
       );
       $stmt->execute([
@@ -339,6 +443,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fields['request_type'] === 'PO' ? $fields['po_shipping_method'] : null,
         $fields['request_type'] === 'PO' ? $po_shipping_cost_amount : null,
         $fields['request_type'] === 'PO' ? $po_total_amount_amount : null,
+        $new_image_path,
+        $new_image_thumb,
         $edit_rfq_id,
       ]);
       header('Location: sourcing_rfq_tracker.php');
@@ -351,9 +457,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             buyer_name, buyer_company, buyer_email, buyer_phone,
             request_title, machine_size, laser_watts, tube_type, part_category, part_specs,
             quantity, required_features, additional_notes, po_supplier_info, po_unit_price, po_line_total, po_expected_delivery_date,
-            po_delivery_address, po_payment_terms, po_shipping_method, po_shipping_cost, po_total_amount
+            po_delivery_address, po_payment_terms, po_shipping_method, po_shipping_cost, po_total_amount,
+            image_path, image_thumb
           )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
       );
       $stmt->execute([
         (int)current_user_id(),
@@ -386,6 +493,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fields['request_type'] === 'PO' ? $fields['po_shipping_method'] : null,
         $fields['request_type'] === 'PO' ? $po_shipping_cost_amount : null,
         $fields['request_type'] === 'PO' ? $po_total_amount_amount : null,
+        $new_image_path,
+        $new_image_thumb,
       ]);
 
       $new_request_id = (int)$pdo->lastInsertId();
@@ -435,7 +544,7 @@ render_alibaba_workflow_banner('create_rfq');
   </div>
 <?php endif; ?>
 
-<form method="post" class="card" novalidate>
+<form method="post" enctype="multipart/form-data" class="card" novalidate>
   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_form_csrf']) ?>" />
   <?php if ($is_edit_mode): ?>
     <input type="hidden" name="edit_rfq_id" value="<?= (int)$edit_rfq_id ?>" />
@@ -665,6 +774,39 @@ render_alibaba_workflow_banner('create_rfq');
     </div>
   </div>
 
+  <h2 class="form-section-heading">Image Attachment</h2>
+  <div class="form-grid">
+    <div class="full">
+      <label>Upload Image (JPG, PNG, GIF)</label>
+      <input type="file" name="rfq_image" id="rfq_image" accept="image/jpeg,image/png,image/gif" />
+      <div class="muted" style="margin-top:4px;">Optional. Attach a reference image for this request.</div>
+    </div>
+    <div class="full" id="rfq_image_preview_wrap" style="<?= $fields['image_thumb'] !== '' ? '' : 'display:none;' ?>">
+      <label>Image Preview</label>
+      <?php echo render_attachment_modal_assets(); ?>
+      <?php if ($fields['image_thumb'] !== '' && $is_edit_mode): ?>
+        <?php
+          $thumb_url = 'sourcing_rfq_image.php?rfq_id=' . (int)$edit_rfq_id . '&type=thumb';
+          $full_url  = 'sourcing_rfq_image.php?rfq_id=' . (int)$edit_rfq_id . '&type=full';
+        ?>
+        <button type="button"
+          class="attachment-open-link"
+          data-attachment-name="<?= h('RFQ #' . $edit_rfq_id . ' Image') ?>"
+          data-attachment-file="<?= h($full_url . '&download=1') ?>"
+          data-attachment-preview="<?= h($full_url) ?>"
+          data-attachment-previewable="1"
+          data-attachment-image="1"
+          style="padding:0; border:0; background:none; cursor:pointer;"
+          title="Click to view full-size image"
+        ><img src="<?= h($thumb_url) ?>"
+              alt="RFQ image thumbnail"
+              style="max-width:200px; max-height:200px; border-radius:6px; border:1px solid rgba(0,0,0,.12); display:block;" /></button>
+        <div class="muted" style="margin-top:4px;">Click the thumbnail to view the full image. Upload a new file above to replace it.</div>
+      <?php endif; ?>
+      <div id="rfq_image_js_preview"></div>
+    </div>
+  </div>
+
   <div class="row" style="margin-top:18px;">
     <button type="submit" class="btn primary"><?= $is_edit_mode ? 'Save Changes' : 'Submit Request' ?></button>
     <?php if (!$is_edit_mode): ?>
@@ -817,6 +959,50 @@ render_alibaba_workflow_banner('create_rfq');
     if (unitPriceField) unitPriceField.addEventListener('input', recalcLineTotal);
     if (quantityField)  quantityField.addEventListener('input', recalcLineTotal);
     recalcLineTotal();
+
+    // Client-side image preview on file select
+    var rfqImageInput   = document.getElementById('rfq_image');
+    var rfqPreviewWrap  = document.getElementById('rfq_image_preview_wrap');
+    var rfqJsPreview    = document.getElementById('rfq_image_js_preview');
+    if (rfqImageInput && rfqPreviewWrap && rfqJsPreview) {
+      rfqImageInput.addEventListener('change', function () {
+        var file = rfqImageInput.files && rfqImageInput.files[0];
+        rfqJsPreview.innerHTML = '';
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function (e) {
+          rfqPreviewWrap.style.display = '';
+          var img = document.createElement('img');
+          img.src = e.target.result;
+          img.alt = 'Selected image preview';
+          img.style.cssText = 'max-width:200px; max-height:200px; border-radius:6px; border:1px solid rgba(0,0,0,.12); display:block; margin-top:6px;';
+          rfqJsPreview.appendChild(img);
+          // Make the JS preview clickable using the attachment modal if available
+          img.style.cursor = 'pointer';
+          img.title = 'Click to view full size';
+          img.addEventListener('click', function () {
+            var modal = document.getElementById('attachmentPreviewModal');
+            var modalTitle = document.getElementById('attachmentModalTitle');
+            var modalBody  = document.getElementById('attachmentModalBody');
+            var modalDownload = document.getElementById('attachmentModalDownload');
+            if (!modal || !modalTitle || !modalBody) {
+              window.open(e.target.result, '_blank');
+              return;
+            }
+            modalTitle.textContent = file.name || 'Image Preview';
+            modalBody.innerHTML = '';
+            var fullImg = document.createElement('img');
+            fullImg.src = e.target.result;
+            fullImg.alt = file.name || 'Image';
+            modalBody.appendChild(fullImg);
+            if (modalDownload) modalDownload.style.display = 'none';
+            modal.classList.add('open');
+            modal.setAttribute('aria-hidden', 'false');
+          });
+        };
+        reader.readAsDataURL(file);
+      });
+    }
   })();
 </script>
 
