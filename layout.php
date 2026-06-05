@@ -318,7 +318,29 @@ function is_menu_item_active(array $item, string $current): bool {
     return false;
   }
 
-  return in_array($current, (array)$files, true);
+  if (!in_array($current, (array)$files, true)) {
+    return false;
+  }
+
+  $href = (string)($item['href'] ?? '');
+  $href_query = parse_url($href, PHP_URL_QUERY);
+  if ($href_query === null || $href_query === '') {
+    return true;
+  }
+
+  $item_query = [];
+  parse_str($href_query, $item_query);
+
+  $current_query = [];
+  parse_str((string)($_SERVER['QUERY_STRING'] ?? ''), $current_query);
+
+  foreach ($item_query as $key => $value) {
+    if (!array_key_exists($key, $current_query) || (string)$current_query[$key] !== (string)$value) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function render_menu_link(array $item, string $current): void {
@@ -530,8 +552,8 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
       ['type' => 'section', 'label' => 'Quotes'],
       ['href' => 'quotes.php?view=new', 'file' => 'quotes.php', 'label' => 'Quote Form'],
       ['href' => 'quotes.php?view=all', 'file' => 'quotes.php', 'label' => 'Quote Tracker'],
-      ['href' => 'quotes.php?view=all', 'file' => 'quotes.php', 'label' => 'Invoice Form'],
-      ['href' => 'quotes.php?view=all', 'file' => 'quotes.php', 'label' => 'Invoice Tracker'],
+      ['href' => 'invoice_form.php', 'file' => 'invoice_form.php', 'label' => 'Invoice Form'],
+      ['href' => 'invoice_tracker.php', 'file' => 'invoice_tracker.php', 'label' => 'Invoice Tracker'],
       ['type' => 'separator'],
       ['type' => 'section', 'label' => 'RFQs'],
       ['href' => 'sourcing_rfq_form.php', 'file' => 'sourcing_rfq_form.php', 'label' => 'RFQ Form'],
