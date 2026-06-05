@@ -19,6 +19,7 @@ $is_edit     = $edit_id > 0;
 $order_id    = max(0, (int)(($_SERVER['REQUEST_METHOD'] === 'POST') ? ($_POST['order_id'] ?? 0) : ($_GET['order_id'] ?? 0)));
 $prefill_order = null;
 const MAX_REQUEST_TITLE_LENGTH = 255;
+const REQUEST_TITLE_ELLIPSIS = '...';
 
 // China ports of loading (common ones)
 $china_ports = [
@@ -155,14 +156,14 @@ if ($is_edit && $_SERVER['REQUEST_METHOD'] !== 'POST') {
         }
 
         $prefill_method = trim((string)($prefill_order['shipping_method'] ?? ''));
-        if (stripos($prefill_method, 'FCL') !== false) {
+        if (preg_match('/\bFCL\b/i', $prefill_method) === 1) {
           $fields['shipment_type'] = 'FCL';
-        } elseif (stripos($prefill_method, 'LCL') !== false) {
+        } elseif (preg_match('/\bLCL\b/i', $prefill_method) === 1) {
           $fields['shipment_type'] = 'LCL';
         }
 
-        $po_number = trim((string)($prefill_order['po_number'] ?? ''));
-        $supplier_name = trim((string)($prefill_order['supplier_name'] ?? ''));
+        $po_number = trim(strip_tags((string)($prefill_order['po_number'] ?? '')));
+        $supplier_name = trim(strip_tags((string)($prefill_order['supplier_name'] ?? '')));
         $model_name = trim((string)($prefill_order['model_name'] ?? ''));
 
         if ($po_number !== '') {
@@ -174,7 +175,8 @@ if ($is_edit && $_SERVER['REQUEST_METHOD'] !== 'POST') {
           $fields['request_title'] .= ' (' . $supplier_name . ')';
         }
         if (mb_strlen($fields['request_title']) > MAX_REQUEST_TITLE_LENGTH) {
-          $fields['request_title'] = mb_substr($fields['request_title'], 0, MAX_REQUEST_TITLE_LENGTH);
+          $trimmed_length = MAX_REQUEST_TITLE_LENGTH - mb_strlen(REQUEST_TITLE_ELLIPSIS);
+          $fields['request_title'] = rtrim(mb_substr($fields['request_title'], 0, $trimmed_length)) . REQUEST_TITLE_ELLIPSIS;
         }
 
         if ($model_name !== '') {
