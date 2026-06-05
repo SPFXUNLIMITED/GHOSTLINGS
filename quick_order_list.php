@@ -46,6 +46,129 @@ function quick_order_notes_preview(?string $notes, int $max_length = 120): strin
     : $notes;
 }
 
+function quick_order_split_name(string $customer_name): array {
+  $customer_name = trim($customer_name);
+  if ($customer_name === '') {
+    return ['', ''];
+  }
+
+  $parts = preg_split('/\s+/', $customer_name);
+  if (!is_array($parts) || !$parts) {
+    return [$customer_name, ''];
+  }
+
+  $first_name = trim((string)array_shift($parts));
+  $last_name = trim(implode(' ', $parts));
+  return [$first_name, $last_name];
+}
+
+function quick_order_resolve_customer_id(PDO $pdo, array $fields): ?int {
+  $posted_customer_id = trim((string)($fields['customer_id'] ?? ''));
+  if ($posted_customer_id !== '') {
+    $customer_id = (int)$posted_customer_id;
+    if ($customer_id > 0) {
+      $stmt = $pdo->prepare("SELECT id FROM customers WHERE id = ? LIMIT 1");
+      $stmt->execute([$customer_id]);
+      if ((int)$stmt->fetchColumn() > 0) {
+        return $customer_id;
+      }
+    }
+    return null;
+  }
+
+  $scores = [];
+  $matchers = [];
+  $customer_name = trim((string)($fields['customer_name'] ?? ''));
+  if ($customer_name !== '') {
+    $matchers[] = [
+      "SELECT id FROM customers WHERE TRIM(CONCAT_WS(' ', NULLIF(first_name, ''), NULLIF(last_name, ''))) = ? LIMIT 25",
+      $customer_name,
+    ];
+  }
+  $company_name = trim((string)($fields['company_name'] ?? ''));
+  if ($company_name !== '') {
+    $matchers[] = ["SELECT id FROM customers WHERE company = ? LIMIT 25", $company_name];
+  }
+  $email = trim((string)($fields['email'] ?? ''));
+  if ($email !== '') {
+    $matchers[] = ["SELECT id FROM customers WHERE email = ? LIMIT 25", $email];
+  }
+  $phone_number = trim((string)($fields['phone_number'] ?? ''));
+  if ($phone_number !== '') {
+    $matchers[] = ["SELECT id FROM customers WHERE phone = ? LIMIT 25", $phone_number];
+  }
+
+  foreach ($matchers as [$sql, $value]) {
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$value]);
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+      $id = (int)($row['id'] ?? 0);
+      if ($id > 0) {
+        $scores[$id] = ($scores[$id] ?? 0) + 1;
+      }
+    }
+  }
+
+  if (!$scores) {
+    return null;
+  }
+
+  arsort($scores);
+  $top_score = (int)reset($scores);
+  $top_ids = array_keys(array_filter($scores, static fn($score): bool => (int)$score === $top_score));
+  if (count($top_ids) !== 1) {
+    return null;
+  }
+  return (int)$top_ids[0];
+}
+
+function quick_order_backfill_customer(PDO $pdo, ?int $customer_id, array $fields): void {
+  if ($customer_id === null || $customer_id <= 0) {
+    return;
+  }
+
+  $stmt = $pdo->prepare("SELECT first_name, last_name, company, phone, email FROM customers WHERE id = ? LIMIT 1");
+  $stmt->execute([$customer_id]);
+  $row = $stmt->fetch(PDO::FETCH_ASSOC);
+  if (!$row) {
+    return;
+  }
+
+  $updates = [];
+  $params = [];
+
+  if (trim((string)($row['company'] ?? '')) === '' && trim((string)($fields['company_name'] ?? '')) !== '') {
+    $updates[] = "company = ?";
+    $params[] = trim((string)$fields['company_name']);
+  }
+  if (trim((string)($row['phone'] ?? '')) === '' && trim((string)($fields['phone_number'] ?? '')) !== '') {
+    $updates[] = "phone = ?";
+    $params[] = trim((string)$fields['phone_number']);
+  }
+  if (trim((string)($row['email'] ?? '')) === '' && trim((string)($fields['email'] ?? '')) !== '') {
+    $updates[] = "email = ?";
+    $params[] = trim((string)$fields['email']);
+  }
+
+  if (trim((string)($row['first_name'] ?? '')) === '' && trim((string)($row['last_name'] ?? '')) === '' && trim((string)($fields['customer_name'] ?? '')) !== '') {
+    [$first_name, $last_name] = quick_order_split_name((string)$fields['customer_name']);
+    if ($first_name !== '' || $last_name !== '') {
+      $updates[] = "first_name = ?";
+      $params[] = $first_name;
+      $updates[] = "last_name = ?";
+      $params[] = $last_name;
+    }
+  }
+
+  if (!$updates) {
+    return;
+  }
+
+  $params[] = $customer_id;
+  $upd = $pdo->prepare("UPDATE customers SET " . implode(', ', $updates) . " WHERE id = ?");
+  $upd->execute($params);
+}
+
 if (empty($_SESSION['quick_order_csrf'])) {
   $_SESSION['quick_order_csrf'] = bin2hex(random_bytes(24));
 }
@@ -97,6 +220,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
 $today = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Y-m-d');
 $errors = [];
 $fields = [
+  'customer_id' => '',
   'customer_name' => '',
   'company_name' => '',
   'phone_number' => '',
@@ -201,11 +325,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
      if ($fields['email'] !== '' && !filter_var($fields['email'], FILTER_VALIDATE_EMAIL)) {
        $errors[] = 'Please enter a valid email address.';
      }
-     if ($fields['notes'] !== '' && strlen($fields['notes']) > MAX_NOTES_LENGTH) {
-       $errors[] = 'Notes must be ' . MAX_NOTES_LENGTH . ' characters or fewer.';
+    if ($fields['customer_id'] !== '' && (int)$fields['customer_id'] <= 0) {
+      $errors[] = 'Invalid customer selected.';
      }
+    if ($fields['notes'] !== '' && strlen($fields['notes']) > MAX_NOTES_LENGTH) {
+      $errors[] = 'Notes must be ' . MAX_NOTES_LENGTH . ' characters or fewer.';
+    }
 
     if (!$errors) {
+      $matched_customer_id = quick_order_resolve_customer_id($pdo, $fields);
       if ($edit_id !== null) {
         // Update existing record
         $upd = $pdo->prepare(
@@ -223,6 +351,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $fields['notes'] !== '' ? $fields['notes'] : null,
           $edit_id,
         ]);
+        quick_order_backfill_customer($pdo, $matched_customer_id, $fields);
         try {
           $actor_id = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
           if ($actor_id !== null && $actor_id <= 0) {
@@ -261,6 +390,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $fields['notes'] !== '' ? $fields['notes'] : null,
           $created_by,
         ]);
+        quick_order_backfill_customer($pdo, $matched_customer_id, $fields);
         $new_id = (int)$pdo->lastInsertId();
         try {
           $actor_name = isset($_SESSION['username']) ? trim((string)$_SESSION['username']) : '';
@@ -514,6 +644,7 @@ render_header($page_title);
       <div style="position:relative;">
         <label for="customer_name">Customer Name <span style="color:var(--d)">*</span></label>
         <input id="customer_name" type="text" name="customer_name" maxlength="255" required autocomplete="off" value="<?= h($fields['customer_name']) ?>" />
+        <input id="customer_id" type="hidden" name="customer_id" value="<?= h($fields['customer_id']) ?>" />
         <div id="customerSuggestions" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:40; background:#fff; border:1px solid #d1d5db; border-radius:10px; box-shadow:0 12px 24px rgba(2,6,23,.12); margin-top:6px; max-height:220px; overflow:auto;"></div>
       </div>
       <div>
@@ -545,6 +676,7 @@ render_header($page_title);
   <script>
     (() => {
       const customerNameInput = document.getElementById('customer_name');
+      const customerIdInput = document.getElementById('customer_id');
       const companyInput = document.getElementById('company_name');
       const phoneInput = document.getElementById('phone_number');
       const emailInput = document.getElementById('email');
@@ -588,6 +720,7 @@ render_header($page_title);
           btn.appendChild(meta);
           btn.addEventListener('click', () => {
             customerNameInput.value = row.customer_name || '';
+            customerIdInput.value = row.id || '';
             companyInput.value = rowCompany;
             phoneInput.value = rowPhone;
             emailInput.value = rowEmail;
@@ -600,6 +733,7 @@ render_header($page_title);
       }
 
       customerNameInput.addEventListener('input', () => {
+        customerIdInput.value = '';
         const q = customerNameInput.value.trim();
         if (debounceTimer) {
           clearTimeout(debounceTimer);
