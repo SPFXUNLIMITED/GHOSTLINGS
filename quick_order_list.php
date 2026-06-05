@@ -68,16 +68,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
 
   $like = '%' . quick_order_escape_like($query) . '%';
   $stmt = $pdo->prepare(
-    "SELECT id, customer_name, company, phone, email
+    "SELECT
+       id,
+       COALESCE(
+         NULLIF(TRIM(CONCAT_WS(' ', NULLIF(first_name, ''), NULLIF(last_name, ''))), ''),
+         NULLIF(company, ''),
+         NULLIF(email, ''),
+         ''
+       ) AS customer_name,
+       company,
+       phone,
+       email
      FROM customers
-     WHERE customer_name LIKE ? ESCAPE '\\\\'
+     WHERE first_name LIKE ? ESCAPE '\\\\'
+        OR last_name LIKE ? ESCAPE '\\\\'
+        OR CONCAT_WS(' ', first_name, last_name) LIKE ? ESCAPE '\\\\'
         OR company LIKE ? ESCAPE '\\\\'
         OR email LIKE ? ESCAPE '\\\\'
+        OR phone LIKE ? ESCAPE '\\\\'
      ORDER BY customer_name ASC, id DESC
      LIMIT 8"
   );
-  $stmt->execute([$like, $like, $like]);
-  echo json_encode($stmt->fetchAll(), JSON_UNESCAPED_UNICODE);
+  $stmt->execute([$like, $like, $like, $like, $like, $like]);
+  echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC), JSON_UNESCAPED_UNICODE);
   exit;
 }
 
@@ -551,6 +564,9 @@ render_header($page_title);
         }
 
         rows.forEach((row) => {
+          const rowCompany = row.company || '';
+          const rowPhone = row.phone || row.phone_number || row.contact_phone || '';
+          const rowEmail = row.email || row.contact_email || '';
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'btn';
@@ -568,13 +584,13 @@ render_header($page_title);
           const meta = document.createElement('div');
           meta.className = 'muted';
           meta.style.marginTop = '3px';
-          meta.textContent = (row.company || '—') + ' • ' + (row.phone || '—') + ' • ' + (row.email || '—');
+          meta.textContent = (rowCompany || '—') + ' • ' + (rowPhone || '—') + ' • ' + (rowEmail || '—');
           btn.appendChild(meta);
           btn.addEventListener('click', () => {
             customerNameInput.value = row.customer_name || '';
-            companyInput.value = row.company || '';
-            phoneInput.value = row.phone || '';
-            emailInput.value = row.email || '';
+            companyInput.value = rowCompany;
+            phoneInput.value = rowPhone;
+            emailInput.value = rowEmail;
             hideSuggestions();
           });
           suggestions.appendChild(btn);
