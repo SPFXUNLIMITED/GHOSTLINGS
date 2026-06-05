@@ -1108,8 +1108,12 @@ render_header('Sourcing RFQ Tracker');
             <tr>
               <td>
                 <?php
-                  $has_rfq_image = (string)($r['image_thumb'] ?? '') !== '' || (string)($r['image_path'] ?? '') !== '';
-                  $thumb_url = $has_rfq_image ? 'sourcing_rfq_image.php?rfq_id=' . (int)$r['id'] . '&type=thumb' : '';
+                  $has_thumb_image = (string)($r['image_thumb'] ?? '') !== '';
+                  $has_full_image = (string)($r['image_path'] ?? '') !== '';
+                  $has_rfq_image = $has_thumb_image || $has_full_image;
+                  $thumb_url = $has_rfq_image
+                    ? 'sourcing_rfq_image.php?rfq_id=' . (int)$r['id'] . '&type=' . ($has_thumb_image ? 'thumb' : 'full')
+                    : '';
                   $full_url = $has_rfq_image ? 'sourcing_rfq_image.php?rfq_id=' . (int)$r['id'] . '&type=full' : '';
                 ?>
                 <?php if ($has_rfq_image): ?>
