@@ -143,9 +143,13 @@ if (!in_array($view, ['all', 'id', 'new'], true)) {
   $view = 'all';
 }
 
-$show_new = $view === 'new';
-$show_all = $view === 'all';
 $detail_id = $view === 'id' ? (int)($_GET['id'] ?? 0) : 0;
+if ($view === 'id' && $detail_id <= 0) {
+  $view = 'all';
+  $detail_id = 0;
+}
+
+$show_new_form = $view === 'new';
 $show_detail = $view === 'id' && $detail_id > 0;
 $saved = isset($_GET['saved']) && $_GET['saved'] === '1';
 $updated = isset($_GET['updated']) && $_GET['updated'] === '1';
@@ -183,6 +187,9 @@ if ($raw_edit !== null && (int)$raw_edit > 0) {
         ];
       }
     }
+
+    $show_all = $view === 'all' && $edit_id === null;
+    $show_form = $show_new_form || $edit_id !== null;
   }
 }
 
@@ -644,7 +651,7 @@ render_header('Quotes');
     </table>
   </div>
 
-<?php else: ?>
+<?php elseif ($show_form): ?>
   <form method="post" class="card" style="max-width:1100px; position:relative;">
     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
     <?php if ($edit_id !== null): ?>
