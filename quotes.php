@@ -35,6 +35,39 @@ function quote_mail_domain(): string {
   return 'localhost';
 }
 
+function quote_is_development(): bool {
+  $env_values = [
+    getenv('APP_ENV'),
+    getenv('APPLICATION_ENV'),
+    $_ENV['APP_ENV'] ?? null,
+    $_SERVER['APP_ENV'] ?? null,
+  ];
+  foreach ($env_values as $value) {
+    $env = strtolower(trim((string)$value));
+    if ($env === '') {
+      continue;
+    }
+    if (in_array($env, ['dev', 'development', 'local', 'test', 'testing'], true)) {
+      return true;
+    }
+    if (in_array($env, ['prod', 'production'], true)) {
+      return false;
+    }
+  }
+
+  $host = strtolower(trim((string)($_SERVER['SERVER_NAME'] ?? $_SERVER['HTTP_HOST'] ?? '')));
+  if ($host === '') {
+    return false;
+  }
+
+  $host = preg_replace('/:\d+$/', '', $host);
+  if ($host === 'localhost' || $host === '127.0.0.1' || $host === '::1') {
+    return true;
+  }
+
+  return preg_match('/(\.local|\.test)$/', $host) === 1;
+}
+
 function quote_escape_like(string $value, string $escape = '\\'): string {
   return str_replace(
     [$escape, '%', '_'],
@@ -564,8 +597,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           }
           exit;
         } catch (Throwable $e) {
-          $pdo->rollBack();
-          $errors[] = 'Unable to save quote right now. Please try again.';
+          if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+          }
+          error_log('Failed to save quote: ' . $e->getMessage());
+          if ($e instanceof PDOException && quote_is_development()) {
+            $errors[] = 'Database error: ' . $e->getMessage();
+          } else {
+            $errors[] = 'Unable to save quote right now. Please try again.';
+          }
         }
       }
     }
