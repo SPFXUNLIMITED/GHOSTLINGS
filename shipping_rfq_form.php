@@ -321,7 +321,7 @@ render_header($is_edit ? ('Edit Shipping RFQ #' . $edit_id) : 'Shipping Form');
     <h1><?= $is_edit ? ('Edit Shipping RFQ #' . (int)$edit_id) : 'Shipping Form' ?></h1>
     <p class="muted">
       <?= $is_edit
-        ? 'Update the shipping RFQ request details below.'
+        ? 'Update the shipping request details below.'
         : 'Request freight shipping quotes for machines or cargo from China to Los Angeles (port or door delivery).' ?>
     </p>
   </div>
