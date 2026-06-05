@@ -310,7 +310,7 @@ $fields = [
   'notes' => '',
 ];
 $line_items = [
-  ['description' => '', 'quantity' => '1', 'unit_price' => '0.00'],
+  ['description' => '', 'quantity' => '1', 'cost' => '0.00', 'markup_percent' => '20', 'unit_price' => '0.00'],
 ];
 
 $view = (string)($_GET['view'] ?? 'all');
@@ -349,16 +349,18 @@ if ($raw_edit !== null && (int)$raw_edit > 0) {
     $fields['quote_date'] = (string)($edit_record['quote_date'] ?? $today);
     $fields['notes'] = (string)($edit_record['notes'] ?? '');
 
-    $item_stmt = $pdo->prepare("SELECT description, quantity, unit_price FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC");
+    $item_stmt = $pdo->prepare("SELECT description, quantity, cost, markup_percent, unit_price FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC");
     $item_stmt->execute([$edit_id]);
     $rows = $item_stmt->fetchAll();
     if ($rows) {
       $line_items = [];
       foreach ($rows as $row) {
         $line_items[] = [
-          'description' => (string)$row['description'],
-          'quantity' => quote_format_money($row['quantity']),
-          'unit_price' => quote_format_money($row['unit_price']),
+          'description'    => (string)$row['description'],
+          'quantity'       => quote_format_money($row['quantity']),
+          'cost'           => quote_format_money($row['cost']),
+          'markup_percent' => number_format((float)$row['markup_percent'], 2),
+          'unit_price'     => quote_format_money($row['unit_price']),
         ];
       }
     }
@@ -463,20 +465,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       $posted_desc = $_POST['item_desc'] ?? [];
       $posted_qty = $_POST['item_qty'] ?? [];
+      $posted_cost = $_POST['item_cost'] ?? [];
+      $posted_markup = $_POST['item_markup'] ?? [];
       $posted_price = $_POST['item_price'] ?? [];
-      if (!is_array($posted_desc) || !is_array($posted_qty) || !is_array($posted_price)) {
+      if (!is_array($posted_desc) || !is_array($posted_qty) || !is_array($posted_cost) || !is_array($posted_markup) || !is_array($posted_price)) {
         $errors[] = 'Line item data is invalid.';
-      } elseif (count($posted_desc) !== count($posted_qty) || count($posted_desc) !== count($posted_price)) {
+      } elseif (count($posted_desc) !== count($posted_qty) || count($posted_desc) !== count($posted_cost) || count($posted_desc) !== count($posted_markup) || count($posted_desc) !== count($posted_price)) {
         $errors[] = 'Line item data is malformed. Please reload and try again.';
       } else {
         $line_items = [];
-        $line_count = min(count($posted_desc), count($posted_qty), count($posted_price), QUOTE_MAX_LINE_ITEMS);
+        $line_count = min(count($posted_desc), count($posted_qty), count($posted_cost), count($posted_markup), QUOTE_MAX_LINE_ITEMS);
         for ($i = 0; $i < $line_count; $i++) {
           $desc = trim((string)$posted_desc[$i]);
           $qty_raw = trim((string)$posted_qty[$i]);
-          $price_raw = trim((string)$posted_price[$i]);
+          $cost_raw = trim((string)$posted_cost[$i]);
+          $markup_raw = trim((string)$posted_markup[$i]);
 
-          if ($desc === '' && $qty_raw === '' && $price_raw === '') {
+          if ($desc === '' && $qty_raw === '' && $cost_raw === '' && $markup_raw === '') {
             continue;
           }
 
@@ -488,18 +493,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Each line item quantity must be greater than 0.';
             continue;
           }
-          if (!is_numeric($price_raw) || (float)$price_raw < 0) {
-            $errors[] = 'Each line item price must be 0 or greater.';
+          if (!is_numeric($cost_raw) || (float)$cost_raw < 0) {
+            $errors[] = 'Each line item cost must be 0 or greater.';
+            continue;
+          }
+          if (!is_numeric($markup_raw) || (float)$markup_raw < 0) {
+            $errors[] = 'Each line item markup must be 0 or greater.';
             continue;
           }
 
           $qty = round((float)$qty_raw, 2);
-          $price = round((float)$price_raw, 2);
+          $cost = round((float)$cost_raw, 2);
+          $markup = round((float)$markup_raw, 2);
+          $price = round($cost * (1 + $markup / 100), 2);
           $line_items[] = [
-            'description' => $desc,
-            'quantity' => $qty,
-            'unit_price' => $price,
-            'line_total' => round($qty * $price, 2),
+            'description'    => $desc,
+            'quantity'       => $qty,
+            'cost'           => $cost,
+            'markup_percent' => $markup,
+            'unit_price'     => $price,
+            'line_total'     => round($qty * $price, 2),
           ];
         }
 
@@ -569,8 +582,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           quote_backfill_customer($pdo, $customer_id, $fields);
 
           $item_ins = $pdo->prepare(
-            "INSERT INTO quote_items (quote_id, line_position, description, quantity, unit_price, line_total)
-             VALUES (?, ?, ?, ?, ?, ?)"
+            "INSERT INTO quote_items (quote_id, line_position, description, quantity, cost, markup_percent, unit_price, line_total)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
           );
           $position = 1;
           foreach ($line_items as $row) {
@@ -579,6 +592,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $position,
               $row['description'],
               $row['quantity'],
+              $row['cost'],
+              $row['markup_percent'],
               $row['unit_price'],
               $row['line_total'],
             ]);
@@ -730,9 +745,11 @@ render_header('Quotes');
         <tr>
           <th style="width:60px;">#</th>
           <th>Description</th>
-          <th style="width:140px;">Qty</th>
-          <th style="width:160px;">Price</th>
-          <th style="width:170px;">Line Total</th>
+          <th style="width:100px;">Qty</th>
+          <th style="width:130px;">Cost</th>
+          <th style="width:110px;">Markup %</th>
+          <th style="width:130px;">Price</th>
+          <th style="width:150px;">Line Total</th>
         </tr>
       </thead>
       <tbody>
@@ -741,6 +758,8 @@ render_header('Quotes');
             <td><?= (int)$idx + 1 ?></td>
             <td><?= h((string)$item['description']) ?></td>
             <td><?= h(quote_format_money($item['quantity'])) ?></td>
+            <td>$<?= h(quote_format_money($item['cost'] ?? 0)) ?></td>
+            <td><?= h(number_format((float)($item['markup_percent'] ?? 20), 2)) ?>%</td>
             <td>$<?= h(quote_format_money($item['unit_price'])) ?></td>
             <td><strong>$<?= h(quote_format_money($item['line_total'])) ?></strong></td>
           </tr>
@@ -854,13 +873,15 @@ render_header('Quotes');
     </div>
 
     <div style="margin-top:16px; overflow-x:auto;">
-      <table style="min-width:760px;" id="lineItemsTable">
+      <table style="min-width:900px;" id="lineItemsTable">
         <thead>
           <tr>
             <th>Description</th>
-            <th style="width:140px;">Qty</th>
-            <th style="width:160px;">Price</th>
-            <th style="width:170px;">Line Total</th>
+            <th style="width:100px;">Qty</th>
+            <th style="width:130px;">Cost</th>
+            <th style="width:110px;">Markup %</th>
+            <th style="width:130px;">Price</th>
+            <th style="width:150px;">Line Total</th>
             <th style="width:90px;">Remove</th>
           </tr>
         </thead>
@@ -869,7 +890,9 @@ render_header('Quotes');
             <tr class="line-item-row">
               <td><input type="text" name="item_desc[]" maxlength="500" value="<?= h((string)$row['description']) ?>" /></td>
               <td><input type="number" step="0.01" min="0.01" name="item_qty[]" value="<?= h((string)$row['quantity']) ?>" /></td>
-              <td><input type="number" step="0.01" min="0" name="item_price[]" value="<?= h((string)$row['unit_price']) ?>" /></td>
+              <td><input type="number" step="0.01" min="0" name="item_cost[]" value="<?= h((string)$row['cost']) ?>" /></td>
+              <td><input type="number" step="0.01" min="0" name="item_markup[]" value="<?= h((string)$row['markup_percent']) ?>" /></td>
+              <td><input type="number" step="0.01" min="0" name="item_price[]" value="<?= h((string)$row['unit_price']) ?>" readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);" /></td>
               <td class="line-total" style="white-space:nowrap;">$0.00</td>
               <td><button type="button" class="btn remove-line">×</button></td>
             </tr>
@@ -994,9 +1017,15 @@ render_header('Quotes');
         let subtotal = 0;
         Array.from(lineItemsBody.querySelectorAll('tr.line-item-row')).forEach((row) => {
           const qtyInput = row.querySelector('input[name="item_qty[]"]');
+          const costInput = row.querySelector('input[name="item_cost[]"]');
+          const markupInput = row.querySelector('input[name="item_markup[]"]');
           const priceInput = row.querySelector('input[name="item_price[]"]');
           const lineTotalCell = row.querySelector('.line-total');
-          const lineTotal = parseNumber(qtyInput?.value) * parseNumber(priceInput?.value);
+          const cost = parseNumber(costInput?.value);
+          const markup = parseNumber(markupInput?.value);
+          const price = cost * (1 + markup / 100);
+          if (priceInput) { priceInput.value = price.toFixed(2); }
+          const lineTotal = parseNumber(qtyInput?.value) * price;
           subtotal += lineTotal;
           lineTotalCell.textContent = '$' + lineTotal.toFixed(2);
         });
@@ -1013,6 +1042,8 @@ render_header('Quotes');
           if (lineItemsBody.querySelectorAll('tr.line-item-row').length <= 1) {
             row.querySelector('input[name="item_desc[]"]').value = '';
             row.querySelector('input[name="item_qty[]"]').value = '1';
+            row.querySelector('input[name="item_cost[]"]').value = '0.00';
+            row.querySelector('input[name="item_markup[]"]').value = '20';
             row.querySelector('input[name="item_price[]"]').value = '0.00';
           } else {
             row.remove();
@@ -1026,7 +1057,9 @@ render_header('Quotes');
         tr.className = 'line-item-row';
         tr.innerHTML = '<td><input type="text" name="item_desc[]" maxlength="500" /></td>'
           + '<td><input type="number" step="0.01" min="0.01" name="item_qty[]" value="1" /></td>'
-          + '<td><input type="number" step="0.01" min="0" name="item_price[]" value="0.00" /></td>'
+          + '<td><input type="number" step="0.01" min="0" name="item_cost[]" value="0.00" /></td>'
+          + '<td><input type="number" step="0.01" min="0" name="item_markup[]" value="20" /></td>'
+          + '<td><input type="number" step="0.01" min="0" name="item_price[]" value="0.00" readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);" /></td>'
           + '<td class="line-total" style="white-space:nowrap;">$0.00</td>'
           + '<td><button type="button" class="btn remove-line">×</button></td>';
         lineItemsBody.appendChild(tr);
