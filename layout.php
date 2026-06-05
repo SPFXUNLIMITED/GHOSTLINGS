@@ -678,7 +678,7 @@ function render_alibaba_workflow_banner(string $current_step = 'create_rfq'): vo
       'url'         => 'order_tracker.php?status=vendor_produces_machine',
     ],
     'shipping' => [
-      'label'       => 'Shipping',
+      'label'       => 'Freight Quote',
       'instruction' => 'The order is in transit. Track shipment progress and required logistics documents.',
       'url'         => 'shipping_rfq_form.php',
     ],
