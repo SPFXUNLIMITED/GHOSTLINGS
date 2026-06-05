@@ -458,7 +458,7 @@ if ($show_detail) {
     exit;
   }
 }
-$page_title = ($show_all || $show_detail) ? 'Quick Order List' : 'Quick Order';
+$page_title = ($show_all || $show_detail) ? 'Quick Order Tracker' : 'Quick Order Form';
 render_header($page_title);
 ?>
 
