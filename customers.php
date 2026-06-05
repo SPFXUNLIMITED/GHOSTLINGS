@@ -17,6 +17,7 @@ if (empty($_SESSION['customers_sync_csrf'])) {
 $errors = [];
 $success = '';
 $customer_table_columns = 6;
+$customers_per_page = 50;
 
 function hubspot_token(PDO $pdo): string {
   $token = app_env_value('HUBSPOT_PRIVATE_APP_TOKEN');
@@ -211,18 +212,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 }
 
-$customers = $pdo->query(
-  "SELECT first_name, last_name, company, phone, email, last_updated, updated_at
-   FROM customers
-   ORDER BY (last_updated IS NULL) ASC, last_updated DESC, updated_at DESC, id DESC"
-)->fetchAll();
+$search = trim((string)($_GET['q'] ?? ''));
+$page = max(1, (int)($_GET['page'] ?? 1));
+$where_sql = '';
+
+$count_stmt = null;
+if ($search !== '') {
+  $where_sql = "WHERE first_name LIKE :q OR last_name LIKE :q OR company LIKE :q OR CONCAT(TRIM(first_name), ' ', TRIM(last_name)) LIKE :q";
+  $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM customers $where_sql");
+  $count_stmt->bindValue(':q', '%' . $search . '%', PDO::PARAM_STR);
+  $count_stmt->execute();
+  $customer_total = (int)$count_stmt->fetchColumn();
+} else {
+  $customer_total = (int)$pdo->query("SELECT COUNT(*) FROM customers")->fetchColumn();
+}
+
+$total_pages = max(1, (int)ceil($customer_total / $customers_per_page));
+$page = min($page, $total_pages);
+$offset = ($page - 1) * $customers_per_page;
+
+$data_sql = "SELECT first_name, last_name, company, phone, email, last_updated, updated_at
+             FROM customers
+             $where_sql
+             ORDER BY (last_updated IS NULL) ASC, last_updated DESC, updated_at DESC, id DESC
+             LIMIT :limit OFFSET :offset";
+$data_stmt = $pdo->prepare($data_sql);
+if ($search !== '') {
+  $data_stmt->bindValue(':q', '%' . $search . '%', PDO::PARAM_STR);
+}
+$data_stmt->bindValue(':limit', $customers_per_page, PDO::PARAM_INT);
+$data_stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+$data_stmt->execute();
+$customers = $data_stmt->fetchAll();
+
+$showing_from = $customer_total > 0 ? ($offset + 1) : 0;
+$showing_to = min($offset + count($customers), $customer_total);
 
 render_header('Customers');
 ?>
 
 <div class="card page-header">
   <div class="page-header-body">
-    <h1>Customers</h1>
+    <h1>Customers <span class="muted" style="font-size:0.7em; font-weight:400;">(<?= (int)$customer_total ?>)</span></h1>
     <p class="muted">Sync and view HubSpot customer contacts.</p>
   </div>
   <form method="post" style="margin:0;">
@@ -245,6 +276,27 @@ render_header('Customers');
   </div>
 <?php endif; ?>
 
+<div class="card">
+  <form method="get" action="customers.php" class="row" style="margin-bottom:4px;" role="search">
+    <input
+      type="text"
+      name="q"
+      value="<?= h($search) ?>"
+      placeholder="Search by customer name or company…"
+      aria-label="Search customers by name or company"
+      style="max-width:360px;"
+    />
+    <button type="submit" class="btn">Search</button>
+    <?php if ($search !== ''): ?>
+      <a class="btn" href="customers.php">Clear</a>
+    <?php endif; ?>
+  </form>
+  <p class="muted" style="margin:8px 0 0;">
+    Showing <?= (int)$showing_from ?>–<?= (int)$showing_to ?> of <?= (int)$customer_total ?> customer<?= $customer_total === 1 ? '' : 's' ?>.
+    <?php if ($search !== ''): ?>Filtered by “<?= h($search) ?>”.<?php endif; ?>
+  </p>
+</div>
+
 <div class="card" style="padding:0; overflow-x:auto;">
   <table>
     <thead>
@@ -260,7 +312,9 @@ render_header('Customers');
     <tbody>
       <?php if (!$customers): ?>
         <tr>
-          <td colspan="<?= $customer_table_columns ?>" class="muted">No customers synced yet.</td>
+          <td colspan="<?= $customer_table_columns ?>" class="muted">
+            <?= $search !== '' ? 'No customers matched your search.' : 'No customers synced yet.' ?>
+          </td>
         </tr>
       <?php endif; ?>
       <?php foreach ($customers as $row): ?>
@@ -306,5 +360,20 @@ render_header('Customers');
     </tbody>
   </table>
 </div>
+
+<?php if ($total_pages > 1): ?>
+  <?php $base_params = $search !== '' ? ['q' => $search] : []; ?>
+  <div class="card" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    <?php if ($page > 1): ?>
+      <?php $prev_params = $base_params; $prev_params['page'] = $page - 1; ?>
+      <a class="btn" href="?<?= h(http_build_query($prev_params)) ?>">← Prev</a>
+    <?php endif; ?>
+    <span class="muted">Page <?= (int)$page ?> of <?= (int)$total_pages ?> (<?= (int)$customers_per_page ?> per page)</span>
+    <?php if ($page < $total_pages): ?>
+      <?php $next_params = $base_params; $next_params['page'] = $page + 1; ?>
+      <a class="btn" href="?<?= h(http_build_query($next_params)) ?>">Next →</a>
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
 
 <?php render_footer(); ?>
