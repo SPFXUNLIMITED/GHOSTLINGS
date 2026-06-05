@@ -369,6 +369,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     imagesavealpha($thumb_img, true);
                     $transparent = imagecolorallocatealpha($thumb_img, 255, 255, 255, 127);
                     imagefill($thumb_img, 0, 0, $transparent);
+                  } elseif ($detected_mime === 'image/gif') {
+                    $trans_idx = imagecolortransparent($src_img);
+                    if ($trans_idx >= 0 && $trans_idx < imagecolorstotal($src_img)) {
+                      $trans_color = imagecolorsforindex($src_img, $trans_idx);
+                      $new_trans = imagecolorallocate($thumb_img, $trans_color['red'], $trans_color['green'], $trans_color['blue']);
+                      imagefill($thumb_img, 0, 0, $new_trans);
+                      imagecolortransparent($thumb_img, $new_trans);
+                    }
                   }
                   imagecopyresampled($thumb_img, $src_img, 0, 0, 0, 0, $dst_w, $dst_h, $src_w, $src_h);
                   $thumb_path = $uploadsDir . '/' . $stored_thumb;

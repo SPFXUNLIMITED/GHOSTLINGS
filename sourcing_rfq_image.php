@@ -12,7 +12,11 @@ if ($rfq_id <= 0) {
 }
 
 $col = $type === 'thumb' ? 'image_thumb' : 'image_path';
-$stmt = $pdo->prepare("SELECT $col AS stored_name FROM rfq_requests WHERE id = ? LIMIT 1");
+if ($col === 'image_thumb') {
+  $stmt = $pdo->prepare("SELECT image_thumb AS stored_name FROM rfq_requests WHERE id = ? LIMIT 1");
+} else {
+  $stmt = $pdo->prepare("SELECT image_path AS stored_name FROM rfq_requests WHERE id = ? LIMIT 1");
+}
 $stmt->execute([$rfq_id]);
 $row = $stmt->fetch();
 
@@ -34,8 +38,8 @@ if (!is_file($path)) {
 }
 
 $fi = finfo_open(FILEINFO_MIME_TYPE);
-$mime = $fi ? (finfo_file($fi, $path) ?: 'image/jpeg') : 'image/jpeg';
-finfo_close($fi);
+$mime = ($fi !== false) ? (finfo_file($fi, $path) ?: 'image/jpeg') : 'image/jpeg';
+if ($fi !== false) finfo_close($fi);
 
 header('Content-Type: ' . $mime);
 header('X-Content-Type-Options: nosniff');
