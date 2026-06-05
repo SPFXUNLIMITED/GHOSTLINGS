@@ -553,13 +553,6 @@ render_alibaba_workflow_banner('create_rfq');
   <div class="info-banner">
     ℹ️ Company and contact details are pre-filled from your <a href="user_page.php">profile</a>. Update your profile to change these defaults.
   </div>
-  <?php if ($canned_responses): ?>
-  <div style="margin:12px 0 16px;">
-    <button type="button" class="btn primary" data-canned-all="1" style="font-weight:700;">
-      Add All Notices
-    </button>
-  </div>
-  <?php endif; ?>
   <h2 class="form-section-heading">Request Details</h2>
 
   <div class="form-grid">
@@ -730,6 +723,9 @@ render_alibaba_workflow_banner('create_rfq');
       <label>Additional Notes</label>
       <?php if ($canned_responses): ?>
       <div style="margin-bottom:6px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" class="btn primary" data-canned-all="1" style="font-weight:700;">
+          Add All Notices
+        </button>
         <?php foreach ($canned_responses as $cr): ?>
         <button type="button" class="btn"
                 data-canned-body="<?= h($cr['body']) ?>"
