@@ -850,6 +850,7 @@ $sql = "
   SELECT
     r.id, r.request_category, r.request_title, r.machine_size, r.laser_watts, r.tube_type, r.part_category, r.part_specs, r.quantity,
     r.required_features, r.additional_notes, r.request_status, r.urgency, r.acquisition_purpose, r.buyer_name, r.contact_name, r.created_at, r.updated_at,
+    r.image_path, r.image_thumb,
     u.username AS requested_by_username,
     COUNT(q.id) AS quote_count,
     MIN(q.quote_amount) AS lowest_quote_amount,
@@ -1092,6 +1093,7 @@ render_header('Sourcing RFQ Tracker');
       <table class="table-auto" style="min-width:720px;">
         <thead>
           <tr>
+            <th>Image</th>
             <th>#</th>
             <th>RFQ</th>
             <th>Status</th>
@@ -1100,10 +1102,26 @@ render_header('Sourcing RFQ Tracker');
         </thead>
         <tbody>
           <?php if (!$rfqs): ?>
-            <tr><td colspan="4" class="muted">No RFQ requests found.</td></tr>
+            <tr><td colspan="5" class="muted">No RFQ requests found.</td></tr>
           <?php endif; ?>
           <?php foreach ($rfqs as $r): ?>
             <tr>
+              <td>
+                <?php
+                  $has_rfq_image = (string)($r['image_thumb'] ?? '') !== '' || (string)($r['image_path'] ?? '') !== '';
+                  $thumb_url = $has_rfq_image ? 'sourcing_rfq_image.php?rfq_id=' . (int)$r['id'] . '&type=thumb' : '';
+                  $full_url = $has_rfq_image ? 'sourcing_rfq_image.php?rfq_id=' . (int)$r['id'] . '&type=full' : '';
+                ?>
+                <?php if ($has_rfq_image): ?>
+                  <a href="<?= h($full_url) ?>" target="_blank" rel="noopener noreferrer" title="View RFQ image">
+                    <img src="<?= h($thumb_url) ?>"
+                         alt="<?= h('RFQ #' . (int)$r['id'] . ' image') ?>"
+                         style="width:50px; height:50px; object-fit:cover; border-radius:6px; border:1px solid rgba(0,0,0,.12); display:block;" />
+                  </a>
+                <?php else: ?>
+                  <span class="muted">—</span>
+                <?php endif; ?>
+              </td>
               <td class="muted"><?= (int)$r['id'] ?></td>
               <td>
                 <strong><?= h($r['request_title']) ?></strong><br>
