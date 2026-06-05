@@ -680,12 +680,12 @@ function render_alibaba_workflow_banner(string $current_step = 'create_rfq'): vo
     'shipping' => [
       'label'       => 'Shipping',
       'instruction' => 'The order is in transit. Track shipment progress and required logistics documents.',
-      'url'         => 'shipping_form.php',
+      'url'         => 'shipping_rfq_form.php',
     ],
     'received' => [
       'label'       => 'Received',
       'instruction' => 'Confirm delivery and completion of final receipt and acceptance activities.',
-      'url'         => 'shipping_tracker.php',
+      'url'         => 'shipping_rfq_tracker.php',
     ],
   ];
 
