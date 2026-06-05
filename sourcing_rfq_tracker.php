@@ -1101,10 +1101,25 @@ render_header('Sourcing RFQ Tracker');
   <?php if ($rfq_list_has_images): ?>
     <?= render_attachment_modal_assets() ?>
     <style>
+      .rfq-thumb-modal-button {
+        padding: 0;
+        border: 0;
+        background: none;
+      }
+
       .rfq-thumb-modal-button:focus-visible {
         outline: 2px solid currentColor;
         outline-offset: 2px;
         border-radius: 8px;
+      }
+
+      .rfq-thumb-modal-image {
+        width: 50px;
+        height: 50px;
+        object-fit: cover;
+        border-radius: 6px;
+        border: 1px solid rgba(0,0,0,.12);
+        display: block;
       }
     </style>
   <?php endif; ?>
@@ -1144,12 +1159,12 @@ render_header('Sourcing RFQ Tracker');
                           data-attachment-preview="<?= h($full_url) ?>"
                           data-attachment-previewable="1"
                           data-attachment-image="1"
-                          style="padding:0; border:0; background:none;"
                           aria-label="<?= h('View RFQ #' . (int)$r['id'] . ' image in modal') ?>"
                           title="View RFQ image">
-                    <img src="<?= h($thumb_url) ?>"
+                    <img class="rfq-thumb-modal-image"
+                         src="<?= h($thumb_url) ?>"
                          alt="<?= h('RFQ #' . (int)$r['id'] . ' image') ?>"
-                         style="width:50px; height:50px; object-fit:cover; border-radius:6px; border:1px solid rgba(0,0,0,.12); display:block;" />
+                         />
                   </button>
                 <?php else: ?>
                   <span class="muted">—</span>
