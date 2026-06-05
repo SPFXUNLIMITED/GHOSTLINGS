@@ -453,6 +453,8 @@ render_header('Shipping RFQ Tracker');
   </div>
 </div>
 
+<?php render_alibaba_workflow_banner('received'); ?>
+
 <?php if ($errors): ?>
   <div class="alert error">
     <ul style="margin:0; padding-left:18px;">
