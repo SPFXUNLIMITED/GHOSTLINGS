@@ -157,7 +157,7 @@ function build_order_email_text(array $order, array $order_statuses): string {
   $lines[] = 'Origin:        ' . trim((string)($order['shipping_origin'] ?? 'N/A'));
   $lines[] = 'Destination:   ' . trim((string)($order['destination_port'] ?? 'N/A'));
   $lines[] = 'Deliver To:    ' . trim((string)($order['destination_address'] ?? 'N/A'));
-  $lines[] = 'Expected Ready:' . ' ' . format_order_email_date((string)($order['expected_ready_date'] ?? ''));
+  $lines[] = 'Expected Ready: ' . format_order_email_date((string)($order['expected_ready_date'] ?? ''));
   $lines[] = 'Expected Ship: ' . format_order_email_date((string)($order['expected_ship_date'] ?? ''));
   $lines[] = 'Lead Time:     ' . ($order['production_lead_time_days'] !== null && $order['production_lead_time_days'] !== '' ? ((int)$order['production_lead_time_days'] . ' days') : 'N/A');
   $lines[] = 'Trade Assurance: ' . trim((string)($order['trade_assurance_order_no'] ?? 'N/A'));
@@ -746,7 +746,7 @@ render_header('Order Tracker');
                   'q' => $search,
                   'status' => $status_filter,
                   'rfq_id' => $rfq_filter > 0 ? $rfq_filter : null,
-                ], static fn($value): bool => $value !== null && $value !== '');
+                ], fn($value): bool => $value !== null && $value !== '');
               ?>
               <a class="btn" href="order_tracker.php?<?= h(http_build_query($email_text_query)) ?>">Create Email Text</a>
               <form method="post" style="display:inline;" onsubmit="return confirm('Delete this order? This cannot be undone.');">
