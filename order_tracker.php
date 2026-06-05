@@ -740,7 +740,7 @@ render_header('Order Tracker');
             <td class="col-actions">
               <a class="btn" href="order_form.php?order_id=<?= (int)$order['id'] ?>">Edit</a>
               <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$order['rfq_request_id'] ?>">RFQ</a>
-              <a class="btn" href="shipping_rfq_form.php?order_id=<?= (int)$order['id'] ?>">Create Shipping Record</a>
+              <a class="btn" href="freight_quote_form.php?order_id=<?= (int)$order['id'] ?>">Create Shipping Record</a>
               <?php
                 $email_text_query = array_filter([
                   'order_text_id' => (int)$order['id'],

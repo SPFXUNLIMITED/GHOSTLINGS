@@ -567,7 +567,7 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
       ['href' => 'order_tracker.php', 'file' => 'order_tracker.php', 'label' => 'PO Tracker'],
       ['type' => 'separator'],
       ['type' => 'section', 'label' => 'Shipping'],
-      ['href' => 'shipping_rfq_form.php', 'file' => 'shipping_rfq_form.php', 'label' => 'Freight Quote Form'],
+      ['href' => 'freight_quote_form.php', 'file' => 'freight_quote_form.php', 'label' => 'Freight Quote Form'],
       ['href' => 'shipping_rfq_tracker.php', 'file' => 'shipping_rfq_tracker.php', 'label' => 'Freight Quote Tracker'],
     ], $current); ?>
     <?php render_menu_dropdown('Quotes & Invoices', [
@@ -680,7 +680,7 @@ function render_alibaba_workflow_banner(string $current_step = 'create_rfq'): vo
     'shipping' => [
       'label'       => 'Freight Quote',
       'instruction' => 'The order is in transit. Track shipment progress and required logistics documents.',
-      'url'         => 'shipping_rfq_form.php',
+      'url'         => 'freight_quote_form.php',
     ],
     'received' => [
       'label'       => 'Received',
