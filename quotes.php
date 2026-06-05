@@ -228,9 +228,11 @@ function quote_backfill_customer(PDO $pdo, ?int $customer_id, array $fields): vo
   $update_stmt->execute($params);
 }
 
-function quote_send_email(array $quote, array $items): bool {
+function quote_send_email(array $quote, array $items, ?string &$error_message = null): bool {
+  $error_message = null;
   $to = trim((string)($quote['email'] ?? ''));
   if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+    $error_message = 'Quote email address is missing or invalid.';
     return false;
   }
 
@@ -249,6 +251,7 @@ function quote_send_email(array $quote, array $items): bool {
   if ($smtp_from_email === '' || !filter_var($smtp_from_email, FILTER_VALIDATE_EMAIL)) $smtp_errors[] = 'SMTP_FROM_EMAIL';
 
   if ($smtp_errors) {
+    $error_message = 'Missing or invalid SMTP configuration: ' . implode(', ', $smtp_errors);
     error_log('Quote email send failed due to missing or invalid SMTP configuration: ' . implode(', ', $smtp_errors));
     return false;
   }
@@ -331,8 +334,13 @@ function quote_send_email(array $quote, array $items): bool {
     $mailer->isHTML(true);
     $mailer->Body = $html_body;
     $mailer->AltBody = $text_body;
-    return $mailer->send();
+    if (!$mailer->send()) {
+      $error_message = trim((string)$mailer->ErrorInfo);
+      return false;
+    }
+    return true;
   } catch (Throwable $e) {
+    $error_message = $e->getMessage();
     error_log(
       'Quote email send failed for quote #' . $quote_id
       . ' to ' . $to
@@ -515,13 +523,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $items = $item_stmt->fetchAll();
         if (!$items) {
           $errors[] = 'Cannot send email: quote has no line items.';
-        } elseif (!quote_send_email($quote, $items)) {
-          $errors[] = 'Email was not sent. Confirm the quote email address is valid and mail is configured.';
         } else {
-          $pdo->prepare("UPDATE quotes SET status = CASE WHEN status = 'draft' THEN 'sent' ELSE status END WHERE id = ?")->execute([$row_id]);
-          $_SESSION['quotes_csrf'] = bin2hex(random_bytes(24));
-          header('Location: quotes.php?view=id&id=' . $row_id . '&email_sent=1');
-          exit;
+          $email_error = null;
+          if (!quote_send_email($quote, $items, $email_error)) {
+            $errors[] = $email_error !== null && $email_error !== '' ? $email_error : 'Email was not sent.';
+          } else {
+            $pdo->prepare("UPDATE quotes SET status = CASE WHEN status = 'draft' THEN 'sent' ELSE status END WHERE id = ?")->execute([$row_id]);
+            $_SESSION['quotes_csrf'] = bin2hex(random_bytes(24));
+            header('Location: quotes.php?view=id&id=' . $row_id . '&email_sent=1');
+            exit;
+          }
         }
       }
     } elseif ($action === 'send_sms') {
