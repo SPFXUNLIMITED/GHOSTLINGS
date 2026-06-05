@@ -182,7 +182,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $pdo->prepare("DELETE FROM shipping_rfq_crates WHERE shipping_rfq_id = ?")->execute([$rfq_id]);
       $pdo->prepare("DELETE FROM shipping_rfq_quotes WHERE shipping_rfq_id = ?")->execute([$rfq_id]);
       $pdo->prepare("DELETE FROM shipping_rfq_requests WHERE id = ?")->execute([$rfq_id]);
-      $success = 'Shipping RFQ deleted.';
+      $success = 'Freight Quote deleted.';
       $selected_rfq_id = 0;
     }
   }
@@ -414,21 +414,21 @@ if ($rfq_text_id > 0) {
   }
 }
 
-render_header('Shipping Tracker');
+render_header('Freight Quote Tracker');
 ?>
 
 <div class="card shipping-rfq-hero page-header">
   <div class="shipping-rfq-hero-glow" aria-hidden="true"></div>
   <div class="page-header-body shipping-rfq-hero-body">
     <span class="shipping-rfq-hero-tag">Ocean + Air Freight Command Center</span>
-    <h1>Shipping Tracker <span class="shipping-rfq-hero-count">(<?= (int)$hero_total_rfqs ?>)</span></h1>
+    <h1>Freight Quote Tracker <span class="shipping-rfq-hero-count">(<?= (int)$hero_total_rfqs ?>)</span></h1>
     <p class="muted">Orchestrate every shipment request, compare carrier bids faster, and keep cargo moving with confidence.</p>
-    <ul class="shipping-rfq-hero-pills" aria-label="Shipping Tracker highlights">
+    <ul class="shipping-rfq-hero-pills" aria-label="Freight Quote Tracker highlights">
       <li class="shipping-rfq-hero-pill"><span aria-hidden="true">📦</span> Live quote pipeline</li>
       <li class="shipping-rfq-hero-pill"><span aria-hidden="true">🌍</span> Global route visibility</li>
       <li class="shipping-rfq-hero-pill"><span aria-hidden="true">⚡</span> Faster booking decisions</li>
     </ul>
-    <div class="shipping-rfq-hero-stats" aria-label="Shipping Tracker summary">
+    <div class="shipping-rfq-hero-stats" aria-label="Freight Quote Tracker summary">
       <div class="shipping-rfq-hero-stat">
         <strong><?= (int)$hero_total_rfqs ?></strong>
         <span>Total RFQs</span>
@@ -448,7 +448,7 @@ render_header('Shipping Tracker');
     </div>
   </div>
   <div class="shipping-rfq-hero-actions">
-    <a class="btn primary" href="shipping_rfq_form.php">+ New Shipping RFQ</a>
+    <a class="btn primary" href="shipping_rfq_form.php">+ New Freight Quote</a>
     <button type="button" class="btn" id="focus-srfq-filters">Explore Pipeline</button>
   </div>
 </div>
@@ -499,7 +499,7 @@ render_header('Shipping Tracker');
 <!-- Email text panel -->
 <?php if ($rfq_email_text !== ''): ?>
   <div class="card">
-    <h2 style="margin-top:0;">Shipping RFQ Email Text</h2>
+    <h2 style="margin-top:0;">Freight Quote Email Text</h2>
     <p class="muted" style="margin-top:0;">Copy this text and paste it into your email to forwarders.</p>
     <label id="srfq_email_lbl" for="srfq_email_text">Email content</label>
     <textarea id="srfq_email_text" rows="20" readonly aria-labelledby="srfq_email_lbl"><?= h($rfq_email_text) ?></textarea>
@@ -545,7 +545,7 @@ render_header('Shipping Tracker');
         </thead>
         <tbody>
           <?php if (!$rfqs): ?>
-            <tr><td colspan="5" class="muted">No shipping RFQ requests found.</td></tr>
+            <tr><td colspan="5" class="muted">No freight quote requests found.</td></tr>
           <?php endif; ?>
           <?php foreach ($rfqs as $r): ?>
             <?php
@@ -590,7 +590,7 @@ render_header('Shipping Tracker');
                 <a class="btn" href="shipping_rfq_tracker.php?rfq_text_id=<?= (int)$r['id'] ?>">Email Text</a>
                 <a class="btn" href="shipping_rfq_form.php?edit_id=<?= (int)$r['id'] ?>">Edit</a>
                 <form method="post" style="display:inline;"
-                      onsubmit="return confirm('Delete this Shipping RFQ and all its quotes? This cannot be undone.');">
+                      onsubmit="return confirm('Delete this Freight Quote and all its quotes? This cannot be undone.');">
                   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['srfq_tracker_csrf']) ?>" />
                   <input type="hidden" name="action" value="delete_rfq" />
                   <input type="hidden" name="rfq_id" value="<?= (int)$r['id'] ?>" />
@@ -616,7 +616,7 @@ render_header('Shipping Tracker');
   <div class="card">
     <div class="page-header" style="margin-bottom:14px;">
       <div class="page-header-body">
-        <h2>Quotes — <span class="muted" style="font-weight:400;">Shipping RFQ #<?= (int)$selected_rfq['id'] ?></span></h2>
+        <h2>Quotes — <span class="muted" style="font-weight:400;">Freight Quote #<?= (int)$selected_rfq['id'] ?></span></h2>
         <p class="muted"><?= h($selected_rfq['request_title']) ?></p>
       </div>
       <div class="row" style="flex-shrink:0;">
