@@ -2,9 +2,6 @@
 require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
-require_once __DIR__ . '/lib/PHPMailer/src/Exception.php';
-require_once __DIR__ . '/lib/PHPMailer/src/PHPMailer.php';
-require_once __DIR__ . '/lib/PHPMailer/src/SMTP.php';
 require_admin_or_moderator();
 
 const QUOTE_MAX_NOTES_LENGTH = 10000;
@@ -228,9 +225,43 @@ function quote_backfill_customer(PDO $pdo, ?int $customer_id, array $fields): vo
   $update_stmt->execute($params);
 }
 
+function quote_prepare_phpmailer(): bool {
+  if (class_exists(\PHPMailer\PHPMailer\PHPMailer::class)) {
+    return true;
+  }
+
+  $files = [
+    __DIR__ . '/lib/PHPMailer/src/Exception.php',
+    __DIR__ . '/lib/PHPMailer/src/PHPMailer.php',
+    __DIR__ . '/lib/PHPMailer/src/SMTP.php',
+  ];
+
+  foreach ($files as $file) {
+    if (!is_file($file) || !is_readable($file)) {
+      error_log('Quote email send failed: missing PHPMailer file: ' . $file);
+      return false;
+    }
+  }
+
+  foreach ($files as $file) {
+    require_once $file;
+  }
+
+  if (!class_exists(\PHPMailer\PHPMailer\PHPMailer::class)) {
+    error_log('Quote email send failed: PHPMailer class not available after include.');
+    return false;
+  }
+
+  return true;
+}
+
 function quote_send_email(array $quote, array $items): bool {
   $to = trim((string)($quote['email'] ?? ''));
   if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+    return false;
+  }
+
+  if (!quote_prepare_phpmailer()) {
     return false;
   }
 
