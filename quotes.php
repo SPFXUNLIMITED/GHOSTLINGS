@@ -43,6 +43,136 @@ function quote_escape_like(string $value, string $escape = '\\'): string {
   );
 }
 
+function quote_split_name(string $customer_name): array {
+  $customer_name = trim($customer_name);
+  if ($customer_name === '') {
+    return ['', ''];
+  }
+
+  $parts = preg_split('/\s+/', $customer_name);
+  if (!is_array($parts) || !$parts) {
+    return [$customer_name, ''];
+  }
+
+  $first_name = trim((string)array_shift($parts));
+  $last_name = trim(implode(' ', $parts));
+  return [$first_name, $last_name];
+}
+
+function quote_resolve_customer_id(PDO $pdo, array $fields): ?int {
+  $posted_customer_id = trim((string)($fields['customer_id'] ?? ''));
+  if ($posted_customer_id !== '') {
+    $customer_id = (int)$posted_customer_id;
+    if ($customer_id > 0) {
+      $stmt = $pdo->prepare("SELECT id FROM customers WHERE id = ? LIMIT 1");
+      $stmt->execute([$customer_id]);
+      if ((int)$stmt->fetchColumn() > 0) {
+        return $customer_id;
+      }
+    }
+    return null;
+  }
+
+  $scores = [];
+  $matchers = [];
+  $customer_name = trim((string)($fields['customer_name'] ?? ''));
+  if ($customer_name !== '') {
+    [$first_name, $last_name] = quote_split_name($customer_name);
+    $matchers[] = [
+      "SELECT id FROM customers WHERE first_name = ? AND last_name = ? LIMIT 25",
+      [$first_name, $last_name],
+    ];
+  }
+  $company_name = trim((string)($fields['company_name'] ?? ''));
+  if ($company_name !== '') {
+    $matchers[] = ["SELECT id FROM customers WHERE company = ? LIMIT 25", [$company_name]];
+  }
+  $email = trim((string)($fields['email'] ?? ''));
+  if ($email !== '') {
+    $matchers[] = ["SELECT id FROM customers WHERE email = ? LIMIT 25", [$email]];
+  }
+  $phone_number = trim((string)($fields['phone_number'] ?? ''));
+  if ($phone_number !== '') {
+    $matchers[] = ["SELECT id FROM customers WHERE phone = ? LIMIT 25", [$phone_number]];
+  }
+
+  $prepared = [];
+  foreach ($matchers as [$sql, $params]) {
+    if (!isset($prepared[$sql])) {
+      $prepared[$sql] = $pdo->prepare($sql);
+    }
+    $stmt = $prepared[$sql];
+    $stmt->execute($params);
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+      $id = (int)($row['id'] ?? 0);
+      if ($id > 0) {
+        $scores[$id] = ($scores[$id] ?? 0) + 1;
+      }
+    }
+  }
+
+  if (!$scores) {
+    return null;
+  }
+
+  arsort($scores);
+  $top_score = (int)reset($scores);
+  $top_ids = array_keys(array_filter($scores, static fn($score): bool => (int)$score === $top_score));
+  if (count($top_ids) !== 1) {
+    error_log('Quote customer backfill match ambiguity for customer "' . $customer_name . '"');
+    return null;
+  }
+
+  return (int)$top_ids[0];
+}
+
+function quote_backfill_customer(PDO $pdo, ?int $customer_id, array $fields): void {
+  if ($customer_id === null || $customer_id <= 0) {
+    return;
+  }
+
+  $stmt = $pdo->prepare("SELECT first_name, last_name, company, phone, email FROM customers WHERE id = ? LIMIT 1");
+  $stmt->execute([$customer_id]);
+  $row = $stmt->fetch(PDO::FETCH_ASSOC);
+  if (!$row) {
+    return;
+  }
+
+  $updates = [];
+  $params = [];
+
+  if (trim((string)($row['company'] ?? '')) === '' && trim((string)($fields['company_name'] ?? '')) !== '') {
+    $updates[] = "company = ?";
+    $params[] = trim((string)$fields['company_name']);
+  }
+  if (trim((string)($row['phone'] ?? '')) === '' && trim((string)($fields['phone_number'] ?? '')) !== '') {
+    $updates[] = "phone = ?";
+    $params[] = trim((string)$fields['phone_number']);
+  }
+  if (trim((string)($row['email'] ?? '')) === '' && trim((string)($fields['email'] ?? '')) !== '') {
+    $updates[] = "email = ?";
+    $params[] = trim((string)$fields['email']);
+  }
+
+  if (trim((string)($row['first_name'] ?? '')) === '' && trim((string)($row['last_name'] ?? '')) === '' && trim((string)($fields['customer_name'] ?? '')) !== '') {
+    [$first_name, $last_name] = quote_split_name((string)$fields['customer_name']);
+    if ($first_name !== '' || $last_name !== '') {
+      $updates[] = "first_name = ?";
+      $params[] = $first_name;
+      $updates[] = "last_name = ?";
+      $params[] = $last_name;
+    }
+  }
+
+  if (!$updates) {
+    return;
+  }
+
+  $params[] = $customer_id;
+  $update_stmt = $pdo->prepare("UPDATE customers SET " . implode(', ', $updates) . " WHERE id = ?");
+  $update_stmt->execute($params);
+}
+
 function quote_send_email(array $quote, array $items): bool {
   $to = trim((string)($quote['email'] ?? ''));
   if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
@@ -109,15 +239,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
 
   $like = '%' . quote_escape_like($query) . '%';
   $stmt = $pdo->prepare(
-    "SELECT id, customer_name, company, phone, email
+    "SELECT
+      id,
+      COALESCE(
+        NULLIF(TRIM(CONCAT_WS(' ', NULLIF(first_name, ''), NULLIF(last_name, ''))), ''),
+        NULLIF(company, ''),
+        NULLIF(email, ''),
+        ''
+      ) AS customer_name,
+      company AS company_name,
+      phone,
+      email
      FROM customers
-     WHERE customer_name LIKE ? ESCAPE '\\\\'
-        OR company LIKE ? ESCAPE '\\\\'
-        OR email LIKE ? ESCAPE '\\\\'
+     WHERE first_name LIKE ? ESCAPE '\\\\'
+       OR last_name LIKE ? ESCAPE '\\\\'
+       OR CONCAT_WS(' ', first_name, last_name) LIKE ? ESCAPE '\\\\'
+       OR company LIKE ? ESCAPE '\\\\'
+       OR email LIKE ? ESCAPE '\\\\'
+       OR phone LIKE ? ESCAPE '\\\\'
      ORDER BY customer_name ASC, id DESC
      LIMIT 8"
   );
-  $stmt->execute([$like, $like, $like]);
+  $stmt->execute([$like, $like, $like, $like, $like, $like]);
   echo json_encode($stmt->fetchAll(), JSON_UNESCAPED_UNICODE);
   exit;
 }
@@ -280,21 +423,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Notes must be ' . QUOTE_MAX_NOTES_LENGTH . ' characters or fewer.';
       }
 
-      $customer_id = null;
-      if ($fields['customer_id'] !== '') {
-        $customer_id_candidate = (int)$fields['customer_id'];
-        if ($customer_id_candidate <= 0) {
-          $errors[] = 'Invalid customer selected.';
-        } else {
-          $check_customer = $pdo->prepare("SELECT id FROM customers WHERE id = ? LIMIT 1");
-          $check_customer->execute([$customer_id_candidate]);
-          if (!$check_customer->fetchColumn()) {
-            $errors[] = 'Selected customer no longer exists. Please select again.';
-          } else {
-            $customer_id = $customer_id_candidate;
-          }
-        }
+      if ($fields['customer_id'] !== '' && (int)$fields['customer_id'] <= 0) {
+        $errors[] = 'Invalid customer selected.';
       }
+
+      $customer_id = quote_resolve_customer_id($pdo, $fields);
 
       $posted_desc = $_POST['item_desc'] ?? [];
       $posted_qty = $_POST['item_qty'] ?? [];
@@ -376,6 +509,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $subtotal,
               $edit_id,
             ]);
+            quote_backfill_customer($pdo, $customer_id, $fields);
 
             $pdo->prepare("DELETE FROM quote_items WHERE quote_id = ?")->execute([$edit_id]);
             $quote_id = $edit_id;
@@ -400,6 +534,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $subtotal,
               $created_by,
             ]);
+            quote_backfill_customer($pdo, $customer_id, $fields);
             $quote_id = (int)$pdo->lastInsertId();
           }
 
@@ -750,6 +885,9 @@ render_header('Quotes');
         }
 
         rows.forEach((row) => {
+          const rowCompany = row.company_name || row.company || '';
+          const rowPhone = row.phone || row.phone_number || row.contact_phone || '';
+          const rowEmail = row.email || row.contact_email || '';
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'btn';
@@ -767,14 +905,14 @@ render_header('Quotes');
           const meta = document.createElement('div');
           meta.className = 'muted';
           meta.style.marginTop = '3px';
-          meta.textContent = (row.company || '—') + ' • ' + (row.phone || '—') + ' • ' + (row.email || '—');
+          meta.textContent = (rowCompany || '—') + ' • ' + (rowPhone || '—') + ' • ' + (rowEmail || '—');
           btn.appendChild(meta);
           btn.addEventListener('click', () => {
             customerNameInput.value = row.customer_name || '';
             customerIdInput.value = row.id || '';
-            companyInput.value = row.company || '';
-            phoneInput.value = row.phone || '';
-            emailInput.value = row.email || '';
+            companyInput.value = rowCompany;
+            phoneInput.value = rowPhone;
+            emailInput.value = rowEmail;
             hideSuggestions();
           });
           suggestions.appendChild(btn);
