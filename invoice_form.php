@@ -15,8 +15,14 @@ if (empty($_SESSION['invoice_form_csrf'])) {
   $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
 }
 
+$view_mode_requested = isset($_GET['mode']) && $_GET['mode'] === 'view';
+
 // ---------- POST: Save invoice ----------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  if ($view_mode_requested) {
+    http_response_code(405);
+    exit('Viewing mode is read only.');
+  }
   $csrf = (string)($_POST['csrf_token'] ?? '');
   if (!hash_equals((string)$_SESSION['invoice_form_csrf'], $csrf)) {
     http_response_code(403);
@@ -190,6 +196,23 @@ function invoice_default_number(): string {
   return 'INV-' . $stamp . '-NEW';
 }
 
+function invoice_readonly_style(): string {
+  return 'background:var(--surface,#f8fafc); color:var(--muted,#64748b);';
+}
+
+function invoice_readonly_attrs(): string {
+  return ' readonly style="' . invoice_readonly_style() . '"';
+}
+
+function invoice_field_lock_attrs(bool $is_view_mode): string {
+  return $is_view_mode ? invoice_readonly_attrs() : '';
+}
+
+function invoice_quote_date_value(?array $quote, string $fallback): string {
+  $quote_date = trim((string)($quote['quote_date'] ?? ''));
+  return $quote_date !== '' ? $quote_date : $fallback;
+}
+
 $quote_id_param = trim((string)($_GET['id'] ?? ''));
 $has_quote_id = $quote_id_param !== '';
 $quote_id = $has_quote_id ? (int)$quote_id_param : 0;
@@ -234,6 +257,13 @@ if ($has_quote_id) {
 }
 
 $today = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Y-m-d');
+$is_view_mode = $view_mode_requested && $quote !== null;
+$invoice_heading = $is_view_mode ? 'View Invoice' : ($quote ? 'Edit Invoice' : 'New Invoice');
+$invoice_subtitle = $quote
+  ? ($is_view_mode
+      ? 'Read-only invoice view for invoice #' . invoice_number_from_quote($quote, $quote_id) . '.'
+      : 'Update invoice details for invoice #' . invoice_number_from_quote($quote, $quote_id) . '.')
+  : 'Basic invoice scaffold for creating a standalone invoice.';
 $fields = [
   'invoice_number' => $quote ? invoice_number_from_quote($quote, $quote_id) : invoice_default_number(),
   'source_quote_id' => $quote ? (string)$quote_id : '',
@@ -241,7 +271,7 @@ $fields = [
   'company_name' => (string)($quote['company_name'] ?? ''),
   'phone_number' => (string)($quote['phone_number'] ?? ''),
   'email' => (string)($quote['email'] ?? ''),
-  'invoice_date' => $today,
+  'invoice_date' => invoice_quote_date_value($quote, $today),
   'notes' => (string)($quote['notes'] ?? ''),
 ];
 
@@ -269,15 +299,19 @@ if (!$line_items) {
 
 $invoice_converted = isset($_GET['invoice_converted']) && $_GET['invoice_converted'] === '1';
 
-render_header('Invoice Form');
+render_header($invoice_heading);
 ?>
 
 <div class="card page-header">
   <div class="page-header-body">
-    <h1>Invoice Form</h1>
-    <p class="muted"><?= $quote ? 'Basic invoice scaffold pre-filled from quote #' . (int)$quote_id . '.' : 'Basic invoice scaffold for creating a standalone invoice.' ?></p>
+    <h1><?= h($invoice_heading) ?></h1>
+    <p class="muted"><?= h($invoice_subtitle) ?></p>
   </div>
   <div class="actions">
+    <?php if ($is_view_mode && $quote): ?>
+      <a class="btn primary" href="invoice_form.php?id=<?= (int)$quote_id ?>">Edit Invoice</a>
+    <?php endif; ?>
+    <a class="btn" href="invoice_tracker.php">Invoice Tracker</a>
     <?php if ($quote): ?>
       <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
     <?php endif; ?>
@@ -290,41 +324,43 @@ render_header('Invoice Form');
     <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">Quote converted to invoice successfully.</div>
   <?php endif; ?>
 
+  <?php if (!$is_view_mode): ?>
   <form method="post" action="">
     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
     <input type="hidden" name="source_quote_id" value="<?= h($fields['source_quote_id']) ?>" />
+  <?php endif; ?>
 
     <div style="display:grid; gap:14px; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));">
       <div>
         <label for="invoice_number">Invoice #</label>
-        <input id="invoice_number" type="text" name="invoice_number" value="<?= h($fields['invoice_number']) ?>" readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);" />
+        <input id="invoice_number" type="text" name="invoice_number" value="<?= h($fields['invoice_number']) ?>"<?= invoice_readonly_attrs() ?> />
       </div>
       <div>
         <label for="invoice_date">Invoice Date</label>
-        <input id="invoice_date" type="date" name="invoice_date" value="<?= h($fields['invoice_date']) ?>" />
+        <input id="invoice_date" type="date" name="invoice_date" value="<?= h($fields['invoice_date']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> />
       </div>
       <div>
         <label for="source_quote_label">Source Quote</label>
-        <input id="source_quote_label" type="text" value="<?= h($quote ? 'Quote #' . (int)$quote_id : 'Standalone Invoice') ?>" readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);" />
+        <input id="source_quote_label" type="text" value="<?= h($quote ? 'Quote #' . (int)$quote_id : 'Standalone Invoice') ?>"<?= invoice_readonly_attrs() ?> />
       </div>
     </div>
 
     <div style="display:grid; gap:14px; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); margin-top:16px;">
       <div>
         <label for="customer_name">Customer Name</label>
-        <input id="customer_name" type="text" name="customer_name" maxlength="255" value="<?= h($fields['customer_name']) ?>" />
+        <input id="customer_name" type="text" name="customer_name" maxlength="255" value="<?= h($fields['customer_name']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> />
       </div>
       <div>
         <label for="company_name">Company</label>
-        <input id="company_name" type="text" name="company_name" maxlength="255" value="<?= h($fields['company_name']) ?>" />
+        <input id="company_name" type="text" name="company_name" maxlength="255" value="<?= h($fields['company_name']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> />
       </div>
       <div>
         <label for="phone_number">Phone</label>
-        <input id="phone_number" type="text" name="phone_number" maxlength="100" value="<?= h($fields['phone_number']) ?>" />
+        <input id="phone_number" type="text" name="phone_number" maxlength="100" value="<?= h($fields['phone_number']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> />
       </div>
       <div>
         <label for="email">Email</label>
-        <input id="email" type="email" name="email" maxlength="255" value="<?= h($fields['email']) ?>" />
+        <input id="email" type="email" name="email" maxlength="255" value="<?= h($fields['email']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> />
       </div>
     </div>
 
@@ -344,37 +380,55 @@ render_header('Invoice Form');
         <tbody id="lineItemsBody">
           <?php foreach ($line_items as $row): ?>
             <tr class="line-item-row">
-              <td><input type="text" name="item_desc[]" maxlength="500" value="<?= h((string)$row['description']) ?>" /></td>
-              <td><input type="number" step="0.01" min="0.01" name="item_qty[]" value="<?= h((string)$row['quantity']) ?>" /></td>
-              <td><input type="number" step="0.01" min="0" name="item_cost[]" value="<?= h((string)$row['cost']) ?>" /></td>
-              <td><input type="number" step="0.01" min="0" name="item_markup[]" value="<?= h((string)$row['markup_percent']) ?>" /></td>
-              <td><input type="number" step="0.01" min="0" name="item_price[]" value="<?= h((string)$row['unit_price']) ?>" readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);" /></td>
+              <td><input type="text" name="item_desc[]" maxlength="500" value="<?= h((string)$row['description']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> /></td>
+              <td><input type="number" step="0.01" min="0.01" name="item_qty[]" value="<?= h((string)$row['quantity']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> /></td>
+              <td><input type="number" step="0.01" min="0" name="item_cost[]" value="<?= h((string)$row['cost']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> /></td>
+              <td><input type="number" step="0.01" min="0" name="item_markup[]" value="<?= h((string)$row['markup_percent']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> /></td>
+              <td><input type="number" step="0.01" min="0" name="item_price[]" value="<?= h((string)$row['unit_price']) ?>"<?= invoice_readonly_attrs() ?> /></td>
               <td class="line-total" style="white-space:nowrap;">$<?= h((string)$row['line_total']) ?></td>
-              <td><button type="button" class="btn remove-line">×</button></td>
+              <td>
+                <?php if (!$is_view_mode): ?>
+                  <button type="button" class="btn remove-line">×</button>
+                <?php else: ?>
+                  <span class="muted">—</span>
+                <?php endif; ?>
+              </td>
             </tr>
           <?php endforeach; ?>
         </tbody>
       </table>
       <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-        <button type="button" class="btn" id="addLineItem">+ Add Line Item</button>
+        <?php if (!$is_view_mode): ?>
+          <button type="button" class="btn" id="addLineItem">+ Add Line Item</button>
+        <?php else: ?>
+          <span class="muted">Line items are read only in view mode.</span>
+        <?php endif; ?>
         <div><strong>Subtotal: $<span id="invoiceSubtotal">0.00</span></strong></div>
       </div>
     </div>
 
     <div style="margin-top:14px;">
       <label for="notes">Notes</label>
-      <textarea id="notes" name="notes" rows="5"><?= h($fields['notes']) ?></textarea>
+      <textarea id="notes" name="notes" rows="5"<?= invoice_field_lock_attrs($is_view_mode) ?>><?= h($fields['notes']) ?></textarea>
     </div>
 
     <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
-      <button type="submit" class="btn primary" style="font-size:18px; padding:14px 22px;">Save Invoice</button>
+      <?php if (!$is_view_mode): ?>
+        <button type="submit" class="btn primary" style="font-size:18px; padding:14px 22px;">Save Invoice</button>
+      <?php else: ?>
+        <a class="btn primary" href="invoice_form.php?id=<?= (int)$quote_id ?>">Edit Invoice</a>
+      <?php endif; ?>
+      <a class="btn" href="invoice_tracker.php">Invoice Tracker</a>
       <?php if ($quote): ?>
         <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
       <?php endif; ?>
     </div>
+  <?php if (!$is_view_mode): ?>
   </form>
+  <?php endif; ?>
 </div>
 
+<?php if (!$is_view_mode): ?>
 <script>
 (() => {
   const lineItemsBody = document.getElementById('lineItemsBody');
@@ -384,6 +438,7 @@ render_header('Invoice Form');
   const defaultCost = '<?= h(INVOICE_DEFAULT_COST) ?>';
   const defaultMarkup = '<?= h(INVOICE_DEFAULT_MARKUP) ?>';
   const defaultPrice = '<?= h(INVOICE_DEFAULT_PRICE) ?>';
+  const readonlyStyle = '<?= invoice_readonly_style() ?>';
 
   function parseNumber(value) {
     const n = parseFloat(value);
@@ -442,7 +497,7 @@ render_header('Invoice Form');
       + '<td><input type="number" step="0.01" min="0.01" name="item_qty[]" value="' + defaultQty + '" /></td>'
       + '<td><input type="number" step="0.01" min="0" name="item_cost[]" value="' + defaultCost + '" /></td>'
       + '<td><input type="number" step="0.01" min="0" name="item_markup[]" value="' + defaultMarkup + '" /></td>'
-      + '<td><input type="number" step="0.01" min="0" name="item_price[]" value="' + defaultPrice + '" readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);" /></td>'
+      + '<td><input type="number" step="0.01" min="0" name="item_price[]" value="' + defaultPrice + '" readonly style="' + readonlyStyle + '" /></td>'
       + '<td class="line-total" style="white-space:nowrap;">$0.00</td>'
       + '<td><button type="button" class="btn remove-line">×</button></td>';
     lineItemsBody.appendChild(tr);
@@ -454,4 +509,21 @@ render_header('Invoice Form');
   computeTotals();
 })();
 </script>
+<?php else: ?>
+<script>
+(() => {
+  let subtotal = 0;
+  document.querySelectorAll('#lineItemsBody .line-total').forEach((cell) => {
+    const amount = parseFloat((cell.textContent || '').replace(/[^0-9.-]/g, ''));
+    if (Number.isFinite(amount)) {
+      subtotal += amount;
+    }
+  });
+  const subtotalNode = document.getElementById('invoiceSubtotal');
+  if (subtotalNode) {
+    subtotalNode.textContent = subtotal.toFixed(2);
+  }
+})();
+</script>
+<?php endif; ?>
 <?php render_footer(); ?>
