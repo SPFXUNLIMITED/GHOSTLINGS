@@ -617,8 +617,8 @@ render_header('Order Tracker');
   <div class="card">
     <h2 style="margin-top:0;"><?= h($order_email_text_title) ?></h2>
     <p class="muted" style="margin-top:0;">Copy this text and paste it into your email to the supplier.</p>
-    <label id="order_email_text_label" for="order_email_text">Email content</label>
-    <textarea id="order_email_text" rows="16" readonly aria-labelledby="order_email_text_label"><?= h($order_email_text) ?></textarea>
+    <label for="order_email_text">Email content</label>
+    <textarea id="order_email_text" rows="16" readonly><?= h($order_email_text) ?></textarea>
     <div class="row" style="margin-top:8px;">
       <button type="button" class="btn" onclick="copyOrderEmailText()">Copy Text</button>
       <span id="order_copy_status" class="muted" role="status" aria-live="polite"></span>
@@ -740,7 +740,15 @@ render_header('Order Tracker');
             <td class="col-actions">
               <a class="btn" href="order_form.php?order_id=<?= (int)$order['id'] ?>">Edit</a>
               <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$order['rfq_request_id'] ?>">RFQ</a>
-              <a class="btn" href="order_tracker.php?order_text_id=<?= (int)$order['id'] ?>">Create Email Text</a>
+              <?php
+                $email_text_query = array_filter([
+                  'order_text_id' => (int)$order['id'],
+                  'q' => $search,
+                  'status' => $status_filter,
+                  'rfq_id' => $rfq_filter > 0 ? $rfq_filter : null,
+                ], static fn($value): bool => $value !== null && $value !== '');
+              ?>
+              <a class="btn" href="order_tracker.php?<?= h(http_build_query($email_text_query)) ?>">Create Email Text</a>
               <form method="post" style="display:inline;" onsubmit="return confirm('Delete this order? This cannot be undone.');">
                 <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_order_tracker_csrf']) ?>">
                 <input type="hidden" name="action" value="delete_order">
