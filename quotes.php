@@ -238,7 +238,7 @@ function quote_prepare_phpmailer(): bool {
 
   foreach ($files as $file) {
     if (!is_file($file) || !is_readable($file)) {
-      error_log('Quote email send failed: missing PHPMailer file: ' . $file);
+      error_log('Quote email send failed: PHPMailer file missing or unreadable: ' . $file);
       return false;
     }
   }
