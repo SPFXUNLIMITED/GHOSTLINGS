@@ -188,10 +188,11 @@ if ($raw_edit !== null && (int)$raw_edit > 0) {
       }
     }
 
-    $show_all = $view === 'all' && $edit_id === null;
-    $show_form = $show_new_form || $edit_id !== null;
   }
 }
+
+$show_all = $view === 'all' && $edit_id === null;
+$show_form = $show_new_form || $edit_id !== null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = (string)($_POST['action'] ?? 'save');
