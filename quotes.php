@@ -239,17 +239,17 @@ function quote_send_email(array $quote, array $items): bool {
   $smtp_username = quote_env_value('SMTP_USERNAME');
   $smtp_password = quote_env_value('SMTP_PASSWORD');
   $smtp_from_email = quote_env_value('SMTP_FROM_EMAIL');
-  $smtp_from_name = quote_env_value('SMTP_FROM_NAME');
+  $smtp_from_name = trim(str_replace(["\r", "\n"], ' ', quote_env_value('SMTP_FROM_NAME')));
 
-  if (
-    $smtp_host === ''
-    || $smtp_port <= 0
-    || $smtp_username === ''
-    || $smtp_password === ''
-    || $smtp_from_email === ''
-    || !filter_var($smtp_from_email, FILTER_VALIDATE_EMAIL)
-  ) {
-    error_log('Quote email send failed due to missing or invalid SMTP configuration.');
+  $smtp_errors = [];
+  if ($smtp_host === '') $smtp_errors[] = 'SMTP_HOST';
+  if ($smtp_port <= 0) $smtp_errors[] = 'SMTP_PORT';
+  if ($smtp_username === '') $smtp_errors[] = 'SMTP_USERNAME';
+  if ($smtp_password === '') $smtp_errors[] = 'SMTP_PASSWORD';
+  if ($smtp_from_email === '' || !filter_var($smtp_from_email, FILTER_VALIDATE_EMAIL)) $smtp_errors[] = 'SMTP_FROM_EMAIL';
+
+  if ($smtp_errors) {
+    error_log('Quote email send failed due to missing or invalid SMTP configuration: ' . implode(', ', $smtp_errors));
     return false;
   }
 
@@ -319,8 +319,10 @@ function quote_send_email(array $quote, array $items): bool {
     $mailer->Password = $smtp_password;
     if ($smtp_port === 465) {
       $mailer->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+      $mailer->SMTPAutoTLS = false;
     } else {
       $mailer->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+      $mailer->SMTPAutoTLS = true;
     }
     $mailer->CharSet = 'UTF-8';
     $mailer->setFrom($smtp_from_email, $smtp_from_name);
