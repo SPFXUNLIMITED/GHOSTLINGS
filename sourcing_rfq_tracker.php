@@ -1087,15 +1087,27 @@ render_header('Sourcing RFQ Tracker');
   </script>
 <?php endif; ?>
 
-<?php if (!$selected_rfq): ?>
-  <?= render_attachment_modal_assets() ?>
-  <style>
-    .rfq-thumb-modal-button:focus-visible {
-      outline: 2px solid #2563eb;
-      outline-offset: 2px;
-      border-radius: 8px;
+<?php
+  $rfq_list_has_images = false;
+  foreach ($rfqs as $rfq_list_item) {
+    if ((string)($rfq_list_item['image_thumb'] ?? '') !== '' || (string)($rfq_list_item['image_path'] ?? '') !== '') {
+      $rfq_list_has_images = true;
+      break;
     }
-  </style>
+  }
+?>
+
+<?php if (!$selected_rfq): ?>
+  <?php if ($rfq_list_has_images): ?>
+    <?= render_attachment_modal_assets() ?>
+    <style>
+      .rfq-thumb-modal-button:focus-visible {
+        outline: 2px solid currentColor;
+        outline-offset: 2px;
+        border-radius: 8px;
+      }
+    </style>
+  <?php endif; ?>
   <div class="card">
     <div class="table-wrap" style="overflow-x:auto;">
       <table class="table-auto" style="min-width:720px;">
