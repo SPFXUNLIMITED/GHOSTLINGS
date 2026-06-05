@@ -623,7 +623,7 @@ function render_alibaba_workflow_banner(string $current_step = 'create_rfq'): vo
     'send_purchase_order' => [
       'label'       => 'Send Purchase Order',
       'instruction' => 'Issue the formal Purchase Order. The supplier will confirm receipt and acceptance.',
-      'url'         => 'sourcing_rfq_tracker.php',
+      'url'         => 'order_tracker.php',
     ],
     'vendor_accepts_po' => [
       'label'       => 'Vendor Accepts PO',
