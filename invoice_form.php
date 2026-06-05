@@ -8,9 +8,172 @@ const INVOICE_DEFAULT_QTY = '1.00';
 const INVOICE_DEFAULT_COST = '0.00';
 const INVOICE_DEFAULT_MARKUP = '20.00';
 const INVOICE_DEFAULT_PRICE = '0.00';
+const INVOICE_MIN_QTY = 0.01;
+
+// ---------- CSRF ----------
+if (empty($_SESSION['invoice_form_csrf'])) {
+  $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
+}
+
+// ---------- POST: Save invoice ----------
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  $csrf = (string)($_POST['csrf_token'] ?? '');
+  if (!hash_equals((string)$_SESSION['invoice_form_csrf'], $csrf)) {
+    http_response_code(403);
+    exit('Invalid CSRF token.');
+  }
+  $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
+
+  $post_source_quote_id = (int)trim((string)($_POST['source_quote_id'] ?? ''));
+  $post_invoice_number  = trim((string)($_POST['invoice_number'] ?? ''));
+  $post_invoice_date    = trim((string)($_POST['invoice_date'] ?? ''));
+  $post_customer_name   = trim((string)($_POST['customer_name'] ?? ''));
+  $post_company_name    = trim((string)($_POST['company_name'] ?? ''));
+  $post_phone_number    = trim((string)($_POST['phone_number'] ?? ''));
+  $post_email           = trim((string)($_POST['email'] ?? ''));
+  $post_notes           = trim((string)($_POST['notes'] ?? ''));
+
+  // Validate date; fall back to today
+  $tz = new DateTimeZone(APP_TZ);
+  $post_invoice_date_obj = DateTime::createFromFormat('Y-m-d', $post_invoice_date, $tz);
+  if (!$post_invoice_date_obj) {
+    $post_invoice_date = (new DateTime('now', $tz))->format('Y-m-d');
+  }
+
+  $item_descs   = (array)($_POST['item_desc']   ?? []);
+  $item_qtys    = (array)($_POST['item_qty']    ?? []);
+  $item_costs   = (array)($_POST['item_cost']   ?? []);
+  $item_markups = (array)($_POST['item_markup'] ?? []);
+
+  $subtotal = 0.0;
+  $line_items_to_save = [];
+  $count = count($item_descs);
+  for ($i = 0; $i < $count; $i++) {
+    $desc      = trim((string)($item_descs[$i]   ?? ''));
+    $qty       = max(INVOICE_MIN_QTY, (float)($item_qtys[$i]    ?? 1));
+    $cost      = max(0.0,  (float)($item_costs[$i]   ?? 0));
+    $markup    = max(0.0,  (float)($item_markups[$i] ?? 0));
+    $price     = $cost * (1 + $markup / 100);
+    $line_total = $qty * $price;
+    $subtotal  += $line_total;
+    $line_items_to_save[] = [
+      'description'   => $desc,
+      'quantity'      => $qty,
+      'cost'          => $cost,
+      'markup_percent'=> $markup,
+      'unit_price'    => $price,
+      'line_total'    => $line_total,
+    ];
+  }
+
+  $created_by = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+  if ($created_by !== null && $created_by <= 0) {
+    $created_by = null;
+  }
+
+  $pdo->beginTransaction();
+  try {
+    if ($post_source_quote_id > 0) {
+      // Update the existing quote row and mark it as converted
+      $inv_no = $post_invoice_number !== '' ? $post_invoice_number
+        : invoice_generate_number($post_source_quote_id);
+
+      $upd = $pdo->prepare(
+        "UPDATE quotes
+            SET customer_name     = ?,
+                company_name      = ?,
+                phone_number      = ?,
+                email             = ?,
+                quote_date        = ?,
+                notes             = ?,
+                subtotal_amount   = ?,
+                status            = 'converted',
+                converted_invoice_no = ?,
+                converted_at      = COALESCE(converted_at, NOW())
+          WHERE id = ?"
+      );
+      $upd->execute([
+        $post_customer_name,
+        $post_company_name !== '' ? $post_company_name : null,
+        $post_phone_number  !== '' ? $post_phone_number  : null,
+        $post_email         !== '' ? $post_email         : null,
+        $post_invoice_date,
+        $post_notes         !== '' ? $post_notes         : null,
+        round($subtotal, 2),
+        $inv_no,
+        $post_source_quote_id,
+      ]);
+
+      // Replace line items
+      $pdo->prepare("DELETE FROM quote_items WHERE quote_id = ?")->execute([$post_source_quote_id]);
+
+      $ins = $pdo->prepare(
+        "INSERT INTO quote_items
+           (quote_id, line_position, description, quantity, cost, markup_percent, unit_price, line_total)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      );
+      foreach ($line_items_to_save as $pos => $item) {
+        $ins->execute([
+          $post_source_quote_id, $pos + 1,
+          $item['description'], $item['quantity'], $item['cost'],
+          $item['markup_percent'], $item['unit_price'], $item['line_total'],
+        ]);
+      }
+    } else {
+      // Insert a new quote row representing the standalone invoice
+      $ins_q = $pdo->prepare(
+        "INSERT INTO quotes
+           (customer_name, company_name, phone_number, email, quote_date,
+            status, notes, subtotal_amount, converted_invoice_no, converted_at, created_by)
+         VALUES (?, ?, ?, ?, ?, 'converted', ?, ?, '', NOW(), ?)"
+      );
+      $ins_q->execute([
+        $post_customer_name,
+        $post_company_name !== '' ? $post_company_name : null,
+        $post_phone_number  !== '' ? $post_phone_number  : null,
+        $post_email         !== '' ? $post_email         : null,
+        $post_invoice_date,
+        $post_notes         !== '' ? $post_notes         : null,
+        round($subtotal, 2),
+        $created_by,
+      ]);
+      $new_id = (int)$pdo->lastInsertId();
+
+      // Assign invoice number using the new row's ID
+      $inv_no = invoice_generate_number($new_id);
+      $pdo->prepare("UPDATE quotes SET converted_invoice_no = ? WHERE id = ?")->execute([$inv_no, $new_id]);
+
+      // Insert line items
+      $ins = $pdo->prepare(
+        "INSERT INTO quote_items
+           (quote_id, line_position, description, quantity, cost, markup_percent, unit_price, line_total)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      );
+      foreach ($line_items_to_save as $pos => $item) {
+        $ins->execute([
+          $new_id, $pos + 1,
+          $item['description'], $item['quantity'], $item['cost'],
+          $item['markup_percent'], $item['unit_price'], $item['line_total'],
+        ]);
+      }
+    }
+
+    $pdo->commit();
+    header('Location: invoice_tracker.php?success=created');
+    exit;
+  } catch (Throwable $e) {
+    $pdo->rollBack();
+    throw $e;
+  }
+}
 
 function invoice_format_money($value): string {
   return number_format((float)$value, 2);
+}
+
+function invoice_generate_number(int $id): string {
+  $stamp = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Ymd');
+  return 'INV-' . $stamp . '-' . str_pad((string)$id, 5, '0', STR_PAD_LEFT);
 }
 
 function invoice_number_from_quote(array $quote, int $quote_id): string {
@@ -19,8 +182,7 @@ function invoice_number_from_quote(array $quote, int $quote_id): string {
     return $existing;
   }
 
-  $stamp = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Ymd');
-  return 'INV-' . $stamp . '-' . str_pad((string)$quote_id, 5, '0', STR_PAD_LEFT);
+  return invoice_generate_number($quote_id);
 }
 
 function invoice_default_number(): string {
@@ -128,9 +290,8 @@ render_header('Invoice Form');
     <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">Quote converted to invoice successfully.</div>
   <?php endif; ?>
 
-  <div class="alert" style="margin-bottom:14px;">This is the initial invoice form scaffold. Saving invoices can be added next.</div>
-
-  <form method="post" action="#">
+  <form method="post" action="">
+    <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
     <input type="hidden" name="source_quote_id" value="<?= h($fields['source_quote_id']) ?>" />
 
     <div style="display:grid; gap:14px; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));">
@@ -206,7 +367,7 @@ render_header('Invoice Form');
     </div>
 
     <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
-      <button type="button" class="btn primary" disabled style="font-size:18px; padding:14px 22px; opacity:.7; cursor:not-allowed;">Save Invoice (Coming Soon)</button>
+      <button type="submit" class="btn primary" style="font-size:18px; padding:14px 22px;">Save Invoice</button>
       <?php if ($quote): ?>
         <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
       <?php endif; ?>

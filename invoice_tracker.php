@@ -48,6 +48,10 @@ $invoice_number_stamp = (new DateTime('now', new DateTimeZone(APP_TZ)))->format(
 render_header('Invoice Tracker');
 ?>
 
+<?php if (($_GET['success'] ?? '') === 'created'): ?>
+  <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">Invoice saved successfully.</div>
+<?php endif; ?>
+
 <div class="card">
   <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
     <h2 style="margin:0;">All Invoices</h2>
