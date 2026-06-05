@@ -300,23 +300,54 @@ function render_doc_details(string $details, array $placeholder_values = []): st
   );
 }
 
+function is_menu_item_visible(array $item): bool {
+  $type = $item['type'] ?? 'link';
+  if ($type !== 'link') {
+    return true;
+  }
+
+  return !array_key_exists('visible', $item) || !empty($item['visible']);
+}
+
+function is_menu_item_active(array $item, string $current): bool {
+  $files = $item['files'] ?? null;
+  if ($files === null && isset($item['file'])) {
+    $files = [$item['file']];
+  }
+  if ($files === null) {
+    return false;
+  }
+
+  return in_array($current, (array)$files, true);
+}
+
+function render_menu_link(array $item, string $current): void {
+  if (array_key_exists('visible', $item) && empty($item['visible'])) {
+    return;
+  }
+  ?>
+  <a class="menu-link <?= is_menu_item_active($item, $current) ? 'active' : '' ?>" href="<?= h($item['href']) ?>"><?= h($item['label']) ?></a>
+  <?php
+}
+
 function render_menu_dropdown(string $label, array $items, string $current): void {
-  $visible_items = array_values(array_filter($items, static fn(array $item): bool => !empty($item['visible'])));
+  $visible_items = array_values(array_filter($items, 'is_menu_item_visible'));
   if (!$visible_items) {
     return;
   }
 
-  if (count($visible_items) === 1) {
-    $item = $visible_items[0];
+  $link_items = array_values(array_filter($visible_items, static fn(array $item): bool => ($item['type'] ?? 'link') === 'link'));
+  if (count($link_items) === 1 && count($visible_items) === 1) {
+    $item = $link_items[0];
     ?>
-    <a class="menu-link <?= $current === $item['file'] ? 'active' : '' ?>" href="<?= h($item['href']) ?>"><?= h($item['label']) ?></a>
+    <a class="menu-link <?= is_menu_item_active($item, $current) ? 'active' : '' ?>" href="<?= h($item['href']) ?>"><?= h($item['label']) ?></a>
     <?php
     return;
   }
 
   $is_active = false;
-  foreach ($visible_items as $item) {
-    if ($current === $item['file']) {
+  foreach ($link_items as $item) {
+    if (is_menu_item_active($item, $current)) {
       $is_active = true;
       break;
     }
@@ -326,7 +357,14 @@ function render_menu_dropdown(string $label, array $items, string $current): voi
     <summary class="menu-link menu-dropdown-toggle <?= $is_active ? 'active' : '' ?>"><?= h($label) ?></summary>
     <div class="menu-dropdown-menu">
       <?php foreach ($visible_items as $item): ?>
-      <a class="menu-dropdown-item <?= $current === $item['file'] ? 'active' : '' ?>" href="<?= h($item['href']) ?>"><?= h($item['label']) ?></a>
+      <?php $type = $item['type'] ?? 'link'; ?>
+      <?php if ($type === 'section'): ?>
+      <div class="menu-dropdown-section-label"><?= h($item['label']) ?></div>
+      <?php elseif ($type === 'separator'): ?>
+      <div class="menu-dropdown-divider" aria-hidden="true"></div>
+      <?php else: ?>
+      <a class="menu-dropdown-item <?= is_menu_item_active($item, $current) ? 'active' : '' ?>" href="<?= h($item['href']) ?>"><?= h($item['label']) ?></a>
+      <?php endif; ?>
       <?php endforeach; ?>
     </div>
   </details>
@@ -459,41 +497,47 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
 <nav class="menubar card">
   <div class="menubar-inner">
     <?php if ($is_regular_user): ?>
-    <a class="menu-link <?= $current === 'user_page.php' ? 'active' : '' ?>" href="user_page.php">My Profile</a>
-    <a class="menu-link <?= $current === 'machine_inquiry_form.php' ? 'active' : '' ?>" href="machine_inquiry_form.php">Machine Inquiry Form</a>
+    <?php render_menu_link(['href' => 'user_page.php', 'file' => 'user_page.php', 'label' => 'My Profile'], $current); ?>
+    <?php render_menu_link(['href' => 'machine_inquiry_form.php', 'file' => 'machine_inquiry_form.php', 'label' => 'Machine Inquiry Form'], $current); ?>
     <?php elseif ($show_mod_menu): ?>
-    <a class="menu-link <?= $current === 'index.php' ? 'active' : '' ?>" href="index.php">Home</a>
-    <a class="menu-link <?= $current === 'user_page.php' ? 'active' : '' ?>" href="user_page.php">My Profile</a>
-    <a class="menu-link <?= $current === 'messages.php' ? 'active' : '' ?>" href="messages.php">Messages</a>
-    <a class="menu-link <?= $current === 'time_clock.php' ? 'active' : '' ?>" href="time_clock.php">Time Clock</a>
-    <a class="menu-link <?= $current === 'quick_order_form.php' ? 'active' : '' ?>" href="quick_order_form.php">Quick Order</a>
-    <a class="menu-link <?= $current === 'quick_order_list.php' ? 'active' : '' ?>" href="quick_order_list.php">Quick Order List</a>
+    <?php render_menu_link(['href' => 'index.php', 'file' => 'index.php', 'label' => 'Home'], $current); ?>
+    <?php render_menu_link(['href' => 'user_page.php', 'file' => 'user_page.php', 'label' => 'My Profile'], $current); ?>
+    <?php render_menu_link(['href' => 'messages.php', 'file' => 'messages.php', 'label' => 'Messages'], $current); ?>
+    <?php render_menu_link(['href' => 'time_clock.php', 'files' => ['time_clock.php', 'time_report.php'], 'label' => 'Time Clock'], $current); ?>
     <?php render_menu_dropdown('Inquiries', [
-      ['href' => 'machine_inquiry_form.php', 'file' => 'machine_inquiry_form.php', 'label' => 'Machine Inquiry Form', 'visible' => true],
-      ['href' => 'machine_inquiry_admin.php', 'file' => 'machine_inquiry_admin.php', 'label' => 'Inquiry Admin', 'visible' => true],
+      ['href' => 'machine_inquiry_form.php', 'file' => 'machine_inquiry_form.php', 'label' => 'Machine Inquiry Form'],
+      ['href' => 'machine_inquiry_admin.php', 'file' => 'machine_inquiry_admin.php', 'label' => 'Inquiry Admin'],
     ], $current); ?>
     <?php render_menu_dropdown('Projects', [
-      ['href' => 'projects.php', 'file' => 'projects.php', 'label' => 'Projects', 'visible' => true],
-      ['href' => 'documents.php', 'file' => 'documents.php', 'label' => 'Documents', 'visible' => true],
-      ['href' => 'sops.php', 'file' => 'sops.php', 'label' => 'SOP', 'visible' => true],
-      ['href' => 'playbooks.php', 'file' => 'playbooks.php', 'label' => 'Playbooks', 'visible' => true],
-      ['href' => 'archives.php', 'file' => 'archives.php', 'label' => 'Archives', 'visible' => true],
+      ['href' => 'projects.php', 'files' => ['projects.php', 'project_form.php', 'project_details.php'], 'label' => 'Projects'],
+      ['href' => 'documents.php', 'files' => ['documents.php', 'doc_form.php', 'doc_tasks.php'], 'label' => 'Documents'],
+      ['href' => 'sops.php', 'files' => ['sops.php', 'sop_category_form.php', 'sop_page_form.php', 'sop_pages.php'], 'label' => 'SOP'],
+      ['href' => 'playbooks.php', 'files' => ['playbooks.php', 'playbook_form.php', 'playbook_task_form.php', 'playbook_tasks.php'], 'label' => 'Playbooks'],
+      ['href' => 'archives.php', 'file' => 'archives.php', 'label' => 'Archives'],
+    ], $current); ?>
+    <?php render_menu_dropdown('Sales', [
+      ['type' => 'section', 'label' => 'Quick Orders'],
+      ['href' => 'quick_order_form.php', 'file' => 'quick_order_form.php', 'label' => 'Quick Order'],
+      ['href' => 'quick_order_list.php', 'file' => 'quick_order_list.php', 'label' => 'Quick Order List'],
     ], $current); ?>
     <?php render_menu_dropdown('Sourcing', [
-      ['href' => 'vendors.php', 'file' => 'vendors.php', 'label' => 'Vendors', 'visible' => true],
-      ['href' => 'customers.php', 'file' => 'customers.php', 'label' => 'Customers', 'visible' => true],
-      ['href' => 'quotes.php', 'file' => 'quotes.php', 'label' => 'Quotes', 'visible' => true],
-      ['href' => 'freight_forwarders.php', 'file' => 'freight_forwarders.php', 'label' => 'Freight Forwarders', 'visible' => true],
-      ['href' => 'sourcing_rfq_form.php', 'file' => 'sourcing_rfq_form.php', 'label' => 'Sourcing RFQ Form', 'visible' => true],
-      ['href' => 'sourcing_rfq_tracker.php', 'file' => 'sourcing_rfq_tracker.php', 'label' => 'Sourcing RFQ Tracker', 'visible' => true],
-      ['href' => 'alibaba_responses.php', 'file' => 'alibaba_responses.php', 'label' => 'Alibaba Responses', 'visible' => true],
-      ['href' => 'shipping_rfq_form.php', 'file' => 'shipping_rfq_form.php', 'label' => 'Shipping RFQ Form', 'visible' => true],
-      ['href' => 'shipping_rfq_tracker.php', 'file' => 'shipping_rfq_tracker.php', 'label' => 'Shipping RFQ Tracker', 'visible' => true],
-      ['href' => 'order_tracker.php', 'file' => 'order_tracker.php', 'label' => 'Order Tracker', 'visible' => true],
+      ['type' => 'section', 'label' => 'Partners & Pricing'],
+      ['href' => 'vendors.php', 'files' => ['vendors.php', 'vendor_form.php', 'vendor_details.php'], 'label' => 'Vendors'],
+      ['href' => 'customers.php', 'file' => 'customers.php', 'label' => 'Customers'],
+      ['href' => 'quotes.php', 'files' => ['quotes.php', 'rfq_details.php', 'rfq_quote_details.php', 'rfq_quote_file.php'], 'label' => 'Quotes'],
+      ['href' => 'freight_forwarders.php', 'files' => ['freight_forwarders.php', 'freight_forwarder_form.php', 'freight_forwarder_details.php'], 'label' => 'Freight Forwarders'],
+      ['href' => 'alibaba_responses.php', 'file' => 'alibaba_responses.php', 'label' => 'Alibaba Responses'],
+      ['type' => 'separator'],
+      ['type' => 'section', 'label' => 'RFQ & Shipping'],
+      ['href' => 'sourcing_rfq_form.php', 'file' => 'sourcing_rfq_form.php', 'label' => 'Sourcing RFQ Form'],
+      ['href' => 'sourcing_rfq_tracker.php', 'files' => ['sourcing_rfq_tracker.php', 'sourcing_rfq_submitted.php', 'sourcing_rfq_image.php'], 'label' => 'Sourcing RFQ Tracker'],
+      ['href' => 'shipping_rfq_form.php', 'file' => 'shipping_rfq_form.php', 'label' => 'Shipping RFQ Form'],
+      ['href' => 'shipping_rfq_tracker.php', 'file' => 'shipping_rfq_tracker.php', 'label' => 'Shipping RFQ Tracker'],
+      ['href' => 'order_tracker.php', 'files' => ['order_tracker.php', 'order_form.php', 'order_document_file.php', 'order_document_upload.php'], 'label' => 'Order Tracker'],
     ], $current); ?>
-    <a class="menu-link <?= in_array($current, ['inventory_list.php', 'inventory_form.php'], true) ? 'active' : '' ?>" href="inventory_list.php">Inventory</a>
+    <?php render_menu_link(['href' => 'inventory_list.php', 'files' => ['inventory_list.php', 'inventory_form.php'], 'label' => 'Inventory'], $current); ?>
     <?php if ($show_admin_menu): ?>
-    <a class="menu-link <?= $current === 'admin_backend.php' ? 'active' : '' ?>" href="admin_backend.php">Admin Backend</a>
+    <?php render_menu_link(['href' => 'admin_backend.php', 'files' => ['admin_backend.php', 'users.php', 'user_profiles.php', 'form_admin.php'], 'label' => 'Admin Backend'], $current); ?>
     <?php endif; ?>
     <?php endif; ?>
   </div>
