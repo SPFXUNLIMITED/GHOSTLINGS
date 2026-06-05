@@ -318,7 +318,37 @@ function is_menu_item_active(array $item, string $current): bool {
     return false;
   }
 
-  return in_array($current, (array)$files, true);
+  if (!in_array($current, (array)$files, true)) {
+    return false;
+  }
+
+  $href = (string)($item['href'] ?? '');
+  $href_query = parse_url($href, PHP_URL_QUERY);
+  if (empty($href_query)) {
+    return true;
+  }
+
+  $item_query = [];
+  parse_str($href_query, $item_query);
+
+  $current_query = $_GET;
+
+  foreach ($item_query as $key => $value) {
+    if (!array_key_exists($key, $current_query)) {
+      return false;
+    }
+
+    $current_value = $current_query[$key];
+    if (is_array($current_value)) {
+      return false;
+    }
+
+    if ((string)$current_value !== (string)$value) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function render_menu_link(array $item, string $current): void {
@@ -522,16 +552,12 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
     ], $current); ?>
     <?php render_menu_dropdown('Sourcing', [
       ['type' => 'section', 'label' => 'Partners & Pricing'],
-      ['href' => 'vendors.php', 'files' => ['vendors.php', 'vendor_form.php', 'vendor_details.php'], 'label' => 'Vendors'],
       ['href' => 'customers.php', 'file' => 'customers.php', 'label' => 'Customers'],
+      ['href' => 'vendors.php', 'files' => ['vendors.php', 'vendor_form.php', 'vendor_details.php'], 'label' => 'Vendors'],
       ['href' => 'freight_forwarders.php', 'files' => ['freight_forwarders.php', 'freight_forwarder_form.php', 'freight_forwarder_details.php'], 'label' => 'Freight Forwarders'],
-      ['href' => 'alibaba_responses.php', 'file' => 'alibaba_responses.php', 'label' => 'Alibaba Responses'],
       ['type' => 'separator'],
-      ['type' => 'section', 'label' => 'Quotes'],
-      ['href' => 'quotes.php?view=new', 'file' => 'quotes.php', 'label' => 'Quote Form'],
-      ['href' => 'quotes.php?view=all', 'file' => 'quotes.php', 'label' => 'Quote Tracker'],
-      ['href' => 'quotes.php?view=all', 'file' => 'quotes.php', 'label' => 'Invoice Form'],
-      ['href' => 'quotes.php?view=all', 'file' => 'quotes.php', 'label' => 'Invoice Tracker'],
+      ['type' => 'section', 'label' => 'Tools'],
+      ['href' => 'alibaba_responses.php', 'file' => 'alibaba_responses.php', 'label' => 'Alibaba Responses'],
       ['type' => 'separator'],
       ['type' => 'section', 'label' => 'RFQs'],
       ['href' => 'sourcing_rfq_form.php', 'file' => 'sourcing_rfq_form.php', 'label' => 'RFQ Form'],
@@ -542,6 +568,13 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
       ['type' => 'section', 'label' => 'Shipping'],
       ['href' => 'shipping_rfq_form.php', 'file' => 'shipping_rfq_form.php', 'label' => 'Shipping Form'],
       ['href' => 'shipping_rfq_tracker.php', 'file' => 'shipping_rfq_tracker.php', 'label' => 'Shipping Tracker'],
+    ], $current); ?>
+    <?php render_menu_dropdown('Quotes & Invoices', [
+      ['href' => 'quotes.php?view=new', 'file' => 'quotes.php', 'label' => 'Quote Form'],
+      ['href' => 'quotes.php?view=all', 'file' => 'quotes.php', 'label' => 'Quote Tracker'],
+      ['type' => 'separator'],
+      ['href' => 'invoice_form.php', 'file' => 'invoice_form.php', 'label' => 'Invoice Form'],
+      ['href' => 'invoice_tracker.php', 'file' => 'invoice_tracker.php', 'label' => 'Invoice Tracker'],
     ], $current); ?>
     <?php render_menu_link(['href' => 'inventory_list.php', 'files' => ['inventory_list.php', 'inventory_form.php'], 'label' => 'Inventory'], $current); ?>
     <?php if ($show_admin_menu): ?>
