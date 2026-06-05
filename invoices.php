@@ -24,10 +24,26 @@ if ($view === 'id' && $detail_id <= 0) {
 $print_mode = isset($_GET['print']) && $_GET['print'] === '1';
 $show_all = $view === 'all';
 $show_detail = $view === 'id' && $detail_id > 0;
+$per_page = 50;
+$page = max(1, (int)($_GET['page'] ?? 1));
+$total_invoices = 0;
+$total_pages = 1;
 
 $invoices = [];
 if ($show_all) {
-  $stmt = $pdo->query(
+  $total_stmt = $pdo->query(
+    "SELECT COUNT(*)
+     FROM quotes q
+     WHERE q.converted_invoice_no IS NOT NULL AND q.converted_invoice_no <> ''"
+  );
+  $total_invoices = (int)$total_stmt->fetchColumn();
+  $total_pages = max(1, (int)ceil($total_invoices / $per_page));
+  if ($page > $total_pages) {
+    $page = $total_pages;
+  }
+  $offset = ($page - 1) * $per_page;
+
+  $stmt = $pdo->prepare(
     "SELECT q.id, q.converted_invoice_no, q.customer_name, q.company_name, q.quote_date,
             q.subtotal_amount, q.converted_at, q.created_at, COUNT(qi.id) AS line_count
      FROM quotes q
@@ -35,8 +51,11 @@ if ($show_all) {
      WHERE q.converted_invoice_no IS NOT NULL AND q.converted_invoice_no <> ''
      GROUP BY q.id
      ORDER BY COALESCE(q.converted_at, q.created_at) DESC, q.id DESC
-     LIMIT 200"
+     LIMIT :limit OFFSET :offset"
   );
+  $stmt->bindValue(':limit', $per_page, PDO::PARAM_INT);
+  $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+  $stmt->execute();
   $invoices = $stmt->fetchAll();
 }
 
@@ -67,7 +86,12 @@ if ($show_detail) {
     exit;
   }
 
-  $item_stmt = $pdo->prepare("SELECT * FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC");
+  $item_stmt = $pdo->prepare(
+    "SELECT id, quote_id, line_position, description, quantity, cost, markup_percent, unit_price, line_total
+     FROM quote_items
+     WHERE quote_id = ?
+     ORDER BY line_position ASC, id ASC"
+  );
   $item_stmt->execute([$detail_id]);
   $detail_items = $item_stmt->fetchAll();
 }
@@ -142,8 +166,8 @@ render_header('Invoices');
             <td><?= (int)$idx + 1 ?></td>
             <td><?= h((string)$item['description']) ?></td>
             <td><?= h(invoice_format_money($item['quantity'])) ?></td>
-            <td>$<?= h(invoice_format_money($item['cost'] ?? 0)) ?></td>
-            <td><?= h(number_format((float)($item['markup_percent'] ?? 20), 2)) ?>%</td>
+            <td>$<?= h(invoice_format_money($item['cost'])) ?></td>
+            <td><?= h(number_format((float)$item['markup_percent'], 2)) ?>%</td>
             <td>$<?= h(invoice_format_money($item['unit_price'])) ?></td>
             <td><strong>$<?= h(invoice_format_money($item['line_total'])) ?></strong></td>
           </tr>
@@ -201,6 +225,20 @@ render_header('Invoices');
         <?php endforeach; ?>
       </tbody>
     </table>
+
+    <?php if ($total_invoices > $per_page): ?>
+      <div class="no-print" style="margin-top:14px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <p class="muted" style="margin:0;">Page <?= (int)$page ?> of <?= (int)$total_pages ?> • <?= (int)$total_invoices ?> invoices</p>
+        <div style="display:flex; gap:8px;">
+          <?php if ($page > 1): ?>
+            <a class="btn" href="invoices.php?view=all&page=<?= (int)($page - 1) ?>">Previous</a>
+          <?php endif; ?>
+          <?php if ($page < $total_pages): ?>
+            <a class="btn" href="invoices.php?view=all&page=<?= (int)($page + 1) ?>">Next</a>
+          <?php endif; ?>
+        </div>
+      </div>
+    <?php endif; ?>
   </div>
 <?php endif; ?>
 
