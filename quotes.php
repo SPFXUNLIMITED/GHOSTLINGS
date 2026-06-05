@@ -91,7 +91,7 @@ function quote_env_value(string $key): string {
           }
 
           $name = trim(substr($line, 0, $separator_pos));
-          if ($name === '' || !preg_match('/^[A-Z0-9_]+$/i', $name)) {
+          if ($name === '' || !preg_match('/^[A-Z0-9_]+$/', $name)) {
             continue;
           }
 
@@ -99,9 +99,25 @@ function quote_env_value(string $key): string {
           if (strlen($value) >= 2) {
             $first = $value[0];
             $last = $value[strlen($value) - 1];
-            if (($first === '"' && $last === '"') || ($first === "'" && $last === "'")) {
+            if ($first === '"' && $last === '"') {
               $value = substr($value, 1, -1);
+              $value = strtr($value, [
+                '\\\\' => '\\',
+                '\\"' => '"',
+                '\\n' => "\n",
+                '\\r' => "\r",
+                '\\t' => "\t",
+              ]);
+            } elseif ($first === "'" && $last === "'") {
+              $value = substr($value, 1, -1);
+              $value = strtr($value, [
+                '\\\\' => '\\',
+                "\\'" => "'",
+              ]);
             }
+          } else {
+            $value = preg_replace('/\s+#.*$/', '', $value) ?? $value;
+            $value = rtrim($value);
           }
 
           $dotenv_values[$name] = $value;
