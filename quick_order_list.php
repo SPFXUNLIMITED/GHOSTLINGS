@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
          NULLIF(email, ''),
          ''
        ) AS customer_name,
-       company,
+       company AS company_name,
        phone,
        email
      FROM customers
@@ -564,7 +564,7 @@ render_header($page_title);
         }
 
         rows.forEach((row) => {
-          const rowCompany = row.company || '';
+          const rowCompany = row.company_name || row.company || '';
           const rowPhone = row.phone || row.phone_number || row.contact_phone || '';
           const rowEmail = row.email || row.contact_email || '';
           const btn = document.createElement('button');
