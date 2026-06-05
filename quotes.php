@@ -596,15 +596,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           }
           exit;
         } catch (Throwable $e) {
-          if ($pdo->inTransaction()) {
-            $pdo->rollBack();
-          }
-          error_log('Failed to save quote: ' . $e->getMessage());
-          if ($e instanceof PDOException && quote_is_development()) {
-            $errors[] = 'Database error: ' . $e->getMessage();
-          } else {
-            $errors[] = 'Unable to save quote right now. Please try again.';
-          }
+          $pdo->rollBack();
+          error_log('Quote save failed: ' . $e->getMessage());
+          $errors[] = 'Save failed: ' . $e->getMessage();
         }
       }
     }
