@@ -1089,6 +1089,13 @@ render_header('Sourcing RFQ Tracker');
 
 <?php if (!$selected_rfq): ?>
   <?= render_attachment_modal_assets() ?>
+  <style>
+    .rfq-thumb-modal-button:focus-visible {
+      outline: 2px solid #2563eb;
+      outline-offset: 2px;
+      border-radius: 8px;
+    }
+  </style>
   <div class="card">
     <div class="table-wrap" style="overflow-x:auto;">
       <table class="table-auto" style="min-width:720px;">
@@ -1119,13 +1126,14 @@ render_header('Sourcing RFQ Tracker');
                 ?>
                 <?php if ($has_rfq_image): ?>
                   <button type="button"
-                          class="attachment-open-link"
+                          class="attachment-open-link rfq-thumb-modal-button"
                           data-attachment-name="<?= h('RFQ #' . (int)$r['id'] . ' Image') ?>"
                           data-attachment-file="<?= h($full_url . '&download=1') ?>"
                           data-attachment-preview="<?= h($full_url) ?>"
                           data-attachment-previewable="1"
                           data-attachment-image="1"
                           style="padding:0; border:0; background:none;"
+                          aria-label="<?= h('View RFQ #' . (int)$r['id'] . ' image in modal') ?>"
                           title="View RFQ image">
                     <img src="<?= h($thumb_url) ?>"
                          alt="<?= h('RFQ #' . (int)$r['id'] . ' image') ?>"
