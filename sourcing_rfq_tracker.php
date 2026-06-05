@@ -1087,7 +1087,42 @@ render_header('Sourcing RFQ Tracker');
   </script>
 <?php endif; ?>
 
+<?php
+  $rfq_list_has_images = false;
+  foreach ($rfqs as $rfq_list_item) {
+    if ((string)($rfq_list_item['image_thumb'] ?? '') !== '' || (string)($rfq_list_item['image_path'] ?? '') !== '') {
+      $rfq_list_has_images = true;
+      break;
+    }
+  }
+?>
+
 <?php if (!$selected_rfq): ?>
+  <?php if ($rfq_list_has_images): ?>
+    <?= render_attachment_modal_assets() ?>
+    <style>
+      .rfq-thumb-modal-button {
+        padding: 0;
+        border: 0;
+        background: none;
+      }
+
+      .rfq-thumb-modal-button:focus-visible {
+        outline: 2px solid currentColor;
+        outline-offset: 2px;
+        border-radius: 8px;
+      }
+
+      .rfq-thumb-modal-image {
+        width: 50px;
+        height: 50px;
+        object-fit: cover;
+        border-radius: 6px;
+        border: 1px solid rgba(0,0,0,.12);
+        display: block;
+      }
+    </style>
+  <?php endif; ?>
   <div class="card">
     <div class="table-wrap" style="overflow-x:auto;">
       <table class="table-auto" style="min-width:720px;">
@@ -1108,20 +1143,30 @@ render_header('Sourcing RFQ Tracker');
             <tr>
               <td>
                 <?php
+                  $rfq_id = (int)$r['id'];
                   $has_thumb_image = (string)($r['image_thumb'] ?? '') !== '';
                   $has_full_image = (string)($r['image_path'] ?? '') !== '';
                   $has_rfq_image = $has_thumb_image || $has_full_image;
                   $thumb_url = $has_rfq_image
-                    ? 'sourcing_rfq_image.php?rfq_id=' . (int)$r['id'] . '&type=' . ($has_thumb_image ? 'thumb' : 'full')
+                    ? 'sourcing_rfq_image.php?rfq_id=' . $rfq_id . '&type=' . ($has_thumb_image ? 'thumb' : 'full')
                     : '';
-                  $full_url = $has_rfq_image ? 'sourcing_rfq_image.php?rfq_id=' . (int)$r['id'] . '&type=full' : '';
+                  $full_url = $has_rfq_image ? 'sourcing_rfq_image.php?rfq_id=' . $rfq_id . '&type=full' : '';
+                  $download_url = $has_rfq_image ? 'sourcing_rfq_image.php?rfq_id=' . $rfq_id . '&type=full&download=1' : '';
                 ?>
                 <?php if ($has_rfq_image): ?>
-                  <a href="<?= h($full_url) ?>" target="_blank" rel="noopener noreferrer" title="View RFQ image">
-                    <img src="<?= h($thumb_url) ?>"
-                         alt="<?= h('RFQ #' . (int)$r['id'] . ' image') ?>"
-                         style="width:50px; height:50px; object-fit:cover; border-radius:6px; border:1px solid rgba(0,0,0,.12); display:block;" />
-                  </a>
+                  <button type="button"
+                          class="attachment-open-link rfq-thumb-modal-button"
+                          data-attachment-name="<?= h('RFQ #' . $rfq_id . ' Image') ?>"
+                          data-attachment-file="<?= h($download_url) ?>"
+                          data-attachment-preview="<?= h($full_url) ?>"
+                          data-attachment-previewable="1"
+                          data-attachment-image="1"
+                          aria-label="<?= h('View RFQ #' . $rfq_id . ' image in modal') ?>">
+                    <img class="rfq-thumb-modal-image"
+                         src="<?= h($thumb_url) ?>"
+                         alt="<?= h('RFQ #' . $rfq_id . ' image') ?>"
+                         />
+                  </button>
                 <?php else: ?>
                   <span class="muted">—</span>
                 <?php endif; ?>
