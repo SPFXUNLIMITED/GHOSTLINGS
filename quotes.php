@@ -91,7 +91,7 @@ function quote_env_value(string $key): string {
           }
 
           $name = trim(substr($line, 0, $separator_pos));
-          if ($name === '' || !preg_match('/^[A-Z0-9_]+$/', $name)) {
+          if ($name === '' || !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $name)) {
             continue;
           }
 
