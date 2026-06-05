@@ -23,6 +23,14 @@ function quick_order_status_redirect_url(): string {
   return 'quick_order_list.php?view=all&status_updated=1';
 }
 
+function quick_order_escape_like(string $value, string $escape = '\\'): string {
+  return str_replace(
+    [$escape, '%', '_'],
+    [$escape . $escape, $escape . '%', $escape . '_'],
+    $value
+  );
+}
+
 function quick_order_notes_preview(?string $notes, int $max_length = 120): string {
   $notes = trim((string)$notes);
   if ($notes === '') {
@@ -40,6 +48,37 @@ function quick_order_notes_preview(?string $notes, int $max_length = 120): strin
 
 if (empty($_SESSION['quick_order_csrf'])) {
   $_SESSION['quick_order_csrf'] = bin2hex(random_bytes(24));
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
+  header('Content-Type: application/json; charset=utf-8');
+
+  $csrf = trim((string)($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
+  if ($csrf === '' || !hash_equals((string)$_SESSION['quick_order_csrf'], $csrf)) {
+    http_response_code(403);
+    echo json_encode([]);
+    exit;
+  }
+
+  $query = trim((string)($_GET['q'] ?? ''));
+  if ($query === '') {
+    echo json_encode([]);
+    exit;
+  }
+
+  $like = '%' . quick_order_escape_like($query) . '%';
+  $stmt = $pdo->prepare(
+    "SELECT id, customer_name, company, phone, email
+     FROM customers
+     WHERE customer_name LIKE ? ESCAPE '\\\\'
+        OR company LIKE ? ESCAPE '\\\\'
+        OR email LIKE ? ESCAPE '\\\\'
+     ORDER BY customer_name ASC, id DESC
+     LIMIT 8"
+  );
+  $stmt->execute([$like, $like, $like]);
+  echo json_encode($stmt->fetchAll(), JSON_UNESCAPED_UNICODE);
+  exit;
 }
 
 $today = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Y-m-d');
@@ -452,16 +491,17 @@ render_header($page_title);
     </div>
   </div>
 <?php else: ?>
-  <form method="post" class="card" style="max-width:960px;">
+  <form method="post" class="card" style="max-width:960px; position:relative;">
     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quick_order_csrf']) ?>" />
     <?php if ($edit_id !== null): ?>
       <input type="hidden" name="edit_id" value="<?= $edit_id ?>" />
       <h2 style="margin:0 0 14px;">Edit Quick Order</h2>
     <?php endif; ?>
-    <div class="form-grid">
-      <div>
+    <div class="form-grid" style="position:relative;">
+      <div style="position:relative;">
         <label for="customer_name">Customer Name <span style="color:var(--d)">*</span></label>
-        <input id="customer_name" type="text" name="customer_name" maxlength="255" required value="<?= h($fields['customer_name']) ?>" />
+        <input id="customer_name" type="text" name="customer_name" maxlength="255" required autocomplete="off" value="<?= h($fields['customer_name']) ?>" />
+        <div id="customerSuggestions" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:40; background:#fff; border:1px solid #d1d5db; border-radius:10px; box-shadow:0 12px 24px rgba(2,6,23,.12); margin-top:6px; max-height:220px; overflow:auto;"></div>
       </div>
       <div>
         <label for="company_name">Company Name</label>
@@ -489,6 +529,89 @@ render_header($page_title);
       <a class="btn" href="<?= $edit_id !== null ? 'quick_order_list.php?view=id&id=' . (int)$edit_id : 'quick_order_list.php?view=all' ?>"><?= $edit_id !== null ? 'Back to Quick Order' : 'View All Quick Orders' ?></a>
     </div>
   </form>
+  <script>
+    (() => {
+      const customerNameInput = document.getElementById('customer_name');
+      const companyInput = document.getElementById('company_name');
+      const phoneInput = document.getElementById('phone_number');
+      const emailInput = document.getElementById('email');
+      const suggestions = document.getElementById('customerSuggestions');
+      let debounceTimer = null;
+
+      function hideSuggestions() {
+        suggestions.style.display = 'none';
+        suggestions.innerHTML = '';
+      }
+
+      function renderSuggestions(rows) {
+        suggestions.innerHTML = '';
+        if (!rows.length) {
+          hideSuggestions();
+          return;
+        }
+
+        rows.forEach((row) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn';
+          btn.style.display = 'block';
+          btn.style.width = '100%';
+          btn.style.textAlign = 'left';
+          btn.style.borderRadius = '0';
+          btn.style.border = '0';
+          btn.style.borderBottom = '1px solid #e5e7eb';
+          btn.style.background = '#fff';
+          btn.style.padding = '10px 12px';
+          const title = document.createElement('strong');
+          title.textContent = row.customer_name || '';
+          btn.appendChild(title);
+          const meta = document.createElement('div');
+          meta.className = 'muted';
+          meta.style.marginTop = '3px';
+          meta.textContent = (row.company || '—') + ' • ' + (row.phone || '—') + ' • ' + (row.email || '—');
+          btn.appendChild(meta);
+          btn.addEventListener('click', () => {
+            customerNameInput.value = row.customer_name || '';
+            companyInput.value = row.company || '';
+            phoneInput.value = row.phone || '';
+            emailInput.value = row.email || '';
+            hideSuggestions();
+          });
+          suggestions.appendChild(btn);
+        });
+
+        suggestions.style.display = 'block';
+      }
+
+      customerNameInput.addEventListener('input', () => {
+        const q = customerNameInput.value.trim();
+        if (debounceTimer) {
+          clearTimeout(debounceTimer);
+        }
+        if (q.length < 1) {
+          hideSuggestions();
+          return;
+        }
+
+        debounceTimer = setTimeout(() => {
+          const searchUrl = 'quick_order_list.php?customer_search=1&q=' + encodeURIComponent(q);
+          fetch(searchUrl, {
+            credentials: 'same-origin',
+            headers: { 'X-CSRF-Token': '<?= h($_SESSION['quick_order_csrf']) ?>' }
+          })
+            .then((res) => res.ok ? res.json() : [])
+            .then((rows) => renderSuggestions(Array.isArray(rows) ? rows : []))
+            .catch(() => hideSuggestions());
+        }, 180);
+      });
+
+      document.addEventListener('click', (event) => {
+        if (!event.target.closest('#customerSuggestions') && event.target !== customerNameInput) {
+          hideSuggestions();
+        }
+      });
+    })();
+  </script>
 <?php endif; ?>
 
 <?php if ($show_all): ?>
