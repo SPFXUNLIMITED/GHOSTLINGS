@@ -18,6 +18,7 @@ $edit_id     = max(0, (int)(($_SERVER['REQUEST_METHOD'] === 'POST') ? ($_POST['e
 $is_edit     = $edit_id > 0;
 $order_id    = max(0, (int)(($_SERVER['REQUEST_METHOD'] === 'POST') ? ($_POST['order_id'] ?? 0) : ($_GET['order_id'] ?? 0)));
 $prefill_order = null;
+const MAX_REQUEST_TITLE_LENGTH = 255;
 
 // China ports of loading (common ones)
 $china_ports = [
@@ -125,7 +126,8 @@ if ($is_edit && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     }
 
     // Pre-fill from order when creating a new shipping record from Order Tracker.
-    if (!$is_edit && $_SERVER['REQUEST_METHOD'] !== 'POST' && $order_id > 0) {
+    $should_prefill_from_order = !$is_edit && $_SERVER['REQUEST_METHOD'] !== 'POST' && $order_id > 0;
+    if ($should_prefill_from_order) {
       $os = $pdo->prepare(
         "SELECT id, po_number, supplier_name, model_name, shipping_method, shipping_origin, destination_port, destination_address, notes
          FROM rfq_orders
@@ -152,10 +154,10 @@ if ($is_edit && $_SERVER['REQUEST_METHOD'] !== 'POST') {
           $fields['destination_address'] = $prefill_dest_address;
         }
 
-        $prefill_method = strtoupper(trim((string)($prefill_order['shipping_method'] ?? '')));
-        if (str_contains($prefill_method, 'FCL')) {
+        $prefill_method = trim((string)($prefill_order['shipping_method'] ?? ''));
+        if (stripos($prefill_method, 'FCL') !== false) {
           $fields['shipment_type'] = 'FCL';
-        } elseif (str_contains($prefill_method, 'LCL')) {
+        } elseif (stripos($prefill_method, 'LCL') !== false) {
           $fields['shipment_type'] = 'LCL';
         }
 
@@ -171,8 +173,8 @@ if ($is_edit && $_SERVER['REQUEST_METHOD'] !== 'POST') {
         if ($supplier_name !== '') {
           $fields['request_title'] .= ' (' . $supplier_name . ')';
         }
-        if (mb_strlen($fields['request_title']) > 255) {
-          $fields['request_title'] = mb_substr($fields['request_title'], 0, 255);
+        if (mb_strlen($fields['request_title']) > MAX_REQUEST_TITLE_LENGTH) {
+          $fields['request_title'] = mb_substr($fields['request_title'], 0, MAX_REQUEST_TITLE_LENGTH);
         }
 
         if ($model_name !== '') {
@@ -192,7 +194,7 @@ if ($is_edit && $_SERVER['REQUEST_METHOD'] !== 'POST') {
         }
         $fields['additional_notes'] = trim(implode("\n", $note_lines));
       } else {
-        $errors[] = 'Order not found for shipping pre-fill.';
+        $errors[] = 'Order #' . $order_id . ' not found for shipping pre-fill.';
         $order_id = 0;
       }
     }
