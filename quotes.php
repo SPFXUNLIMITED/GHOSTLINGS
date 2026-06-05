@@ -470,7 +470,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $posted_price = $_POST['item_price'] ?? [];
       if (!is_array($posted_desc) || !is_array($posted_qty) || !is_array($posted_cost) || !is_array($posted_markup) || !is_array($posted_price)) {
         $errors[] = 'Line item data is invalid.';
-      } elseif (count($posted_desc) !== count($posted_qty) || count($posted_desc) !== count($posted_cost) || count($posted_desc) !== count($posted_markup)) {
+      } elseif (count($posted_desc) !== count($posted_qty) || count($posted_desc) !== count($posted_cost) || count($posted_desc) !== count($posted_markup) || count($posted_desc) !== count($posted_price)) {
         $errors[] = 'Line item data is malformed. Please reload and try again.';
       } else {
         $line_items = [];
@@ -481,7 +481,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $cost_raw = trim((string)$posted_cost[$i]);
           $markup_raw = trim((string)$posted_markup[$i]);
 
-          if ($desc === '' && $qty_raw === '' && $cost_raw === '') {
+          if ($desc === '' && $qty_raw === '' && $cost_raw === '' && $markup_raw === '') {
             continue;
           }
 
