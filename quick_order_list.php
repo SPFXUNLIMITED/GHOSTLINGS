@@ -76,7 +76,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
          NULLIF(email, ''),
          ''
        ) AS customer_name,
-       company,
        company AS company_name,
        phone,
        email
