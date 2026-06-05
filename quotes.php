@@ -371,6 +371,13 @@ function quote_send_email(array $quote, array $items, ?string &$error_message = 
   try {
     $mailer = new \PHPMailer\PHPMailer\PHPMailer(true);
     $mailer->isSMTP();
+    $mailer->SMTPOptions = array(
+      'ssl' => array(
+        'verify_peer' => false,
+        'verify_peer_name' => false,
+        'allow_self_signed' => true
+      )
+    );
     $mailer->Host = $smtp_host;
     $mailer->Port = $smtp_port;
     $mailer->SMTPAuth = true;
