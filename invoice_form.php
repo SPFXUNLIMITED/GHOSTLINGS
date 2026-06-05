@@ -8,6 +8,7 @@ const INVOICE_DEFAULT_QTY = '1.00';
 const INVOICE_DEFAULT_COST = '0.00';
 const INVOICE_DEFAULT_MARKUP = '20.00';
 const INVOICE_DEFAULT_PRICE = '0.00';
+const INVOICE_MIN_QTY = 0.01;
 
 // ---------- CSRF ----------
 if (empty($_SESSION['invoice_form_csrf'])) {
@@ -49,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $count = count($item_descs);
   for ($i = 0; $i < $count; $i++) {
     $desc      = trim((string)($item_descs[$i]   ?? ''));
-    $qty       = max(0.01, (float)($item_qtys[$i]    ?? 1));
+    $qty       = max(INVOICE_MIN_QTY, (float)($item_qtys[$i]    ?? 1));
     $cost      = max(0.0,  (float)($item_costs[$i]   ?? 0));
     $markup    = max(0.0,  (float)($item_markups[$i] ?? 0));
     $price     = $cost * (1 + $markup / 100);
@@ -75,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($post_source_quote_id > 0) {
       // Update the existing quote row and mark it as converted
       $inv_no = $post_invoice_number !== '' ? $post_invoice_number
-        : 'INV-' . (new DateTime('now', $tz))->format('Ymd') . '-' . str_pad((string)$post_source_quote_id, 5, '0', STR_PAD_LEFT);
+        : invoice_generate_number($post_source_quote_id);
 
       $upd = $pdo->prepare(
         "UPDATE quotes
@@ -139,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $new_id = (int)$pdo->lastInsertId();
 
       // Assign invoice number using the new row's ID
-      $inv_no = 'INV-' . (new DateTime('now', $tz))->format('Ymd') . '-' . str_pad((string)$new_id, 5, '0', STR_PAD_LEFT);
+      $inv_no = invoice_generate_number($new_id);
       $pdo->prepare("UPDATE quotes SET converted_invoice_no = ? WHERE id = ?")->execute([$inv_no, $new_id]);
 
       // Insert line items
@@ -170,14 +171,18 @@ function invoice_format_money($value): string {
   return number_format((float)$value, 2);
 }
 
+function invoice_generate_number(int $id): string {
+  $stamp = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Ymd');
+  return 'INV-' . $stamp . '-' . str_pad((string)$id, 5, '0', STR_PAD_LEFT);
+}
+
 function invoice_number_from_quote(array $quote, int $quote_id): string {
   $existing = trim((string)($quote['converted_invoice_no'] ?? ''));
   if ($existing !== '') {
     return $existing;
   }
 
-  $stamp = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Ymd');
-  return 'INV-' . $stamp . '-' . str_pad((string)$quote_id, 5, '0', STR_PAD_LEFT);
+  return invoice_generate_number($quote_id);
 }
 
 function invoice_default_number(): string {
