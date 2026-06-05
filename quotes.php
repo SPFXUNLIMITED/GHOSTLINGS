@@ -60,9 +60,6 @@ function quote_is_development(): bool {
     return false;
   }
 
-  if (preg_match('/:\d+$/', $host) === 1) {
-    $host = (string)substr($host, 0, (int)strrpos($host, ':'));
-  }
   if ($host === 'localhost' || $host === '127.0.0.1' || $host === '::1') {
     return true;
   }
