@@ -139,9 +139,14 @@ $line_items = [
 ];
 
 $view = (string)($_GET['view'] ?? 'all');
+if (!in_array($view, ['all', 'id', 'new'], true)) {
+  $view = 'all';
+}
+
+$show_new = $view === 'new';
 $show_all = $view === 'all';
 $detail_id = $view === 'id' ? (int)($_GET['id'] ?? 0) : 0;
-$show_detail = $detail_id > 0;
+$show_detail = $view === 'id' && $detail_id > 0;
 $saved = isset($_GET['saved']) && $_GET['saved'] === '1';
 $updated = isset($_GET['updated']) && $_GET['updated'] === '1';
 $invoice_converted = isset($_GET['invoice_converted']) && $_GET['invoice_converted'] === '1';
@@ -482,7 +487,7 @@ render_header('Quotes');
     <?php if (!$show_all): ?>
       <a class="btn" href="quotes.php?view=all">Back to Quotes</a>
     <?php endif; ?>
-    <a class="btn primary" href="quotes.php">New Quote</a>
+    <a class="btn primary" href="quotes.php?view=new">New Quote</a>
   </div>
 </div>
 
