@@ -708,9 +708,9 @@ function render_alibaba_workflow_banner(string $current_step = 'create_rfq'): vo
     'make_deposit_payment'        => 'in_production',
     'vendor_produces_machine'     => 'in_production',
     'make_final_payment'          => 'freight_quote',
-    'vendor_ships_machine'        => 'freight_quote',
-    'receive_tracking_documents'  => 'freight_quote',
-    'arrives_clears_customs'      => 'freight_quote',
+    'vendor_ships_machine'        => 'booked_in_transit',
+    'receive_tracking_documents'  => 'booked_in_transit',
+    'arrives_clears_customs'      => 'booked_in_transit',
     'shipping'                    => 'freight_quote',
     'final_inspection_acceptance' => 'received',
   ];
