@@ -218,9 +218,12 @@ $where_sql = '';
 
 $count_stmt = null;
 if ($search !== '') {
-  $where_sql = "WHERE first_name LIKE :q OR last_name LIKE :q OR company LIKE :q OR CONCAT(TRIM(first_name), ' ', TRIM(last_name)) LIKE :q";
+  $where_sql = "WHERE first_name LIKE :q OR last_name LIKE :q OR company LIKE :q";
+  $escaped_search = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search);
+  $search_like = '%' . $escaped_search . '%';
+  $where_sql .= " ESCAPE '!'";
   $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM customers $where_sql");
-  $count_stmt->bindValue(':q', '%' . $search . '%', PDO::PARAM_STR);
+  $count_stmt->bindValue(':q', $search_like, PDO::PARAM_STR);
   $count_stmt->execute();
   $customer_total = (int)$count_stmt->fetchColumn();
 } else {
@@ -238,7 +241,7 @@ $data_sql = "SELECT first_name, last_name, company, phone, email, last_updated, 
              LIMIT :limit OFFSET :offset";
 $data_stmt = $pdo->prepare($data_sql);
 if ($search !== '') {
-  $data_stmt->bindValue(':q', '%' . $search . '%', PDO::PARAM_STR);
+  $data_stmt->bindValue(':q', $search_like, PDO::PARAM_STR);
 }
 $data_stmt->bindValue(':limit', $customers_per_page, PDO::PARAM_INT);
 $data_stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
@@ -292,7 +295,7 @@ render_header('Customers');
     <?php endif; ?>
   </form>
   <p class="muted" style="margin:8px 0 0;">
-    Showing <?= (int)$showing_from ?>–<?= (int)$showing_to ?> of <?= (int)$customer_total ?> customer<?= $customer_total === 1 ? '' : 's' ?>.
+    Showing <?= (int)$showing_from ?>-<?= (int)$showing_to ?> of <?= (int)$customer_total ?> customer<?= $customer_total === 1 ? '' : 's' ?>.
     <?php if ($search !== ''): ?>Filtered by “<?= h($search) ?>”.<?php endif; ?>
   </p>
 </div>
