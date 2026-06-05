@@ -23,46 +23,58 @@ function invoice_number_from_quote(array $quote, int $quote_id): string {
   return 'INV-' . $stamp . '-' . str_pad((string)$quote_id, 5, '0', STR_PAD_LEFT);
 }
 
-$quote_id = (int)($_GET['id'] ?? 0);
-if ($quote_id <= 0) {
-  http_response_code(404);
-  render_header('Invoice Not Found');
-  ?>
-  <div class="card">
-    <h1 style="margin-top:0;">Invoice Not Found</h1>
-    <p class="muted">A source quote ID is required to pre-fill this invoice.</p>
-    <a class="btn" href="quotes.php?view=all">Back to Quotes</a>
-  </div>
-  <?php
-  render_footer();
-  exit;
+function invoice_default_number(): string {
+  $stamp = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Ymd');
+  return 'INV-' . $stamp . '-NEW';
 }
 
-$quote_stmt = $pdo->prepare("SELECT * FROM quotes WHERE id = ? LIMIT 1");
-$quote_stmt->execute([$quote_id]);
-$quote = $quote_stmt->fetch(PDO::FETCH_ASSOC);
-if (!$quote) {
-  http_response_code(404);
-  render_header('Invoice Not Found');
-  ?>
-  <div class="card">
-    <h1 style="margin-top:0;">Invoice Not Found</h1>
-    <p class="muted">We couldn’t find the quote used to pre-fill this invoice.</p>
-    <a class="btn" href="quotes.php?view=all">Back to Quotes</a>
-  </div>
-  <?php
-  render_footer();
-  exit;
-}
+$quote_id_param = trim((string)($_GET['id'] ?? ''));
+$has_quote_id = $quote_id_param !== '';
+$quote_id = $has_quote_id ? (int)$quote_id_param : 0;
+$quote = null;
+$rows = [];
 
-$item_stmt = $pdo->prepare("SELECT description, quantity, cost, markup_percent, unit_price, line_total FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC");
-$item_stmt->execute([$quote_id]);
-$rows = $item_stmt->fetchAll(PDO::FETCH_ASSOC);
+if ($has_quote_id) {
+  if ($quote_id <= 0) {
+    http_response_code(404);
+    render_header('Invoice Not Found');
+    ?>
+    <div class="card">
+      <h1 style="margin-top:0;">Invoice Not Found</h1>
+      <p class="muted">The requested quote ID is invalid.</p>
+      <a class="btn" href="quotes.php?view=all">Back to Quotes</a>
+    </div>
+    <?php
+    render_footer();
+    exit;
+  }
+
+  $quote_stmt = $pdo->prepare("SELECT * FROM quotes WHERE id = ? LIMIT 1");
+  $quote_stmt->execute([$quote_id]);
+  $quote = $quote_stmt->fetch(PDO::FETCH_ASSOC);
+  if (!$quote) {
+    http_response_code(404);
+    render_header('Invoice Not Found');
+    ?>
+    <div class="card">
+      <h1 style="margin-top:0;">Invoice Not Found</h1>
+      <p class="muted">We couldn’t find the quote used to pre-fill this invoice.</p>
+      <a class="btn" href="quotes.php?view=all">Back to Quotes</a>
+    </div>
+    <?php
+    render_footer();
+    exit;
+  }
+
+  $item_stmt = $pdo->prepare("SELECT description, quantity, cost, markup_percent, unit_price, line_total FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC");
+  $item_stmt->execute([$quote_id]);
+  $rows = $item_stmt->fetchAll(PDO::FETCH_ASSOC);
+}
 
 $today = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Y-m-d');
 $fields = [
-  'invoice_number' => invoice_number_from_quote($quote, $quote_id),
-  'source_quote_id' => (string)$quote_id,
+  'invoice_number' => $quote ? invoice_number_from_quote($quote, $quote_id) : invoice_default_number(),
+  'source_quote_id' => $quote ? (string)$quote_id : '',
   'customer_name' => (string)($quote['customer_name'] ?? ''),
   'company_name' => (string)($quote['company_name'] ?? ''),
   'phone_number' => (string)($quote['phone_number'] ?? ''),
@@ -101,10 +113,12 @@ render_header('Invoice Form');
 <div class="card page-header">
   <div class="page-header-body">
     <h1>Invoice Form</h1>
-    <p class="muted">Basic invoice scaffold pre-filled from quote #<?= (int)$quote_id ?>.</p>
+    <p class="muted"><?= $quote ? 'Basic invoice scaffold pre-filled from quote #' . (int)$quote_id . '.' : 'Basic invoice scaffold for creating a standalone invoice.' ?></p>
   </div>
   <div class="actions">
-    <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
+    <?php if ($quote): ?>
+      <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
+    <?php endif; ?>
     <a class="btn" href="quotes.php?view=all">All Quotes</a>
   </div>
 </div>
@@ -130,7 +144,7 @@ render_header('Invoice Form');
       </div>
       <div>
         <label for="source_quote_label">Source Quote</label>
-        <input id="source_quote_label" type="text" value="Quote #<?= (int)$quote_id ?>" readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);" />
+        <input id="source_quote_label" type="text" value="<?= h($quote ? 'Quote #' . (int)$quote_id : 'Standalone Invoice') ?>" readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);" />
       </div>
     </div>
 
@@ -193,7 +207,9 @@ render_header('Invoice Form');
 
     <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
       <button type="button" class="btn primary" disabled style="font-size:18px; padding:14px 22px; opacity:.7; cursor:not-allowed;">Save Invoice (Coming Soon)</button>
-      <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
+      <?php if ($quote): ?>
+        <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
+      <?php endif; ?>
     </div>
   </form>
 </div>
