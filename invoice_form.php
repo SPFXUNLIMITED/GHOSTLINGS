@@ -4,6 +4,11 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_admin_or_moderator();
 
+const INVOICE_DEFAULT_QTY = '1.00';
+const INVOICE_DEFAULT_COST = '0.00';
+const INVOICE_DEFAULT_MARKUP = '20.00';
+const INVOICE_DEFAULT_PRICE = '0.00';
+
 function invoice_format_money($value): string {
   return number_format((float)$value, 2);
 }
@@ -80,11 +85,11 @@ foreach ($rows as $row) {
 if (!$line_items) {
   $line_items[] = [
     'description' => '',
-    'quantity' => '1.00',
-    'cost' => '0.00',
-    'markup_percent' => '20.00',
-    'unit_price' => '0.00',
-    'line_total' => '0.00',
+    'quantity' => INVOICE_DEFAULT_QTY,
+    'cost' => INVOICE_DEFAULT_COST,
+    'markup_percent' => INVOICE_DEFAULT_MARKUP,
+    'unit_price' => INVOICE_DEFAULT_PRICE,
+    'line_total' => INVOICE_DEFAULT_PRICE,
   ];
 }
 
@@ -198,6 +203,10 @@ render_header('Invoice Form');
   const lineItemsBody = document.getElementById('lineItemsBody');
   const addLineItem = document.getElementById('addLineItem');
   const subtotalNode = document.getElementById('invoiceSubtotal');
+  const defaultQty = '<?= h(INVOICE_DEFAULT_QTY) ?>';
+  const defaultCost = '<?= h(INVOICE_DEFAULT_COST) ?>';
+  const defaultMarkup = '<?= h(INVOICE_DEFAULT_MARKUP) ?>';
+  const defaultPrice = '<?= h(INVOICE_DEFAULT_PRICE) ?>';
 
   function parseNumber(value) {
     const n = parseFloat(value);
@@ -238,10 +247,10 @@ render_header('Invoice Form');
     removeBtn.addEventListener('click', () => {
       if (lineItemsBody.querySelectorAll('tr.line-item-row').length <= 1) {
         row.querySelector('input[name="item_desc[]"]').value = '';
-        row.querySelector('input[name="item_qty[]"]').value = '1';
-        row.querySelector('input[name="item_cost[]"]').value = '0.00';
-        row.querySelector('input[name="item_markup[]"]').value = '20';
-        row.querySelector('input[name="item_price[]"]').value = '0.00';
+        row.querySelector('input[name="item_qty[]"]').value = defaultQty;
+        row.querySelector('input[name="item_cost[]"]').value = defaultCost;
+        row.querySelector('input[name="item_markup[]"]').value = defaultMarkup;
+        row.querySelector('input[name="item_price[]"]').value = defaultPrice;
       } else {
         row.remove();
       }
@@ -253,10 +262,10 @@ render_header('Invoice Form');
     const tr = document.createElement('tr');
     tr.className = 'line-item-row';
     tr.innerHTML = '<td><input type="text" name="item_desc[]" maxlength="500" /></td>'
-      + '<td><input type="number" step="0.01" min="0.01" name="item_qty[]" value="1" /></td>'
-      + '<td><input type="number" step="0.01" min="0" name="item_cost[]" value="0.00" /></td>'
-      + '<td><input type="number" step="0.01" min="0" name="item_markup[]" value="20" /></td>'
-      + '<td><input type="number" step="0.01" min="0" name="item_price[]" value="0.00" readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);" /></td>'
+      + '<td><input type="number" step="0.01" min="0.01" name="item_qty[]" value="' + defaultQty + '" /></td>'
+      + '<td><input type="number" step="0.01" min="0" name="item_cost[]" value="' + defaultCost + '" /></td>'
+      + '<td><input type="number" step="0.01" min="0" name="item_markup[]" value="' + defaultMarkup + '" /></td>'
+      + '<td><input type="number" step="0.01" min="0" name="item_price[]" value="' + defaultPrice + '" readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);" /></td>'
       + '<td class="line-total" style="white-space:nowrap;">$0.00</td>'
       + '<td><button type="button" class="btn remove-line">×</button></td>';
     lineItemsBody.appendChild(tr);
