@@ -1161,8 +1161,7 @@ render_header('Sourcing RFQ Tracker');
                           data-attachment-preview="<?= h($full_url) ?>"
                           data-attachment-previewable="1"
                           data-attachment-image="1"
-                          aria-label="<?= h('View RFQ #' . $rfq_id . ' image in modal') ?>"
-                          title="View RFQ image">
+                          aria-label="<?= h('View RFQ #' . $rfq_id . ' image in modal') ?>">
                     <img class="rfq-thumb-modal-image"
                          src="<?= h($thumb_url) ?>"
                          alt="<?= h('RFQ #' . $rfq_id . ' image') ?>"
