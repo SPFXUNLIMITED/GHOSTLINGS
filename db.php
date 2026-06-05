@@ -31,6 +31,21 @@ function app_ensure_integration_settings_table(PDO $pdo): void {
       PRIMARY KEY (setting_key)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   ");
+
+  $has_is_encrypted = (bool)$pdo
+    ->query("SHOW COLUMNS FROM integration_settings LIKE 'is_encrypted'")
+    ->fetchColumn();
+  if (!$has_is_encrypted) {
+    $pdo->exec("ALTER TABLE integration_settings ADD COLUMN is_encrypted TINYINT(1) NOT NULL DEFAULT 0 AFTER setting_val");
+  }
+
+  $has_updated_at = (bool)$pdo
+    ->query("SHOW COLUMNS FROM integration_settings LIKE 'updated_at'")
+    ->fetchColumn();
+  if (!$has_updated_at) {
+    $pdo->exec("ALTER TABLE integration_settings ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+  }
+
   $ready = true;
 }
 
