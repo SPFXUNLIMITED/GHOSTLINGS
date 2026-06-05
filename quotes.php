@@ -541,10 +541,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $subtotal,
               $edit_id,
             ]);
-            quote_backfill_customer($pdo, $customer_id, $fields);
-
-            $pdo->prepare("DELETE FROM quote_items WHERE quote_id = ?")->execute([$edit_id]);
             $quote_id = $edit_id;
+            $pdo->prepare("DELETE FROM quote_items WHERE quote_id = ?")->execute([$edit_id]);
           } else {
             $created_by = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
             if ($created_by !== null && $created_by <= 0) {
@@ -566,9 +564,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $subtotal,
               $created_by,
             ]);
-            quote_backfill_customer($pdo, $customer_id, $fields);
             $quote_id = (int)$pdo->lastInsertId();
           }
+          quote_backfill_customer($pdo, $customer_id, $fields);
 
           $item_ins = $pdo->prepare(
             "INSERT INTO quote_items (quote_id, line_position, description, quantity, unit_price, line_total)
