@@ -1,4 +1,4 @@
-:root { --b:#e5e7eb; --t:#111827; --m:#6b7280; --p:#2563eb; --d:#dc2626; }
+:root { --b:#e5e7eb; --t:#111827; --m:#6b7280; --p:#2563eb; --d:#dc2626; --menu-hover-border:#bfdbfe; --menu-shadow-rgb:15, 23, 42; --menu-accent-shadow-rgb:37, 99, 235; }
 * { box-sizing: border-box; }
 body { font-family: system-ui, Arial, sans-serif; color: var(--t); background:#f9fafb; margin:0; }
 .container { max-width: 980px; margin: 24px auto; padding: 0 16px; }
@@ -194,16 +194,16 @@ label { display:block; margin: 10px 0 6px; font-size: 14px; color: var(--m); }
 }
 
 .menu-link:hover {
-  border-color: #bfdbfe;
+  border-color: var(--menu-hover-border);
   background: #f8fafc;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 24px rgba(var(--menu-shadow-rgb), 0.08);
 }
 
 .menu-link.active {
   background: var(--p);
   color: #fff;
   border-color: var(--p);
-  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.18);
+  box-shadow: 0 10px 24px rgba(var(--menu-accent-shadow-rgb), 0.18);
 }
 
 .menu-dropdown {
@@ -241,7 +241,7 @@ label { display:block; margin: 10px 0 6px; font-size: 14px; color: var(--m); }
   border: 1px solid #dbe5f0;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+  box-shadow: 0 18px 40px rgba(var(--menu-shadow-rgb), 0.16);
   z-index: 20;
 }
 

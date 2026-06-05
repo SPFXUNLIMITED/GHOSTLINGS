@@ -300,8 +300,20 @@ function render_doc_details(string $details, array $placeholder_values = []): st
   );
 }
 
+function is_menu_item_visible(array $item): bool {
+  $type = $item['type'] ?? 'link';
+  if ($type !== 'link') {
+    return true;
+  }
+
+  return !array_key_exists('visible', $item) || !empty($item['visible']);
+}
+
 function is_menu_item_active(array $item, string $current): bool {
-  $files = $item['files'] ?? ($item['file'] ?? null);
+  $files = $item['files'] ?? null;
+  if ($files === null && isset($item['file'])) {
+    $files = [$item['file']];
+  }
   if ($files === null) {
     return false;
   }
@@ -319,10 +331,7 @@ function render_menu_link(array $item, string $current): void {
 }
 
 function render_menu_dropdown(string $label, array $items, string $current): void {
-  $visible_items = array_values(array_filter($items, static function (array $item): bool {
-    $type = $item['type'] ?? 'link';
-    return $type !== 'link' || !array_key_exists('visible', $item) || !empty($item['visible']);
-  }));
+  $visible_items = array_values(array_filter($items, 'is_menu_item_visible'));
   if (!$visible_items) {
     return;
   }
