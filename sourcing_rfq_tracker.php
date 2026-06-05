@@ -1117,11 +1117,20 @@ render_header('Sourcing RFQ Tracker');
                   $full_url = $has_rfq_image ? 'sourcing_rfq_image.php?rfq_id=' . (int)$r['id'] . '&type=full' : '';
                 ?>
                 <?php if ($has_rfq_image): ?>
-                  <a href="<?= h($full_url) ?>" target="_blank" rel="noopener noreferrer" title="View RFQ image">
+                  <?= render_attachment_modal_assets() ?>
+                  <button type="button"
+                          class="attachment-open-link"
+                          data-attachment-name="<?= h('RFQ #' . (int)$r['id'] . ' Image') ?>"
+                          data-attachment-file="<?= h($full_url . '&download=1') ?>"
+                          data-attachment-preview="<?= h($full_url) ?>"
+                          data-attachment-previewable="1"
+                          data-attachment-image="1"
+                          style="padding:0; border:0; background:none;"
+                          title="View RFQ image">
                     <img src="<?= h($thumb_url) ?>"
                          alt="<?= h('RFQ #' . (int)$r['id'] . ' image') ?>"
                          style="width:50px; height:50px; object-fit:cover; border-radius:6px; border:1px solid rgba(0,0,0,.12); display:block;" />
-                  </a>
+                  </button>
                 <?php else: ?>
                   <span class="muted">—</span>
                 <?php endif; ?>
