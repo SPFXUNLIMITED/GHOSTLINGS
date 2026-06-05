@@ -80,27 +80,32 @@ function quick_order_resolve_customer_id(PDO $pdo, array $fields): ?int {
   $matchers = [];
   $customer_name = trim((string)($fields['customer_name'] ?? ''));
   if ($customer_name !== '') {
+    [$first_name, $last_name] = quick_order_split_name($customer_name);
     $matchers[] = [
-      "SELECT id FROM customers WHERE TRIM(CONCAT_WS(' ', NULLIF(first_name, ''), NULLIF(last_name, ''))) = ? LIMIT 25",
-      $customer_name,
+      "SELECT id FROM customers WHERE first_name = ? AND last_name = ? LIMIT 25",
+      [$first_name, $last_name],
     ];
   }
   $company_name = trim((string)($fields['company_name'] ?? ''));
   if ($company_name !== '') {
-    $matchers[] = ["SELECT id FROM customers WHERE company = ? LIMIT 25", $company_name];
+    $matchers[] = ["SELECT id FROM customers WHERE company = ? LIMIT 25", [$company_name]];
   }
   $email = trim((string)($fields['email'] ?? ''));
   if ($email !== '') {
-    $matchers[] = ["SELECT id FROM customers WHERE email = ? LIMIT 25", $email];
+    $matchers[] = ["SELECT id FROM customers WHERE email = ? LIMIT 25", [$email]];
   }
   $phone_number = trim((string)($fields['phone_number'] ?? ''));
   if ($phone_number !== '') {
-    $matchers[] = ["SELECT id FROM customers WHERE phone = ? LIMIT 25", $phone_number];
+    $matchers[] = ["SELECT id FROM customers WHERE phone = ? LIMIT 25", [$phone_number]];
   }
 
-  foreach ($matchers as [$sql, $value]) {
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$value]);
+  $prepared = [];
+  foreach ($matchers as [$sql, $params]) {
+    if (!isset($prepared[$sql])) {
+      $prepared[$sql] = $pdo->prepare($sql);
+    }
+    $stmt = $prepared[$sql];
+    $stmt->execute($params);
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
       $id = (int)($row['id'] ?? 0);
       if ($id > 0) {
@@ -117,6 +122,7 @@ function quick_order_resolve_customer_id(PDO $pdo, array $fields): ?int {
   $top_score = (int)reset($scores);
   $top_ids = array_keys(array_filter($scores, static fn($score): bool => (int)$score === $top_score));
   if (count($top_ids) !== 1) {
+    error_log('Quick Order customer backfill match ambiguity for customer "' . $customer_name . '"');
     return null;
   }
   return (int)$top_ids[0];
@@ -165,8 +171,8 @@ function quick_order_backfill_customer(PDO $pdo, ?int $customer_id, array $field
   }
 
   $params[] = $customer_id;
-  $upd = $pdo->prepare("UPDATE customers SET " . implode(', ', $updates) . " WHERE id = ?");
-  $upd->execute($params);
+  $update_stmt = $pdo->prepare("UPDATE customers SET " . implode(', ', $updates) . " WHERE id = ?");
+  $update_stmt->execute($params);
 }
 
 if (empty($_SESSION['quick_order_csrf'])) {
