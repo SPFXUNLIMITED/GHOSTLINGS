@@ -18,10 +18,38 @@ $errors = [];
 $success = '';
 $customer_table_columns = 6;
 
-function hubspot_token(): string {
+function hubspot_token(PDO $pdo): string {
   $token = app_env_value('HUBSPOT_PRIVATE_APP_TOKEN');
   if ($token !== '') return $token;
-  return app_env_value('HUBSPOT_ACCESS_TOKEN');
+  $token = app_env_value('HUBSPOT_ACCESS_TOKEN');
+  if ($token !== '') return $token;
+
+  try {
+    app_ensure_integration_settings_table($pdo);
+    $stmt = $pdo->prepare(
+      "SELECT setting_val, is_encrypted
+       FROM integration_settings
+       WHERE setting_key = 'hubspot_private_app_token'
+       LIMIT 1"
+    );
+    $stmt->execute();
+    $row = $stmt->fetch();
+    if (is_array($row)) {
+      $stored = trim((string)($row['setting_val'] ?? ''));
+      if ($stored !== '') {
+        $is_encrypted = (int)($row['is_encrypted'] ?? 0) === 1;
+        $resolved = $is_encrypted ? app_decrypt_setting_value($stored) : $stored;
+        $resolved = trim((string)$resolved);
+        if ($resolved !== '') {
+          return $resolved;
+        }
+      }
+    }
+  } catch (Throwable $e) {
+    error_log('HubSpot token lookup failed: ' . $e->getMessage());
+  }
+
+  return '';
 }
 
 function app_env_value(string $key): string {
