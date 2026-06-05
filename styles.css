@@ -38,6 +38,31 @@ body { font-family: system-ui, Arial, sans-serif; color: var(--t); background:#f
   flex-wrap: wrap;
   justify-content: flex-end;
 }
+.topbar-help-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
+  color: #1d4ed8;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.12);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.topbar-help-link:hover,
+.topbar-help-link:focus {
+  transform: translateY(-1px);
+  border-color: #93c5fd;
+  color: #1e40af;
+  box-shadow: 0 12px 22px rgba(37, 99, 235, 0.18);
+  outline: none;
+}
 .topbar-clock-label {
   white-space: nowrap;
 }

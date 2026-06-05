@@ -466,6 +466,7 @@ function render_header(string $title): void {
 		  $now_ms = (int)$now->format('U') * 1000;
 		?>
 		<div class="topbar-meta">
+          <a class="topbar-help-link" href="help_glossary.php" aria-label="Open help glossary" title="Help glossary">?</a>
 		  <?php if ($username): ?>
             <?= $clock_status_badge ?>
 		    <span class="muted topbar-clock-label">LA: <strong id="clock"></strong></span>
