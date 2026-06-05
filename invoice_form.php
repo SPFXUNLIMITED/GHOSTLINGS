@@ -438,6 +438,7 @@ render_header($invoice_heading);
   const defaultCost = '<?= h(INVOICE_DEFAULT_COST) ?>';
   const defaultMarkup = '<?= h(INVOICE_DEFAULT_MARKUP) ?>';
   const defaultPrice = '<?= h(INVOICE_DEFAULT_PRICE) ?>';
+  const readonlyStyle = '<?= invoice_readonly_style() ?>';
 
   function parseNumber(value) {
     const n = parseFloat(value);
@@ -496,7 +497,7 @@ render_header($invoice_heading);
       + '<td><input type="number" step="0.01" min="0.01" name="item_qty[]" value="' + defaultQty + '" /></td>'
       + '<td><input type="number" step="0.01" min="0" name="item_cost[]" value="' + defaultCost + '" /></td>'
       + '<td><input type="number" step="0.01" min="0" name="item_markup[]" value="' + defaultMarkup + '" /></td>'
-      + '<td><input type="number" step="0.01" min="0" name="item_price[]" value="' + defaultPrice + '" readonly style="<?= invoice_readonly_style() ?>" /></td>'
+      + '<td><input type="number" step="0.01" min="0" name="item_price[]" value="' + defaultPrice + '" readonly style="' + readonlyStyle + '" /></td>'
       + '<td class="line-total" style="white-space:nowrap;">$0.00</td>'
       + '<td><button type="button" class="btn remove-line">×</button></td>';
     lineItemsBody.appendChild(tr);
