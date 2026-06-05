@@ -677,10 +677,20 @@ function render_alibaba_workflow_banner(string $current_step = 'create_rfq'): vo
       'instruction' => 'Production is underway. Monitor milestones and supplier updates until goods are ready to ship.',
       'url'         => 'order_tracker.php?status=vendor_produces_machine',
     ],
-    'shipping' => [
+    'freight_quote' => [
       'label'       => 'Freight Quote',
-      'instruction' => 'The order is in transit. Track shipment progress and required logistics documents.',
+      'instruction' => 'Request freight quotes from forwarders for the inbound shipment.',
       'url'         => 'freight_quote_form.php',
+    ],
+    'quotes_received' => [
+      'label'       => 'Quotes Received',
+      'instruction' => 'Review freight quotes received from forwarders and select the best shipping option.',
+      'url'         => 'freight_quote_tracker.php',
+    ],
+    'booked_in_transit' => [
+      'label'       => 'Booked / In Transit',
+      'instruction' => 'Shipment has been booked and is in transit. Monitor progress and track logistics documents.',
+      'url'         => 'freight_quote_tracker.php',
     ],
     'received' => [
       'label'       => 'Received',
@@ -697,10 +707,11 @@ function render_alibaba_workflow_banner(string $current_step = 'create_rfq'): vo
     'send_po'                     => 'send_purchase_order',
     'make_deposit_payment'        => 'in_production',
     'vendor_produces_machine'     => 'in_production',
-    'make_final_payment'          => 'shipping',
-    'vendor_ships_machine'        => 'shipping',
-    'receive_tracking_documents'  => 'shipping',
-    'arrives_clears_customs'      => 'shipping',
+    'make_final_payment'          => 'freight_quote',
+    'vendor_ships_machine'        => 'freight_quote',
+    'receive_tracking_documents'  => 'freight_quote',
+    'arrives_clears_customs'      => 'freight_quote',
+    'shipping'                    => 'freight_quote',
     'final_inspection_acceptance' => 'received',
   ];
   if (isset($legacy_step_aliases[$current_step])) {

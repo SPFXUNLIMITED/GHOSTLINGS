@@ -453,7 +453,7 @@ render_header('Freight Quote Tracker');
   </div>
 </div>
 
-<?php render_alibaba_workflow_banner('received'); ?>
+<?php render_alibaba_workflow_banner('quotes_received'); ?>
 
 <?php if ($errors): ?>
   <div class="alert error">
