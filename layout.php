@@ -529,7 +529,7 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
       ['type' => 'separator'],
       ['type' => 'section', 'label' => 'Quotes'],
       ['href' => 'quotes.php?view=new', 'file' => 'quotes.php', 'label' => 'Quote Form'],
-      ['href' => 'quotes.php?view=all', 'files' => ['quotes.php', 'rfq_details.php', 'rfq_quote_details.php', 'rfq_quote_file.php'], 'label' => 'Quote Tracker'],
+      ['href' => 'quotes.php?view=all', 'file' => 'quotes.php', 'label' => 'Quote Tracker'],
       ['href' => 'quotes.php?view=all', 'file' => 'quotes.php', 'label' => 'Invoice Form'],
       ['href' => 'quotes.php?view=all', 'file' => 'quotes.php', 'label' => 'Invoice Tracker'],
       ['type' => 'separator'],
