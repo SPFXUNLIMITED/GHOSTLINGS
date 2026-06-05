@@ -54,11 +54,156 @@ function record_order_stage_history(PDO $pdo, int $order_id, ?string $from_stage
   );
   $stmt->execute([$order_id, $from_stage, $to_stage, $changed_by]);
 }
+
+function format_order_email_currency($amount, string $currency): string {
+  if ($amount === null || $amount === '') {
+    return 'N/A';
+  }
+  if (is_numeric($amount)) {
+    return $currency . ' ' . number_format((float)$amount, 2);
+  }
+  return trim((string)$amount);
+}
+
+function format_order_email_date($value): string {
+  $value = trim((string)$value);
+  if ($value === '') {
+    return 'N/A';
+  }
+  $timestamp = strtotime($value);
+  if ($timestamp === false) {
+    return $value;
+  }
+  return date('F j, Y', $timestamp);
+}
+
+function build_order_email_text(array $order, array $order_statuses): string {
+  $sep = str_repeat('=', 60);
+  $sep2 = str_repeat('-', 60);
+  $currency = strtoupper(trim((string)($order['currency'] ?? 'USD')));
+  if ($currency === '') {
+    $currency = 'USD';
+  }
+  $requested_by = trim((string)($order['requested_by_username'] ?? ''));
+  $contact_name = trim((string)($order['contact_name'] ?? ''));
+  $company_name = trim((string)($order['company_name'] ?? ''));
+  $contact_email = trim((string)($order['contact_email'] ?? ''));
+  $contact_phone = trim((string)($order['contact_phone'] ?? ''));
+  $po_number = trim((string)($order['po_number'] ?? ''));
+  if ($po_number === '') {
+    $po_number = 'PO #' . (int)($order['id'] ?? 0);
+  }
+  $status_key = (string)($order['order_status'] ?? '');
+  $status_label = (string)($order_statuses[$status_key] ?? ucwords(str_replace('_', ' ', $status_key)));
+  $created_date = format_order_email_date((string)($order['order_date'] ?? $order['created_at'] ?? ''));
+
+  $lines = [
+    $sep,
+    'PURCHASE ORDER (PO)',
+    $sep,
+    '',
+    'PO #:         ' . $po_number,
+    'Date:         ' . $created_date,
+    'Status:       ' . $status_label,
+    'RFQ #:        ' . (int)($order['rfq_request_id'] ?? 0),
+    'Quote #:      ' . ((int)($order['rfq_quote_id'] ?? 0) > 0 ? (int)$order['rfq_quote_id'] : 'N/A'),
+    '',
+    $sep2,
+    'FROM:',
+    $sep2,
+  ];
+
+  if ($company_name !== '') {
+    $lines[] = 'Company:      ' . $company_name;
+  }
+  if ($contact_name !== '') {
+    $lines[] = 'Contact:      ' . $contact_name;
+  } elseif ($requested_by !== '') {
+    $lines[] = 'Requested By: ' . $requested_by;
+  }
+  if ($contact_email !== '') {
+    $lines[] = 'Email:        ' . $contact_email;
+  }
+  if ($contact_phone !== '') {
+    $lines[] = 'Phone:        ' . $contact_phone;
+  }
+
+  $lines[] = '';
+  $lines[] = $sep2;
+  $lines[] = 'SUPPLIER:';
+  $lines[] = $sep2;
+  $lines[] = 'Supplier:      ' . trim((string)($order['supplier_name'] ?? 'N/A'));
+
+  $lines[] = '';
+  $lines[] = $sep2;
+  $lines[] = 'ORDER DETAILS:';
+  $lines[] = $sep2;
+  $lines[] = 'Request Title: ' . trim((string)($order['request_title'] ?? 'N/A'));
+  $lines[] = 'Model:         ' . trim((string)($order['model_name'] ?? 'N/A'));
+  $lines[] = 'SKU:           ' . trim((string)($order['sku'] ?? 'N/A'));
+  $lines[] = 'Quantity:      ' . (int)($order['quantity'] ?? 0);
+  $lines[] = 'Unit Price:    ' . format_order_email_currency($order['unit_price'] ?? null, $currency);
+  $lines[] = 'Order Total:   ' . format_order_email_currency($order['order_total'] ?? null, $currency);
+
+  $lines[] = '';
+  $lines[] = $sep2;
+  $lines[] = 'PAYMENT & SHIPPING:';
+  $lines[] = $sep2;
+  $lines[] = 'Payment Terms: ' . trim((string)($order['payment_terms'] ?? 'N/A'));
+  $lines[] = 'Deposit:       ' . format_order_email_currency($order['deposit_amount'] ?? null, $currency);
+  $lines[] = 'Balance:       ' . format_order_email_currency($order['balance_amount'] ?? null, $currency);
+  $lines[] = 'Incoterm:      ' . trim((string)($order['incoterm'] ?? 'N/A'));
+  $lines[] = 'Shipping:      ' . trim((string)($order['shipping_method'] ?? 'N/A'));
+  $lines[] = 'Origin:        ' . trim((string)($order['shipping_origin'] ?? 'N/A'));
+  $lines[] = 'Destination:   ' . trim((string)($order['destination_port'] ?? 'N/A'));
+  $lines[] = 'Deliver To:    ' . trim((string)($order['destination_address'] ?? 'N/A'));
+  $lines[] = 'Expected Ready: ' . format_order_email_date((string)($order['expected_ready_date'] ?? ''));
+  $lines[] = 'Expected Ship: ' . format_order_email_date((string)($order['expected_ship_date'] ?? ''));
+  $lines[] = 'Lead Time:     ' . ($order['production_lead_time_days'] !== null && $order['production_lead_time_days'] !== '' ? ((int)$order['production_lead_time_days'] . ' days') : 'N/A');
+  $lines[] = 'Trade Assurance: ' . trim((string)($order['trade_assurance_order_no'] ?? 'N/A'));
+  $lines[] = 'Proforma Invoice: ' . trim((string)($order['proforma_invoice_no'] ?? 'N/A'));
+
+  $included_accessories = trim((string)($order['included_accessories'] ?? ''));
+  if ($included_accessories !== '') {
+    $lines[] = '';
+    $lines[] = $sep2;
+    $lines[] = 'INCLUDED ACCESSORIES:';
+    $lines[] = $sep2;
+    $lines[] = $included_accessories;
+  }
+
+  $warranty_terms = trim((string)($order['warranty_terms'] ?? ''));
+  if ($warranty_terms !== '') {
+    $lines[] = '';
+    $lines[] = $sep2;
+    $lines[] = 'WARRANTY TERMS:';
+    $lines[] = $sep2;
+    $lines[] = $warranty_terms;
+  }
+
+  $notes = trim((string)($order['notes'] ?? ''));
+  if ($notes !== '') {
+    $lines[] = '';
+    $lines[] = $sep2;
+    $lines[] = 'NOTES:';
+    $lines[] = $sep2;
+    $lines[] = $notes;
+  }
+
+  $lines[] = '';
+  $lines[] = $sep;
+  $lines[] = 'Please confirm receipt, pricing, and production/shipping schedule.';
+  $lines[] = $sep;
+
+  return implode("\n", $lines);
+}
+
 $errors = [];
 $success = '';
 $search = trim((string)($_GET['q'] ?? ''));
 $status_filter = trim((string)($_GET['status'] ?? ''));
 $rfq_filter = isset($_GET['rfq_id']) ? (int)$_GET['rfq_id'] : 0;
+$order_text_id = isset($_GET['order_text_id']) ? (int)$_GET['order_text_id'] : 0;
 $can_manage_stage = is_admin_or_moderator();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -183,6 +328,27 @@ $sql .= " ORDER BY o.updated_at DESC, o.id DESC";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $orders = $stmt->fetchAll();
+
+$order_email_text = '';
+$order_email_text_title = 'Purchase Order Email Text';
+if ($order_text_id > 0) {
+  $text_stmt = $pdo->prepare(
+    "SELECT o.*, r.request_title, r.contact_name, r.company_name, r.contact_email, r.contact_phone,
+            u.username AS requested_by_username
+     FROM rfq_orders o
+     INNER JOIN rfq_requests r ON r.id = o.rfq_request_id
+     LEFT JOIN users u ON u.id = r.requested_by
+     WHERE o.id = ?
+     LIMIT 1"
+  );
+  $text_stmt->execute([$order_text_id]);
+  $order_for_email = $text_stmt->fetch();
+  if ($order_for_email) {
+    $order_email_text = build_order_email_text($order_for_email, $order_statuses);
+  } else {
+    $errors[] = 'Order not found for email text export.';
+  }
+}
 
 $hero_stmt = $pdo->query("SELECT order_status FROM rfq_orders");
 $hero_rows  = $hero_stmt->fetchAll();
@@ -447,6 +613,39 @@ render_header('Order Tracker');
   <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;"><?= h($success) ?></div>
 <?php endif; ?>
 
+<?php if ($order_email_text !== ''): ?>
+  <div class="card">
+    <h2 style="margin-top:0;"><?= h($order_email_text_title) ?></h2>
+    <p class="muted" style="margin-top:0;">Copy this text and paste it into your email to the supplier.</p>
+    <label for="order_email_text">Email content</label>
+    <textarea id="order_email_text" rows="16" readonly><?= h($order_email_text) ?></textarea>
+    <div class="row" style="margin-top:8px;">
+      <button type="button" class="btn" onclick="copyOrderEmailText()">Copy Text</button>
+      <span id="order_copy_status" class="muted" role="status" aria-live="polite"></span>
+    </div>
+  </div>
+  <script>
+    function copyOrderEmailText() {
+      const text = document.getElementById('order_email_text').value;
+      const status = document.getElementById('order_copy_status');
+      const failMessage = 'Failed to copy to clipboard. Please select the text and copy manually.';
+      const canUseClipboard = navigator.clipboard && typeof navigator.clipboard.writeText === 'function';
+      if (!canUseClipboard) {
+        status.textContent = failMessage;
+        setTimeout(function() { status.textContent = ''; }, 5000);
+        return;
+      }
+      navigator.clipboard.writeText(text).then(function() {
+        status.textContent = 'Copied to clipboard.';
+        setTimeout(function() { status.textContent = ''; }, 3000);
+      }, function() {
+        status.textContent = failMessage;
+        setTimeout(function() { status.textContent = ''; }, 5000);
+      });
+    }
+  </script>
+<?php endif; ?>
+
 <div class="card">
   <form method="get" class="row" style="align-items:flex-end;">
     <div style="flex:1 1 280px;">
@@ -541,6 +740,15 @@ render_header('Order Tracker');
             <td class="col-actions">
               <a class="btn" href="order_form.php?order_id=<?= (int)$order['id'] ?>">Edit</a>
               <a class="btn" href="sourcing_rfq_tracker.php?rfq_id=<?= (int)$order['rfq_request_id'] ?>">RFQ</a>
+              <?php
+                $email_text_query = array_filter([
+                  'order_text_id' => (int)$order['id'],
+                  'q' => $search,
+                  'status' => $status_filter,
+                  'rfq_id' => $rfq_filter > 0 ? $rfq_filter : null,
+                ], fn($value): bool => $value !== null && $value !== '');
+              ?>
+              <a class="btn" href="order_tracker.php?<?= h(http_build_query($email_text_query)) ?>">Create Email Text</a>
               <form method="post" style="display:inline;" onsubmit="return confirm('Delete this order? This cannot be undone.');">
                 <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_order_tracker_csrf']) ?>">
                 <input type="hidden" name="action" value="delete_order">
