@@ -10,7 +10,7 @@ function invoice_tracker_format_money($value): string {
   return number_format((float)$value, 2);
 }
 
-function invoice_tracker_number(array $row): string {
+function invoice_tracker_number(array $row, string $stamp): string {
   $existing = trim((string)($row['converted_invoice_no'] ?? ''));
   if ($existing !== '') {
     return $existing;
@@ -21,7 +21,6 @@ function invoice_tracker_number(array $row): string {
     return '—';
   }
 
-  $stamp = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Ymd');
   return 'INV-' . $stamp . '-' . str_pad((string)$quote_id, 5, '0', STR_PAD_LEFT);
 }
 
@@ -34,7 +33,7 @@ function invoice_tracker_status_label(string $status): string {
   return ucwords(str_replace('_', ' ', $status));
 }
 
-$stmt = $pdo->query(
+$stmt = $pdo->prepare(
   "SELECT id, customer_name, company_name, quote_date, subtotal_amount, status, converted_invoice_no, created_at
    FROM quotes
    WHERE (converted_invoice_no IS NOT NULL AND converted_invoice_no <> '')
@@ -42,7 +41,9 @@ $stmt = $pdo->query(
    ORDER BY created_at DESC, id DESC
    LIMIT 300"
 );
+$stmt->execute();
 $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$invoice_number_stamp = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Ymd');
 
 render_header('Invoice Tracker');
 ?>
@@ -80,7 +81,7 @@ render_header('Invoice Tracker');
             $status_color = $status_raw === 'converted' ? '#166534' : '#334155';
           ?>
           <tr>
-            <td style="white-space:nowrap;"><strong><?= h(invoice_tracker_number($invoice)) ?></strong></td>
+            <td style="white-space:nowrap;"><strong><?= h(invoice_tracker_number($invoice, $invoice_number_stamp)) ?></strong></td>
             <td>
               <?= h($customer_display) ?>
               <?php if ($company_name !== ''): ?>

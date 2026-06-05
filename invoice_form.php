@@ -25,13 +25,61 @@ function invoice_number_from_quote(array $quote, int $quote_id): string {
 
 $quote_id = (int)($_GET['id'] ?? 0);
 if ($quote_id <= 0) {
-  http_response_code(404);
-  render_header('Invoice Not Found');
+  $quote_options_stmt = $pdo->prepare(
+    "SELECT id, customer_name, company_name, quote_date, status
+     FROM quotes
+     ORDER BY created_at DESC, id DESC
+     LIMIT 50"
+  );
+  $quote_options_stmt->execute();
+  $quote_options = $quote_options_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  render_header('Invoice Form');
   ?>
   <div class="card">
-    <h1 style="margin-top:0;">Invoice Not Found</h1>
-    <p class="muted">A source quote ID is required to pre-fill this invoice.</p>
-    <a class="btn" href="quotes.php?view=all">Back to Quotes</a>
+    <h1 style="margin-top:0;">New Invoice</h1>
+    <p class="muted">Select a quote to pre-fill this invoice form.</p>
+    <div style="overflow-x:auto; margin-top:12px;">
+      <table style="min-width:700px;">
+        <thead>
+          <tr>
+            <th>Quote #</th>
+            <th>Customer</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php if (!$quote_options): ?>
+            <tr><td colspan="5" class="muted">No quotes available yet.</td></tr>
+          <?php endif; ?>
+          <?php foreach ($quote_options as $option): ?>
+            <?php
+              $option_customer = trim((string)($option['customer_name'] ?? ''));
+              $option_company = trim((string)($option['company_name'] ?? ''));
+            ?>
+            <tr>
+              <td>#<?= h((string)(int)$option['id']) ?></td>
+              <td>
+                <?= h($option_customer !== '' ? $option_customer : '—') ?>
+                <?php if ($option_company !== ''): ?>
+                  <div class="muted" style="font-size:0.85em;"><?= h($option_company) ?></div>
+                <?php endif; ?>
+              </td>
+              <td><?= h((string)($option['quote_date'] ?? '—')) ?></td>
+              <td><?= h(ucwords(str_replace('_', ' ', (string)($option['status'] ?? '')))) ?></td>
+              <td style="white-space:nowrap;">
+                <a class="btn primary" href="invoice_form.php?id=<?= h((string)(int)$option['id']) ?>">Create Invoice</a>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+    <div class="row" style="margin-top:14px;">
+      <a class="btn" href="quotes.php?view=all">Back to Quotes</a>
+    </div>
   </div>
   <?php
   render_footer();
