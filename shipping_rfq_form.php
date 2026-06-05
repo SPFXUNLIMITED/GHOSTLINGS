@@ -83,7 +83,7 @@ if ($is_edit && $_SERVER['REQUEST_METHOD'] !== 'POST') {
   $es->execute([$edit_id]);
   $er = $es->fetch();
   if (!$er) {
-    $errors[] = 'Freight Quote request not found.';
+    $errors[] = 'Freight Quote not found.';
     $is_edit = false;
     $edit_id = 0;
   } else {
@@ -289,7 +289,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if ($is_edit) {
     $ex = $pdo->prepare("SELECT id FROM shipping_rfq_requests WHERE id = ? LIMIT 1");
     $ex->execute([$edit_id]);
-    if (!$ex->fetch()) $errors[] = 'Freight Quote request not found.';
+    if (!$ex->fetch()) $errors[] = 'Freight Quote not found.';
   }
 
   if (!$errors) {
@@ -379,7 +379,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
 
       $_SESSION['shipping_rfq_form_csrf'] = bin2hex(random_bytes(24));
-      $success = 'Freight Quote request submitted. You can now track quotes in the Freight Quote Tracker.';
+      $success = 'Freight Quote submitted. You can now track quotes in the Freight Quote Tracker.';
       // Reset form
       $fields = array_merge([
         'request_title' => '', 'machine_model' => '', 'machine_weight_kg' => '',
@@ -392,12 +392,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 }
 
-render_header($is_edit ? ('Edit Freight Quote Request #' . $edit_id) : 'Freight Quote Form');
+render_header($is_edit ? ('Edit Freight Quote #' . $edit_id) : 'Freight Quote Form');
 ?>
 
 <div class="card page-header">
   <div class="page-header-body">
-    <h1><?= $is_edit ? ('Edit Freight Quote Request #' . (int)$edit_id) : 'Freight Quote Form' ?></h1>
+    <h1><?= $is_edit ? ('Edit Freight Quote #' . (int)$edit_id) : 'Freight Quote Form' ?></h1>
     <p class="muted">
       <?= $is_edit
         ? 'Update the freight quote details below.'
@@ -407,7 +407,7 @@ render_header($is_edit ? ('Edit Freight Quote Request #' . $edit_id) : 'Freight 
   <a class="btn" href="shipping_rfq_tracker.php">Go to Freight Quote Tracker</a>
 </div>
 
-<?php render_alibaba_workflow_banner('shipping'); ?>
+<?php render_alibaba_workflow_banner('freight_quote'); ?>
 
 <?php if ($errors): ?>
   <div class="alert error">
@@ -556,7 +556,7 @@ render_header($is_edit ? ('Edit Freight Quote Request #' . $edit_id) : 'Freight 
   </div>
 
   <div class="row" style="margin-top:18px;">
-    <button type="submit" class="btn primary"><?= $is_edit ? 'Save Changes' : 'Submit Freight Quote Request' ?></button>
+    <button type="submit" class="btn primary"><?= $is_edit ? 'Save Changes' : 'Submit Freight Quote' ?></button>
     <a class="btn" href="shipping_rfq_tracker.php">Go to Freight Quote Tracker</a>
   </div>
 </form>
