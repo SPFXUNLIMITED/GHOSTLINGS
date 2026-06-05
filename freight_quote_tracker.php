@@ -490,7 +490,7 @@ render_header('Freight Quote Tracker');
     </div>
     <div class="row">
       <button type="submit" class="btn primary">Filter</button>
-      <a class="btn" href="shipping_rfq_tracker.php">Clear</a>
+      <a class="btn" href="freight_quote_tracker.php">Clear</a>
       <a class="btn" href="freight_quote_form.php">New RFQ</a>
     </div>
   </form>
@@ -590,8 +590,8 @@ render_header('Freight Quote Tracker');
               </td>
               <td class="muted"><?= (int)$r['quote_count'] ?></td>
               <td class="col-actions">
-                <a class="btn" href="shipping_rfq_tracker.php?rfq_id=<?= (int)$r['id'] ?>">Quotes</a>
-                <a class="btn" href="shipping_rfq_tracker.php?rfq_text_id=<?= (int)$r['id'] ?>">Email Text</a>
+                <a class="btn" href="freight_quote_tracker.php?rfq_id=<?= (int)$r['id'] ?>">Quotes</a>
+                <a class="btn" href="freight_quote_tracker.php?rfq_text_id=<?= (int)$r['id'] ?>">Email Text</a>
                 <a class="btn" href="freight_quote_form.php?edit_id=<?= (int)$r['id'] ?>">Edit</a>
                 <form method="post" style="display:inline;"
                       onsubmit="return confirm('Delete this Freight Quote and all its quotes? This cannot be undone.');">
@@ -624,8 +624,8 @@ render_header('Freight Quote Tracker');
         <p class="muted"><?= h($selected_rfq['request_title']) ?></p>
       </div>
       <div class="row" style="flex-shrink:0;">
-        <a class="btn" href="shipping_rfq_tracker.php<?= $search !== '' || $status_filter !== '' ? '?' . http_build_query(array_filter(['q' => $search, 'status' => $status_filter])) : '' ?>">← All RFQs</a>
-        <a class="btn" href="shipping_rfq_tracker.php?rfq_text_id=<?= (int)$selected_rfq['id'] ?>">Email Text</a>
+        <a class="btn" href="freight_quote_tracker.php<?= $search !== '' || $status_filter !== '' ? '?' . http_build_query(array_filter(['q' => $search, 'status' => $status_filter])) : '' ?>">← All RFQs</a>
+        <a class="btn" href="freight_quote_tracker.php?rfq_text_id=<?= (int)$selected_rfq['id'] ?>">Email Text</a>
         <a class="btn" href="freight_quote_form.php?edit_id=<?= (int)$selected_rfq['id'] ?>">Edit RFQ</a>
       </div>
     </div>
@@ -762,7 +762,7 @@ render_header('Freight Quote Tracker');
         </div>
         <div class="full row" style="margin-top:4px;">
           <button type="submit" class="btn primary">Save Changes</button>
-          <a class="btn" href="shipping_rfq_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>">Cancel</a>
+          <a class="btn" href="freight_quote_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>">Cancel</a>
         </div>
       </form>
       <hr style="margin:18px 0;" />
@@ -888,7 +888,7 @@ render_header('Freight Quote Tracker');
                   </span>
                 </td>
                 <td class="col-actions">
-                  <a class="btn" href="shipping_rfq_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>&edit_quote_id=<?= (int)$q['id'] ?>">Edit</a>
+                  <a class="btn" href="freight_quote_tracker.php?rfq_id=<?= (int)$selected_rfq['id'] ?>&edit_quote_id=<?= (int)$q['id'] ?>">Edit</a>
                   <form method="post" style="display:inline;"
                         onsubmit="return confirm('Delete this quote? This cannot be undone.');">
                     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['srfq_tracker_csrf']) ?>" />
