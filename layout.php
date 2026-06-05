@@ -544,9 +544,11 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
     ], $current); ?>
     <?php render_menu_dropdown('Sourcing', [
       ['type' => 'section', 'label' => 'Partners & Pricing'],
-      ['href' => 'vendors.php', 'files' => ['vendors.php', 'vendor_form.php', 'vendor_details.php'], 'label' => 'Vendors'],
       ['href' => 'customers.php', 'file' => 'customers.php', 'label' => 'Customers'],
+      ['href' => 'vendors.php', 'files' => ['vendors.php', 'vendor_form.php', 'vendor_details.php'], 'label' => 'Vendors'],
       ['href' => 'freight_forwarders.php', 'files' => ['freight_forwarders.php', 'freight_forwarder_form.php', 'freight_forwarder_details.php'], 'label' => 'Freight Forwarders'],
+      ['type' => 'separator'],
+      ['type' => 'section', 'label' => 'Tools'],
       ['href' => 'alibaba_responses.php', 'file' => 'alibaba_responses.php', 'label' => 'Alibaba Responses'],
       ['type' => 'separator'],
       ['type' => 'section', 'label' => 'Quotes'],
