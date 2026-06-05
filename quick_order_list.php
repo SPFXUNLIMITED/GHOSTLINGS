@@ -86,10 +86,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
         OR company LIKE ? ESCAPE '\\\\'
         OR email LIKE ? ESCAPE '\\\\'
         OR phone LIKE ? ESCAPE '\\\\'
-     ORDER BY customer_name ASC, id DESC
+     ORDER BY 2 ASC, id DESC
      LIMIT 8"
   );
-  $stmt->execute([$like, $like, $like, $like, $like, $like]);
+  $stmt->execute(array_fill(0, 6, $like));
   echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC), JSON_UNESCAPED_UNICODE);
   exit;
 }
