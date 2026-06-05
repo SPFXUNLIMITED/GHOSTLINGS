@@ -656,7 +656,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $errors[] = 'This quote is already converted to an invoice.';
         } else {
           $_SESSION['quotes_csrf'] = bin2hex(random_bytes(24));
-          header('Location: quotes.php?view=id&id=' . $row_id . '&invoice_converted=1');
+          header('Location: invoice_form.php?id=' . $row_id . '&invoice_converted=1');
           exit;
         }
       }
