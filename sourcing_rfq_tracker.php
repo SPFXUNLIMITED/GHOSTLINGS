@@ -1165,6 +1165,8 @@ render_header('Sourcing RFQ Tracker');
                     <img class="rfq-thumb-modal-image"
                          src="<?= h($thumb_url) ?>"
                          alt="<?= h('RFQ #' . $rfq_id . ' image') ?>"
+                         loading="lazy"
+                         decoding="async"
                          />
                   </button>
                 <?php else: ?>

@@ -800,6 +800,8 @@ render_alibaba_workflow_banner('create_rfq');
           title="Click to view full-size image"
         ><img src="<?= h($thumb_url) ?>"
               alt="RFQ image thumbnail"
+              loading="lazy"
+              decoding="async"
               style="max-width:200px; max-height:200px; border-radius:6px; border:1px solid rgba(0,0,0,.12); display:block;" /></button>
         <div class="muted" style="margin-top:4px;">Click the thumbnail to view the full image. Upload a new file above to replace it.</div>
       <?php endif; ?>
