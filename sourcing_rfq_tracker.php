@@ -1945,7 +1945,8 @@ render_header('Sourcing RFQ Tracker');
               <td>
                 <?php
                   $alibaba_chat_link = trim((string)($q['alibaba_chat_link'] ?? ''));
-                  $alibaba_chat_scheme = strtolower((string)parse_url($alibaba_chat_link, PHP_URL_SCHEME));
+                  $alibaba_chat_scheme_raw = parse_url($alibaba_chat_link, PHP_URL_SCHEME);
+                  $alibaba_chat_scheme = is_string($alibaba_chat_scheme_raw) ? strtolower($alibaba_chat_scheme_raw) : '';
                   $is_valid_alibaba_chat_link = $alibaba_chat_link !== ''
                     && filter_var($alibaba_chat_link, FILTER_VALIDATE_URL)
                     && in_array($alibaba_chat_scheme, ['http', 'https'], true);
