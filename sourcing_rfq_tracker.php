@@ -8,6 +8,7 @@ const MAX_LEAD_TIME_DAYS = 3650;
 const MAX_QUOTE_UPLOAD_BYTES = 26214400; // 25 MB
 const MAX_QUOTE_NOTES_LENGTH = 5000;
 const MAX_SUPPLIER_NAME_LENGTH = 255;
+const MAX_ALIBABA_CHAT_LINK_LENGTH = 1000;
 const MAX_MODEL_NAME_LENGTH = 255;
 const MAX_SHIPPING_METHOD_LENGTH = 100;
 const NUMERIC_VALUE_PATTERN = '/\d+(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?/';
@@ -543,6 +544,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $ai_fill_source_text = trim((string)($_POST['ai_quote_text'] ?? ''));
       $add_quote_post = [
         'supplier_name'   => '',
+        'alibaba_chat_link' => '',
         'model_name'      => '',
         'sku'             => '',
         'msrp'            => '',
@@ -641,6 +643,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'add_quote') {
       $rfq_id = (int)($_POST['rfq_id'] ?? 0);
       $supplier_name = trim((string)($_POST['supplier_name'] ?? ''));
+      $alibaba_chat_link = trim((string)($_POST['alibaba_chat_link'] ?? ''));
       $model_name = trim((string)($_POST['model_name'] ?? ''));
       $sku = trim((string)($_POST['sku'] ?? ''));
       $msrp_raw = trim((string)($_POST['msrp'] ?? ''));
@@ -663,6 +666,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($rfq_id <= 0) $errors[] = 'Invalid RFQ request selected.';
       if ($supplier_name === '') $errors[] = 'Supplier name is required.';
       if ($supplier_name !== '' && strlen($supplier_name) > MAX_SUPPLIER_NAME_LENGTH) $errors[] = 'Supplier name must be ' . MAX_SUPPLIER_NAME_LENGTH . ' characters or fewer.';
+      if ($alibaba_chat_link !== '' && strlen($alibaba_chat_link) > MAX_ALIBABA_CHAT_LINK_LENGTH) $errors[] = 'Alibaba Chat Link must be ' . MAX_ALIBABA_CHAT_LINK_LENGTH . ' characters or fewer.';
       if (strlen($model_name) > MAX_MODEL_NAME_LENGTH) $errors[] = 'Model name must be ' . MAX_MODEL_NAME_LENGTH . ' characters or fewer.';
       if (strlen($sku) > 100) $errors[] = 'SKU must be 100 characters or fewer.';
       if (strlen($shipping_method) > MAX_SHIPPING_METHOD_LENGTH) $errors[] = 'Shipping method must be ' . MAX_SHIPPING_METHOD_LENGTH . ' characters or fewer.';
@@ -790,16 +794,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           } else {
           $ins = $pdo->prepare(
             "INSERT INTO rfq_quotes
-            (rfq_request_id, supplier_name, model_name, sku, msrp, map_price, moq_20_price, moq_20_margin_msrp,
+            (rfq_request_id, supplier_name, alibaba_chat_link, model_name, sku, msrp, map_price, moq_20_price, moq_20_margin_msrp,
              moq_20_margin_map, moq_10_price, moq_10_margin_msrp, moq_10_margin_map, drop_ship_price,
              drop_ship_margin_msrp, drop_ship_margin_map, quote_amount, currency, lead_time_days, shipping_cost,
                shipping_origin, shipping_method, quote_status, received_on, notes, created_by,
                quote_file_original_name, quote_file_stored_name, quote_file_mime_type, quote_file_size_bytes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
           );
           $ins->execute([
             $rfq_id,
             $supplier_name,
+            $alibaba_chat_link === '' ? null : $alibaba_chat_link,
             $model_name === '' ? null : $model_name,
             $sku === '' ? null : $sku,
             $msrp_raw === '' ? null : (float)$msrp_raw,
@@ -839,6 +844,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $add_quote_post = [
           'supplier_name'   => $supplier_name,
+          'alibaba_chat_link' => $alibaba_chat_link,
           'model_name'      => $model_name,
           'sku'             => $sku,
           'msrp'            => $msrp_raw,
@@ -861,6 +867,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $quote_id = (int)($_POST['quote_id'] ?? 0);
       $rfq_id = (int)($_POST['rfq_id'] ?? 0);
       $supplier_name = trim((string)($_POST['supplier_name'] ?? ''));
+      $alibaba_chat_link = trim((string)($_POST['alibaba_chat_link'] ?? ''));
       $model_name = trim((string)($_POST['model_name'] ?? ''));
       $sku = trim((string)($_POST['sku'] ?? ''));
       $msrp_raw = trim((string)($_POST['msrp'] ?? ''));
@@ -885,6 +892,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($rfq_id <= 0) $errors[] = 'Invalid RFQ request.';
       if ($supplier_name === '') $errors[] = 'Supplier name is required.';
       if ($supplier_name !== '' && strlen($supplier_name) > MAX_SUPPLIER_NAME_LENGTH) $errors[] = 'Supplier name must be ' . MAX_SUPPLIER_NAME_LENGTH . ' characters or fewer.';
+      if ($alibaba_chat_link !== '' && strlen($alibaba_chat_link) > MAX_ALIBABA_CHAT_LINK_LENGTH) $errors[] = 'Alibaba Chat Link must be ' . MAX_ALIBABA_CHAT_LINK_LENGTH . ' characters or fewer.';
       if (strlen($model_name) > MAX_MODEL_NAME_LENGTH) $errors[] = 'Model name must be ' . MAX_MODEL_NAME_LENGTH . ' characters or fewer.';
       if (strlen($sku) > 100) $errors[] = 'SKU must be 100 characters or fewer.';
       if (strlen($shipping_method) > MAX_SHIPPING_METHOD_LENGTH) $errors[] = 'Shipping method must be ' . MAX_SHIPPING_METHOD_LENGTH . ' characters or fewer.';
@@ -1012,7 +1020,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           if (!$errors) {
             $upd = $pdo->prepare(
               "UPDATE rfq_quotes SET
-                supplier_name = ?, model_name = ?, sku = ?, msrp = ?, map_price = ?, moq_20_price = ?,
+                supplier_name = ?, alibaba_chat_link = ?, model_name = ?, sku = ?, msrp = ?, map_price = ?, moq_20_price = ?,
                 moq_20_margin_msrp = ?, moq_20_margin_map = ?, moq_10_price = ?, moq_10_margin_msrp = ?,
                 moq_10_margin_map = ?, drop_ship_price = ?, drop_ship_margin_msrp = ?, drop_ship_margin_map = ?,
                 quote_amount = ?, currency = ?, lead_time_days = ?,
@@ -1024,6 +1032,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
             $upd->execute([
               $supplier_name,
+              $alibaba_chat_link === '' ? null : $alibaba_chat_link,
               $model_name === '' ? null : $model_name,
               $sku === '' ? null : $sku,
               $msrp_raw === '' ? null : (float)$msrp_raw,
@@ -1079,6 +1088,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($errors) {
         $edit_quote_post = [
           'supplier_name'   => $supplier_name,
+          'alibaba_chat_link' => $alibaba_chat_link,
           'model_name'      => $model_name,
           'sku'             => $sku,
           'msrp'            => $msrp_raw,
@@ -1580,6 +1590,11 @@ render_header('Sourcing RFQ Tracker');
           <input type="text" name="supplier_name" maxlength="<?= MAX_SUPPLIER_NAME_LENGTH ?>" required
                  value="<?= h($editing_quote['supplier_name']) ?>" />
         </div>
+        <div class="full">
+          <label>Alibaba Chat Link (optional)</label>
+          <input type="text" name="alibaba_chat_link" maxlength="<?= MAX_ALIBABA_CHAT_LINK_LENGTH ?>"
+                 value="<?= h((string)($editing_quote['alibaba_chat_link'] ?? '')) ?>" />
+        </div>
         <div>
           <label>Model Name</label>
           <input type="text" name="model_name" maxlength="<?= MAX_MODEL_NAME_LENGTH ?>"
@@ -1714,6 +1729,11 @@ render_header('Sourcing RFQ Tracker');
           <label>Supplier Name <span style="color:var(--d)">*</span></label>
           <input type="text" name="supplier_name" maxlength="<?= MAX_SUPPLIER_NAME_LENGTH ?>" required placeholder="e.g. ABC Laser Systems"
                  value="<?= h($add_quote_post['supplier_name'] ?? '') ?>" />
+        </div>
+        <div class="full">
+          <label>Alibaba Chat Link (optional)</label>
+          <input type="text" name="alibaba_chat_link" maxlength="<?= MAX_ALIBABA_CHAT_LINK_LENGTH ?>" placeholder="https://..."
+                 value="<?= h($add_quote_post['alibaba_chat_link'] ?? '') ?>" />
         </div>
         <div>
           <label>Model Name</label>
