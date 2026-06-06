@@ -1359,7 +1359,7 @@ render_header('Sourcing RFQ Tracker');
   </div>
 <?php endif; ?>
 
-<?php if ($rfq_text_id <= 0): ?>
+<?php if (!$rfq_text_id): ?>
   <div class="card">
     <form method="get" class="row" style="align-items:flex-end;">
       <div style="flex:1 1 300px;">
@@ -1437,7 +1437,7 @@ render_header('Sourcing RFQ Tracker');
   }
 ?>
 
-<?php if (!$selected_rfq && $rfq_text_id <= 0): ?>
+<?php if (!$selected_rfq && !$rfq_text_id): ?>
   <?php if ($rfq_list_has_images): ?>
     <?= render_attachment_modal_assets() ?>
     <style>

@@ -741,7 +741,7 @@ render_header('Freight Quote Tracker');
 <?php endif; ?>
 
 <!-- Filter bar -->
-<?php if ($rfq_text_id <= 0): ?>
+<?php if (!$rfq_text_id): ?>
   <div class="card">
     <form method="get" class="row" style="gap:12px; align-items:flex-end; flex-wrap:wrap;">
       <?php if ($selected_rfq_id > 0): ?>
@@ -804,7 +804,7 @@ render_header('Freight Quote Tracker');
 <?php endif; ?>
 
 <!-- RFQ list -->
-<?php if (!$selected_rfq && $rfq_text_id <= 0): ?>
+<?php if (!$selected_rfq && !$rfq_text_id): ?>
   <div class="card">
     <div class="table-wrap" style="overflow-x:auto;">
       <table class="table-auto" style="min-width:980px;">
