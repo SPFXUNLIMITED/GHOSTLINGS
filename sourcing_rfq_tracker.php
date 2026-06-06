@@ -587,6 +587,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $rfq_id = (int)($_POST['rfq_id'] ?? 0);
       $quote_id = (int)($_POST['quote_id'] ?? 0);
       $ai_fill_target = (string)($_POST['ai_fill_target'] ?? 'add');
+      if (!in_array($ai_fill_target, ['add', 'edit'], true)) {
+        $ai_fill_target = 'add';
+      }
       $is_edit_ai_fill = $ai_fill_target === 'edit';
       $selected_rfq_id = $rfq_id;
       if ($is_edit_ai_fill) {
@@ -614,7 +617,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Please wait ' . RFQ_AI_MIN_SECONDS_BETWEEN_REQUESTS . ' seconds before using AI Fill Quote again.';
       } else {
         if ($is_edit_ai_fill) {
-          $existing_quote_stmt = $pdo->prepare("SELECT * FROM rfq_quotes WHERE id = ? AND rfq_request_id = ? LIMIT 1");
+          $existing_quote_stmt = $pdo->prepare(
+            "SELECT supplier_name, alibaba_chat_link, model_name, sku, msrp, map_price, moq_20_price,
+                    moq_10_price, drop_ship_price, quote_amount, currency, lead_time_days, shipping_cost,
+                    shipping_origin, shipping_method, quote_status, received_on, notes
+               FROM rfq_quotes
+              WHERE id = ? AND rfq_request_id = ?
+              LIMIT 1"
+          );
           $existing_quote_stmt->execute([$quote_id, $rfq_id]);
           $existing_quote = $existing_quote_stmt->fetch();
           if (!$existing_quote) {
