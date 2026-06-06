@@ -7,6 +7,9 @@ require_rfq_access();
 const MAX_LEAD_TIME_DAYS = 3650;
 const MAX_QUOTE_UPLOAD_BYTES = 26214400; // 25 MB
 const MAX_QUOTE_NOTES_LENGTH = 5000;
+const MAX_SUPPLIER_NAME_LENGTH = 255;
+const MAX_MODEL_NAME_LENGTH = 255;
+const MAX_SHIPPING_METHOD_LENGTH = 100;
 const NUMERIC_VALUE_PATTERN = '/\d+(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?/';
 const RFQ_AI_REQUEST_TIMEOUT_SECONDS = 15;
 const RFQ_AI_SOURCE_TEXT_MAX_LENGTH = 20000;
@@ -378,6 +381,25 @@ function extract_sourcing_quote_with_ai(string $source_text, ?string &$error_mes
   return $fields;
 }
 
+function sanitize_ai_text_value(?string $value, int $max_length): string {
+  $value = trim((string)$value);
+  $value = preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $value) ?? '';
+  $value = preg_replace('/\s+/', ' ', $value) ?? '';
+  return mb_substr(trim($value), 0, $max_length);
+}
+
+function normalize_ai_decimal_value(?string $value): string {
+  $value = str_replace(' ', '', trim((string)$value));
+  if ($value === '' || !preg_match(NUMERIC_VALUE_PATTERN, $value, $match)) {
+    return '';
+  }
+  $normalized_value = str_replace(',', '', $match[0]);
+  if ($normalized_value === '' || !is_numeric($normalized_value) || (float)$normalized_value < 0) {
+    return '';
+  }
+  return number_format((float)$normalized_value, 2, '.', '');
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
   if (empty($_SESSION['rfq_tracker_csrf']) || !hash_equals((string)$_SESSION['rfq_tracker_csrf'], $submitted_csrf)) {
@@ -461,14 +483,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!is_array($ai_fields)) {
           $errors[] = $ai_error ?: 'AI fill failed. Please review and try again.';
         } else {
-          $supplier_name = mb_substr(trim((string)($ai_fields['supplier_name'] ?? '')), 0, 255);
-          $model_name = mb_substr(trim((string)($ai_fields['model_name'] ?? '')), 0, 255);
+          $supplier_name = sanitize_ai_text_value($ai_fields['supplier_name'] ?? '', MAX_SUPPLIER_NAME_LENGTH);
+          $model_name = sanitize_ai_text_value($ai_fields['model_name'] ?? '', MAX_MODEL_NAME_LENGTH);
           $quote_amount_raw = trim((string)($ai_fields['quote_amount'] ?? ''));
           $lead_time_raw = trim((string)($ai_fields['lead_time_days'] ?? ''));
-          $moq = trim((string)($ai_fields['moq'] ?? ''));
-          $shipping_method = mb_substr(trim((string)($ai_fields['shipping_method'] ?? '')), 0, 100);
+          $moq = sanitize_ai_text_value($ai_fields['moq'] ?? '', MAX_QUOTE_NOTES_LENGTH);
+          $shipping_method = sanitize_ai_text_value($ai_fields['shipping_method'] ?? '', MAX_SHIPPING_METHOD_LENGTH);
           $shipping_cost_raw = trim((string)($ai_fields['shipping_cost'] ?? ''));
-          $notes = trim((string)($ai_fields['notes'] ?? ''));
+          $notes = sanitize_ai_text_value($ai_fields['notes'] ?? '', MAX_QUOTE_NOTES_LENGTH);
 
           if ($supplier_name !== '') {
             $add_quote_post['supplier_name'] = $supplier_name;
@@ -476,11 +498,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           if ($model_name !== '') {
             $add_quote_post['model_name'] = $model_name;
           }
-          if ($quote_amount_raw !== '' && preg_match(NUMERIC_VALUE_PATTERN, str_replace(' ', '', $quote_amount_raw), $amount_match)) {
-            $normalized_amount = str_replace(',', '', $amount_match[0]);
-            if ($normalized_amount !== '' && (float)$normalized_amount >= 0) {
-              $add_quote_post['quote_amount'] = number_format((float)$normalized_amount, 2, '.', '');
-            }
+          $normalized_amount = normalize_ai_decimal_value($quote_amount_raw);
+          if ($normalized_amount !== '') {
+            $add_quote_post['quote_amount'] = $normalized_amount;
           }
           if ($lead_time_raw !== '' && preg_match('/\b(\d{1,4})(?:\s*-\s*\d{1,4})?\b/', $lead_time_raw, $lead_match)) {
             $normalized_days = (int)$lead_match[1];
@@ -491,11 +511,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           if ($shipping_method !== '') {
             $add_quote_post['shipping_method'] = $shipping_method;
           }
-          if ($shipping_cost_raw !== '' && preg_match(NUMERIC_VALUE_PATTERN, str_replace(' ', '', $shipping_cost_raw), $shipping_match)) {
-            $normalized_shipping_cost = str_replace(',', '', $shipping_match[0]);
-            if ($normalized_shipping_cost !== '' && (float)$normalized_shipping_cost >= 0) {
-              $add_quote_post['shipping_cost'] = number_format((float)$normalized_shipping_cost, 2, '.', '');
-            }
+          $normalized_shipping_cost = normalize_ai_decimal_value($shipping_cost_raw);
+          if ($normalized_shipping_cost !== '') {
+            $add_quote_post['shipping_cost'] = $normalized_shipping_cost;
           }
 
           $note_lines = [];
@@ -1459,12 +1477,12 @@ render_header('Sourcing RFQ Tracker');
 
         <div>
           <label>Supplier Name <span style="color:var(--d)">*</span></label>
-          <input type="text" name="supplier_name" maxlength="255" required
+          <input type="text" name="supplier_name" maxlength="<?= MAX_SUPPLIER_NAME_LENGTH ?>" required
                  value="<?= h($editing_quote['supplier_name']) ?>" />
         </div>
         <div>
           <label>Model Name</label>
-          <input type="text" name="model_name" maxlength="255"
+          <input type="text" name="model_name" maxlength="<?= MAX_MODEL_NAME_LENGTH ?>"
                  value="<?= h((string)($editing_quote['model_name'] ?? '')) ?>" />
         </div>
         <div>
@@ -1519,7 +1537,7 @@ render_header('Sourcing RFQ Tracker');
         </div>
         <div>
           <label>Shipping Method</label>
-          <input type="text" name="shipping_method" maxlength="100"
+          <input type="text" name="shipping_method" maxlength="<?= MAX_SHIPPING_METHOD_LENGTH ?>"
                  value="<?= h((string)($editing_quote['shipping_method'] ?? '')) ?>" />
         </div>
         <div>
@@ -1594,12 +1612,12 @@ render_header('Sourcing RFQ Tracker');
 
         <div>
           <label>Supplier Name <span style="color:var(--d)">*</span></label>
-          <input type="text" name="supplier_name" maxlength="255" required placeholder="e.g. ABC Laser Systems"
+          <input type="text" name="supplier_name" maxlength="<?= MAX_SUPPLIER_NAME_LENGTH ?>" required placeholder="e.g. ABC Laser Systems"
                  value="<?= h($add_quote_post['supplier_name'] ?? '') ?>" />
         </div>
         <div>
           <label>Model Name</label>
-          <input type="text" name="model_name" maxlength="255" placeholder="e.g. GL-1325 Pro"
+          <input type="text" name="model_name" maxlength="<?= MAX_MODEL_NAME_LENGTH ?>" placeholder="e.g. GL-1325 Pro"
                  value="<?= h($add_quote_post['model_name'] ?? '') ?>" />
         </div>
         <div>
@@ -1654,7 +1672,7 @@ render_header('Sourcing RFQ Tracker');
         </div>
         <div>
           <label>Shipping Method</label>
-          <input type="text" name="shipping_method" maxlength="100" placeholder="e.g. DDP / FOB / EXW"
+          <input type="text" name="shipping_method" maxlength="<?= MAX_SHIPPING_METHOD_LENGTH ?>" placeholder="e.g. DDP / FOB / EXW"
                  value="<?= h($add_quote_post['shipping_method'] ?? '') ?>" />
         </div>
         <div>
