@@ -541,7 +541,7 @@ render_header('Customers');
     if (controller) controller.abort();
     controller = new AbortController();
 
-    const targetUrl = new URL(form.getAttribute('action'), window.location.origin);
+    const targetUrl = new URL(form.getAttribute('action') || window.location.pathname, window.location.href);
     if (query !== '') targetUrl.searchParams.set('q', query);
     targetUrl.searchParams.set('live_search', '1');
 
