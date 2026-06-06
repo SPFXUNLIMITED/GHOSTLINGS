@@ -303,7 +303,7 @@ render_header('Customers');
 
 <div class="card page-header">
   <div class="page-header-body">
-    <h1>Customers <span class="muted" style="font-size:0.7em; font-weight:400;">(<?= (int)$customer_total ?>)</span></h1>
+    <h1>Customers <span id="customers-count" class="muted" style="font-size:0.7em; font-weight:400;">(<?= (int)$customer_total ?>)</span></h1>
     <p class="muted">Sync and view HubSpot customer contacts.</p>
   </div>
   <div class="actions">
@@ -330,8 +330,9 @@ render_header('Customers');
 <?php endif; ?>
 
 <div class="card">
-  <form method="get" action="customers.php" class="row" style="margin-bottom:4px;" role="search">
+  <form id="customers-search-form" method="get" action="customers.php" class="row" style="margin-bottom:4px;" role="search">
     <input
+      id="customers-search-input"
       type="text"
       name="q"
       value="<?= h($search) ?>"
@@ -340,17 +341,20 @@ render_header('Customers');
       style="max-width:360px;"
     />
     <button type="submit" class="btn">Search</button>
-    <?php if ($search !== ''): ?>
-      <a class="btn" href="customers.php">Clear</a>
-    <?php endif; ?>
+    <a
+      id="customers-search-clear"
+      class="btn"
+      href="customers.php"
+      <?= $search === '' ? 'style="display:none;"' : '' ?>
+    >Clear</a>
   </form>
-  <p class="muted" style="margin:8px 0 0;">
+  <p id="customers-summary" class="muted" style="margin:8px 0 0;">
     Showing <?= (int)$showing_from ?>-<?= (int)$showing_to ?> of <?= (int)$customer_total ?> customer<?= $customer_total === 1 ? '' : 's' ?>.
     <?php if ($search !== ''): ?>Filtered by “<?= h($search) ?>”.<?php endif; ?>
   </p>
 </div>
 
-<div class="card" style="padding:0; overflow-x:auto;">
+<div id="customers-table-wrap" class="card" style="padding:0; overflow-x:auto;">
   <table>
     <thead>
       <tr>
@@ -430,19 +434,114 @@ render_header('Customers');
   </table>
 </div>
 
-<?php if ($total_pages > 1): ?>
-  <?php $base_params = $search !== '' ? ['q' => $search] : []; ?>
-  <div class="card" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-    <?php if ($page > 1): ?>
-      <?php $prev_params = $base_params; $prev_params['page'] = $page - 1; ?>
-      <a class="btn" href="?<?= h(http_build_query($prev_params)) ?>">← Prev</a>
-    <?php endif; ?>
-    <span class="muted">Page <?= (int)$page ?> of <?= (int)$total_pages ?> (<?= (int)$customers_per_page ?> per page)</span>
-    <?php if ($page < $total_pages): ?>
-      <?php $next_params = $base_params; $next_params['page'] = $page + 1; ?>
-      <a class="btn" href="?<?= h(http_build_query($next_params)) ?>">Next →</a>
-    <?php endif; ?>
-  </div>
-<?php endif; ?>
+<div id="customers-pagination">
+  <?php if ($total_pages > 1): ?>
+    <?php $base_params = $search !== '' ? ['q' => $search] : []; ?>
+    <div class="card" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      <?php if ($page > 1): ?>
+        <?php $prev_params = $base_params; $prev_params['page'] = $page - 1; ?>
+        <a class="btn" href="?<?= h(http_build_query($prev_params)) ?>">← Prev</a>
+      <?php endif; ?>
+      <span class="muted">Page <?= (int)$page ?> of <?= (int)$total_pages ?> (<?= (int)$customers_per_page ?> per page)</span>
+      <?php if ($page < $total_pages): ?>
+        <?php $next_params = $base_params; $next_params['page'] = $page + 1; ?>
+        <a class="btn" href="?<?= h(http_build_query($next_params)) ?>">Next →</a>
+      <?php endif; ?>
+    </div>
+  <?php endif; ?>
+</div>
+
+<script>
+(() => {
+  const form = document.getElementById('customers-search-form');
+  const input = document.getElementById('customers-search-input');
+  const clearButton = document.getElementById('customers-search-clear');
+  const count = document.getElementById('customers-count');
+  const summary = document.getElementById('customers-summary');
+  const tableWrap = document.getElementById('customers-table-wrap');
+  const pagination = document.getElementById('customers-pagination');
+  if (!form || !input || !clearButton || !count || !summary || !tableWrap || !pagination) return;
+
+  let debounceTimer = null;
+  let controller = null;
+  let lastQuery = input.value.trim();
+
+  const updateClearButton = () => {
+    clearButton.style.display = input.value.trim() === '' ? 'none' : '';
+  };
+
+  const updateAddressBar = (query) => {
+    const nextUrl = new URL(window.location.href);
+    if (query === '') {
+      nextUrl.searchParams.delete('q');
+    } else {
+      nextUrl.searchParams.set('q', query);
+    }
+    nextUrl.searchParams.delete('page');
+    window.history.replaceState(null, '', nextUrl.toString());
+  };
+
+  const runLiveSearch = () => {
+    const query = input.value.trim();
+    updateClearButton();
+    if (query === lastQuery) return;
+    lastQuery = query;
+
+    if (controller) controller.abort();
+    controller = new AbortController();
+
+    const targetUrl = new URL(form.getAttribute('action') || window.location.pathname, window.location.origin);
+    if (query !== '') targetUrl.searchParams.set('q', query);
+
+    fetch(targetUrl.toString(), {
+      method: 'GET',
+      credentials: 'same-origin',
+      signal: controller.signal,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error('Live search request failed.');
+        return response.text();
+      })
+      .then((html) => {
+        const nextDoc = new DOMParser().parseFromString(html, 'text/html');
+        const nextCount = nextDoc.getElementById('customers-count');
+        const nextSummary = nextDoc.getElementById('customers-summary');
+        const nextTableWrap = nextDoc.getElementById('customers-table-wrap');
+        const nextPagination = nextDoc.getElementById('customers-pagination');
+        if (!nextCount || !nextSummary || !nextTableWrap || !nextPagination) return;
+
+        count.textContent = nextCount.textContent;
+        summary.innerHTML = nextSummary.innerHTML;
+        tableWrap.innerHTML = nextTableWrap.innerHTML;
+        pagination.innerHTML = nextPagination.innerHTML;
+        updateAddressBar(query);
+      })
+      .catch((error) => {
+        if (error && error.name === 'AbortError') return;
+        console.error(error);
+      });
+  };
+
+  input.addEventListener('input', () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = window.setTimeout(runLiveSearch, 250);
+  });
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (debounceTimer) clearTimeout(debounceTimer);
+    runLiveSearch();
+  });
+
+  clearButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    input.value = '';
+    if (debounceTimer) clearTimeout(debounceTimer);
+    runLiveSearch();
+    input.focus();
+  });
+})();
+</script>
 
 <?php render_footer(); ?>
