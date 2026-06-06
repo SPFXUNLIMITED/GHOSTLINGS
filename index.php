@@ -1,6 +1,8 @@
 <?php
 require __DIR__ . '/db.php';
-$openaiApiKeyDebug = getenv('OPENAI_API_KEY') ? 'OPENAI_API_KEY loaded: YES' : 'OPENAI_API_KEY loaded: NO';
+$openaiApiKeyDebug = static function (): string {
+  return getenv('OPENAI_API_KEY') ? 'OPENAI_API_KEY loaded: YES' : 'OPENAI_API_KEY loaded: NO';
+};
 require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 
@@ -9,7 +11,7 @@ require_login();
 render_header('Home');
 render_alibaba_workflow_banner('create_rfq');
 if (is_admin()) {
-  echo '<div style="margin: 0 auto 16px; max-width: 1100px; padding: 10px 14px; border: 1px solid #facc15; border-radius: 10px; background: #fffbeb; color: #92400e; font-weight: 600;">' . h($openaiApiKeyDebug) . '</div>';
+  echo '<div style="margin: 0 auto 16px; max-width: 1100px; padding: 10px 14px; border: 1px solid #facc15; border-radius: 10px; background: #fffbeb; color: #92400e; font-weight: 600;">' . h($openaiApiKeyDebug()) . '</div>';
 }
 ?>
 
