@@ -811,13 +811,15 @@ function render_footer(): void {
 ?>
   </div>
 
-<?php if ($is_logged_in): ?>
+<?php if ($is_logged_in):
+  $fc = basename($_SERVER['PHP_SELF']);
+  $supplier_pages = ['vendors.php', 'vendor_form.php', 'vendor_details.php'];
+?>
   <nav class="footer-nav" aria-label="Secondary navigation">
     <div class="footer-nav-inner">
-      <?php $fc = basename($_SERVER['PHP_SELF']); ?>
       <a class="footer-nav-link <?= $fc === 'customers.php' ? 'active' : '' ?>" href="customers.php">Customers</a>
       <a class="footer-nav-link <?= $fc === 'index.php' ? 'active' : '' ?>" href="index.php">Dashboard</a>
-      <a class="footer-nav-link <?= in_array($fc, ['vendors.php', 'vendor_form.php', 'vendor_details.php'], true) ? 'active' : '' ?>" href="vendors.php">Suppliers</a>
+      <a class="footer-nav-link <?= in_array($fc, $supplier_pages, true) ? 'active' : '' ?>" href="vendors.php">Suppliers</a>
       <a class="footer-nav-link <?= $fc === 'time_report.php' ? 'active' : '' ?>" href="time_report.php">Reports</a>
     </div>
   </nav>
