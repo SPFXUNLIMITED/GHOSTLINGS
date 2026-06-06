@@ -818,8 +818,6 @@ function render_footer(): void {
   <nav class="footer-nav" aria-label="Secondary navigation">
     <div class="footer-nav-inner">
       <a class="footer-nav-link <?= $fc === 'customers.php' ? 'active' : '' ?>" href="customers.php">Customers</a>
-      <a class="footer-nav-link <?= $fc === 'index.php' ? 'active' : '' ?>" href="index.php">Dashboard</a>
-      <a class="footer-nav-link <?= in_array($fc, $supplier_pages, true) ? 'active' : '' ?>" href="vendors.php">Suppliers</a>
       <a class="footer-nav-link <?= $fc === 'time_report.php' ? 'active' : '' ?>" href="time_report.php">Reports</a>
     </div>
   </nav>
