@@ -13,10 +13,13 @@ const HUBSPOT_CONTACTS_API_BASE = 'https://api.hubapi.com/crm/v3/objects/contact
 if (empty($_SESSION['customers_sync_csrf'])) {
   $_SESSION['customers_sync_csrf'] = bin2hex(random_bytes(24));
 }
+if (empty($_SESSION['customers_delete_csrf'])) {
+  $_SESSION['customers_delete_csrf'] = bin2hex(random_bytes(24));
+}
 
 $errors = [];
 $success = '';
-$customer_table_columns = 6;
+$customer_table_columns = 7;
 $customers_per_page = 50;
 
 function hubspot_token(PDO $pdo): string {
@@ -212,17 +215,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 }
 
+$created = isset($_GET['created']) && $_GET['created'] === '1';
+$updated = isset($_GET['updated']) && $_GET['updated'] === '1';
+$deleted = isset($_GET['deleted']) && $_GET['deleted'] === '1';
+$delete_blocked = isset($_GET['delete_blocked']) && $_GET['delete_blocked'] === '1';
+if ($success === '') {
+  if ($created) {
+    $success = 'Customer added.';
+  } elseif ($updated) {
+    $success = 'Customer updated.';
+  } elseif ($deleted) {
+    $success = 'Customer deleted.';
+  }
+}
+if ($delete_blocked) {
+  $errors[] = 'This customer cannot be deleted because they have associated RFQs or orders.';
+}
+
 $search = trim((string)($_GET['q'] ?? ''));
 $page = max(1, (int)($_GET['page'] ?? 1));
 $where_sql = '';
 
 $count_stmt = null;
 if ($search !== '') {
-  $where_sql = "WHERE first_name LIKE :q OR last_name LIKE :q OR company LIKE :q";
+  $where_sql = "WHERE c.first_name LIKE :q OR c.last_name LIKE :q OR c.company LIKE :q";
   $escaped_search = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search);
   $search_like = '%' . $escaped_search . '%';
   $where_sql .= " ESCAPE '!'";
-  $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM customers $where_sql");
+  $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM customers c $where_sql");
   $count_stmt->bindValue(':q', $search_like, PDO::PARAM_STR);
   $count_stmt->execute();
   $customer_total = (int)$count_stmt->fetchColumn();
@@ -234,10 +254,37 @@ $total_pages = max(1, (int)ceil($customer_total / $customers_per_page));
 $page = min($page, $total_pages);
 $offset = ($page - 1) * $customers_per_page;
 
-$data_sql = "SELECT first_name, last_name, company, phone, email, last_updated, updated_at
-             FROM customers
+$data_sql = "SELECT
+               c.id,
+               c.first_name,
+               c.last_name,
+               c.company,
+               c.phone,
+               c.email,
+               c.last_updated,
+               c.updated_at,
+               (
+                 EXISTS (
+                   SELECT 1
+                   FROM rfq_requests r
+                   WHERE
+                     (c.email <> '' AND (r.contact_email = c.email OR r.buyer_email = c.email))
+                     OR (c.company <> '' AND (r.company_name = c.company OR r.buyer_company = c.company))
+                     OR (TRIM(CONCAT_WS(' ', c.first_name, c.last_name)) <> '' AND (r.contact_name = TRIM(CONCAT_WS(' ', c.first_name, c.last_name)) OR r.buyer_name = TRIM(CONCAT_WS(' ', c.first_name, c.last_name))))
+                 )
+                 OR EXISTS (
+                   SELECT 1
+                   FROM customer_phone_inquiries o
+                   WHERE
+                     (c.email <> '' AND o.email = c.email)
+                     OR (c.company <> '' AND o.company_name = c.company)
+                     OR (c.phone <> '' AND o.phone_number = c.phone)
+                     OR (TRIM(CONCAT_WS(' ', c.first_name, c.last_name)) <> '' AND o.customer_name = TRIM(CONCAT_WS(' ', c.first_name, c.last_name)))
+                 )
+               ) AS has_associations
+             FROM customers c
              $where_sql
-             ORDER BY (last_updated IS NULL) ASC, last_updated DESC, updated_at DESC, id DESC
+             ORDER BY (c.last_updated IS NULL) ASC, c.last_updated DESC, c.updated_at DESC, c.id DESC
              LIMIT :limit OFFSET :offset";
 $data_stmt = $pdo->prepare($data_sql);
 if ($search !== '') {
@@ -259,10 +306,13 @@ render_header('Customers');
     <h1>Customers <span class="muted" style="font-size:0.7em; font-weight:400;">(<?= (int)$customer_total ?>)</span></h1>
     <p class="muted">Sync and view HubSpot customer contacts.</p>
   </div>
-  <form method="post" style="margin:0;">
-    <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customers_sync_csrf']) ?>" />
-    <button type="submit" class="btn primary" style="font-size:18px; padding:14px 24px;">Sync from HubSpot</button>
-  </form>
+  <div class="actions">
+    <a class="btn primary" href="customer_form.php">+ Add New Customer</a>
+    <form method="post" style="margin:0;">
+      <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customers_sync_csrf']) ?>" />
+      <button type="submit" class="btn primary" style="font-size:18px; padding:14px 24px;">Sync from HubSpot</button>
+    </form>
+  </div>
 </div>
 
 <?php if ($errors): ?>
@@ -310,6 +360,7 @@ render_header('Customers');
         <th>Phone</th>
         <th>Email</th>
         <th>Last Updated</th>
+        <th>Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -358,6 +409,21 @@ render_header('Customers');
             <?php endif; ?>
           </td>
           <td class="muted"><?= h(format_customer_last_updated($row['last_updated'] ?? null)) ?></td>
+          <td class="actions">
+            <a class="btn" href="customer_details.php?id=<?= (int)$row['id'] ?>">View</a>
+            <a class="btn" href="customer_form.php?id=<?= (int)$row['id'] ?>">Edit</a>
+            <?php if ((int)($row['has_associations'] ?? 0) === 1): ?>
+              <span title="This customer cannot be deleted because they have associated RFQs or orders.">
+                <button type="button" class="btn danger" disabled>Delete</button>
+              </span>
+            <?php else: ?>
+              <form method="post" action="customer_delete.php" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this customer? This action cannot be undone.');">
+                <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customers_delete_csrf']) ?>" />
+                <input type="hidden" name="id" value="<?= (int)$row['id'] ?>" />
+                <button type="submit" class="btn danger">Delete</button>
+              </form>
+            <?php endif; ?>
+          </td>
         </tr>
       <?php endforeach; ?>
     </tbody>
