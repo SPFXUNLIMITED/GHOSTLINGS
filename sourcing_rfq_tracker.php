@@ -1359,28 +1359,30 @@ render_header('Sourcing RFQ Tracker');
   </div>
 <?php endif; ?>
 
-<div class="card">
-  <form method="get" class="row" style="align-items:flex-end;">
-    <div style="flex:1 1 300px;">
-      <label>Search RFQs</label>
-      <input type="text" name="q" value="<?= h($search) ?>"
-             placeholder="Search title, machine specs, part specs, or features..." />
-    </div>
-    <div style="width:220px;">
-      <label>Status</label>
-      <select name="status">
-        <option value="">All statuses</option>
-        <?php foreach ($request_statuses as $k => $label): ?>
-          <option value="<?= h($k) ?>" <?= $status_filter === $k ? 'selected' : '' ?>><?= h($label) ?></option>
-        <?php endforeach; ?>
-      </select>
-    </div>
-    <div class="row">
-      <button type="submit" class="btn primary">Filter</button>
-      <a class="btn" href="sourcing_rfq_tracker.php">Clear</a>
-    </div>
-  </form>
-</div>
+<?php if ($rfq_text_id <= 0): ?>
+  <div class="card">
+    <form method="get" class="row" style="align-items:flex-end;">
+      <div style="flex:1 1 300px;">
+        <label>Search RFQs</label>
+        <input type="text" name="q" value="<?= h($search) ?>"
+               placeholder="Search title, machine specs, part specs, or features..." />
+      </div>
+      <div style="width:220px;">
+        <label>Status</label>
+        <select name="status">
+          <option value="">All statuses</option>
+          <?php foreach ($request_statuses as $k => $label): ?>
+            <option value="<?= h($k) ?>" <?= $status_filter === $k ? 'selected' : '' ?>><?= h($label) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="row">
+        <button type="submit" class="btn primary">Filter</button>
+        <a class="btn" href="sourcing_rfq_tracker.php">Clear</a>
+      </div>
+    </form>
+  </div>
+<?php endif; ?>
 
 <?php if ($rfq_email_text !== ''): ?>
   <div class="card">
@@ -1435,7 +1437,7 @@ render_header('Sourcing RFQ Tracker');
   }
 ?>
 
-<?php if (!$selected_rfq): ?>
+<?php if (!$selected_rfq && $rfq_text_id <= 0): ?>
   <?php if ($rfq_list_has_images): ?>
     <?= render_attachment_modal_assets() ?>
     <style>

@@ -741,32 +741,34 @@ render_header('Freight Quote Tracker');
 <?php endif; ?>
 
 <!-- Filter bar -->
-<div class="card">
-  <form method="get" class="row" style="gap:12px; align-items:flex-end; flex-wrap:wrap;">
-    <?php if ($selected_rfq_id > 0): ?>
-      <input type="hidden" name="rfq_id" value="<?= (int)$selected_rfq_id ?>" />
-    <?php endif; ?>
-    <div style="flex:1; min-width:180px;">
-      <label>Search</label>
-      <input type="text" id="shipping-rfq-search-input" name="q" value="<?= h($search) ?>"
-             placeholder="Search title, model, or port…" />
-    </div>
-    <div style="width:200px;">
-      <label>Status</label>
-      <select name="status">
-        <option value="">All statuses</option>
-        <?php foreach ($request_statuses as $k => $label): ?>
-          <option value="<?= h($k) ?>" <?= $status_filter === $k ? 'selected' : '' ?>><?= h($label) ?></option>
-        <?php endforeach; ?>
-      </select>
-    </div>
-    <div class="row">
-      <button type="submit" class="btn primary">Filter</button>
-      <a class="btn" href="freight_quote_tracker.php">Clear</a>
-      <a class="btn" href="freight_quote_form.php">New Freight Quote</a>
-    </div>
-  </form>
-</div>
+<?php if ($rfq_text_id <= 0): ?>
+  <div class="card">
+    <form method="get" class="row" style="gap:12px; align-items:flex-end; flex-wrap:wrap;">
+      <?php if ($selected_rfq_id > 0): ?>
+        <input type="hidden" name="rfq_id" value="<?= (int)$selected_rfq_id ?>" />
+      <?php endif; ?>
+      <div style="flex:1; min-width:180px;">
+        <label>Search</label>
+        <input type="text" id="shipping-rfq-search-input" name="q" value="<?= h($search) ?>"
+               placeholder="Search title, model, or port…" />
+      </div>
+      <div style="width:200px;">
+        <label>Status</label>
+        <select name="status">
+          <option value="">All statuses</option>
+          <?php foreach ($request_statuses as $k => $label): ?>
+            <option value="<?= h($k) ?>" <?= $status_filter === $k ? 'selected' : '' ?>><?= h($label) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="row">
+        <button type="submit" class="btn primary">Filter</button>
+        <a class="btn" href="freight_quote_tracker.php">Clear</a>
+        <a class="btn" href="freight_quote_form.php">New Freight Quote</a>
+      </div>
+    </form>
+  </div>
+<?php endif; ?>
 
 <!-- Email text panel -->
 <?php if ($rfq_email_text !== ''): ?>
@@ -802,7 +804,7 @@ render_header('Freight Quote Tracker');
 <?php endif; ?>
 
 <!-- RFQ list -->
-<?php if (!$selected_rfq): ?>
+<?php if (!$selected_rfq && $rfq_text_id <= 0): ?>
   <div class="card">
     <div class="table-wrap" style="overflow-x:auto;">
       <table class="table-auto" style="min-width:980px;">
