@@ -198,7 +198,7 @@ function build_shipping_rfq_email_text(array $rfq, array $crates): string {
     'SHIPPING REQUEST FOR QUOTATION',
     $sep,
     '',
-    'RFQ #:          ' . (int)$rfq['id'],
+    'Freight Quote #: ' . (int)$rfq['id'],
     'Date:           ' . $date,
     'Status:         ' . ucfirst(str_replace('_', ' ', trim((string)$rfq['request_status']))),
     '',
@@ -615,7 +615,7 @@ render_header('Freight Quote Tracker');
     <div class="shipping-rfq-hero-stats" aria-label="Freight Quote Tracker summary">
       <div class="shipping-rfq-hero-stat">
         <strong><?= (int)$hero_total_rfqs ?></strong>
-        <span>Total RFQs</span>
+        <span>Total Requests</span>
       </div>
       <div class="shipping-rfq-hero-stat">
         <strong><?= (int)$hero_open_rfqs ?></strong>
@@ -675,7 +675,7 @@ render_header('Freight Quote Tracker');
     <div class="row">
       <button type="submit" class="btn primary">Filter</button>
       <a class="btn" href="freight_quote_tracker.php">Clear</a>
-      <a class="btn" href="freight_quote_form.php">New RFQ</a>
+      <a class="btn" href="freight_quote_form.php">New Freight Quote</a>
     </div>
   </form>
 </div>
@@ -808,9 +808,9 @@ render_header('Freight Quote Tracker');
         <p class="muted"><?= h($selected_rfq['request_title']) ?></p>
       </div>
       <div class="row" style="flex-shrink:0;">
-        <a class="btn" href="freight_quote_tracker.php<?= $search !== '' || $status_filter !== '' ? '?' . http_build_query(array_filter(['q' => $search, 'status' => $status_filter])) : '' ?>">← All RFQs</a>
+        <a class="btn" href="freight_quote_tracker.php<?= $search !== '' || $status_filter !== '' ? '?' . http_build_query(array_filter(['q' => $search, 'status' => $status_filter])) : '' ?>">← All Freight Quotes</a>
         <a class="btn" href="freight_quote_tracker.php?rfq_text_id=<?= (int)$selected_rfq['id'] ?>">Email Text</a>
-        <a class="btn" href="freight_quote_form.php?edit_id=<?= (int)$selected_rfq['id'] ?>">Edit RFQ</a>
+        <a class="btn" href="freight_quote_form.php?edit_id=<?= (int)$selected_rfq['id'] ?>">Edit Freight Quote</a>
       </div>
     </div>
 
@@ -952,6 +952,7 @@ render_header('Freight Quote Tracker');
       <hr style="margin:18px 0;" />
     <?php else: ?>
       <!-- Add quote form -->
+      <h3 style="margin-top:0; margin-bottom:12px;">Add Quote</h3>
       <div style="margin-bottom:12px;">
         <button type="button" class="btn" id="toggle-ai-fill-quote">AI Fill Quote</button>
       </div>
@@ -974,7 +975,6 @@ render_header('Freight Quote Tracker');
         $add_forwarder_other_value = trim((string)($ai_prefill['forwarder_name_other'] ?? ''));
         $add_forwarder_is_other = $add_forwarder_name_value === '__other__';
       ?>
-      <h3 style="margin-top:0; margin-bottom:12px;">Add Quote</h3>
       <form method="post" class="form-grid" novalidate>
         <input type="hidden" name="csrf_token" value="<?= h($_SESSION['srfq_tracker_csrf']) ?>" />
         <input type="hidden" name="action"  value="add_quote" />
