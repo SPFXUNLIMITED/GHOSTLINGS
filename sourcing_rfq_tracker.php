@@ -286,7 +286,7 @@ function allowed_quote_upload_mime_types(): array {
   ];
 }
 
-function rfq_env_value(string $key): string {
+function rfq_env_lookup(string $key): array {
   static $dotenv_values = null;
 
   if ($dotenv_values === null) {
@@ -342,34 +342,61 @@ function rfq_env_value(string $key): string {
     }
   }
 
-  $env_value = getenv($key);
-  if ($env_value === false) {
-    $env_value = null;
-  }
-
   $candidates = [
-    $env_value,
-    $_ENV[$key] ?? null,
-    $_SERVER[$key] ?? null,
-    $dotenv_values[$key] ?? null,
+    'getenv' => (($value = getenv($key)) === false ? null : $value),
+    'getenv_redirect' => (($value = getenv('REDIRECT_' . $key)) === false ? null : $value),
+    '_ENV' => $_ENV[$key] ?? null,
+    '_SERVER' => $_SERVER[$key] ?? null,
+    '_SERVER_REDIRECT' => $_SERVER['REDIRECT_' . $key] ?? null,
+    'dotenv' => $dotenv_values[$key] ?? null,
   ];
-  foreach ($candidates as $candidate) {
+
+  $diagnostics = [];
+  foreach ($candidates as $source => $candidate) {
+    if ($candidate === null) {
+      $diagnostics[] = $source . '=missing';
+      continue;
+    }
+
     $value = trim((string)$candidate);
     if ($value !== '') {
-      return $value;
+      return [
+        'value' => $value,
+        'source' => $source,
+        'diagnostics' => implode(', ', $diagnostics),
+      ];
     }
+    $diagnostics[] = $source . '=blank';
   }
-  return '';
+  return [
+    'value' => '',
+    'source' => 'none',
+    'diagnostics' => implode(', ', $diagnostics),
+  ];
+}
+
+function rfq_env_value(string $key): string {
+  $lookup = rfq_env_lookup($key);
+  return (string)($lookup['value'] ?? '');
+}
+
+function rfq_ai_env_debug_suffix(bool $is_loaded): string {
+  $debug_flag = strtolower(rfq_env_value('OPENAI_DEBUG_ENV'));
+  if (!in_array($debug_flag, ['1', 'true', 'yes', 'on'], true)) {
+    return '';
+  }
+  return ' Debug: OPENAI_API_KEY loaded=' . ($is_loaded ? 'yes' : 'no') . '.';
 }
 
 function extract_sourcing_quote_with_ai(string $source_text, ?string &$error_message = null): ?array {
-  $api_key = rfq_env_value('OPENAI_API_KEY');
+  $api_key_lookup = rfq_env_lookup('OPENAI_API_KEY');
+  $api_key = (string)($api_key_lookup['value'] ?? '');
   if ($api_key === '') {
-    $error_message = 'AI fill is not configured. Missing OPENAI_API_KEY.';
+    $error_message = 'AI fill is not configured. Missing OPENAI_API_KEY.' . rfq_ai_env_debug_suffix(false);
     return null;
   }
   if (preg_match('/[\r\n]/', $api_key)) {
-    $error_message = 'AI fill is not configured. OPENAI_API_KEY is invalid.';
+    $error_message = 'AI fill is not configured. OPENAI_API_KEY is invalid.' . rfq_ai_env_debug_suffix(true);
     return null;
   }
 
