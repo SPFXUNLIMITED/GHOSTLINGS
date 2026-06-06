@@ -585,6 +585,24 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
   </div>
 </nav>
 
+<?php if ($show_mod_menu): ?>
+<button
+  type="button"
+  id="leftQuickAccessToggle"
+  class="left-quick-access-toggle"
+  aria-expanded="false"
+  aria-controls="leftQuickAccessPanel"
+>
+  Quick Menu
+</button>
+<aside id="leftQuickAccessPanel" class="left-quick-access-panel" aria-hidden="true">
+  <a class="left-quick-access-link <?= $current === 'quick_order_form.php' ? 'active' : '' ?>" href="quick_order_form.php">Quick Order Form</a>
+  <a class="left-quick-access-link <?= $current === 'quick_order_list.php' ? 'active' : '' ?>" href="quick_order_list.php">Quick Order Tracker</a>
+  <a class="left-quick-access-link <?= $current === 'customers.php' ? 'active' : '' ?>" href="customers.php">Customers</a>
+  <a class="left-quick-access-link <?= in_array($current, ['inventory_list.php', 'inventory_form.php'], true) ? 'active' : '' ?>" href="inventory_list.php">Inventory</a>
+</aside>
+<?php endif; ?>
+
 <script>
   (function () {
     const dropdowns = Array.from(document.querySelectorAll('details.menu-dropdown'));
@@ -624,6 +642,39 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
     });
   })();
 </script>
+
+<?php if ($show_mod_menu): ?>
+<script>
+  (function () {
+    const toggle = document.getElementById('leftQuickAccessToggle');
+    const panel = document.getElementById('leftQuickAccessPanel');
+    if (!toggle || !panel) return;
+
+    const setOpen = (open) => {
+      panel.classList.toggle('open', open);
+      panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+
+    toggle.addEventListener('click', function () {
+      setOpen(!panel.classList.contains('open'));
+    });
+
+    document.addEventListener('click', function (event) {
+      if (!panel.classList.contains('open')) return;
+      if (!panel.contains(event.target) && event.target !== toggle) {
+        setOpen(false);
+      }
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    });
+  })();
+</script>
+<?php endif; ?>
 
 <?php }
 
