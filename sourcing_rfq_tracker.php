@@ -566,8 +566,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       if ($rfq_id <= 0) $errors[] = 'Invalid RFQ request selected.';
       if ($supplier_name === '') $errors[] = 'Supplier name is required.';
-      if (strlen($model_name) > 255) $errors[] = 'Model name must be 255 characters or fewer.';
+      if (strlen($supplier_name) > MAX_SUPPLIER_NAME_LENGTH) $errors[] = 'Supplier name must be ' . MAX_SUPPLIER_NAME_LENGTH . ' characters or fewer.';
+      if (strlen($model_name) > MAX_MODEL_NAME_LENGTH) $errors[] = 'Model name must be ' . MAX_MODEL_NAME_LENGTH . ' characters or fewer.';
       if (strlen($sku) > 100) $errors[] = 'SKU must be 100 characters or fewer.';
+      if (strlen($shipping_method) > MAX_SHIPPING_METHOD_LENGTH) $errors[] = 'Shipping method must be ' . MAX_SHIPPING_METHOD_LENGTH . ' characters or fewer.';
       if ($msrp_raw !== '' && (!is_numeric($msrp_raw) || (float)$msrp_raw < 0)) {
         $errors[] = 'MSRP must be a non-negative number.';
       }
@@ -786,8 +788,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($quote_id <= 0) $errors[] = 'Invalid quote.';
       if ($rfq_id <= 0) $errors[] = 'Invalid RFQ request.';
       if ($supplier_name === '') $errors[] = 'Supplier name is required.';
-      if (strlen($model_name) > 255) $errors[] = 'Model name must be 255 characters or fewer.';
+      if (strlen($supplier_name) > MAX_SUPPLIER_NAME_LENGTH) $errors[] = 'Supplier name must be ' . MAX_SUPPLIER_NAME_LENGTH . ' characters or fewer.';
+      if (strlen($model_name) > MAX_MODEL_NAME_LENGTH) $errors[] = 'Model name must be ' . MAX_MODEL_NAME_LENGTH . ' characters or fewer.';
       if (strlen($sku) > 100) $errors[] = 'SKU must be 100 characters or fewer.';
+      if (strlen($shipping_method) > MAX_SHIPPING_METHOD_LENGTH) $errors[] = 'Shipping method must be ' . MAX_SHIPPING_METHOD_LENGTH . ' characters or fewer.';
       if ($msrp_raw !== '' && (!is_numeric($msrp_raw) || (float)$msrp_raw < 0)) {
         $errors[] = 'MSRP must be a non-negative number.';
       }
