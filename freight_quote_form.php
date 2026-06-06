@@ -261,11 +261,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $errors[] = 'Machine weight must be a positive number.';
   }
   if ($pol_resolved === '') $errors[] = 'Port of loading is required.';
-  if (!in_array($fields['destination_type'], ['port_la', 'door_delivery'], true)) {
+  if (!in_array($fields['destination_type'], ['port_la', 'port_long_beach', 'door_delivery', 'other_us_port'], true)) {
     $errors[] = 'Invalid destination type.';
   }
-  if ($fields['destination_type'] === 'door_delivery' && $fields['destination_address'] === '') {
-    $errors[] = 'Delivery address is required for door delivery.';
+  if ($fields['destination_type'] === 'other_us_port' && $fields['destination_address'] === '') {
+    $errors[] = 'Please specify the port name for Other US Port.';
   }
   if (!in_array($fields['shipment_type'], ['FCL', 'LCL'], true)) {
     $errors[] = 'Shipment type must be FCL or LCL.';
@@ -294,7 +294,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   if (!$errors) {
     $machine_weight_val = $fields['machine_weight_kg'] !== '' ? (float)$fields['machine_weight_kg'] : null;
-    $dest_addr = $fields['destination_type'] === 'door_delivery' ? $fields['destination_address'] : '';
+    $dest_addr = $fields['destination_type'] === 'other_us_port' ? $fields['destination_address'] : '';
 
     if ($is_edit) {
       $stmt = $pdo->prepare(
@@ -531,15 +531,17 @@ render_header($is_edit ? ('Edit Freight Quote #' . $edit_id) : 'Freight Quote Fo
     <div>
       <label>Destination <span style="color:var(--d)">*</span></label>
       <select name="destination_type" id="destination_type" required>
-        <option value="port_la"       <?= $fields['destination_type'] === 'port_la'       ? 'selected' : '' ?>>Los Angeles Port (Port of Los Angeles)</option>
-        <option value="door_delivery" <?= $fields['destination_type'] === 'door_delivery' ? 'selected' : '' ?>>Door Delivery (specify address)</option>
+        <option value="port_la"         <?= $fields['destination_type'] === 'port_la'         ? 'selected' : '' ?>>Port of Los Angeles (LA/LB)</option>
+        <option value="port_long_beach" <?= $fields['destination_type'] === 'port_long_beach' ? 'selected' : '' ?>>Port of Long Beach</option>
+        <option value="door_delivery"   <?= $fields['destination_type'] === 'door_delivery'   ? 'selected' : '' ?>>Door Delivery (Southern California)</option>
+        <option value="other_us_port"   <?= $fields['destination_type'] === 'other_us_port'   ? 'selected' : '' ?>>Other US Port</option>
       </select>
     </div>
-    <div id="door_address_wrap" style="display:<?= $fields['destination_type'] === 'door_delivery' ? 'block' : 'none' ?>;">
-      <label>Delivery Address</label>
+    <div id="other_port_wrap" style="display:<?= $fields['destination_type'] === 'other_us_port' ? 'block' : 'none' ?>;">
+      <label>Port Name <span style="color:var(--d)">*</span></label>
       <input type="text" name="destination_address" maxlength="500"
              value="<?= h($fields['destination_address']) ?>"
-             placeholder="Full delivery address including city, state, ZIP" />
+             placeholder="Enter the specific port name" />
     </div>
     <div>
       <label>Shipment Type <span style="color:var(--d)">*</span></label>
@@ -574,10 +576,10 @@ render_header($is_edit ? ('Edit Freight Quote #' . $edit_id) : 'Freight Quote Fo
 
   // Destination: show/hide door address
   var destSel = document.getElementById('destination_type');
-  var doorWrap = document.getElementById('door_address_wrap');
+  var doorWrap = document.getElementById('other_port_wrap');
   if (destSel && doorWrap) {
     destSel.addEventListener('change', function () {
-      doorWrap.style.display = destSel.value === 'door_delivery' ? 'block' : 'none';
+      doorWrap.style.display = destSel.value === 'other_us_port' ? 'block' : 'none';
     });
   }
 
