@@ -497,6 +497,52 @@ function normalize_ai_decimal_value(?string $value): string {
   return number_format((float)$normalized_value, 2, '.', '');
 }
 
+function empty_quote_form_values(): array {
+  return [
+    'supplier_name'     => '',
+    'alibaba_chat_link' => '',
+    'model_name'        => '',
+    'sku'               => '',
+    'msrp'              => '',
+    'map_price'         => '',
+    'moq_20_price'      => '',
+    'moq_10_price'      => '',
+    'drop_ship_price'   => '',
+    'quote_amount'      => '',
+    'currency'          => 'USD',
+    'lead_time_days'    => '',
+    'shipping_cost'     => '',
+    'shipping_origin'   => '',
+    'shipping_method'   => '',
+    'quote_status'      => 'received',
+    'received_on'       => '',
+    'notes'             => '',
+  ];
+}
+
+function quote_row_to_form_values(array $quote): array {
+  return [
+    'supplier_name'     => trim((string)($quote['supplier_name'] ?? '')),
+    'alibaba_chat_link' => trim((string)($quote['alibaba_chat_link'] ?? '')),
+    'model_name'        => trim((string)($quote['model_name'] ?? '')),
+    'sku'               => trim((string)($quote['sku'] ?? '')),
+    'msrp'              => $quote['msrp'] !== null ? (string)$quote['msrp'] : '',
+    'map_price'         => $quote['map_price'] !== null ? (string)$quote['map_price'] : '',
+    'moq_20_price'      => $quote['moq_20_price'] !== null ? (string)$quote['moq_20_price'] : '',
+    'moq_10_price'      => $quote['moq_10_price'] !== null ? (string)$quote['moq_10_price'] : '',
+    'drop_ship_price'   => $quote['drop_ship_price'] !== null ? (string)$quote['drop_ship_price'] : '',
+    'quote_amount'      => $quote['quote_amount'] !== null ? (string)$quote['quote_amount'] : '',
+    'currency'          => trim((string)($quote['currency'] ?? 'USD')),
+    'lead_time_days'    => $quote['lead_time_days'] !== null ? (string)$quote['lead_time_days'] : '',
+    'shipping_cost'     => $quote['shipping_cost'] !== null ? (string)$quote['shipping_cost'] : '',
+    'shipping_origin'   => trim((string)($quote['shipping_origin'] ?? '')),
+    'shipping_method'   => trim((string)($quote['shipping_method'] ?? '')),
+    'quote_status'      => trim((string)($quote['quote_status'] ?? 'received')),
+    'received_on'       => trim((string)($quote['received_on'] ?? '')),
+    'notes'             => trim((string)($quote['notes'] ?? '')),
+  ];
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
   if (empty($_SESSION['rfq_tracker_csrf']) || !hash_equals((string)$_SESSION['rfq_tracker_csrf'], $submitted_csrf)) {
@@ -539,32 +585,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
     } elseif ($action === 'ai_fill_quote') {
       $rfq_id = (int)($_POST['rfq_id'] ?? 0);
+      $quote_id = (int)($_POST['quote_id'] ?? 0);
+      $ai_fill_target = (string)($_POST['ai_fill_target'] ?? 'add');
+      if (!in_array($ai_fill_target, ['add', 'edit'], true)) {
+        $ai_fill_target = 'add';
+      }
+      $is_edit_ai_fill = $ai_fill_target === 'edit';
       $selected_rfq_id = $rfq_id;
+      if ($is_edit_ai_fill) {
+        $edit_quote_id = $quote_id;
+      }
       $ai_fill_show_panel = true;
       $ai_fill_source_text = trim((string)($_POST['ai_quote_text'] ?? ''));
-      $add_quote_post = [
-        'supplier_name'   => '',
-        'alibaba_chat_link' => '',
-        'model_name'      => '',
-        'sku'             => '',
-        'msrp'            => '',
-        'map_price'       => '',
-        'moq_20_price'    => '',
-        'moq_10_price'    => '',
-        'drop_ship_price' => '',
-        'quote_amount'    => '',
-        'currency'        => 'USD',
-        'lead_time_days'  => '',
-        'shipping_cost'   => '',
-        'shipping_origin' => '',
-        'shipping_method' => '',
-        'quote_status'    => 'received',
-        'received_on'     => '',
-        'notes'           => '',
-      ];
+      $quote_form_post = empty_quote_form_values();
+      if (!$is_edit_ai_fill) {
+        $add_quote_post = $quote_form_post;
+      }
 
       if ($rfq_id <= 0) {
         $errors[] = 'Invalid RFQ request selected.';
+      } elseif ($is_edit_ai_fill && $quote_id <= 0) {
+        $errors[] = 'Invalid quote selected.';
       } elseif ($ai_fill_source_text === '') {
         $errors[] = 'Please paste supplier quote text before using AI Fill Quote.';
       } elseif (mb_strlen($ai_fill_source_text) > RFQ_AI_SOURCE_TEXT_MAX_LENGTH) {
@@ -575,12 +616,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       ) {
         $errors[] = 'Please wait ' . RFQ_AI_MIN_SECONDS_BETWEEN_REQUESTS . ' seconds before using AI Fill Quote again.';
       } else {
+        if ($is_edit_ai_fill) {
+          $existing_quote_stmt = $pdo->prepare(
+            "SELECT supplier_name, alibaba_chat_link, model_name, sku, msrp, map_price, moq_20_price,
+                    moq_10_price, drop_ship_price, quote_amount, currency, lead_time_days, shipping_cost,
+                    shipping_origin, shipping_method, quote_status, received_on, notes
+               FROM rfq_quotes
+              WHERE id = ? AND rfq_request_id = ?
+              LIMIT 1"
+          );
+          $existing_quote_stmt->execute([$quote_id, $rfq_id]);
+          $existing_quote = $existing_quote_stmt->fetch();
+          if (!$existing_quote) {
+            $errors[] = 'Quote not found.';
+          } else {
+            $quote_form_post = quote_row_to_form_values($existing_quote);
+          }
+        }
+      }
+
+      if (!$errors) {
         $_SESSION['rfq_ai_fill_last_request_at'] = time();
         $ai_error = null;
         $ai_fields = extract_sourcing_quote_with_ai($ai_fill_source_text, $ai_error);
         if (!is_array($ai_fields)) {
           $errors[] = $ai_error ?: 'AI fill failed. Please review and try again.';
         } else {
+          $ai_fill_applied = false;
           $supplier_name = sanitize_ai_text_value($ai_fields['supplier_name'] ?? '', MAX_SUPPLIER_NAME_LENGTH);
           $model_name = sanitize_ai_text_value($ai_fields['model_name'] ?? '', MAX_MODEL_NAME_LENGTH);
           $quote_amount_raw = trim((string)($ai_fields['quote_amount'] ?? ''));
@@ -591,27 +653,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $notes = sanitize_ai_text_value($ai_fields['notes'] ?? '', MAX_QUOTE_NOTES_LENGTH);
 
           if ($supplier_name !== '') {
-            $add_quote_post['supplier_name'] = $supplier_name;
+            $quote_form_post['supplier_name'] = $supplier_name;
+            $ai_fill_applied = true;
           }
           if ($model_name !== '') {
-            $add_quote_post['model_name'] = $model_name;
+            $quote_form_post['model_name'] = $model_name;
+            $ai_fill_applied = true;
           }
           $normalized_amount = normalize_ai_decimal_value($quote_amount_raw);
           if ($normalized_amount !== '') {
-            $add_quote_post['quote_amount'] = $normalized_amount;
+            $quote_form_post['quote_amount'] = $normalized_amount;
+            $ai_fill_applied = true;
           }
           if ($lead_time_raw !== '' && preg_match(LEAD_TIME_PATTERN, $lead_time_raw, $lead_match)) {
             $normalized_days = (int)$lead_match[1];
             if ($normalized_days > 0 && $normalized_days <= MAX_LEAD_TIME_DAYS) {
-              $add_quote_post['lead_time_days'] = (string)$normalized_days;
+              $quote_form_post['lead_time_days'] = (string)$normalized_days;
+              $ai_fill_applied = true;
             }
           }
           if ($shipping_method !== '') {
-            $add_quote_post['shipping_method'] = $shipping_method;
+            $quote_form_post['shipping_method'] = $shipping_method;
+            $ai_fill_applied = true;
           }
           $normalized_shipping_cost = normalize_ai_decimal_value($shipping_cost_raw);
           if ($normalized_shipping_cost !== '') {
-            $add_quote_post['shipping_cost'] = $normalized_shipping_cost;
+            $quote_form_post['shipping_cost'] = $normalized_shipping_cost;
+            $ai_fill_applied = true;
           }
 
           $note_lines = [];
@@ -622,21 +690,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $note_lines[] = 'MOQ: ' . $moq;
           }
           if ($note_lines) {
-            $add_quote_post['notes'] = mb_substr(implode("\n", $note_lines), 0, MAX_QUOTE_NOTES_LENGTH);
+            $quote_form_post['notes'] = mb_substr(implode("\n", $note_lines), 0, MAX_QUOTE_NOTES_LENGTH);
+            $ai_fill_applied = true;
           }
 
-          if (
-            $add_quote_post['supplier_name'] === '' &&
-            $add_quote_post['model_name'] === '' &&
-            $add_quote_post['quote_amount'] === '' &&
-            $add_quote_post['lead_time_days'] === '' &&
-            $add_quote_post['shipping_method'] === '' &&
-            $add_quote_post['shipping_cost'] === '' &&
-            $add_quote_post['notes'] === ''
-          ) {
+          if (!$ai_fill_applied) {
             $errors[] = 'AI could not extract quote details. Please ensure the pasted text includes supplier information, pricing, or lead times.';
           } else {
-            $success = 'AI Fill complete. Review the fields, make any edits, then click Add Quote.';
+            if ($is_edit_ai_fill) {
+              $edit_quote_post = $quote_form_post;
+              $success = 'AI Fill complete. Review the fields, make any edits, then click Save Changes.';
+            } else {
+              $add_quote_post = $quote_form_post;
+              $success = 'AI Fill complete. Review the fields, make any edits, then click Add Quote.';
+            }
           }
         }
       }
@@ -1581,6 +1648,25 @@ render_header('Sourcing RFQ Tracker');
 
     <?php if ($editing_quote): ?>
       <h3 style="margin-top:0; margin-bottom:12px;">Edit Quote</h3>
+      <div style="margin-bottom:12px;">
+        <button type="button" class="btn" id="toggle-ai-fill-quote">AI Fill Quote</button>
+      </div>
+      <div id="ai-fill-quote-panel" style="display:none; margin-bottom:14px; padding:12px; border:1px solid var(--line,#e5e7eb); border-radius:8px;"
+           data-open="<?= $ai_fill_show_panel ? '1' : '0' ?>">
+        <form method="post" novalidate>
+          <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
+          <input type="hidden" name="action" value="ai_fill_quote" />
+          <input type="hidden" name="ai_fill_target" value="edit" />
+          <input type="hidden" name="rfq_id" value="<?= (int)$selected_rfq['id'] ?>" />
+          <input type="hidden" name="quote_id" value="<?= (int)$editing_quote['id'] ?>" />
+          <label for="ai_quote_text"><strong>Paste Alibaba message / supplier quote text</strong></label>
+          <textarea id="ai_quote_text" name="ai_quote_text" rows="7" maxlength="<?= RFQ_AI_SOURCE_TEXT_MAX_LENGTH ?>"
+                    placeholder="Paste Alibaba supplier message or quote text here..."><?= h($ai_fill_source_text) ?></textarea>
+          <div class="row" style="margin-top:8px;">
+            <button type="submit" class="btn primary">Fill Form</button>
+          </div>
+        </form>
+      </div>
       <form method="post" class="form-grid" enctype="multipart/form-data" novalidate>
         <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
         <input type="hidden" name="action" value="edit_quote" />
@@ -1713,6 +1799,7 @@ render_header('Sourcing RFQ Tracker');
         <form method="post" novalidate>
           <input type="hidden" name="csrf_token" value="<?= h($_SESSION['rfq_tracker_csrf']) ?>" />
           <input type="hidden" name="action" value="ai_fill_quote" />
+          <input type="hidden" name="ai_fill_target" value="add" />
           <input type="hidden" name="rfq_id" value="<?= (int)$selected_rfq['id'] ?>" />
           <label for="ai_quote_text"><strong>Paste Alibaba message / supplier quote text</strong></label>
           <textarea id="ai_quote_text" name="ai_quote_text" rows="7" maxlength="<?= RFQ_AI_SOURCE_TEXT_MAX_LENGTH ?>"
