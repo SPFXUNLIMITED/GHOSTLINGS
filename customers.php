@@ -105,6 +105,103 @@ function format_customer_last_updated(?string $value): string {
   return date('m/d/Y g:i A', $ts);
 }
 
+function build_customers_summary_text(int $showing_from, int $showing_to, int $customer_total, string $search): string {
+  $summary = 'Showing ' . $showing_from . '-' . $showing_to . ' of ' . $customer_total . ' customer' . ($customer_total === 1 ? '' : 's') . '.';
+  if ($search !== '') {
+    $summary .= ' Filtered by “' . $search . '”.';
+  }
+  return $summary;
+}
+
+function render_customers_table_rows(array $customers, string $search, int $customer_table_columns): void {
+  if (!$customers): ?>
+    <tr>
+      <td colspan="<?= $customer_table_columns ?>" class="muted">
+        <?= $search !== '' ? 'No customers matched your search.' : 'No customers synced yet.' ?>
+      </td>
+    </tr>
+    <?php
+    return;
+  endif;
+
+  foreach ($customers as $row): ?>
+    <tr>
+      <td>
+        <?php if ($row['first_name'] !== ''): ?>
+          <strong><?= h((string)$row['first_name']) ?></strong>
+        <?php else: ?>
+          <span class="muted">—</span>
+        <?php endif; ?>
+      </td>
+      <td>
+        <?php if ($row['last_name'] !== ''): ?>
+          <strong><?= h((string)$row['last_name']) ?></strong>
+        <?php else: ?>
+          <span class="muted">—</span>
+        <?php endif; ?>
+      </td>
+      <td>
+        <?php if ($row['company'] !== ''): ?>
+          <?= h((string)$row['company']) ?>
+        <?php else: ?>
+          <span class="muted">—</span>
+        <?php endif; ?>
+      </td>
+      <td>
+        <?php if ($row['phone'] !== ''): ?>
+          <?= h((string)$row['phone']) ?>
+        <?php else: ?>
+          <span class="muted">—</span>
+        <?php endif; ?>
+      </td>
+      <td>
+        <?php if ($row['email'] !== ''): ?>
+          <?= h((string)$row['email']) ?>
+        <?php else: ?>
+          <span class="muted">—</span>
+        <?php endif; ?>
+      </td>
+      <td class="muted"><?= h(format_customer_last_updated($row['last_updated'] ?? null)) ?></td>
+      <td class="actions">
+        <a class="btn" href="customer_details.php?id=<?= (int)$row['id'] ?>">View</a>
+        <a class="btn" href="customer_form.php?id=<?= (int)$row['id'] ?>">Edit</a>
+        <?php if ((int)($row['has_associations'] ?? 0) === 1): ?>
+          <span title="This customer cannot be deleted because they have associated RFQs or orders.">
+            <button type="button" class="btn danger" disabled>Delete</button>
+          </span>
+        <?php else: ?>
+          <form method="post" action="customer_delete.php" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this customer? This action cannot be undone.');">
+            <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customers_delete_csrf']) ?>" />
+            <input type="hidden" name="id" value="<?= (int)$row['id'] ?>" />
+            <button type="submit" class="btn danger">Delete</button>
+          </form>
+        <?php endif; ?>
+      </td>
+    </tr>
+  <?php endforeach;
+}
+
+function render_customers_pagination(int $total_pages, int $page, int $customers_per_page, string $search): void {
+  if ($total_pages <= 1) {
+    return;
+  }
+
+  $base_params = $search !== '' ? ['q' => $search] : [];
+  ?>
+  <div class="card" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    <?php if ($page > 1): ?>
+      <?php $prev_params = $base_params; $prev_params['page'] = $page - 1; ?>
+      <a class="btn" href="?<?= h(http_build_query($prev_params)) ?>">← Prev</a>
+    <?php endif; ?>
+    <span class="muted">Page <?= (int)$page ?> of <?= (int)$total_pages ?> (<?= (int)$customers_per_page ?> per page)</span>
+    <?php if ($page < $total_pages): ?>
+      <?php $next_params = $base_params; $next_params['page'] = $page + 1; ?>
+      <a class="btn" href="?<?= h(http_build_query($next_params)) ?>">Next →</a>
+    <?php endif; ?>
+  </div>
+  <?php
+}
+
 function sync_customers_from_hubspot(PDO $pdo): array {
   $token = hubspot_token($pdo);
   if ($token === '') {
@@ -297,6 +394,35 @@ $customers = $data_stmt->fetchAll();
 
 $showing_from = $customer_total > 0 ? ($offset + 1) : 0;
 $showing_to = min($offset + count($customers), $customer_total);
+$summary_text = build_customers_summary_text($showing_from, $showing_to, $customer_total, $search);
+
+$is_live_search_request = isset($_GET['live_search']) && $_GET['live_search'] === '1';
+if ($is_live_search_request) {
+  ob_start();
+  render_customers_table_rows($customers, $search, $customer_table_columns);
+  $table_rows_html = (string)ob_get_clean();
+
+  ob_start();
+  render_customers_pagination($total_pages, $page, $customers_per_page, $search);
+  $pagination_html = (string)ob_get_clean();
+
+  header('Content-Type: application/json; charset=UTF-8');
+  header('X-Content-Type-Options: nosniff');
+  $live_payload = json_encode([
+    'countText' => '(' . (int)$customer_total . ')',
+    'summaryText' => $summary_text,
+    'tableRowsHtml' => $table_rows_html,
+    'paginationHtml' => $pagination_html,
+  ], JSON_UNESCAPED_UNICODE);
+  if ($live_payload === false) {
+    http_response_code(500);
+    $error_payload = json_encode(['error' => 'Failed to encode live search response: ' . json_last_error_msg()], JSON_UNESCAPED_UNICODE);
+    echo $error_payload !== false ? $error_payload : '{"error":"Failed to encode live search response."}';
+    exit;
+  }
+  echo $live_payload;
+  exit;
+}
 
 render_header('Customers');
 ?>
@@ -348,10 +474,7 @@ render_header('Customers');
       <?= $search === '' ? 'style="display:none;"' : '' ?>
     >Clear</a>
   </form>
-  <p id="customers-summary" class="muted" style="margin:8px 0 0;">
-    Showing <?= (int)$showing_from ?>-<?= (int)$showing_to ?> of <?= (int)$customer_total ?> customer<?= $customer_total === 1 ? '' : 's' ?>.
-    <?php if ($search !== ''): ?>Filtered by “<?= h($search) ?>”.<?php endif; ?>
-  </p>
+  <p id="customers-summary" class="muted" style="margin:8px 0 0;"><?= h($summary_text) ?></p>
 </div>
 
 <div id="customers-table-wrap" class="card" style="padding:0; overflow-x:auto;">
@@ -367,88 +490,12 @@ render_header('Customers');
         <th>Actions</th>
       </tr>
     </thead>
-    <tbody>
-      <?php if (!$customers): ?>
-        <tr>
-          <td colspan="<?= $customer_table_columns ?>" class="muted">
-            <?= $search !== '' ? 'No customers matched your search.' : 'No customers synced yet.' ?>
-          </td>
-        </tr>
-      <?php endif; ?>
-      <?php foreach ($customers as $row): ?>
-        <tr>
-          <td>
-            <?php if ($row['first_name'] !== ''): ?>
-              <strong><?= h((string)$row['first_name']) ?></strong>
-            <?php else: ?>
-              <span class="muted">—</span>
-            <?php endif; ?>
-          </td>
-          <td>
-            <?php if ($row['last_name'] !== ''): ?>
-              <strong><?= h((string)$row['last_name']) ?></strong>
-            <?php else: ?>
-              <span class="muted">—</span>
-            <?php endif; ?>
-          </td>
-          <td>
-            <?php if ($row['company'] !== ''): ?>
-              <?= h((string)$row['company']) ?>
-            <?php else: ?>
-              <span class="muted">—</span>
-            <?php endif; ?>
-          </td>
-          <td>
-            <?php if ($row['phone'] !== ''): ?>
-              <?= h((string)$row['phone']) ?>
-            <?php else: ?>
-              <span class="muted">—</span>
-            <?php endif; ?>
-          </td>
-          <td>
-            <?php if ($row['email'] !== ''): ?>
-              <?= h((string)$row['email']) ?>
-            <?php else: ?>
-              <span class="muted">—</span>
-            <?php endif; ?>
-          </td>
-          <td class="muted"><?= h(format_customer_last_updated($row['last_updated'] ?? null)) ?></td>
-          <td class="actions">
-            <a class="btn" href="customer_details.php?id=<?= (int)$row['id'] ?>">View</a>
-            <a class="btn" href="customer_form.php?id=<?= (int)$row['id'] ?>">Edit</a>
-            <?php if ((int)($row['has_associations'] ?? 0) === 1): ?>
-              <span title="This customer cannot be deleted because they have associated RFQs or orders.">
-                <button type="button" class="btn danger" disabled>Delete</button>
-              </span>
-            <?php else: ?>
-              <form method="post" action="customer_delete.php" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this customer? This action cannot be undone.');">
-                <input type="hidden" name="csrf_token" value="<?= h($_SESSION['customers_delete_csrf']) ?>" />
-                <input type="hidden" name="id" value="<?= (int)$row['id'] ?>" />
-                <button type="submit" class="btn danger">Delete</button>
-              </form>
-            <?php endif; ?>
-          </td>
-        </tr>
-      <?php endforeach; ?>
-    </tbody>
+    <tbody id="customers-table-body"><?php render_customers_table_rows($customers, $search, $customer_table_columns); ?></tbody>
   </table>
 </div>
 
 <div id="customers-pagination">
-  <?php if ($total_pages > 1): ?>
-    <?php $base_params = $search !== '' ? ['q' => $search] : []; ?>
-    <div class="card" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-      <?php if ($page > 1): ?>
-        <?php $prev_params = $base_params; $prev_params['page'] = $page - 1; ?>
-        <a class="btn" href="?<?= h(http_build_query($prev_params)) ?>">← Prev</a>
-      <?php endif; ?>
-      <span class="muted">Page <?= (int)$page ?> of <?= (int)$total_pages ?> (<?= (int)$customers_per_page ?> per page)</span>
-      <?php if ($page < $total_pages): ?>
-        <?php $next_params = $base_params; $next_params['page'] = $page + 1; ?>
-        <a class="btn" href="?<?= h(http_build_query($next_params)) ?>">Next →</a>
-      <?php endif; ?>
-    </div>
-  <?php endif; ?>
+  <?php render_customers_pagination($total_pages, $page, $customers_per_page, $search); ?>
 </div>
 
 <script>
@@ -458,10 +505,14 @@ render_header('Customers');
   const clearButton = document.getElementById('customers-search-clear');
   const count = document.getElementById('customers-count');
   const summary = document.getElementById('customers-summary');
-  const tableWrap = document.getElementById('customers-table-wrap');
+  const tableBody = document.getElementById('customers-table-body');
   const pagination = document.getElementById('customers-pagination');
-  if (!form || !input || !clearButton || !count || !summary || !tableWrap || !pagination) return;
+  if (!form || !input || !clearButton || !count || !summary || !tableBody || !pagination) {
+    console.warn('Customer live search disabled: missing required DOM elements.');
+    return;
+  }
 
+  const SEARCH_DEBOUNCE_DELAY_MS = 250;
   let debounceTimer = null;
   let controller = null;
   let lastQuery = input.value.trim();
@@ -490,8 +541,9 @@ render_header('Customers');
     if (controller) controller.abort();
     controller = new AbortController();
 
-    const targetUrl = new URL(form.getAttribute('action') || window.location.pathname, window.location.origin);
+    const targetUrl = new URL(form.getAttribute('action'), window.location.origin);
     if (query !== '') targetUrl.searchParams.set('q', query);
+    targetUrl.searchParams.set('live_search', '1');
 
     fetch(targetUrl.toString(), {
       method: 'GET',
@@ -500,21 +552,18 @@ render_header('Customers');
       headers: { 'X-Requested-With': 'XMLHttpRequest' }
     })
       .then((response) => {
-        if (!response.ok) throw new Error('Live search request failed.');
-        return response.text();
+        if (!response.ok) throw new Error('Live search request failed with status ' + response.status + ' (' + response.statusText + ').');
+        return response.json();
       })
-      .then((html) => {
-        const nextDoc = new DOMParser().parseFromString(html, 'text/html');
-        const nextCount = nextDoc.getElementById('customers-count');
-        const nextSummary = nextDoc.getElementById('customers-summary');
-        const nextTableWrap = nextDoc.getElementById('customers-table-wrap');
-        const nextPagination = nextDoc.getElementById('customers-pagination');
-        if (!nextCount || !nextSummary || !nextTableWrap || !nextPagination) return;
-
-        count.textContent = nextCount.textContent;
-        summary.innerHTML = nextSummary.innerHTML;
-        tableWrap.innerHTML = nextTableWrap.innerHTML;
-        pagination.innerHTML = nextPagination.innerHTML;
+      .then((payload) => {
+        if (!payload || typeof payload !== 'object') {
+          console.warn('Customer live search received an unexpected payload from ' + targetUrl.toString() + '.', payload);
+          return;
+        }
+        if (typeof payload.countText === 'string') count.textContent = payload.countText;
+        if (typeof payload.summaryText === 'string') summary.textContent = payload.summaryText;
+        if (typeof payload.tableRowsHtml === 'string') tableBody.innerHTML = payload.tableRowsHtml;
+        if (typeof payload.paginationHtml === 'string') pagination.innerHTML = payload.paginationHtml;
         updateAddressBar(query);
       })
       .catch((error) => {
@@ -525,7 +574,7 @@ render_header('Customers');
 
   input.addEventListener('input', () => {
     if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = window.setTimeout(runLiveSearch, 250);
+    debounceTimer = window.setTimeout(runLiveSearch, SEARCH_DEBOUNCE_DELAY_MS);
   });
 
   form.addEventListener('submit', (event) => {
