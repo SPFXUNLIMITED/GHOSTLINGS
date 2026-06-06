@@ -7,8 +7,10 @@ require_rfq_access();
 const MAX_LEAD_TIME_DAYS = 3650;
 const MAX_QUOTE_UPLOAD_BYTES = 26214400; // 25 MB
 const MAX_QUOTE_NOTES_LENGTH = 5000;
+const NUMERIC_VALUE_PATTERN = '/\d+(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?/';
 const RFQ_AI_REQUEST_TIMEOUT_SECONDS = 15;
 const RFQ_AI_SOURCE_TEXT_MAX_LENGTH = 20000;
+const RFQ_AI_MIN_SECONDS_BETWEEN_REQUESTS = 3;
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
@@ -447,7 +449,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Please paste supplier quote text before using AI Fill Quote.';
       } elseif (mb_strlen($ai_fill_source_text) > RFQ_AI_SOURCE_TEXT_MAX_LENGTH) {
         $errors[] = 'Pasted text is too long. Please keep it under ' . number_format(RFQ_AI_SOURCE_TEXT_MAX_LENGTH) . ' characters.';
+      } elseif (
+        isset($_SESSION['rfq_ai_fill_last_request_at'])
+        && (time() - (int)$_SESSION['rfq_ai_fill_last_request_at']) < RFQ_AI_MIN_SECONDS_BETWEEN_REQUESTS
+      ) {
+        $errors[] = 'Please wait a moment before using AI Fill Quote again.';
       } else {
+        $_SESSION['rfq_ai_fill_last_request_at'] = time();
         $ai_error = null;
         $ai_fields = extract_sourcing_quote_with_ai($ai_fill_source_text, $ai_error);
         if (!is_array($ai_fields)) {
@@ -468,22 +476,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           if ($model_name !== '') {
             $add_quote_post['model_name'] = $model_name;
           }
-          if ($quote_amount_raw !== '' && preg_match('/\d+(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?/', str_replace(' ', '', $quote_amount_raw), $amount_match)) {
+          if ($quote_amount_raw !== '' && preg_match(NUMERIC_VALUE_PATTERN, str_replace(' ', '', $quote_amount_raw), $amount_match)) {
             $normalized_amount = str_replace(',', '', $amount_match[0]);
             if ($normalized_amount !== '' && (float)$normalized_amount >= 0) {
               $add_quote_post['quote_amount'] = number_format((float)$normalized_amount, 2, '.', '');
             }
           }
           if ($lead_time_raw !== '' && preg_match('/\b(\d{1,4})(?:\s*-\s*\d{1,4})?\b/', $lead_time_raw, $lead_match)) {
-            $normalized_days = (string)(int)$lead_match[1];
-            if ($normalized_days !== '' && (int)$normalized_days <= MAX_LEAD_TIME_DAYS) {
-              $add_quote_post['lead_time_days'] = $normalized_days;
+            $normalized_days = (int)$lead_match[1];
+            if ($normalized_days > 0 && $normalized_days <= MAX_LEAD_TIME_DAYS) {
+              $add_quote_post['lead_time_days'] = (string)$normalized_days;
             }
           }
           if ($shipping_method !== '') {
             $add_quote_post['shipping_method'] = $shipping_method;
           }
-          if ($shipping_cost_raw !== '' && preg_match('/\d+(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?/', str_replace(' ', '', $shipping_cost_raw), $shipping_match)) {
+          if ($shipping_cost_raw !== '' && preg_match(NUMERIC_VALUE_PATTERN, str_replace(' ', '', $shipping_cost_raw), $shipping_match)) {
             $normalized_shipping_cost = str_replace(',', '', $shipping_match[0]);
             if ($normalized_shipping_cost !== '' && (float)$normalized_shipping_cost >= 0) {
               $add_quote_post['shipping_cost'] = number_format((float)$normalized_shipping_cost, 2, '.', '');
@@ -1808,8 +1816,8 @@ render_header('Sourcing RFQ Tracker');
     var aiToggleButton = document.getElementById('toggle-ai-fill-quote');
     var aiFillPanel = document.getElementById('ai-fill-quote-panel');
     if (aiToggleButton && aiFillPanel) {
-      var isOpenByDefault = aiFillPanel.getAttribute('data-open') === '1';
-      var syncAiPanel = function(show) {
+      const isOpenByDefault = aiFillPanel.getAttribute('data-open') === '1';
+      const syncAiPanel = function(show) {
         aiFillPanel.style.display = show ? '' : 'none';
       };
       syncAiPanel(isOpenByDefault);
