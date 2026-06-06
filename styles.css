@@ -333,11 +333,11 @@ label { display:block; margin: 10px 0 6px; font-size: 14px; color: var(--m); }
 
 .left-quick-access-panel {
   position: fixed;
-  left: 0;
+  left: 34px;
   top: 50%;
   transform: translate(-108%, -50%);
   z-index: 44;
-  width: min(280px, calc(100vw - 56px));
+  width: min(300px, calc(100vw - 64px));
   border: 1px solid #dbe5f0;
   border-left: 0;
   border-radius: 0 14px 14px 0;
@@ -395,7 +395,7 @@ label { display:block; margin: 10px 0 6px; font-size: 14px; color: var(--m); }
   }
 
   .left-quick-access-panel {
-    width: min(240px, calc(100vw - 52px));
+    width: min(280px, calc(100vw - 56px));
   }
 }
 
