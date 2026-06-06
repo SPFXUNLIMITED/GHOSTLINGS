@@ -810,6 +810,19 @@ function render_footer(): void {
   $is_logged_in = !empty($_SESSION['user_id']);
 ?>
   </div>
+
+<?php if ($is_logged_in): ?>
+  <nav class="footer-nav" aria-label="Secondary navigation">
+    <div class="footer-nav-inner">
+      <?php $fc = basename($_SERVER['PHP_SELF']); ?>
+      <a class="footer-nav-link <?= $fc === 'customers.php' ? 'active' : '' ?>" href="customers.php">Customers</a>
+      <a class="footer-nav-link <?= $fc === 'index.php' ? 'active' : '' ?>" href="index.php">Dashboard</a>
+      <a class="footer-nav-link <?= in_array($fc, ['vendors.php', 'vendor_form.php', 'vendor_details.php'], true) ? 'active' : '' ?>" href="vendors.php">Suppliers</a>
+      <a class="footer-nav-link <?= $fc === 'time_report.php' ? 'active' : '' ?>" href="time_report.php">Reports</a>
+    </div>
+  </nav>
+<?php endif; ?>
+
   <script src="sort.js?v=<?= urlencode((string)filemtime(__DIR__ . '/sort.js')) ?>"></script>
 
 <?php if ($is_logged_in): ?>
