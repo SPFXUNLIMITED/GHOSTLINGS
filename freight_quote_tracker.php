@@ -49,6 +49,15 @@ $quote_status_styles = [
 $errors  = [];
 $success = '';
 $forwarder_options = [];
+$ai_fill_source_text = '';
+$ai_fill_show_panel = false;
+$ai_prefill = [
+  'forwarder_name' => '',
+  'forwarder_name_other' => '',
+  'quote_amount' => '',
+  'transit_time_days' => '',
+  'notes' => '',
+];
 
 try {
   $ff_stmt = $pdo->query("SELECT company_name FROM freight_forwarders WHERE company_name <> '' ORDER BY company_name ASC");
@@ -65,6 +74,94 @@ try {
 function srfq_status_select_style(array $styles, ?string $status): string {
   [$bg, $color] = $styles[(string)$status] ?? ['#f3f4f6', '#374151'];
   return "background:$bg; color:$color; border-color:$bg; font-weight:600;";
+}
+
+function srfq_env_value(string $key): string {
+  $candidates = [
+    getenv($key),
+    $_ENV[$key] ?? null,
+    $_SERVER[$key] ?? null,
+  ];
+  foreach ($candidates as $candidate) {
+    $value = trim((string)$candidate);
+    if ($value !== '') {
+      return $value;
+    }
+  }
+  return '';
+}
+
+function srfq_extract_quote_with_ai(string $source_text, ?string &$error_message = null): ?array {
+  $api_key = srfq_env_value('OPENAI_API_KEY');
+  if ($api_key === '') {
+    $error_message = 'AI fill is not configured. Missing OPENAI_API_KEY.';
+    return null;
+  }
+
+  $model = srfq_env_value('OPENAI_MODEL');
+  if ($model === '') {
+    $model = 'gpt-4.1-mini';
+  }
+
+  $payload = [
+    'model' => $model,
+    'temperature' => 0,
+    'response_format' => ['type' => 'json_object'],
+    'messages' => [
+      [
+        'role' => 'system',
+        'content' => 'Extract freight quote details from user text. Return strict JSON only with keys: forwarder_name, quote_amount, transit_time_days, notes. Use empty string when missing. quote_amount must be number-like text without currency words. transit_time_days must be an integer in days.',
+      ],
+      [
+        'role' => 'user',
+        'content' => $source_text,
+      ],
+    ],
+  ];
+
+  $ch = curl_init('https://api.openai.com/v1/chat/completions');
+  curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_TIMEOUT => 30,
+    CURLOPT_HTTPHEADER => [
+      'Authorization: Bearer ' . $api_key,
+      'Content-Type: application/json',
+    ],
+    CURLOPT_POST => true,
+    CURLOPT_POSTFIELDS => json_encode($payload),
+  ]);
+  $body = curl_exec($ch);
+  $curl_error = curl_error($ch);
+  $status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+  curl_close($ch);
+
+  if ($body === false) {
+    $error_message = 'AI request failed: ' . ($curl_error !== '' ? $curl_error : 'Unknown request error.');
+    return null;
+  }
+  if ($status < 200 || $status >= 300) {
+    $error_message = 'AI request failed with status ' . $status . '.';
+    return null;
+  }
+
+  $response = json_decode($body, true);
+  if (!is_array($response)) {
+    $error_message = 'AI request failed: invalid response format.';
+    return null;
+  }
+  $content = (string)($response['choices'][0]['message']['content'] ?? '');
+  if ($content === '') {
+    $error_message = 'AI request failed: empty AI response.';
+    return null;
+  }
+
+  $fields = json_decode($content, true);
+  if (!is_array($fields)) {
+    $error_message = 'AI request failed: unable to parse extracted fields.';
+    return null;
+  }
+
+  return $fields;
 }
 
 function build_shipping_rfq_email_text(array $rfq, array $crates): string {
@@ -313,6 +410,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $success = 'Quote deleted.';
     }
     $selected_rfq_id = $rfq_id;
+  }
+
+  if (!$errors && $action === 'ai_fill_quote') {
+    $rfq_id = max(0, (int)($_POST['rfq_id'] ?? 0));
+    $selected_rfq_id = $rfq_id;
+    $ai_fill_show_panel = true;
+    $ai_fill_source_text = trim((string)($_POST['ai_quote_text'] ?? ''));
+    if ($ai_fill_source_text === '') {
+      $errors[] = 'Please paste forwarder quote text before using AI Fill Quote.';
+    } else {
+      $ai_error = null;
+      $ai_fields = srfq_extract_quote_with_ai($ai_fill_source_text, $ai_error);
+      if (!is_array($ai_fields)) {
+        $errors[] = $ai_error ?: 'AI fill failed. Please review and try again.';
+      } else {
+        $ai_forwarder = trim((string)($ai_fields['forwarder_name'] ?? ''));
+        $ai_quote_amount_raw = trim((string)($ai_fields['quote_amount'] ?? ''));
+        $ai_transit_raw = trim((string)($ai_fields['transit_time_days'] ?? ''));
+        $ai_notes = trim((string)($ai_fields['notes'] ?? ''));
+
+        if ($ai_forwarder !== '') {
+          if (in_array($ai_forwarder, $forwarder_options, true)) {
+            $ai_prefill['forwarder_name'] = $ai_forwarder;
+            $ai_prefill['forwarder_name_other'] = '';
+          } else {
+            $ai_prefill['forwarder_name'] = '__other__';
+            $ai_prefill['forwarder_name_other'] = mb_substr($ai_forwarder, 0, 255);
+          }
+        }
+
+        if ($ai_quote_amount_raw !== '') {
+          $normalized_amount = preg_replace('/[^0-9.\-]/', '', $ai_quote_amount_raw);
+          if ($normalized_amount !== '' && is_numeric($normalized_amount) && (float)$normalized_amount >= 0) {
+            $ai_prefill['quote_amount'] = number_format((float)$normalized_amount, 2, '.', '');
+          }
+        }
+
+        if ($ai_transit_raw !== '') {
+          $normalized_days = preg_replace('/\D+/', '', $ai_transit_raw);
+          if ($normalized_days !== '' && (int)$normalized_days > 0) {
+            $ai_prefill['transit_time_days'] = (string)(int)$normalized_days;
+          }
+        }
+
+        if ($ai_notes !== '') {
+          $ai_prefill['notes'] = mb_substr($ai_notes, 0, 5000);
+        }
+
+        if (
+          $ai_prefill['forwarder_name'] === '' &&
+          $ai_prefill['forwarder_name_other'] === '' &&
+          $ai_prefill['quote_amount'] === '' &&
+          $ai_prefill['transit_time_days'] === '' &&
+          $ai_prefill['notes'] === ''
+        ) {
+          $errors[] = 'AI could not find quote details. Please adjust the pasted text and try again.';
+        } else {
+          $success = 'AI Fill complete. Review the fields, make any edits, then click Add Quote.';
+        }
+      }
+    }
   }
 }
 
@@ -772,6 +930,28 @@ render_header('Freight Quote Tracker');
       <hr style="margin:18px 0;" />
     <?php else: ?>
       <!-- Add quote form -->
+      <div style="margin-bottom:12px;">
+        <button type="button" class="btn" id="toggle-ai-fill-quote">AI Fill Quote</button>
+      </div>
+      <div id="ai-fill-quote-panel" style="display:none; margin-bottom:14px; padding:12px; border:1px solid var(--line,#e5e7eb); border-radius:8px;"
+           data-open="<?= $ai_fill_show_panel ? '1' : '0' ?>">
+        <form method="post" novalidate>
+          <input type="hidden" name="csrf_token" value="<?= h($_SESSION['srfq_tracker_csrf']) ?>" />
+          <input type="hidden" name="action"  value="ai_fill_quote" />
+          <input type="hidden" name="rfq_id"  value="<?= (int)$selected_rfq['id'] ?>" />
+          <label for="ai_quote_text"><strong>Paste forwarder text</strong></label>
+          <textarea id="ai_quote_text" name="ai_quote_text" rows="7" maxlength="20000"
+                    placeholder="Paste forwarder email or quote text here..."><?= h($ai_fill_source_text) ?></textarea>
+          <div class="row" style="margin-top:8px;">
+            <button type="submit" class="btn primary">Fill Form</button>
+          </div>
+        </form>
+      </div>
+      <?php
+        $add_forwarder_name_value = trim((string)($ai_prefill['forwarder_name'] ?? ''));
+        $add_forwarder_other_value = trim((string)($ai_prefill['forwarder_name_other'] ?? ''));
+        $add_forwarder_is_other = $add_forwarder_name_value === '__other__';
+      ?>
       <h3 style="margin-top:0; margin-bottom:12px;">Add Quote</h3>
       <form method="post" class="form-grid" novalidate>
         <input type="hidden" name="csrf_token" value="<?= h($_SESSION['srfq_tracker_csrf']) ?>" />
@@ -782,16 +962,18 @@ render_header('Freight Quote Tracker');
           <select name="forwarder_name" id="add_forwarder_name" required data-forwarder-select data-other-target="add_forwarder_name_other">
             <option value="">Select forwarder</option>
             <?php foreach ($forwarder_options as $forwarder_name): ?>
-              <option value="<?= h($forwarder_name) ?>"><?= h($forwarder_name) ?></option>
+              <option value="<?= h($forwarder_name) ?>" <?= $add_forwarder_name_value === $forwarder_name ? 'selected' : '' ?>><?= h($forwarder_name) ?></option>
             <?php endforeach; ?>
-            <option value="__other__">Other</option>
+            <option value="__other__" <?= $add_forwarder_is_other ? 'selected' : '' ?>>Other</option>
           </select>
           <input type="text" name="forwarder_name_other" id="add_forwarder_name_other" maxlength="255"
-                 placeholder="Enter freight forwarder / carrier name" style="display:none;" />
+                 placeholder="Enter freight forwarder / carrier name" value="<?= h($add_forwarder_other_value) ?>"
+                 style="<?= $add_forwarder_is_other ? '' : 'display:none;' ?>" />
         </div>
         <div>
           <label>Quote Amount <span style="color:var(--d)">*</span></label>
-          <input type="number" name="quote_amount" min="0" step="0.01" required placeholder="0.00" />
+          <input type="number" name="quote_amount" min="0" step="0.01" required placeholder="0.00"
+                 value="<?= h((string)($ai_prefill['quote_amount'] ?? '')) ?>" />
         </div>
         <div>
           <label>Currency</label>
@@ -799,7 +981,8 @@ render_header('Freight Quote Tracker');
         </div>
         <div>
           <label>Transit Time (days)</label>
-          <input type="number" name="transit_time_days" min="1" placeholder="e.g. 30" />
+          <input type="number" name="transit_time_days" min="1" placeholder="e.g. 30"
+                 value="<?= h((string)($ai_prefill['transit_time_days'] ?? '')) ?>" />
         </div>
         <div>
           <label>Shipment Type</label>
@@ -837,7 +1020,7 @@ render_header('Freight Quote Tracker');
         <div class="full">
           <label>Notes</label>
           <textarea name="notes" rows="3" maxlength="5000"
-                    placeholder="Include charges breakdown, incoterm, insurance, etc."></textarea>
+                    placeholder="Include charges breakdown, incoterm, insurance, etc."><?= h((string)($ai_prefill['notes'] ?? '')) ?></textarea>
         </div>
         <div class="full row" style="margin-top:4px;">
           <button type="submit" class="btn primary">Add Quote</button>
@@ -953,6 +1136,19 @@ render_header('Freight Quote Tracker');
       requestAnimationFrame(function () {
         searchInput.focus();
       });
+    });
+  }
+
+  var aiToggleButton = document.getElementById('toggle-ai-fill-quote');
+  var aiFillPanel = document.getElementById('ai-fill-quote-panel');
+  if (aiToggleButton && aiFillPanel) {
+    var isOpenByDefault = aiFillPanel.getAttribute('data-open') === '1';
+    var syncAiPanel = function (show) {
+      aiFillPanel.style.display = show ? '' : 'none';
+    };
+    syncAiPanel(isOpenByDefault);
+    aiToggleButton.addEventListener('click', function () {
+      syncAiPanel(aiFillPanel.style.display === 'none');
     });
   }
 })();
