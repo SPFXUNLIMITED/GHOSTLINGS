@@ -537,7 +537,7 @@ render_header($is_edit ? ('Edit Freight Quote #' . $edit_id) : 'Freight Quote Fo
         <option value="other_us_port"   <?= $fields['destination_type'] === 'other_us_port'   ? 'selected' : '' ?>>Other US Port</option>
       </select>
     </div>
-    <div id="door_address_wrap" style="display:<?= $fields['destination_type'] === 'other_us_port' ? 'block' : 'none' ?>;">
+    <div id="other_port_wrap" style="display:<?= $fields['destination_type'] === 'other_us_port' ? 'block' : 'none' ?>;">
       <label>Port Name <span style="color:var(--d)">*</span></label>
       <input type="text" name="destination_address" maxlength="500"
              value="<?= h($fields['destination_address']) ?>"
@@ -576,7 +576,7 @@ render_header($is_edit ? ('Edit Freight Quote #' . $edit_id) : 'Freight Quote Fo
 
   // Destination: show/hide door address
   var destSel = document.getElementById('destination_type');
-  var doorWrap = document.getElementById('door_address_wrap');
+  var doorWrap = document.getElementById('other_port_wrap');
   if (destSel && doorWrap) {
     destSel.addEventListener('change', function () {
       doorWrap.style.display = destSel.value === 'other_us_port' ? 'block' : 'none';
