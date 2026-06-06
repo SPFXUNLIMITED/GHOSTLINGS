@@ -11,11 +11,63 @@ const REQUEST_TYPES = ['RFQ', 'Sourcing', 'PO'];
 const REQUEST_CATEGORIES = ['machine', 'parts'];
 const PO_SHIPPING_METHODS = ['Sea Freight', 'Air Freight', 'Express', 'Pickup'];
 
+function sourcing_rfq_escape_like(string $value, string $escape = '\\'): string {
+  return str_replace(
+    [$escape, '%', '_'],
+    [$escape . $escape, $escape . '%', $escape . '_'],
+    $value
+  );
+}
+
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
 }
 if (empty($_SESSION['rfq_form_csrf'])) {
   $_SESSION['rfq_form_csrf'] = bin2hex(random_bytes(24));
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
+  header('Content-Type: application/json; charset=utf-8');
+
+  $csrf = trim((string)($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
+  if ($csrf === '' || !hash_equals((string)$_SESSION['rfq_form_csrf'], $csrf)) {
+    http_response_code(403);
+    echo json_encode([]);
+    exit;
+  }
+
+  $query = trim((string)($_GET['q'] ?? ''));
+  if ($query === '') {
+    echo json_encode([]);
+    exit;
+  }
+
+  $like = '%' . sourcing_rfq_escape_like($query) . '%';
+  $stmt = $pdo->prepare(
+    "SELECT
+       id,
+       COALESCE(
+         NULLIF(TRIM(CONCAT_WS(' ', NULLIF(first_name, ''), NULLIF(last_name, ''))), ''),
+         NULLIF(company, ''),
+         NULLIF(email, ''),
+         ''
+       ) AS customer_name,
+       company AS company_name,
+       phone,
+       email
+     FROM customers
+     WHERE first_name LIKE ? ESCAPE '\\\\'
+        OR last_name LIKE ? ESCAPE '\\\\'
+        OR CONCAT_WS(' ', first_name, last_name) LIKE ? ESCAPE '\\\\'
+        OR company LIKE ? ESCAPE '\\\\'
+        OR email LIKE ? ESCAPE '\\\\'
+        OR phone LIKE ? ESCAPE '\\\\'
+     ORDER BY customer_name ASC, id DESC
+     LIMIT 8"
+  );
+  $stmt->execute([$like, $like, $like, $like, $like, $like]);
+  echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC), JSON_UNESCAPED_UNICODE);
+  exit;
 }
 
 $errors = [];
@@ -598,24 +650,25 @@ render_alibaba_workflow_banner('create_rfq');
   <div id="customer_information_section" style="margin-top:12px; display:<?= $fields['acquisition_purpose'] === 'customer' ? 'block' : 'none' ?>;">
     <h2 class="form-section-heading">Customer Information</h2>
     <div class="form-grid" style="margin-bottom:12px;">
-      <div>
-        <label>Customer Name</label>
-        <input type="text" name="buyer_name" maxlength="255"
+      <div style="position:relative;">
+        <label for="buyer_name">Customer Name</label>
+        <input id="buyer_name" type="text" name="buyer_name" maxlength="255" autocomplete="off"
                value="<?= h($fields['buyer_name']) ?>" <?= $fields['acquisition_purpose'] === 'customer' ? '' : 'disabled' ?> />
+        <div id="buyerNameSuggestions" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:40; background:#fff; border:1px solid #d1d5db; border-radius:10px; box-shadow:0 12px 24px rgba(2,6,23,.12); margin-top:6px; max-height:220px; overflow:auto;"></div>
       </div>
       <div>
-        <label>Customer Company</label>
-        <input type="text" name="buyer_company" maxlength="255"
+        <label for="buyer_company">Customer Company</label>
+        <input id="buyer_company" type="text" name="buyer_company" maxlength="255"
                value="<?= h($fields['buyer_company']) ?>" <?= $fields['acquisition_purpose'] === 'customer' ? '' : 'disabled' ?> />
       </div>
       <div>
-        <label>Customer Email</label>
-        <input type="email" name="buyer_email" maxlength="255"
+        <label for="buyer_email">Customer Email</label>
+        <input id="buyer_email" type="email" name="buyer_email" maxlength="255"
                value="<?= h($fields['buyer_email']) ?>" <?= $fields['acquisition_purpose'] === 'customer' ? '' : 'disabled' ?> />
       </div>
       <div>
-        <label>Customer Phone</label>
-        <input type="text" name="buyer_phone" maxlength="100"
+        <label for="buyer_phone">Customer Phone</label>
+        <input id="buyer_phone" type="text" name="buyer_phone" maxlength="100"
                value="<?= h($fields['buyer_phone']) ?>" <?= $fields['acquisition_purpose'] === 'customer' ? '' : 'disabled' ?> />
       </div>
     </div>
@@ -823,6 +876,12 @@ render_alibaba_workflow_banner('create_rfq');
     var acquisitionField = document.getElementById('acquisition_purpose');
     var customerInfoSection = document.getElementById('customer_information_section');
     var customerInfoInputs = customerInfoSection ? customerInfoSection.querySelectorAll('input') : [];
+    var buyerNameInput = document.getElementById('buyer_name');
+    var buyerCompanyInput = document.getElementById('buyer_company');
+    var buyerEmailInput = document.getElementById('buyer_email');
+    var buyerPhoneInput = document.getElementById('buyer_phone');
+    var buyerSuggestions = document.getElementById('buyerNameSuggestions');
+    var buyerSearchDebounceTimer = null;
     var workflowStepConfig = {
       create_rfq: {
         label: 'Create RFQ',
@@ -887,6 +946,83 @@ render_alibaba_workflow_banner('create_rfq');
       }
     }
 
+    function hideBuyerSuggestions() {
+      if (!buyerSuggestions) return;
+      buyerSuggestions.style.display = 'none';
+      buyerSuggestions.innerHTML = '';
+    }
+
+    function renderBuyerSuggestions(rows) {
+      if (!buyerSuggestions) return;
+      buyerSuggestions.innerHTML = '';
+      if (!rows.length) {
+        hideBuyerSuggestions();
+        return;
+      }
+      rows.forEach(function (row) {
+        var rowName = row.customer_name || '';
+        var rowCompany = row.company_name || '';
+        var rowPhone = row.phone || '';
+        var rowEmail = row.email || '';
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn';
+        btn.style.display = 'block';
+        btn.style.width = '100%';
+        btn.style.textAlign = 'left';
+        btn.style.borderRadius = '0';
+        btn.style.border = '0';
+        btn.style.borderBottom = '1px solid #e5e7eb';
+        btn.style.background = '#fff';
+        btn.style.padding = '10px 12px';
+        var title = document.createElement('strong');
+        title.textContent = rowName;
+        btn.appendChild(title);
+        var meta = document.createElement('div');
+        meta.className = 'muted';
+        meta.style.marginTop = '3px';
+        meta.textContent = (rowCompany || '—') + ' • ' + (rowPhone || '—') + ' • ' + (rowEmail || '—');
+        btn.appendChild(meta);
+        btn.addEventListener('click', function () {
+          if (buyerNameInput) buyerNameInput.value = rowName;
+          if (buyerCompanyInput) buyerCompanyInput.value = rowCompany;
+          if (buyerEmailInput) buyerEmailInput.value = rowEmail;
+          if (buyerPhoneInput) buyerPhoneInput.value = rowPhone;
+          hideBuyerSuggestions();
+        });
+        buyerSuggestions.appendChild(btn);
+      });
+      buyerSuggestions.style.display = 'block';
+    }
+
+    if (buyerNameInput && buyerSuggestions) {
+      buyerNameInput.addEventListener('input', function () {
+        if (buyerSearchDebounceTimer) {
+          clearTimeout(buyerSearchDebounceTimer);
+        }
+        var q = buyerNameInput.value.trim();
+        if (q.length < 1 || buyerNameInput.disabled) {
+          hideBuyerSuggestions();
+          return;
+        }
+        buyerSearchDebounceTimer = setTimeout(function () {
+          var searchUrl = 'sourcing_rfq_form.php?customer_search=1&q=' + encodeURIComponent(q);
+          fetch(searchUrl, {
+            credentials: 'same-origin',
+            headers: { 'X-CSRF-Token': '<?= h($_SESSION['rfq_form_csrf']) ?>' }
+          })
+            .then(function (res) { return res.ok ? res.json() : []; })
+            .then(function (rows) { renderBuyerSuggestions(Array.isArray(rows) ? rows : []); })
+            .catch(function () { hideBuyerSuggestions(); });
+        }, 180);
+      });
+      document.addEventListener('click', function (event) {
+        if (!event.target.closest('#buyerNameSuggestions') && event.target !== buyerNameInput) {
+          hideBuyerSuggestions();
+        }
+      });
+    }
+
     if (acquisitionField && customerInfoSection) {
       function toggleCustomerInfo() {
         var showCustomerInfo = acquisitionField.value === 'customer';
@@ -894,6 +1030,9 @@ render_alibaba_workflow_banner('create_rfq');
         customerInfoInputs.forEach(function (input) {
           input.disabled = !showCustomerInfo;
         });
+        if (!showCustomerInfo) {
+          hideBuyerSuggestions();
+        }
       }
       acquisitionField.addEventListener('change', toggleCustomerInfo);
       toggleCustomerInfo();
