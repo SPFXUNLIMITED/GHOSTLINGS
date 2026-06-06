@@ -576,6 +576,8 @@ $pdo->exec("
     supplier_name      VARCHAR(255) NOT NULL,
     alibaba_chat_link  VARCHAR(1000) NULL,
     model_name         VARCHAR(255) NULL,
+    dimensions         VARCHAR(255) NULL,
+    weight             VARCHAR(255) NULL,
     sku                VARCHAR(100) NULL,
     msrp               DECIMAL(12,2) NULL,
     map_price          DECIMAL(12,2) NULL,
@@ -611,6 +613,8 @@ $pdo->exec("
 foreach ([
   "ALTER TABLE rfq_quotes ADD COLUMN model_name VARCHAR(255) NULL",
   "ALTER TABLE rfq_quotes ADD COLUMN alibaba_chat_link VARCHAR(1000) NULL AFTER supplier_name",
+  "ALTER TABLE rfq_quotes ADD COLUMN dimensions VARCHAR(255) NULL AFTER model_name",
+  "ALTER TABLE rfq_quotes ADD COLUMN weight VARCHAR(255) NULL AFTER dimensions",
   "ALTER TABLE rfq_quotes ADD COLUMN sku VARCHAR(100) NULL",
   "ALTER TABLE rfq_quotes ADD COLUMN msrp DECIMAL(12,2) NULL",
   "ALTER TABLE rfq_quotes ADD COLUMN map_price DECIMAL(12,2) NULL AFTER msrp",
