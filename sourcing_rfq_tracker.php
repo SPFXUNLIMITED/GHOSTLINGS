@@ -42,19 +42,19 @@ $request_status_styles = [
 ];
 $quote_statuses = [
   'received' => 'Received',
+  'shortlisted' => 'Shortlisted',
   'under_review' => 'Under Review',
   'negotiating' => 'Negotiating',
   'accepted' => 'Accepted',
   'rejected' => 'Rejected',
-  'lost' => 'Lost',
 ];
 $quote_status_styles = [
   'received' => ['#dcfce7', '#166534'],
+  'shortlisted' => ['#e0f2fe', '#0c4a6e'],
   'under_review' => ['#dbeafe', '#1d4ed8'],
   'negotiating' => ['#fef3c7', '#92400e'],
   'accepted' => ['#ede9fe', '#6d28d9'],
   'rejected' => ['#fee2e2', '#991b1b'],
-  'lost' => ['#f3f4f6', '#374151'],
 ];
 $urgency_badges = [
   'low' => ['Low', '#ecfeff', '#155e75'],
