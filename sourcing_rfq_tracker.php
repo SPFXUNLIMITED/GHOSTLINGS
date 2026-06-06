@@ -10,6 +10,8 @@ const MAX_QUOTE_NOTES_LENGTH = 5000;
 const MAX_SUPPLIER_NAME_LENGTH = 255;
 const MAX_ALIBABA_CHAT_LINK_LENGTH = 1000;
 const MAX_MODEL_NAME_LENGTH = 255;
+const MAX_DIMENSIONS_LENGTH = 255;
+const MAX_WEIGHT_LENGTH = 255;
 const MAX_SHIPPING_METHOD_LENGTH = 100;
 const NUMERIC_VALUE_PATTERN = '/\d+(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?/';
 const LEAD_TIME_PATTERN = '/\b(\d{1,4})(?:\s*-\s*\d{1,4})?\b/';
@@ -502,6 +504,8 @@ function empty_quote_form_values(): array {
     'supplier_name'     => '',
     'alibaba_chat_link' => '',
     'model_name'        => '',
+    'dimensions'        => '',
+    'weight'            => '',
     'sku'               => '',
     'msrp'              => '',
     'map_price'         => '',
@@ -525,6 +529,8 @@ function quote_row_to_form_values(array $quote): array {
     'supplier_name'     => trim((string)($quote['supplier_name'] ?? '')),
     'alibaba_chat_link' => trim((string)($quote['alibaba_chat_link'] ?? '')),
     'model_name'        => trim((string)($quote['model_name'] ?? '')),
+    'dimensions'        => trim((string)($quote['dimensions'] ?? '')),
+    'weight'            => trim((string)($quote['weight'] ?? '')),
     'sku'               => trim((string)($quote['sku'] ?? '')),
     'msrp'              => $quote['msrp'] !== null ? (string)$quote['msrp'] : '',
     'map_price'         => $quote['map_price'] !== null ? (string)$quote['map_price'] : '',
@@ -618,7 +624,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       } else {
         if ($is_edit_ai_fill) {
           $existing_quote_stmt = $pdo->prepare(
-            "SELECT supplier_name, alibaba_chat_link, model_name, sku, msrp, map_price, moq_20_price,
+            "SELECT supplier_name, alibaba_chat_link, model_name, dimensions, weight, sku, msrp, map_price, moq_20_price,
                     moq_10_price, drop_ship_price, quote_amount, currency, lead_time_days, shipping_cost,
                     shipping_origin, shipping_method, quote_status, received_on, notes
                FROM rfq_quotes
@@ -712,6 +718,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $supplier_name = trim((string)($_POST['supplier_name'] ?? ''));
       $alibaba_chat_link = trim((string)($_POST['alibaba_chat_link'] ?? ''));
       $model_name = trim((string)($_POST['model_name'] ?? ''));
+      $dimensions = trim((string)($_POST['dimensions'] ?? ''));
+      $weight = trim((string)($_POST['weight'] ?? ''));
       $sku = trim((string)($_POST['sku'] ?? ''));
       $msrp_raw = trim((string)($_POST['msrp'] ?? ''));
       $map_price_raw = trim((string)($_POST['map_price'] ?? ''));
@@ -735,6 +743,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($supplier_name !== '' && strlen($supplier_name) > MAX_SUPPLIER_NAME_LENGTH) $errors[] = 'Supplier name must be ' . MAX_SUPPLIER_NAME_LENGTH . ' characters or fewer.';
       if ($alibaba_chat_link !== '' && strlen($alibaba_chat_link) > MAX_ALIBABA_CHAT_LINK_LENGTH) $errors[] = 'Alibaba Chat Link must be ' . MAX_ALIBABA_CHAT_LINK_LENGTH . ' characters or fewer.';
       if (strlen($model_name) > MAX_MODEL_NAME_LENGTH) $errors[] = 'Model name must be ' . MAX_MODEL_NAME_LENGTH . ' characters or fewer.';
+      if (strlen($dimensions) > MAX_DIMENSIONS_LENGTH) $errors[] = 'Dimensions must be ' . MAX_DIMENSIONS_LENGTH . ' characters or fewer.';
+      if (strlen($weight) > MAX_WEIGHT_LENGTH) $errors[] = 'Weight must be ' . MAX_WEIGHT_LENGTH . ' characters or fewer.';
       if (strlen($sku) > 100) $errors[] = 'SKU must be 100 characters or fewer.';
       if (strlen($shipping_method) > MAX_SHIPPING_METHOD_LENGTH) $errors[] = 'Shipping method must be ' . MAX_SHIPPING_METHOD_LENGTH . ' characters or fewer.';
       if ($msrp_raw !== '' && (!is_numeric($msrp_raw) || (float)$msrp_raw < 0)) {
@@ -861,18 +871,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           } else {
           $ins = $pdo->prepare(
             "INSERT INTO rfq_quotes
-            (rfq_request_id, supplier_name, alibaba_chat_link, model_name, sku, msrp, map_price, moq_20_price, moq_20_margin_msrp,
+            (rfq_request_id, supplier_name, alibaba_chat_link, model_name, dimensions, weight, sku, msrp, map_price, moq_20_price, moq_20_margin_msrp,
              moq_20_margin_map, moq_10_price, moq_10_margin_msrp, moq_10_margin_map, drop_ship_price,
              drop_ship_margin_msrp, drop_ship_margin_map, quote_amount, currency, lead_time_days, shipping_cost,
                shipping_origin, shipping_method, quote_status, received_on, notes, created_by,
                quote_file_original_name, quote_file_stored_name, quote_file_mime_type, quote_file_size_bytes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
           );
           $ins->execute([
             $rfq_id,
             $supplier_name,
             $alibaba_chat_link === '' ? null : $alibaba_chat_link,
             $model_name === '' ? null : $model_name,
+            $dimensions === '' ? null : $dimensions,
+            $weight === '' ? null : $weight,
             $sku === '' ? null : $sku,
             $msrp_raw === '' ? null : (float)$msrp_raw,
             $map_price_raw === '' ? null : (float)$map_price_raw,
@@ -913,6 +925,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           'supplier_name'   => $supplier_name,
           'alibaba_chat_link' => $alibaba_chat_link,
           'model_name'      => $model_name,
+          'dimensions'      => $dimensions,
+          'weight'          => $weight,
           'sku'             => $sku,
           'msrp'            => $msrp_raw,
           'map_price'       => $map_price_raw,
@@ -936,6 +950,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $supplier_name = trim((string)($_POST['supplier_name'] ?? ''));
       $alibaba_chat_link = trim((string)($_POST['alibaba_chat_link'] ?? ''));
       $model_name = trim((string)($_POST['model_name'] ?? ''));
+      $dimensions = trim((string)($_POST['dimensions'] ?? ''));
+      $weight = trim((string)($_POST['weight'] ?? ''));
       $sku = trim((string)($_POST['sku'] ?? ''));
       $msrp_raw = trim((string)($_POST['msrp'] ?? ''));
       $map_price_raw = trim((string)($_POST['map_price'] ?? ''));
@@ -961,6 +977,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($supplier_name !== '' && strlen($supplier_name) > MAX_SUPPLIER_NAME_LENGTH) $errors[] = 'Supplier name must be ' . MAX_SUPPLIER_NAME_LENGTH . ' characters or fewer.';
       if ($alibaba_chat_link !== '' && strlen($alibaba_chat_link) > MAX_ALIBABA_CHAT_LINK_LENGTH) $errors[] = 'Alibaba Chat Link must be ' . MAX_ALIBABA_CHAT_LINK_LENGTH . ' characters or fewer.';
       if (strlen($model_name) > MAX_MODEL_NAME_LENGTH) $errors[] = 'Model name must be ' . MAX_MODEL_NAME_LENGTH . ' characters or fewer.';
+      if (strlen($dimensions) > MAX_DIMENSIONS_LENGTH) $errors[] = 'Dimensions must be ' . MAX_DIMENSIONS_LENGTH . ' characters or fewer.';
+      if (strlen($weight) > MAX_WEIGHT_LENGTH) $errors[] = 'Weight must be ' . MAX_WEIGHT_LENGTH . ' characters or fewer.';
       if (strlen($sku) > 100) $errors[] = 'SKU must be 100 characters or fewer.';
       if (strlen($shipping_method) > MAX_SHIPPING_METHOD_LENGTH) $errors[] = 'Shipping method must be ' . MAX_SHIPPING_METHOD_LENGTH . ' characters or fewer.';
       if ($msrp_raw !== '' && (!is_numeric($msrp_raw) || (float)$msrp_raw < 0)) {
@@ -1087,7 +1105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           if (!$errors) {
             $upd = $pdo->prepare(
               "UPDATE rfq_quotes SET
-                supplier_name = ?, alibaba_chat_link = ?, model_name = ?, sku = ?, msrp = ?, map_price = ?, moq_20_price = ?,
+                supplier_name = ?, alibaba_chat_link = ?, model_name = ?, dimensions = ?, weight = ?, sku = ?, msrp = ?, map_price = ?, moq_20_price = ?,
                 moq_20_margin_msrp = ?, moq_20_margin_map = ?, moq_10_price = ?, moq_10_margin_msrp = ?,
                 moq_10_margin_map = ?, drop_ship_price = ?, drop_ship_margin_msrp = ?, drop_ship_margin_map = ?,
                 quote_amount = ?, currency = ?, lead_time_days = ?,
@@ -1101,6 +1119,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $supplier_name,
               $alibaba_chat_link === '' ? null : $alibaba_chat_link,
               $model_name === '' ? null : $model_name,
+              $dimensions === '' ? null : $dimensions,
+              $weight === '' ? null : $weight,
               $sku === '' ? null : $sku,
               $msrp_raw === '' ? null : (float)$msrp_raw,
               $map_price_raw === '' ? null : (float)$map_price_raw,
@@ -1157,6 +1177,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           'supplier_name'   => $supplier_name,
           'alibaba_chat_link' => $alibaba_chat_link,
           'model_name'      => $model_name,
+          'dimensions'      => $dimensions,
+          'weight'          => $weight,
           'sku'             => $sku,
           'msrp'            => $msrp_raw,
           'map_price'       => $map_price_raw,
@@ -1689,6 +1711,16 @@ render_header('Sourcing RFQ Tracker');
                  value="<?= h((string)($editing_quote['model_name'] ?? '')) ?>" />
         </div>
         <div>
+          <label>Dimensions</label>
+          <input type="text" name="dimensions" maxlength="<?= MAX_DIMENSIONS_LENGTH ?>" placeholder="e.g. 122 x 89 x 51 cm"
+                 value="<?= h((string)($editing_quote['dimensions'] ?? '')) ?>" />
+        </div>
+        <div>
+          <label>Weight</label>
+          <input type="text" name="weight" maxlength="<?= MAX_WEIGHT_LENGTH ?>" placeholder="e.g. 115 kg"
+                 value="<?= h((string)($editing_quote['weight'] ?? '')) ?>" />
+        </div>
+        <div>
           <label>SKU</label>
           <input type="text" name="sku" maxlength="100"
                  value="<?= h((string)($editing_quote['sku'] ?? '')) ?>" />
@@ -1828,6 +1860,16 @@ render_header('Sourcing RFQ Tracker');
           <label>Model Name</label>
           <input type="text" name="model_name" maxlength="<?= MAX_MODEL_NAME_LENGTH ?>" placeholder="e.g. GL-1325 Pro"
                  value="<?= h($add_quote_post['model_name'] ?? '') ?>" />
+        </div>
+        <div>
+          <label>Dimensions</label>
+          <input type="text" name="dimensions" maxlength="<?= MAX_DIMENSIONS_LENGTH ?>" placeholder="e.g. 122 x 89 x 51 cm"
+                 value="<?= h($add_quote_post['dimensions'] ?? '') ?>" />
+        </div>
+        <div>
+          <label>Weight</label>
+          <input type="text" name="weight" maxlength="<?= MAX_WEIGHT_LENGTH ?>" placeholder="e.g. 115 kg"
+                 value="<?= h($add_quote_post['weight'] ?? '') ?>" />
         </div>
         <div>
           <label>SKU</label>
