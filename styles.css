@@ -1105,3 +1105,51 @@ tbody tr:hover td {
     text-align: center;
   }
 }
+
+/* ── Footer nav bar ─────────────────────────────────────────────────── */
+.footer-nav {
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  border-top: 1px solid var(--b);
+  padding: 8px 16px;
+  margin-top: 24px;
+}
+
+.footer-nav-inner {
+  max-width: 980px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  gap: 4px 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+@media (min-width: 1200px) {
+  .footer-nav-inner {
+    max-width: 1320px;
+  }
+}
+
+.footer-nav-link {
+  display: inline-block;
+  padding: 5px 14px;
+  border: 1px solid var(--b);
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--m);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.footer-nav-link:hover {
+  border-color: var(--menu-hover-border);
+  background: #f0f6ff;
+  color: var(--p);
+}
+
+.footer-nav-link.active {
+  background: var(--p);
+  color: #fff;
+  border-color: var(--p);
+}
