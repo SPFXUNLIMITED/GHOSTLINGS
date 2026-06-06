@@ -546,11 +546,6 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
       ['href' => 'playbooks.php', 'files' => ['playbooks.php', 'playbook_form.php', 'playbook_task_form.php', 'playbook_tasks.php'], 'label' => 'Playbooks'],
       ['href' => 'archives.php', 'file' => 'archives.php', 'label' => 'Archives'],
     ], $current); ?>
-    <?php render_menu_dropdown('Quick Order', [
-      ['type' => 'section', 'label' => 'Quick Order'],
-      ['href' => 'quick_order_form.php', 'file' => 'quick_order_form.php', 'label' => 'Quick Order Form'],
-      ['href' => 'quick_order_list.php', 'file' => 'quick_order_list.php', 'label' => 'Quick Order Tracker'],
-    ], $current); ?>
     <?php render_menu_dropdown('Sourcing', [
       ['type' => 'section', 'label' => 'Partners & Pricing'],
       ['href' => 'vendors.php', 'files' => ['vendors.php', 'vendor_form.php', 'vendor_details.php'], 'label' => 'Vendors'],
@@ -577,7 +572,6 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
       ['href' => 'invoice_form.php', 'files' => ['invoice_form.php'], 'label' => 'Invoice Form'],
       ['href' => 'invoice_tracker.php', 'files' => ['invoice_tracker.php'], 'label' => 'Invoice Tracker'],
     ], $current); ?>
-    <?php render_menu_link(['href' => 'inventory_list.php', 'files' => ['inventory_list.php', 'inventory_form.php'], 'label' => 'Inventory'], $current); ?>
     <?php if ($show_admin_menu): ?>
     <?php render_menu_link(['href' => 'admin_backend.php', 'files' => ['admin_backend.php', 'users.php', 'user_profiles.php', 'form_admin.php'], 'label' => 'Admin Backend'], $current); ?>
     <?php endif; ?>
