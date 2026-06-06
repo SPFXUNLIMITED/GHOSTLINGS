@@ -333,7 +333,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $si,
         ]);
       }
-      header('Location: shipping_rfq_tracker.php?rfq_id=' . $edit_id);
+      header('Location: freight_quote_tracker.php?rfq_id=' . $edit_id);
       exit;
     } else {
       $stmt = $pdo->prepare(
@@ -404,7 +404,7 @@ render_header($is_edit ? ('Edit Freight Quote #' . $edit_id) : 'Freight Quote Fo
         : 'Request freight shipping quotes for machines or cargo from China to Los Angeles (port or door delivery).' ?>
     </p>
   </div>
-  <a class="btn" href="shipping_rfq_tracker.php">Go to Freight Quote Tracker</a>
+  <a class="btn" href="freight_quote_tracker.php">Go to Freight Quote Tracker</a>
 </div>
 
 <?php render_alibaba_workflow_banner('freight_quote'); ?>
@@ -420,7 +420,7 @@ render_header($is_edit ? ('Edit Freight Quote #' . $edit_id) : 'Freight Quote Fo
 <?php if ($success): ?>
   <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">
     <?= h($success) ?>
-    <a href="shipping_rfq_tracker.php" style="margin-left:8px;">Go to Tracker →</a>
+    <a href="freight_quote_tracker.php" style="margin-left:8px;">Go to Tracker →</a>
   </div>
 <?php endif; ?>
 
@@ -557,7 +557,7 @@ render_header($is_edit ? ('Edit Freight Quote #' . $edit_id) : 'Freight Quote Fo
 
   <div class="row" style="margin-top:18px;">
     <button type="submit" class="btn primary"><?= $is_edit ? 'Save Changes' : 'Submit Freight Quote' ?></button>
-    <a class="btn" href="shipping_rfq_tracker.php">Go to Freight Quote Tracker</a>
+    <a class="btn" href="freight_quote_tracker.php">Go to Freight Quote Tracker</a>
   </div>
 </form>
 
