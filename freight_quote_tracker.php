@@ -12,19 +12,23 @@ if (empty($_SESSION['srfq_tracker_csrf'])) {
 }
 
 $request_statuses = [
-  'draft'           => 'Draft',
-  'sourcing'        => 'Sourcing',
+  'pending'         => 'Pending',
+  'sent'            => 'Sent',
   'quotes_received' => 'Quotes Received',
-  'shortlisted'     => 'Shortlisted',
+  'comparing'       => 'Comparing',
   'booked'          => 'Booked',
+  'in_transit'      => 'In Transit',
+  'delivered'       => 'Delivered',
   'closed'          => 'Closed',
 ];
 $request_status_styles = [
-  'draft'           => ['#f3f4f6', '#374151'],
-  'sourcing'        => ['#dbeafe', '#1d4ed8'],
+  'pending'         => ['#f3f4f6', '#374151'],
+  'sent'            => ['#dbeafe', '#1d4ed8'],
   'quotes_received' => ['#dcfce7', '#166534'],
-  'shortlisted'     => ['#fef3c7', '#92400e'],
+  'comparing'       => ['#fef3c7', '#92400e'],
   'booked'          => ['#ede9fe', '#6d28d9'],
+  'in_transit'      => ['#ffedd5', '#9a3412'],
+  'delivered'       => ['#d1fae5', '#065f46'],
   'closed'          => ['#fee2e2', '#991b1b'],
 ];
 $quote_statuses = [
