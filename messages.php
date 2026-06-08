@@ -4,7 +4,7 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_login();
 
-const MAX_MESSAGE_LENGTH = 5 * 1024 * 1024;
+const MAX_MESSAGE_LENGTH = 1024 * 1024;
 
 $current_user_id = (int)$_SESSION['user_id'];
 
