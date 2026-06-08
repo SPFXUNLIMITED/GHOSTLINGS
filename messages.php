@@ -171,7 +171,6 @@ tinymce.init({
         input.onchange = function () {
           var file = input.files[0];
           if (!file) return;
-          editor.uploadImages(function () {});
           var formData = new FormData();
           formData.append('file', file);
           fetch('/project/message_image_upload.php?csrf=<?= h($_SESSION['messages_csrf']) ?>', {
@@ -181,7 +180,7 @@ tinymce.init({
           })
           .then(function (r) { return r.json(); })
           .then(function (data) {
-            if (data.location) {
+            if (data.location && /^\/project\/message_image_serve\.php\?file=[\w%.-]+$/.test(data.location)) {
               editor.insertContent('<img src="' + data.location + '" alt="" />');
             } else {
               alert(data.error || 'Image upload failed.');

@@ -23,7 +23,10 @@ if ($fi) finfo_close($fi);
 
 header('Content-Type: ' . $mime);
 header('X-Content-Type-Options: nosniff');
-header('Content-Length: ' . (string)filesize($path));
+$filesize = filesize($path);
+if ($filesize !== false) {
+  header('Content-Length: ' . (string)$filesize);
+}
 header('Cache-Control: private, max-age=86400');
 header('Content-Disposition: inline');
 readfile($path);

@@ -65,7 +65,7 @@ $ext = $mimeToExt[$mime];
 
 $uploadsDir = __DIR__ . '/uploads';
 if (!is_dir($uploadsDir)) {
-  @mkdir($uploadsDir, 0775, true);
+  @mkdir($uploadsDir, 0755, true);
 }
 if (!is_dir($uploadsDir) || !is_writable($uploadsDir)) {
   http_response_code(500);
