@@ -146,15 +146,52 @@ tinymce.init({
   license_key: 'gpl',
   content_css: '/project/tinymce/js/tinymce/skins/content/default/content.min.css',
   menubar: false,
-  plugins: 'lists link',
-  toolbar: 'bold italic underline | bullist numlist | link | removeformat',
+  plugins: 'lists link image',
+  toolbar: 'bold italic underline | bullist numlist | link | uploadimage | removeformat',
   height: 220,
   branding: false,
   promotion: false,
   statusbar: false,
+  images_upload_url: '/project/message_image_upload.php?csrf=<?= h($_SESSION['messages_csrf']) ?>',
+  images_file_types: 'jpeg,jpg,png,gif,webp',
+  paste_data_images: false,
+  automatic_uploads: true,
   setup: function (editor) {
     editor.on('submit', function () {
       editor.save();
+    });
+
+    editor.ui.registry.addButton('uploadimage', {
+      icon: 'image',
+      tooltip: 'Upload Image',
+      onAction: function () {
+        var input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/jpeg,image/png,image/gif,image/webp';
+        input.onchange = function () {
+          var file = input.files[0];
+          if (!file) return;
+          var formData = new FormData();
+          formData.append('file', file);
+          fetch('/project/message_image_upload.php?csrf=<?= h($_SESSION['messages_csrf']) ?>', {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+          })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.location && /^\/project\/message_image_serve\.php\?file=[\w%.-]+$/.test(data.location)) {
+              editor.insertContent('<img src="' + data.location + '" alt="" />');
+            } else {
+              alert(data.error || 'Image upload failed.');
+            }
+          })
+          .catch(function () {
+            alert('Image upload failed.');
+          });
+        };
+        input.click();
+      }
     });
   }
 });
