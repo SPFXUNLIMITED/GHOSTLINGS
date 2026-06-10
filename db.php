@@ -1357,6 +1357,17 @@ if ($_quotes_checkout_amount_col === false || $_quotes_checkout_amount_col->fetc
 }
 unset($_quotes_checkout_amount_col);
 
+$_quotes_emailed_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'invoice_emailed'");
+if ($_quotes_emailed_col === false || $_quotes_emailed_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN invoice_emailed TINYINT(1) NOT NULL DEFAULT 0");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'invoice_emailed'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_emailed_col);
+
 // Create quote_items table for line items on quotes
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS quote_items (
