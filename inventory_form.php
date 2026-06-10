@@ -46,6 +46,8 @@ foreach ([
   "ALTER TABLE inventory_items ADD COLUMN supplier_2_url VARCHAR(1000) NULL AFTER supplier_2_name",
   "ALTER TABLE inventory_items ADD COLUMN supplier_3_name VARCHAR(255) NOT NULL DEFAULT '' AFTER supplier_2_url",
   "ALTER TABLE inventory_items ADD COLUMN supplier_3_url VARCHAR(1000) NULL AFTER supplier_3_name",
+  "ALTER TABLE inventory_items ADD COLUMN purchased_from VARCHAR(50) NOT NULL DEFAULT '' AFTER supplier_3_url",
+  "ALTER TABLE inventory_items ADD COLUMN markup_percent DECIMAL(7,2) NULL AFTER cost_price",
 ] as $sql) {
   try {
     $pdo->exec($sql);
@@ -239,10 +241,10 @@ $fields = [
   'supplier_2_url' => '',
   'supplier_3_name' => '',
   'supplier_3_url' => '',
+  'purchased_from' => '',
+  'markup_percent' => '',
   'cost_price' => '',
   'retail_price' => '',
-  'wholesale_price' => '',
-  'minimum_price' => '',
   'current_stock' => '0',
   'low_stock_alert' => '0',
   'location' => '',
@@ -259,7 +261,7 @@ if ($is_edit) {
     SELECT
       id, part_number, item_name, description, category,
       supplier_1_name, supplier_1_url, supplier_2_name, supplier_2_url, supplier_3_name, supplier_3_url,
-      cost_price, retail_price, wholesale_price, minimum_price,
+      purchased_from, cost_price, markup_percent, retail_price,
       current_stock, low_stock_alert, location,
       image_original_name, image_stored_name, image_mime_type
     FROM inventory_items
@@ -323,10 +325,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_view) {
       $errors[] = 'Location must be 255 characters or fewer.';
     }
 
-    $cost_price = parse_money_field($fields['cost_price'], 'Cost Price', $errors);
-    $retail_price = parse_money_field($fields['retail_price'], 'Retail Price', $errors);
-    $wholesale_price = parse_money_field($fields['wholesale_price'], 'Wholesale Price', $errors);
-    $minimum_price = parse_money_field($fields['minimum_price'], 'Minimum Price', $errors);
+    $cost_price = parse_money_field($fields['cost_price'], 'Our Cost', $errors);
+    $retail_price = parse_money_field($fields['retail_price'], 'Selling Price', $errors);
+    $markup_percent = $fields['markup_percent'] !== '' ? (string)$fields['markup_percent'] : null;
+    if ($markup_percent !== null && !preg_match('/^\d+(?:\.\d{1,2})?$/', $markup_percent)) {
+      $errors[] = 'Markup % must be a non-negative number with up to 2 decimals.';
+      $markup_percent = null;
+    }
+    $allowed_vendors = ['Alibaba / Wholesale', 'Amazon', 'Other'];
+    if ($fields['purchased_from'] !== '' && !in_array($fields['purchased_from'], $allowed_vendors, true)) {
+      $errors[] = 'Purchased From value is invalid.';
+    }
     $current_stock = parse_int_field($fields['current_stock'], 'Current Stock', $errors);
     $low_stock_alert = parse_int_field($fields['low_stock_alert'], 'Low Stock Alert', $errors);
 
@@ -406,7 +415,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_view) {
           UPDATE inventory_items SET
             item_name = ?, description = ?, category = ?,
             supplier_1_name = ?, supplier_1_url = ?, supplier_2_name = ?, supplier_2_url = ?, supplier_3_name = ?, supplier_3_url = ?,
-            cost_price = ?, retail_price = ?, wholesale_price = ?, minimum_price = ?,
+            purchased_from = ?, cost_price = ?, markup_percent = ?, retail_price = ?,
             current_stock = ?, low_stock_alert = ?, location = ?,
             image_original_name = ?, image_stored_name = ?, image_mime_type = ?
           WHERE id = ?
@@ -421,10 +430,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_view) {
           $supplier_urls[2] !== '' ? $supplier_urls[2] : null,
           $fields['supplier_3_name'],
           $supplier_urls[3] !== '' ? $supplier_urls[3] : null,
+          $fields['purchased_from'] !== '' ? $fields['purchased_from'] : '',
           $cost_price,
+          $markup_percent,
           $retail_price,
-          $wholesale_price,
-          $minimum_price,
           $current_stock,
           $low_stock_alert,
           $fields['location'],
@@ -459,10 +468,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_view) {
             INSERT INTO inventory_items (
               part_number, item_name, description, category,
               supplier_1_name, supplier_1_url, supplier_2_name, supplier_2_url, supplier_3_name, supplier_3_url,
-              cost_price, retail_price, wholesale_price, minimum_price,
+              purchased_from, cost_price, markup_percent, retail_price,
               current_stock, low_stock_alert, location,
               image_original_name, image_stored_name, image_mime_type
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ");
           $ins->execute([
             $placeholder_part_number,
@@ -475,10 +484,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_view) {
             $supplier_urls[2] !== '' ? $supplier_urls[2] : null,
             $fields['supplier_3_name'],
             $supplier_urls[3] !== '' ? $supplier_urls[3] : null,
+            $fields['purchased_from'] !== '' ? $fields['purchased_from'] : '',
             $cost_price,
+            $markup_percent,
             $retail_price,
-            $wholesale_price,
-            $minimum_price,
             $current_stock,
             $low_stock_alert,
             $fields['location'],
@@ -575,20 +584,20 @@ render_header($page_title);
           <td><?= h($fields['category']) ?></td>
         </tr>
         <tr>
-          <th>Cost Price</th>
+          <th>Our Cost</th>
           <td><?= fmt_inventory_money($fields['cost_price']) ?></td>
         </tr>
         <tr>
-          <th>Retail Price</th>
+          <th>Purchased From</th>
+          <td><?= $fields['purchased_from'] !== '' ? h($fields['purchased_from']) : '—' ?></td>
+        </tr>
+        <tr>
+          <th>Markup %</th>
+          <td><?= $fields['markup_percent'] !== '' ? h($fields['markup_percent']) . '%' : '—' ?></td>
+        </tr>
+        <tr>
+          <th>Selling Price</th>
           <td><?= fmt_inventory_money($fields['retail_price']) ?></td>
-        </tr>
-        <tr>
-          <th>Wholesale Price</th>
-          <td><?= fmt_inventory_money($fields['wholesale_price']) ?></td>
-        </tr>
-        <tr>
-          <th>Minimum Price</th>
-          <td><?= fmt_inventory_money($fields['minimum_price']) ?></td>
         </tr>
         <tr>
           <th>Current Stock</th>
@@ -695,20 +704,25 @@ render_header($page_title);
           <input type="url" name="supplier_3_url" maxlength="1000" placeholder="https://..." value="<?= h($fields['supplier_3_url']) ?>" />
         </div>
         <div>
-          <label>Cost Price</label>
-          <input type="text" name="cost_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['cost_price']) ?>" />
+          <label>Purchased From</label>
+          <select name="purchased_from" id="purchased_from">
+            <option value="" <?= $fields['purchased_from'] === '' ? 'selected' : '' ?>>— Select —</option>
+            <option value="Alibaba / Wholesale" <?= $fields['purchased_from'] === 'Alibaba / Wholesale' ? 'selected' : '' ?>>Alibaba / Wholesale</option>
+            <option value="Amazon" <?= $fields['purchased_from'] === 'Amazon' ? 'selected' : '' ?>>Amazon</option>
+            <option value="Other" <?= $fields['purchased_from'] === 'Other' ? 'selected' : '' ?>>Other</option>
+          </select>
         </div>
         <div>
-          <label>Retail Price</label>
-          <input type="text" name="retail_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['retail_price']) ?>" />
+          <label>Markup %</label>
+          <input type="number" name="markup_percent" id="markup_percent" inputmode="decimal" step="0.01" min="0" placeholder="e.g. 90" value="<?= h($fields['markup_percent']) ?>" />
         </div>
         <div>
-          <label>Wholesale Price</label>
-          <input type="text" name="wholesale_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['wholesale_price']) ?>" />
+          <label>Our Cost</label>
+          <input type="text" name="cost_price" id="cost_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['cost_price']) ?>" />
         </div>
         <div>
-          <label>Minimum Price</label>
-          <input type="text" name="minimum_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['minimum_price']) ?>" />
+          <label>Selling Price</label>
+          <input type="text" name="retail_price" id="retail_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['retail_price']) ?>" />
         </div>
         <div>
           <label>Current Stock</label>
@@ -751,5 +765,44 @@ render_header($page_title);
     </form>
   <?php endif; ?>
 </div>
+
+<?php if (!$is_view): ?>
+<script>
+(function () {
+  var vendorMarkups = {
+    'Alibaba / Wholesale': 90,
+    'Amazon': 35,
+    'Other': 50
+  };
+
+  var vendorSel   = document.getElementById('purchased_from');
+  var markupInput = document.getElementById('markup_percent');
+  var costInput   = document.getElementById('cost_price');
+  var sellingInput = document.getElementById('retail_price');
+
+  if (!vendorSel || !markupInput || !costInput || !sellingInput) return;
+
+  function recalcSellingPrice() {
+    var cost   = parseFloat(costInput.value.replace(/[^0-9.]/g, ''));
+    var markup = parseFloat(markupInput.value);
+    if (!isNaN(cost) && !isNaN(markup)) {
+      var selling = cost * (1 + markup / 100);
+      sellingInput.value = selling.toFixed(2);
+    }
+  }
+
+  vendorSel.addEventListener('change', function () {
+    var vendor = vendorSel.value;
+    if (vendor in vendorMarkups) {
+      markupInput.value = vendorMarkups[vendor];
+      recalcSellingPrice();
+    }
+  });
+
+  markupInput.addEventListener('input', recalcSellingPrice);
+  costInput.addEventListener('input', recalcSellingPrice);
+}());
+</script>
+<?php endif; ?>
 
 <?php render_footer(); ?>

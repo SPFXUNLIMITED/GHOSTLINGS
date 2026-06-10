@@ -159,7 +159,7 @@ if ($q !== '') {
     SELECT
       id, part_number, item_name, description, category,
       supplier_1_name, supplier_1_url, supplier_2_name, supplier_2_url, supplier_3_name, supplier_3_url,
-      cost_price, retail_price, wholesale_price, minimum_price,
+      cost_price, retail_price,
       current_stock, low_stock_alert, location,
       image_original_name, image_stored_name, image_mime_type
     FROM inventory_items
@@ -178,7 +178,7 @@ if ($q !== '') {
     SELECT
       id, part_number, item_name, description, category,
       supplier_1_name, supplier_1_url, supplier_2_name, supplier_2_url, supplier_3_name, supplier_3_url,
-      cost_price, retail_price, wholesale_price, minimum_price,
+      cost_price, retail_price,
       current_stock, low_stock_alert, location,
       image_original_name, image_stored_name, image_mime_type
     FROM inventory_items
@@ -326,10 +326,8 @@ render_header('Inventory List');
         <th>Part # / Name</th>
         <th>Category</th>
         <th>Suppliers</th>
-        <th>Cost</th>
-        <th>Retail</th>
-        <th>Wholesale</th>
-        <th>Minimum</th>
+        <th>Our Cost</th>
+        <th>Selling Price</th>
         <th>Stock</th>
         <th>Location</th>
         <th>Actions</th>
@@ -391,8 +389,6 @@ render_header('Inventory List');
           </td>
           <td class="inventory-price"><?= h(fmt_money($item['cost_price'])) ?></td>
           <td class="inventory-price"><?= h(fmt_money($item['retail_price'])) ?></td>
-          <td class="inventory-price"><?= h(fmt_money($item['wholesale_price'])) ?></td>
-          <td class="inventory-price"><?= h(fmt_money($item['minimum_price'])) ?></td>
           <td>
             <span class="<?= $is_low_stock ? 'inventory-low-stock' : 'inventory-ok-stock' ?>">
               <?= $current_stock ?> (alert: <?= $low_stock_alert ?>)
