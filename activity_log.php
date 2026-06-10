@@ -1,4 +1,23 @@
 <?php
+// === TEMP DEBUG - REMOVE LATER ===
+if (isset($pdo) && ($pdo instanceof PDO)) {
+  echo '<pre>';
+  echo "=== RAW created_at VALUES ===\n\n";
+
+  $tables = ['app_requests', 'rfq_requests', 'customer_phone_inquiries'];
+
+  foreach ($tables as $table) {
+    $stmt = $pdo->query("SELECT id, created_at FROM `$table` ORDER BY created_at DESC LIMIT 5");
+    echo "Table: <b>$table</b>\n";
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+      echo "  ID " . $row['id'] . " → " . $row['created_at'] . "\n";
+    }
+    echo "\n";
+  }
+  echo '</pre>';
+}
+// === END DEBUG ===
+
 $activity_rows = [];
 $activity_error = '';
 $activity_limit = isset($_GET['activity_limit']) ? (int)$_GET['activity_limit'] : 200;
