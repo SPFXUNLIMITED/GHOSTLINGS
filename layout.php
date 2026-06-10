@@ -431,10 +431,27 @@ function render_header(string $title): void {
     $unread_stmt = $pdo->prepare("SELECT COUNT(*) FROM messages WHERE recipient_id = ? AND is_read = 0");
     $unread_stmt->execute([$user_id]);
     $unread_count = (int)$unread_stmt->fetchColumn();
-    if ($unread_count > 0) {
-      $unread_messages_badge = '<a href="messages.php" style="text-decoration:none;" aria-label="' . $unread_count . ' unread message' . ($unread_count === 1 ? '' : 's') . '">'
-        . '<span style="display:inline-flex;align-items:center;justify-content:center;background:#dc2626;color:#fff;border-radius:999px;font-size:11px;font-weight:700;min-width:18px;height:18px;padding:0 5px;line-height:1;vertical-align:middle;" title="' . $unread_count . ' unread message' . ($unread_count === 1 ? '' : 's') . '">'
-        . $unread_count
+
+    $bug_count = 0;
+    if (!empty($_SESSION['is_admin'])) {
+      $bug_stmt = $pdo->prepare("SELECT COUNT(*) FROM app_requests WHERE request_type = 'bug' AND status = 'new'");
+      $bug_stmt->execute();
+      $bug_count = (int)$bug_stmt->fetchColumn();
+    }
+
+    $total_notif = $unread_count + $bug_count;
+    if ($total_notif > 0) {
+      $label_parts = [];
+      if ($unread_count > 0) {
+        $label_parts[] = $unread_count . ' unread message' . ($unread_count === 1 ? '' : 's');
+      }
+      if ($bug_count > 0) {
+        $label_parts[] = $bug_count . ' new bug report' . ($bug_count === 1 ? '' : 's');
+      }
+      $notif_label = implode(', ', $label_parts);
+      $unread_messages_badge = '<a href="notifications.php" style="text-decoration:none;" aria-label="' . $notif_label . '">'
+        . '<span style="display:inline-flex;align-items:center;justify-content:center;background:#dc2626;color:#fff;border-radius:999px;font-size:11px;font-weight:700;min-width:18px;height:18px;padding:0 5px;line-height:1;vertical-align:middle;" title="' . $notif_label . '">'
+        . $total_notif
         . '</span></a>';
     }
   }
