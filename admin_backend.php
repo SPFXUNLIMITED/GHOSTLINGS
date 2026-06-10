@@ -335,7 +335,7 @@ if ($section === 'dashboard') {
        FROM ({$activity_sql}) activity{$activity_where_sql}
        ORDER BY {$activity_order_sql}
        LIMIT :activity_limit
-       OFFSET :activity_offset
+       OFFSET :activity_offset"
     );
     foreach ($activity_params as $name => $value) {
       $activity_stmt->bindValue($name, $value, PDO::PARAM_STR);
