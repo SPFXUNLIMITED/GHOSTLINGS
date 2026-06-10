@@ -12,6 +12,8 @@ const INVOICE_DEFAULT_COST = '0.00';
 const INVOICE_DEFAULT_MARKUP = '20.00';
 const INVOICE_DEFAULT_PRICE = '0.00';
 const INVOICE_MIN_QTY = 0.01;
+const STRIPE_AMOUNT_TOLERANCE = 0.01;
+const STRIPE_API_TIMEOUT_SECONDS = 20;
 
 // ---------- CSRF ----------
 if (empty($_SESSION['invoice_form_csrf'])) {
@@ -64,6 +66,74 @@ function invoice_env_value(string $key): string {
   return '';
 }
 
+function invoice_online_payment_enabled(array $quote): bool {
+  return (int)($quote['enable_online_payment'] ?? 0) === 1;
+}
+
+function invoice_stripe_secret_key(PDO $pdo): string {
+  $secret_key = invoice_env_value('STRIPE_SECRET_KEY');
+  if ($secret_key !== '') {
+    return $secret_key;
+  }
+
+  try {
+    app_ensure_integration_settings_table($pdo);
+    $stmt = $pdo->prepare(
+      "SELECT setting_val, is_encrypted
+       FROM integration_settings
+       WHERE setting_key = 'stripe_secret_key'
+       LIMIT 1"
+    );
+    $stmt->execute();
+    $row = $stmt->fetch();
+    if (is_array($row)) {
+      $stored = trim((string)($row['setting_val'] ?? ''));
+      if ($stored !== '') {
+        $is_encrypted = (int)($row['is_encrypted'] ?? 0) === 1;
+        $resolved = $is_encrypted ? app_decrypt_setting_value($stored) : $stored;
+        $resolved = trim((string)$resolved);
+        if ($resolved !== '') {
+          return $resolved;
+        }
+      }
+    }
+  } catch (Throwable $e) {
+    error_log('Stripe secret key lookup failed: ' . $e->getMessage());
+  }
+
+  return '';
+}
+
+function invoice_public_base_url(): string {
+  $configured = trim(invoice_env_value('APP_URL'));
+  if ($configured !== '') {
+    return rtrim($configured, '/');
+  }
+
+  $forwarded_proto = strtolower(trim((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')));
+  $https_on = !empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off';
+  $scheme = $forwarded_proto !== '' ? $forwarded_proto : ($https_on ? 'https' : 'http');
+  $host = trim((string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost'));
+  $script_dir = str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? '/')));
+  if ($script_dir === '.' || $script_dir === '/') {
+    $script_dir = '';
+  }
+
+  return $scheme . '://' . $host . rtrim($script_dir, '/');
+}
+
+function invoice_public_url(string $path, array $params = []): string {
+  $url = invoice_public_base_url() . '/' . ltrim($path, '/');
+  if ($params) {
+    $query = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+    if ($query !== '') {
+      $url .= '?' . $query;
+    }
+  }
+
+  return $url;
+}
+
 function invoice_sender_profile(PDO $pdo, ?int $created_by): array {
   $profile = ['sender_name' => '', 'company_name' => '', 'address' => '', 'phone' => '', 'email' => ''];
 
@@ -95,6 +165,155 @@ function invoice_sender_profile(PDO $pdo, ?int $created_by): array {
     break;
   }
   return $profile;
+}
+
+function invoice_has_valid_checkout_session(array $quote, float $amount): bool {
+  $existing_url = trim((string)($quote['stripe_checkout_url'] ?? ''));
+  $existing_session_id = trim((string)($quote['stripe_checkout_session_id'] ?? ''));
+  $existing_amount = isset($quote['stripe_checkout_amount'])
+    ? round((float)$quote['stripe_checkout_amount'], 2)
+    : null;
+
+  return $existing_url !== ''
+    && $existing_session_id !== ''
+    && $existing_amount !== null
+    && abs($existing_amount - $amount) < STRIPE_AMOUNT_TOLERANCE;
+}
+
+function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_message = null): string {
+  $error_message = null;
+  if (!invoice_online_payment_enabled($quote)) {
+    return '';
+  }
+
+  $quote_id = (int)($quote['id'] ?? 0);
+  if ($quote_id <= 0) {
+    $error_message = 'Invoice must be saved before generating an online payment link.';
+    return '';
+  }
+
+  $amount = round((float)($quote['subtotal_amount'] ?? 0), 2);
+  if ($amount <= 0) {
+    $error_message = 'Online payment requires an invoice total greater than $0.00.';
+    return '';
+  }
+
+  if (invoice_has_valid_checkout_session($quote, $amount)) {
+    return trim((string)($quote['stripe_checkout_url'] ?? ''));
+  }
+
+  if (!function_exists('curl_init')) {
+    $error_message = 'Stripe checkout could not be created because cURL is not available on this server.';
+    return '';
+  }
+
+  $secret_key = invoice_stripe_secret_key($pdo);
+  if ($secret_key === '') {
+    $error_message = 'Stripe secret key is not configured. Please save it in Admin > Integrations or set STRIPE_SECRET_KEY.';
+    return '';
+  }
+
+  $invoice_number = trim((string)($quote['converted_invoice_no'] ?? ''));
+  if ($invoice_number === '') {
+    $invoice_number = '#' . $quote_id;
+  }
+  $customer_name = trim((string)($quote['customer_name'] ?? ''));
+  $company_name = trim((string)($quote['company_name'] ?? ''));
+  $customer_email = trim((string)($quote['email'] ?? ''));
+  $description_parts = array_filter([
+    $company_name !== '' ? $company_name : null,
+    $customer_name !== '' ? $customer_name : null,
+  ]);
+  $product_description = implode(' • ', $description_parts);
+  $amount_cents = (int)round($amount * 100);
+
+  $payload = [
+    'mode' => 'payment',
+    'success_url' => invoice_public_url('invoice_payment_status.php', ['status' => 'success']),
+    'cancel_url' => invoice_public_url('invoice_payment_status.php', ['status' => 'cancel']),
+    'payment_method_types' => ['card'],
+    'line_items' => [[
+      'price_data' => [
+        'currency' => 'usd',
+        'product_data' => array_filter([
+          'name' => 'Invoice ' . $invoice_number,
+          'description' => $product_description !== '' ? $product_description : null,
+        ], static fn($value) => $value !== null && $value !== ''),
+        'unit_amount' => $amount_cents,
+      ],
+      'quantity' => 1,
+    ]],
+    'metadata' => array_filter([
+      'invoice_id' => (string)$quote_id,
+      'invoice_number' => $invoice_number,
+      'customer_name' => $customer_name,
+      'company_name' => $company_name,
+    ], static fn($value) => $value !== ''),
+    'submit_type' => 'pay',
+  ];
+  if ($customer_email !== '' && filter_var($customer_email, FILTER_VALIDATE_EMAIL)) {
+    $payload['customer_email'] = $customer_email;
+  }
+
+  $ch = curl_init('https://api.stripe.com/v1/checkout/sessions');
+  curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_POST => true,
+    CURLOPT_POSTFIELDS => http_build_query($payload, '', '&', PHP_QUERY_RFC3986),
+    CURLOPT_TIMEOUT => STRIPE_API_TIMEOUT_SECONDS,
+    CURLOPT_HTTPHEADER => [
+      'Authorization: Bearer ' . $secret_key,
+      'Content-Type: application/x-www-form-urlencoded',
+    ],
+  ]);
+  $response_body = curl_exec($ch);
+  $curl_error = curl_error($ch);
+  $http_code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+  curl_close($ch);
+
+  if ($response_body === false) {
+    $error_message = $curl_error !== '' ? $curl_error : 'Stripe checkout request failed.';
+    return '';
+  }
+
+  $response = json_decode($response_body, true);
+  if (!is_array($response)) {
+    $error_message = 'Stripe returned an invalid response.';
+    return '';
+  }
+
+  if ($http_code >= 400) {
+    $stripe_error = trim((string)($response['error']['message'] ?? ''));
+    $error_message = $stripe_error !== '' ? $stripe_error : 'Stripe checkout request failed.';
+    return '';
+  }
+
+  $checkout_url = trim((string)($response['url'] ?? ''));
+  $session_id = trim((string)($response['id'] ?? ''));
+  if ($checkout_url === '' || $session_id === '') {
+    $error_message = 'Stripe did not return a hosted checkout link.';
+    return '';
+  }
+
+  $pdo->prepare(
+    "UPDATE quotes
+        SET stripe_checkout_url = ?,
+            stripe_checkout_session_id = ?,
+            stripe_checkout_created_at = NOW(),
+            stripe_checkout_amount = ?
+      WHERE id = ?"
+  )->execute([
+    $checkout_url,
+    $session_id,
+    $amount,
+    $quote_id,
+  ]);
+
+  $quote['stripe_checkout_url'] = $checkout_url;
+  $quote['stripe_checkout_session_id'] = $session_id;
+  $quote['stripe_checkout_amount'] = $amount;
+
+  return $checkout_url;
 }
 
 function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$error_message = null): bool {
@@ -137,6 +356,15 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
   $customer_name = trim((string)($quote['customer_name'] ?? ''));
   $inv_date      = trim((string)($quote['quote_date'] ?? ''));
   $subtotal      = number_format((float)($quote['subtotal_amount'] ?? 0), 2);
+  $payment_link = '';
+  if (invoice_online_payment_enabled($quote)) {
+    $payment_error = null;
+    $payment_link = invoice_checkout_session_url($pdo, $quote, $payment_error);
+    if ($payment_link === '') {
+      $error_message = trim((string)$payment_error) !== '' ? trim((string)$payment_error) : 'Unable to create Stripe checkout link for this invoice.';
+      return false;
+    }
+  }
 
   $subject = $sender_company . ' - Invoice ' . ($inv_no !== '' ? $inv_no : '#' . (int)$quote['id']);
 
@@ -233,6 +461,13 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
 
       . '<p style="margin:0 0 8px;font-size:15px;color:#1e293b;">Hello' . ($customer_name !== '' ? ', ' . $h($customer_name) : '') . ',</p>'
       . '<p style="margin:0 0 24px;font-size:14px;color:#475569;">Please find your invoice details below. Thank you for your business.</p>'
+      . ($payment_link !== ''
+          ? '<div style="margin:0 0 24px;padding:16px 18px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;">'
+              . '<p style="margin:0 0 10px;font-size:14px;font-weight:600;color:#1d4ed8;">Pay this invoice online</p>'
+              . '<p style="margin:0 0 14px;font-size:13px;color:#334155;">Use Stripe’s secure checkout page to pay this invoice online. Card details are entered directly on Stripe and are not collected on our site.</p>'
+              . '<p style="margin:0;"><a href="' . $h($payment_link) . '" style="display:inline-block;padding:11px 18px;background:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:999px;font-weight:700;">Pay Invoice on Stripe</a></p>'
+            . '</div>'
+          : '')
 
       // Line items table
       . '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">'
@@ -283,6 +518,10 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
   $text_body .= str_repeat('-', 40) . "\r\n\r\n";
   $text_body .= "Hello" . ($customer_name !== '' ? ", {$customer_name}" : '') . ",\r\n\r\n";
   $text_body .= "Please find your invoice details below.\r\n\r\nLine Items:\r\n";
+  if ($payment_link !== '') {
+    $text_body .= "Pay online with Stripe: {$payment_link}\r\n";
+    $text_body .= "Card details are entered directly on Stripe's secure checkout page.\r\n\r\n";
+  }
   $text_body .= implode("\r\n", $rows_text) . "\r\n\r\nSubtotal: \${$subtotal}\r\n\r\n";
   $text_body .= "Thank you for your business.\r\n";
   if ($sender_name !== '') {
@@ -477,6 +716,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $post_company_name    = trim((string)($_POST['company_name'] ?? ''));
   $post_phone_number    = trim((string)($_POST['phone_number'] ?? ''));
   $post_email           = trim((string)($_POST['email'] ?? ''));
+  $post_enable_online_payment = !empty($_POST['enable_online_payment']);
   $post_notes           = trim((string)($_POST['notes'] ?? ''));
 
   // Validate date; fall back to today
@@ -524,6 +764,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $inv_no = $post_invoice_number !== '' ? $post_invoice_number
         : invoice_generate_number($post_source_quote_id);
 
+      // Any invoice edit invalidates the old Stripe checkout session to prevent Stripe amount mismatches after invoice updates.
       $upd = $pdo->prepare(
         "UPDATE quotes
             SET customer_name     = ?,
@@ -533,6 +774,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 quote_date        = ?,
                 notes             = ?,
                 subtotal_amount   = ?,
+                enable_online_payment = ?,
+                stripe_checkout_url = NULL,
+                stripe_checkout_session_id = NULL,
+                stripe_checkout_created_at = NULL,
+                stripe_checkout_amount = NULL,
                 status            = 'converted',
                 converted_invoice_no = ?,
                 converted_at      = COALESCE(converted_at, NOW())
@@ -546,6 +792,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $post_invoice_date,
         $post_notes         !== '' ? $post_notes         : null,
         round($subtotal, 2),
+        $post_enable_online_payment ? 1 : 0,
         $inv_no,
         $post_source_quote_id,
       ]);
@@ -570,8 +817,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $ins_q = $pdo->prepare(
         "INSERT INTO quotes
            (customer_name, company_name, phone_number, email, quote_date,
-            status, notes, subtotal_amount, converted_invoice_no, converted_at, created_by)
-         VALUES (?, ?, ?, ?, ?, 'converted', ?, ?, '', NOW(), ?)"
+            status, notes, subtotal_amount, enable_online_payment, converted_invoice_no, converted_at, created_by)
+         VALUES (?, ?, ?, ?, ?, 'converted', ?, ?, ?, '', NOW(), ?)"
       );
       $ins_q->execute([
         $post_customer_name,
@@ -581,6 +828,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $post_invoice_date,
         $post_notes         !== '' ? $post_notes         : null,
         round($subtotal, 2),
+        $post_enable_online_payment ? 1 : 0,
         $created_by,
       ]);
       $new_id = (int)$pdo->lastInsertId();
@@ -712,6 +960,7 @@ $fields = [
   'phone_number' => (string)($quote['phone_number'] ?? ''),
   'email' => (string)($quote['email'] ?? ''),
   'invoice_date' => invoice_quote_date_value($quote, $today),
+  'enable_online_payment' => $quote && invoice_online_payment_enabled($quote) ? '1' : '0',
   'notes' => (string)($quote['notes'] ?? ''),
 ];
 
@@ -743,6 +992,16 @@ $invoice_email_error = isset($_GET['email_error']) && $_GET['email_error'] !== '
 
 render_header($invoice_heading);
 ?>
+
+<style>
+  .invoice-toggle{position:relative;display:inline-flex;align-items:center;cursor:pointer;}
+  .invoice-toggle input{position:absolute;opacity:0;pointer-events:none;}
+  .invoice-toggle-slider{width:54px;height:30px;border-radius:999px;background:#cbd5e1;position:relative;transition:background-color .2s ease;}
+  .invoice-toggle-slider::after{content:'';position:absolute;top:4px;left:4px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(15,23,42,.28);transition:transform .2s ease;}
+  .invoice-toggle input:checked + .invoice-toggle-slider{background:#2563eb;}
+  .invoice-toggle input:checked + .invoice-toggle-slider::after{transform:translateX(24px);}
+  .invoice-toggle input:focus-visible + .invoice-toggle-slider{outline:3px solid rgba(37,99,235,.25);outline-offset:2px;}
+</style>
 
 <div class="card page-header">
   <div class="page-header-body">
@@ -926,6 +1185,22 @@ render_header($invoice_heading);
     </div>
 
     <div style="margin-top:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:14px 16px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc; margin-bottom:14px;">
+        <div style="min-width:min(100%, 320px);">
+          <label for="enable_online_payment" style="display:block; margin:0 0 4px; font-weight:600;">Enable Online Payment</label>
+          <p class="muted" style="margin:0; font-size:13px;">When enabled, invoice emails include a secure Stripe checkout link. Save changes before emailing the invoice.</p>
+        </div>
+        <?php if (!$is_view_mode): ?>
+          <label class="invoice-toggle">
+            <input id="enable_online_payment" type="checkbox" name="enable_online_payment" value="1" <?= $fields['enable_online_payment'] === '1' ? 'checked' : '' ?> />
+            <span class="invoice-toggle-slider" aria-hidden="true"></span>
+          </label>
+        <?php else: ?>
+          <span style="font-weight:700; color:<?= $fields['enable_online_payment'] === '1' ? '#1d4ed8' : '#64748b' ?>;">
+            <?= $fields['enable_online_payment'] === '1' ? 'Enabled' : 'Disabled' ?>
+          </span>
+        <?php endif; ?>
+      </div>
       <label for="notes">Notes</label>
       <textarea id="notes" name="notes" rows="5"<?= invoice_field_lock_attrs($is_view_mode) ?>><?= h($fields['notes']) ?></textarea>
     </div>

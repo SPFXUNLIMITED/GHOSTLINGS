@@ -8,6 +8,7 @@ const CR_LABEL_MAX = 100;
 const CR_BODY_MAX  = 2000;
 const CR_SLOT_COUNT = 4;
 const HUBSPOT_TOKEN_MAX = 512;
+const STRIPE_SECRET_KEY_MAX = 512;
 const RECENT_ACTIVITY_PER_PAGE = 20;
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -49,6 +50,8 @@ $users_errors = [];
 $users_success = '';
 $hubspot_token_is_set = false;
 $hubspot_token_updated_at = '';
+$stripe_secret_key_is_set = false;
+$stripe_secret_key_updated_at = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'canned_responses') {
   $csrf = (string)($_POST['csrf_token'] ?? '');
@@ -88,9 +91,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'integrations') {
   } else {
     $submitted_hubspot_token = trim((string)($_POST['hubspot_private_app_token'] ?? ''));
     $clear_hubspot_token = !empty($_POST['clear_hubspot_token']);
+    $submitted_stripe_secret_key = trim((string)($_POST['stripe_secret_key'] ?? ''));
+    $clear_stripe_secret_key = !empty($_POST['clear_stripe_secret_key']);
 
     if (strlen($submitted_hubspot_token) > HUBSPOT_TOKEN_MAX) {
       $integrations_errors[] = 'HubSpot token must be ' . HUBSPOT_TOKEN_MAX . ' characters or fewer.';
+    }
+    if (strlen($submitted_stripe_secret_key) > STRIPE_SECRET_KEY_MAX) {
+      $integrations_errors[] = 'Stripe secret key must be ' . STRIPE_SECRET_KEY_MAX . ' characters or fewer.';
     }
 
     if (!$integrations_errors) {
@@ -124,10 +132,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'integrations') {
           $is_encrypted,
         ]);
 
+        $existing_stmt = $pdo->prepare("SELECT setting_val FROM integration_settings WHERE setting_key = 'stripe_secret_key' LIMIT 1");
+        $existing_stmt->execute();
+        $existing_value = (string)($existing_stmt->fetchColumn() ?? '');
+
+        $value_to_store = $existing_value;
+        $is_encrypted = 1;
+
+        if ($submitted_stripe_secret_key !== '') {
+          $value_to_store = app_encrypt_setting_value($submitted_stripe_secret_key);
+        } elseif ($clear_stripe_secret_key) {
+          $value_to_store = '';
+          $is_encrypted = 0;
+        }
+
+        $db_value_to_store = $value_to_store === '' ? null : $value_to_store;
+        $pdo->prepare(
+          "INSERT INTO integration_settings (setting_key, setting_val, is_encrypted)
+           VALUES ('stripe_secret_key', ?, ?)
+           ON DUPLICATE KEY UPDATE setting_val = ?, is_encrypted = ?"
+        )->execute([
+          $db_value_to_store,
+          $is_encrypted,
+          $db_value_to_store,
+          $is_encrypted,
+        ]);
+
         $_SESSION['admin_backend_csrf'] = bin2hex(random_bytes(24));
-        $integrations_success = $clear_hubspot_token && $submitted_hubspot_token === ''
-          ? 'HubSpot token removed.'
-          : 'HubSpot token saved securely.';
+        $messages = [];
+        if ($submitted_hubspot_token !== '') {
+          $messages[] = 'HubSpot token saved securely.';
+        } elseif ($clear_hubspot_token) {
+          $messages[] = 'HubSpot token removed.';
+        }
+        if ($submitted_stripe_secret_key !== '') {
+          $messages[] = 'Stripe secret key saved securely.';
+        } elseif ($clear_stripe_secret_key) {
+          $messages[] = 'Stripe secret key removed.';
+        }
+        $integrations_success = $messages ? implode(' ', $messages) : 'Integration settings saved.';
       } catch (Throwable $e) {
         error_log('Integrations token save failed: ' . $e->getMessage());
         $integrations_errors[] = 'Unable to save token right now. Please try again. If this continues, check server error logs.';
@@ -500,6 +543,17 @@ if ($section === 'integrations') {
   $integration = $row->fetch() ?: [];
   $hubspot_token_is_set = trim((string)($integration['setting_val'] ?? '')) !== '';
   $hubspot_token_updated_at = trim((string)($integration['updated_at'] ?? ''));
+
+  $row = $pdo->prepare(
+    "SELECT setting_val, updated_at
+     FROM integration_settings
+     WHERE setting_key = 'stripe_secret_key'
+     LIMIT 1"
+  );
+  $row->execute();
+  $integration = $row->fetch() ?: [];
+  $stripe_secret_key_is_set = trim((string)($integration['setting_val'] ?? '')) !== '';
+  $stripe_secret_key_updated_at = trim((string)($integration['updated_at'] ?? ''));
 }
 
 $total_users = 0;
@@ -1094,6 +1148,22 @@ render_header('Admin Backend');
           <label style="display:inline-flex; gap:8px; align-items:center; margin-top:12px;">
             <input type="checkbox" name="clear_hubspot_token" value="1" />
             <span>Clear saved token</span>
+          </label>
+
+          <div style="max-width:560px; margin-top:18px;">
+            <label for="stripe_secret_key">Stripe Secret Key</label>
+            <input id="stripe_secret_key" type="password" name="stripe_secret_key" maxlength="<?= STRIPE_SECRET_KEY_MAX ?>" autocomplete="new-password" aria-describedby="stripe_secret_key_help" placeholder="<?= $stripe_secret_key_is_set ? 'Saved key is hidden. Enter a new key to replace it.' : 'Enter Stripe secret key' ?>" />
+            <p id="stripe_secret_key_help" class="muted" style="margin:6px 0 0; font-size:12px;">
+              <?= $stripe_secret_key_is_set ? 'A Stripe secret key is currently saved and encrypted in the database.' : 'No Stripe secret key saved yet.' ?>
+              <?php if ($stripe_secret_key_updated_at !== ''): ?>
+                Last updated: <?= h($format_activity_datetime($stripe_secret_key_updated_at)) ?>.
+              <?php endif; ?>
+            </p>
+          </div>
+
+          <label style="display:inline-flex; gap:8px; align-items:center; margin-top:12px;">
+            <input type="checkbox" name="clear_stripe_secret_key" value="1" />
+            <span>Clear saved Stripe key</span>
           </label>
 
           <div style="margin-top:18px;">
