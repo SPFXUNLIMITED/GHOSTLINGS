@@ -17,6 +17,51 @@ if (empty($_SESSION['invoice_form_csrf'])) {
 
 $view_mode_requested = isset($_GET['mode']) && $_GET['mode'] === 'view';
 
+// ---------- GET: Customer live search ----------
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
+  header('Content-Type: application/json; charset=utf-8');
+
+  $csrf = trim((string)($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
+  if ($csrf === '' || !hash_equals((string)$_SESSION['invoice_form_csrf'], $csrf)) {
+    http_response_code(403);
+    echo json_encode([]);
+    exit;
+  }
+
+  $query = trim((string)($_GET['q'] ?? ''));
+  if ($query === '') {
+    echo json_encode([]);
+    exit;
+  }
+
+  $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $query) . '%';
+  $stmt = $pdo->prepare(
+    "SELECT
+       id,
+       COALESCE(
+         NULLIF(TRIM(CONCAT_WS(' ', NULLIF(first_name, ''), NULLIF(last_name, ''))), ''),
+         NULLIF(company, ''),
+         NULLIF(email, ''),
+         ''
+       ) AS customer_name,
+       company AS company_name,
+       phone,
+       email
+     FROM customers
+     WHERE first_name LIKE ? ESCAPE '\\\\'
+        OR last_name LIKE ? ESCAPE '\\\\'
+        OR CONCAT_WS(' ', first_name, last_name) LIKE ? ESCAPE '\\\\'
+        OR company LIKE ? ESCAPE '\\\\'
+        OR email LIKE ? ESCAPE '\\\\'
+        OR phone LIKE ? ESCAPE '\\\\'
+     ORDER BY customer_name ASC, id DESC
+     LIMIT 8"
+  );
+  $stmt->execute([$like, $like, $like, $like, $like, $like]);
+  echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC), JSON_UNESCAPED_UNICODE);
+  exit;
+}
+
 // ---------- POST: Save invoice ----------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if ($view_mode_requested) {
@@ -346,9 +391,12 @@ render_header($invoice_heading);
     </div>
 
     <div style="display:grid; gap:14px; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); margin-top:16px;">
-      <div>
+      <div style="position:relative;">
         <label for="customer_name">Customer Name</label>
-        <input id="customer_name" type="text" name="customer_name" maxlength="255" value="<?= h($fields['customer_name']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> />
+        <input id="customer_name" type="text" name="customer_name" maxlength="255" autocomplete="off" value="<?= h($fields['customer_name']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> />
+        <?php if (!$is_view_mode): ?>
+          <div id="customerSuggestions" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:40; background:#fff; border:1px solid #d1d5db; border-radius:10px; box-shadow:0 12px 24px rgba(2,6,23,.12); margin-top:6px; max-height:220px; overflow:auto;"></div>
+        <?php endif; ?>
       </div>
       <div>
         <label for="company_name">Company</label>
@@ -507,6 +555,82 @@ render_header($invoice_heading);
 
   Array.from(lineItemsBody.querySelectorAll('tr.line-item-row')).forEach(bindRow);
   computeTotals();
+})();
+</script>
+<script>
+(() => {
+  const customerNameInput = document.getElementById('customer_name');
+  const companyInput = document.getElementById('company_name');
+  const phoneInput = document.getElementById('phone_number');
+  const emailInput = document.getElementById('email');
+  const suggestions = document.getElementById('customerSuggestions');
+  if (!customerNameInput || !companyInput || !phoneInput || !emailInput || !suggestions) return;
+  let debounceTimer = null;
+
+  function hideSuggestions() {
+    suggestions.style.display = 'none';
+    suggestions.innerHTML = '';
+  }
+
+  function renderSuggestions(rows) {
+    suggestions.innerHTML = '';
+    if (!rows.length) { hideSuggestions(); return; }
+    rows.forEach((row) => {
+      const rowCompany = row.company_name || '';
+      const rowPhone = row.phone || '';
+      const rowEmail = row.email || '';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn';
+      btn.style.display = 'block';
+      btn.style.width = '100%';
+      btn.style.textAlign = 'left';
+      btn.style.borderRadius = '0';
+      btn.style.border = '0';
+      btn.style.borderBottom = '1px solid #e5e7eb';
+      btn.style.background = '#fff';
+      btn.style.padding = '10px 12px';
+      const title = document.createElement('strong');
+      title.textContent = row.customer_name || '';
+      btn.appendChild(title);
+      const meta = document.createElement('div');
+      meta.className = 'muted';
+      meta.style.marginTop = '3px';
+      meta.textContent = (rowCompany || '—') + ' • ' + (rowPhone || '—') + ' • ' + (rowEmail || '—');
+      btn.appendChild(meta);
+      btn.addEventListener('click', () => {
+        customerNameInput.value = row.customer_name || '';
+        companyInput.value = rowCompany;
+        phoneInput.value = rowPhone;
+        emailInput.value = rowEmail;
+        hideSuggestions();
+      });
+      suggestions.appendChild(btn);
+    });
+    suggestions.style.display = 'block';
+  }
+
+  customerNameInput.addEventListener('input', () => {
+    const q = customerNameInput.value.trim();
+    if (debounceTimer) clearTimeout(debounceTimer);
+    if (q.length < 1) { hideSuggestions(); return; }
+    debounceTimer = setTimeout(() => {
+      const searchUrl = 'invoice_form.php?customer_search=1&q=' + encodeURIComponent(q);
+      fetch(searchUrl, {
+        credentials: 'same-origin',
+        headers: { 'X-CSRF-Token': '<?= h($_SESSION['invoice_form_csrf']) ?>' }
+      })
+        .then((res) => res.ok ? res.json() : [])
+        .then((rows) => renderSuggestions(Array.isArray(rows) ? rows : []))
+        .catch(() => hideSuggestions());
+    }, 180);
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('#customerSuggestions') && event.target !== customerNameInput) {
+      hideSuggestions();
+    }
+  });
 })();
 </script>
 <?php else: ?>
