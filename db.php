@@ -1456,6 +1456,20 @@ foreach ([
   }
 }
 
+// Create page_views table for employee page view tracking
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS page_views (
+    id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id    INT UNSIGNED NOT NULL,
+    page       VARCHAR(100)  NOT NULL,
+    url        VARCHAR(512)  NOT NULL,
+    viewed_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_page_views_user_id (user_id),
+    KEY idx_page_views_viewed_at (viewed_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 if (!function_exists('log_admin_activity')) {
   function log_admin_activity(PDO $pdo, ?int $user_id, string $action_name, string $details = '', ?string $fallback_user = null): void {
     $safe_user_id = $user_id !== null && $user_id > 0 ? $user_id : null;

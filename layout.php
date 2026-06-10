@@ -454,6 +454,15 @@ function render_header(string $title): void {
         . $total_notif
         . '</span></a>';
     }
+
+    try {
+      $pv_page = mb_substr(basename((string)($_SERVER['PHP_SELF'] ?? '')), 0, 100);
+      $pv_url  = mb_substr((string)($_SERVER['REQUEST_URI'] ?? ''), 0, 512);
+      $pv_stmt = $pdo->prepare("INSERT INTO page_views (user_id, page, url) VALUES (?, ?, ?)");
+      $pv_stmt->execute([$user_id, $pv_page, $pv_url]);
+    } catch (Throwable $e) {
+      // silently ignore; page view logging must never break page rendering
+    }
   }
 ?>
 <!doctype html>
