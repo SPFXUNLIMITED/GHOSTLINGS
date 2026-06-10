@@ -1023,6 +1023,28 @@ try {
   // Column already exists
 }
 
+$hasVendorsRating = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'vendors'
+    AND COLUMN_NAME = 'rating'
+")->fetchColumn();
+if ($hasVendorsRating === 0) {
+  $pdo->exec("ALTER TABLE vendors ADD COLUMN rating TINYINT UNSIGNED NULL DEFAULT NULL");
+}
+
+$hasVendorsReview = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'vendors'
+    AND COLUMN_NAME = 'review'
+")->fetchColumn();
+if ($hasVendorsReview === 0) {
+  $pdo->exec("ALTER TABLE vendors ADD COLUMN review TEXT NULL DEFAULT NULL");
+}
+
 // Create freight_forwarders table if it does not exist yet
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS freight_forwarders (

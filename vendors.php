@@ -60,6 +60,8 @@ render_header('Vendors');
         <th>Phone</th>
         <th>Alibaba Store</th>
         <th>Website</th>
+        <th>Rating</th>
+        <th>Review</th>
         <th>Actions</th>
       </tr>
     </thead>
@@ -98,6 +100,26 @@ render_header('Vendors');
             <a href="<?= h($websiteUrl) ?>" target="_blank" rel="noopener noreferrer" title="<?= h($websiteUrl) ?>"><?= h($display_url) ?></a>
           <?php elseif ($websiteUrl !== ''): ?>
             <?= h($websiteUrl) ?>
+          <?php else: ?>
+            <span class="muted">—</span>
+          <?php endif; ?>
+        </td>
+        <td>
+          <?php if (!empty($v['rating'])): ?>
+            <span title="<?= (int)$v['rating'] ?> out of 5" style="color:#f59e0b; font-size:1.1em; letter-spacing:1px;">
+              <?= str_repeat('★', (int)$v['rating']) ?><span style="color:#d1d5db;"><?= str_repeat('★', 5 - (int)$v['rating']) ?></span>
+            </span>
+          <?php else: ?>
+            <span class="muted">—</span>
+          <?php endif; ?>
+        </td>
+        <td style="max-width:200px;">
+          <?php
+            $reviewText = trim((string)($v['review'] ?? ''));
+            if ($reviewText !== ''):
+              $preview = mb_strlen($reviewText) > 80 ? mb_substr($reviewText, 0, 80) . '…' : $reviewText;
+          ?>
+            <span title="<?= h($reviewText) ?>"><?= h($preview) ?></span>
           <?php else: ?>
             <span class="muted">—</span>
           <?php endif; ?>
