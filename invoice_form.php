@@ -677,6 +677,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   // Handle email action — allowed even in view mode
   if (trim((string)($_POST['action'] ?? '')) === 'send_email') {
     $row_id = (int)($_POST['row_id'] ?? 0);
+    $return_to_tracker = trim((string)($_POST['return_to'] ?? '')) === 'tracker';
     $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
     if ($row_id > 0) {
       $eq_stmt = $pdo->prepare("SELECT * FROM quotes WHERE id = ? LIMIT 1");
@@ -688,11 +689,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $eq_items = $eq_items_stmt->fetchAll(PDO::FETCH_ASSOC);
         $eq_error = null;
         if (invoice_send_email_msg($pdo, $eq_quote, $eq_items, $eq_error)) {
-          $mode_param = $view_mode_requested ? '&mode=view' : '';
-          header('Location: invoice_form.php?id=' . $row_id . $mode_param . '&email_sent=1');
+          $pdo->prepare("UPDATE quotes SET invoice_emailed = 1 WHERE id = ?")->execute([$row_id]);
+          if ($return_to_tracker) {
+            header('Location: invoice_tracker.php?email_sent=' . $row_id);
+          } else {
+            $mode_param = $view_mode_requested ? '&mode=view' : '';
+            header('Location: invoice_form.php?id=' . $row_id . $mode_param . '&email_sent=1');
+          }
         } else {
-          $mode_param = $view_mode_requested ? '&mode=view' : '';
-          header('Location: invoice_form.php?id=' . $row_id . $mode_param . '&email_error=' . urlencode($eq_error ?? 'Unknown error'));
+          if ($return_to_tracker) {
+            header('Location: invoice_tracker.php?email_error=' . urlencode($eq_error ?? 'Unknown error') . '&email_id=' . $row_id);
+          } else {
+            $mode_param = $view_mode_requested ? '&mode=view' : '';
+            header('Location: invoice_form.php?id=' . $row_id . $mode_param . '&email_error=' . urlencode($eq_error ?? 'Unknown error'));
+          }
         }
       } else {
         header('Location: invoice_tracker.php');
