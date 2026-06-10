@@ -376,7 +376,7 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
   $quote_date    = trim((string)($quote['quote_date'] ?? ''));
   $subtotal      = quote_format_money($quote['subtotal_amount'] ?? 0);
 
-  $subject = htmlspecialchars($sender_company, ENT_QUOTES, 'UTF-8') . ' — Quote #' . $quote_id;
+  $subject = $sender_company . ' - Quote #' . $quote_id;
 
   // ---- Build HTML rows ----
   $rows_html = [];
@@ -406,7 +406,9 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
   // ---- Build company header contact line ----
   $header_contact_parts = [];
   if ($sender_address !== '') {
-    $header_contact_parts[] = nl2br(htmlspecialchars(preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ' · ', $sender_address)), ENT_QUOTES, 'UTF-8'));
+    $addr_oneline = str_replace(["\r\n", "\r", "\n"], ' · ', $sender_address);
+    $addr_oneline = preg_replace('/\s+/', ' ', $addr_oneline);
+    $header_contact_parts[] = htmlspecialchars($addr_oneline, ENT_QUOTES, 'UTF-8');
   }
   if ($sender_phone !== '') {
     $header_contact_parts[] = htmlspecialchars($sender_phone, ENT_QUOTES, 'UTF-8');
@@ -498,7 +500,7 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
         . '</tfoot>'
       . '</table>'
 
-      . '<p style="margin:0;font-size:14px;color:#475569;">Thank you for considering our services. Please don\'t hesitate to reach out if you have any questions.</p>'
+      . '<p style="margin:0;font-size:14px;color:#475569;">Thank you for considering our services. Please do not hesitate to reach out if you have any questions.</p>'
     . '</div>'
 
     // ── Prepared-by strip ──

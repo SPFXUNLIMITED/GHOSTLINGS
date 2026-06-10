@@ -138,7 +138,7 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
   $inv_date      = trim((string)($quote['quote_date'] ?? ''));
   $subtotal      = number_format((float)($quote['subtotal_amount'] ?? 0), 2);
 
-  $subject = htmlspecialchars($sender_company, ENT_QUOTES, 'UTF-8') . ' — Invoice ' . ($inv_no !== '' ? $inv_no : '#' . (int)$quote['id']);
+  $subject = $sender_company . ' - Invoice ' . ($inv_no !== '' ? $inv_no : '#' . (int)$quote['id']);
 
   // ---- Build HTML rows ----
   $rows_html = [];
@@ -169,7 +169,9 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
 
   $header_parts = [];
   if ($sender_address !== '') {
-    $header_parts[] = $h(preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ' · ', $sender_address)));
+    $addr_oneline = str_replace(["\r\n", "\r", "\n"], ' · ', $sender_address);
+    $addr_oneline = preg_replace('/\s+/', ' ', $addr_oneline);
+    $header_parts[] = $h($addr_oneline);
   }
   if ($sender_phone !== '') $header_parts[] = $h($sender_phone);
   if ($sender_email !== '') {
@@ -251,7 +253,7 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
         . '</tfoot>'
       . '</table>'
 
-      . '<p style="margin:0;font-size:14px;color:#475569;">If you have any questions regarding this invoice, please don\'t hesitate to contact us.</p>'
+      . '<p style="margin:0;font-size:14px;color:#475569;">If you have any questions regarding this invoice, please do not hesitate to contact us.</p>'
     . '</div>'
 
     // ── Prepared-by strip ──
@@ -825,8 +827,6 @@ render_header($invoice_heading);
             <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
             <button type="submit" class="btn">Email Invoice</button>
           </form>
-        <?php else: ?>
-          <a class="btn" href="invoice_form.php?id=<?= (int)$quote_id ?>&mode=view">Email Invoice</a>
         <?php endif; ?>
       <?php endif; ?>
       <a class="btn" href="invoice_tracker.php">Invoice Tracker</a>
