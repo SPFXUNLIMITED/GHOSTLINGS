@@ -547,12 +547,6 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
       ['href' => 'archives.php', 'file' => 'archives.php', 'label' => 'Archives'],
     ], $current); ?>
     <?php render_menu_dropdown('Sourcing', [
-      ['type' => 'section', 'label' => 'Partners & Pricing'],
-      ['href' => 'vendors.php', 'files' => ['vendors.php', 'vendor_form.php', 'vendor_details.php'], 'label' => 'Vendors'],
-      ['href' => 'freight_forwarders.php', 'files' => ['freight_forwarders.php', 'freight_forwarder_form.php', 'freight_forwarder_details.php'], 'label' => 'Freight Forwarders'],
-      ['type' => 'separator'],
-      ['href' => 'alibaba_responses.php', 'file' => 'alibaba_responses.php', 'label' => 'Alibaba Responses'],
-      ['type' => 'separator'],
       ['type' => 'section', 'label' => 'RFQs'],
       ['href' => 'sourcing_rfq_form.php', 'file' => 'sourcing_rfq_form.php', 'label' => 'RFQ Form'],
       ['href' => 'sourcing_rfq_tracker.php', 'files' => ['sourcing_rfq_tracker.php', 'sourcing_rfq_submitted.php', 'sourcing_rfq_image.php'], 'label' => 'RFQ Tracker'],
@@ -562,6 +556,7 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
       ['href' => 'order_tracker.php', 'file' => 'order_tracker.php', 'label' => 'PO Tracker'],
       ['type' => 'separator'],
       ['type' => 'section', 'label' => 'Shipping'],
+      ['href' => 'freight_forwarders.php', 'files' => ['freight_forwarders.php', 'freight_forwarder_form.php', 'freight_forwarder_details.php'], 'label' => 'Freight Forwarders'],
       ['href' => 'freight_quote_form.php', 'file' => 'freight_quote_form.php', 'label' => 'Freight Quote Form'],
       ['href' => 'freight_quote_tracker.php', 'file' => 'freight_quote_tracker.php', 'label' => 'Freight Quote Tracker'],
     ], $current); ?>
@@ -594,6 +589,8 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
   <a class="left-quick-access-link <?= $current === 'quick_order_list.php' ? 'active' : '' ?>" href="quick_order_list.php">Quick Order Tracker</a>
   <a class="left-quick-access-link <?= $current === 'customers.php' ? 'active' : '' ?>" href="customers.php">Customers</a>
   <a class="left-quick-access-link <?= in_array($current, ['inventory_list.php', 'inventory_form.php'], true) ? 'active' : '' ?>" href="inventory_list.php">Inventory</a>
+  <a class="left-quick-access-link <?= in_array($current, ['vendors.php', 'vendor_form.php', 'vendor_details.php'], true) ? 'active' : '' ?>" href="vendors.php">Vendors</a>
+  <a class="left-quick-access-link <?= $current === 'alibaba_responses.php' ? 'active' : '' ?>" href="alibaba_responses.php">Alibaba Responses</a>
 </aside>
 <?php endif; ?>
 
