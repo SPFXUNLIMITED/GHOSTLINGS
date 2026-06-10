@@ -46,6 +46,9 @@ $users_errors = [];
 $users_success = '';
 $bug_errors = [];
 $bug_success = '';
+$bug_type_labels     = ['bug' => 'Bug', 'software_change' => 'Software Change', 'feature_request' => 'Feature Request'];
+$bug_priority_labels = ['low' => 'Low', 'medium' => 'Medium', 'high' => 'High'];
+$bug_status_labels   = ['new' => 'New', 'in_review' => 'In Review', 'planned' => 'Planned', 'completed' => 'Completed', 'declined' => 'Declined'];
 $hubspot_token_is_set = false;
 $hubspot_token_updated_at = '';
 
@@ -256,11 +259,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'bug_reports') {
   if (!hash_equals((string)$_SESSION['app_request_tracker_csrf'], $csrf)) {
     $bug_errors[] = 'Security token mismatch. Please refresh and try again.';
   } else {
-    $bug_request_id = (int)($_POST['request_id'] ?? 0);
-    $bug_status     = trim((string)($_POST['status'] ?? ''));
+    $bug_request_id  = (int)($_POST['request_id'] ?? 0);
+    $bug_status      = trim((string)($_POST['status'] ?? ''));
     $bug_admin_notes = trim((string)($_POST['admin_notes'] ?? ''));
-
-    $bug_status_labels = ['new' => 'New', 'in_review' => 'In Review', 'planned' => 'Planned', 'completed' => 'Completed', 'declined' => 'Declined'];
 
     if ($bug_request_id <= 0) {
       $bug_errors[] = 'Invalid request.';
@@ -1103,12 +1104,6 @@ render_header('Admin Backend');
       </script>
 
     <?php elseif ($section === 'bug_reports'): ?>
-
-      <?php
-        $bug_type_labels = ['bug' => 'Bug', 'software_change' => 'Software Change', 'feature_request' => 'Feature Request'];
-        $bug_priority_labels = ['low' => 'Low', 'medium' => 'Medium', 'high' => 'High'];
-        $bug_status_labels = ['new' => 'New', 'in_review' => 'In Review', 'planned' => 'Planned', 'completed' => 'Completed', 'declined' => 'Declined'];
-      ?>
 
       <?php if ($bug_errors): ?>
         <div class="alert error">
