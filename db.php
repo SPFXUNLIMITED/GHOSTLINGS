@@ -332,6 +332,8 @@ $pdo->exec("
     project_id    INT NULL DEFAULT NULL,
     description   TEXT NULL DEFAULT NULL,
     clock_in      DATETIME NOT NULL,
+    lunch_start   DATETIME NULL DEFAULT NULL,
+    lunch_end     DATETIME NULL DEFAULT NULL,
     clock_out     DATETIME NULL DEFAULT NULL,
     hours_override DECIMAL(8,2) NULL DEFAULT NULL,
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -340,6 +342,27 @@ $pdo->exec("
     INDEX idx_te_clock_in (clock_in)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+if (!defined('MYSQL_DUPLICATE_COLUMN_ERROR')) {
+  define('MYSQL_DUPLICATE_COLUMN_ERROR', '42S21');
+}
+
+foreach ([
+  "ALTER TABLE time_entries ADD COLUMN lunch_start DATETIME NULL DEFAULT NULL",
+  "ALTER TABLE time_entries ADD COLUMN lunch_end DATETIME NULL DEFAULT NULL",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    if ($e->getCode() !== MYSQL_DUPLICATE_COLUMN_ERROR) {
+      throw $e;
+    }
+  }
+}
+
+if (!defined('ATTENDANCE_IDLE_SESSION_KEY')) {
+  define('ATTENDANCE_IDLE_SESSION_KEY', 'attendance_idle_logged');
+}
 
 // Add email column to users if it does not exist yet
 try {
