@@ -717,8 +717,9 @@ render_header($page_title);
           <input type="number" name="markup_percent" id="markup_percent" step="0.01" min="0" placeholder="e.g. 90" value="<?= h($fields['markup_percent']) ?>" />
         </div>
         <div>
-          <label>Our Cost</label>
+          <label>Unit Cost</label>
           <input type="text" name="cost_price" id="cost_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['cost_price']) ?>" />
+          <p style="margin:4px 0 0;font-size:0.85em;"><strong>⚠ Enter the cost for ONE item only — not the total cost for multiple pieces.</strong></p>
         </div>
         <div>
           <label>Selling Price</label>
