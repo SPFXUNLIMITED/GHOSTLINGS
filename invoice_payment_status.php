@@ -16,7 +16,7 @@ render_header($page_title);
     <p class="muted">Stripe will provide the receipt and payment confirmation for this transaction.</p>
   <?php else: ?>
     <p>Your payment was canceled or not completed.</p>
-    <p class="muted">You can return to the invoice email anytime and use the Stripe payment link again when you are ready.</p>
+    <p class="muted">You can return to the invoice email at any time and use the Stripe payment link again when you are ready.</p>
   <?php endif; ?>
 
   <div style="margin-top:16px;">
