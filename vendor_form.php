@@ -85,6 +85,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($fields['rating'] !== '' && (!ctype_digit($fields['rating']) || (int)$fields['rating'] < 1 || (int)$fields['rating'] > 5)) {
       $errors[] = 'Rating must be a number between 1 and 5.';
     }
+    if (mb_strlen($fields['review']) > 5000) {
+      $errors[] = 'Internal review must be 5000 characters or fewer.';
+    }
 
     if (!$errors) {
       if ($is_edit) {

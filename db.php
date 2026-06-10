@@ -1031,7 +1031,7 @@ $hasVendorsRating = (int)$pdo->query("
     AND COLUMN_NAME = 'rating'
 ")->fetchColumn();
 if ($hasVendorsRating === 0) {
-  $pdo->exec("ALTER TABLE vendors ADD COLUMN rating TINYINT(1) UNSIGNED NULL DEFAULT NULL");
+  $pdo->exec("ALTER TABLE vendors ADD COLUMN rating TINYINT UNSIGNED NULL DEFAULT NULL");
 }
 
 $hasVendorsReview = (int)$pdo->query("
