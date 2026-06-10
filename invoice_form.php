@@ -12,6 +12,8 @@ const INVOICE_DEFAULT_COST = '0.00';
 const INVOICE_DEFAULT_MARKUP = '20.00';
 const INVOICE_DEFAULT_PRICE = '0.00';
 const INVOICE_MIN_QTY = 0.01;
+const STRIPE_CHECKOUT_AMOUNT_EPSILON = 0.00001;
+const STRIPE_API_TIMEOUT_SECONDS = 20;
 
 // ---------- CSRF ----------
 if (empty($_SESSION['invoice_form_csrf'])) {
@@ -188,7 +190,7 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
   $existing_amount = isset($quote['stripe_checkout_amount'])
     ? round((float)$quote['stripe_checkout_amount'], 2)
     : null;
-  if ($existing_url !== '' && $existing_session_id !== '' && $existing_amount !== null && abs($existing_amount - $amount) < 0.00001) {
+  if ($existing_url !== '' && $existing_session_id !== '' && $existing_amount !== null && abs($existing_amount - $amount) < STRIPE_CHECKOUT_AMOUNT_EPSILON) {
     return $existing_url;
   }
 
@@ -250,7 +252,7 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_POST => true,
     CURLOPT_POSTFIELDS => http_build_query($payload, '', '&', PHP_QUERY_RFC3986),
-    CURLOPT_TIMEOUT => 20,
+    CURLOPT_TIMEOUT => STRIPE_API_TIMEOUT_SECONDS,
     CURLOPT_HTTPHEADER => [
       'Authorization: Bearer ' . $secret_key,
       'Content-Type: application/x-www-form-urlencoded',
@@ -754,6 +756,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $inv_no = $post_invoice_number !== '' ? $post_invoice_number
         : invoice_generate_number($post_source_quote_id);
 
+      // Any invoice edit invalidates the old Stripe checkout session so the next email sends a fresh hosted payment link.
       $upd = $pdo->prepare(
         "UPDATE quotes
             SET customer_name     = ?,
