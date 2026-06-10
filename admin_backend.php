@@ -216,6 +216,17 @@ if ($section === 'dashboard') {
            ar.created_at AS occurred_at
          FROM app_requests ar
          LEFT JOIN users u ON u.id = ar.requested_by
+
+         UNION ALL
+
+         SELECT
+           'Page View' AS kind,
+           COALESCE(u.username, CONCAT('User #', pv.user_id)) AS actor,
+           CONCAT('Viewed ', pv.page) AS details,
+           pv.viewed_at AS occurred_at
+         FROM page_views pv
+         LEFT JOIN users u ON u.id = pv.user_id
+         WHERE pv.viewed_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
        ) activity
        ORDER BY occurred_at DESC
        LIMIT 8"
