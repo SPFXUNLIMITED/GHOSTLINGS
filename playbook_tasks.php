@@ -14,10 +14,12 @@ $project = $stmt->fetch();
 if (!$project) { http_response_code(404); exit('Playbook not found'); }
 
 $stmt = $pdo->prepare("
-  SELECT t.*, COUNT(u.id) AS upload_count, usr.username AS assigned_username
+  SELECT t.*, COUNT(DISTINCT u.id) AS upload_count, usr.username AS assigned_username,
+         COUNT(DISTINCT tc.id) AS comment_count
   FROM tasks t
   LEFT JOIN task_uploads u ON u.task_id = t.id
   LEFT JOIN users usr ON usr.id = t.assigned_to
+  LEFT JOIN task_comments tc ON tc.task_id = t.id
   WHERE t.project_id = ?
   GROUP BY t.id
   ORDER BY FIELD(t.priority, 'critical', 'high', 'medium', 'low'), FIELD(t.status, 'todo', 'doing', 'done')
@@ -88,6 +90,7 @@ render_header('Playbook Tasks');
           <td><?= $t['details'] ?? '' ?></td>
           <td>
             <div class="actions">
+              <a class="btn" href="playbook_task_view.php?id=<?= (int)$t['id'] ?>">Comments (<?= (int)($t['comment_count'] ?? 0) ?>)</a>
               <a class="btn" href="playbook_task_form.php?project_id=<?= (int)$project_id ?>&id=<?= (int)$t['id'] ?>">Edit</a>
               <a class="btn danger"
                  href="task_delete.php?project_id=<?= (int)$project_id ?>&id=<?= (int)$t['id'] ?>&return_to=playbook_tasks"
