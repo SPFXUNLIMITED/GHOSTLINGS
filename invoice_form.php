@@ -12,7 +12,7 @@ const INVOICE_DEFAULT_COST = '0.00';
 const INVOICE_DEFAULT_MARKUP = '20.00';
 const INVOICE_DEFAULT_PRICE = '0.00';
 const INVOICE_MIN_QTY = 0.01;
-const STRIPE_CHECKOUT_AMOUNT_EPSILON = 0.00001;
+const STRIPE_AMOUNT_TOLERANCE = 0.00001;
 const STRIPE_API_TIMEOUT_SECONDS = 20;
 
 // ---------- CSRF ----------
@@ -167,6 +167,19 @@ function invoice_sender_profile(PDO $pdo, ?int $created_by): array {
   return $profile;
 }
 
+function invoice_has_valid_checkout_session(array $quote, float $amount): bool {
+  $existing_url = trim((string)($quote['stripe_checkout_url'] ?? ''));
+  $existing_session_id = trim((string)($quote['stripe_checkout_session_id'] ?? ''));
+  $existing_amount = isset($quote['stripe_checkout_amount'])
+    ? round((float)$quote['stripe_checkout_amount'], 2)
+    : null;
+
+  return $existing_url !== ''
+    && $existing_session_id !== ''
+    && $existing_amount !== null
+    && abs($existing_amount - $amount) < STRIPE_AMOUNT_TOLERANCE;
+}
+
 function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_message = null): string {
   $error_message = null;
   if (!invoice_online_payment_enabled($quote)) {
@@ -185,13 +198,8 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
     return '';
   }
 
-  $existing_url = trim((string)($quote['stripe_checkout_url'] ?? ''));
-  $existing_session_id = trim((string)($quote['stripe_checkout_session_id'] ?? ''));
-  $existing_amount = isset($quote['stripe_checkout_amount'])
-    ? round((float)$quote['stripe_checkout_amount'], 2)
-    : null;
-  if ($existing_url !== '' && $existing_session_id !== '' && $existing_amount !== null && abs($existing_amount - $amount) < STRIPE_CHECKOUT_AMOUNT_EPSILON) {
-    return $existing_url;
+  if (invoice_has_valid_checkout_session($quote, $amount)) {
+    return trim((string)($quote['stripe_checkout_url'] ?? ''));
   }
 
   if (!function_exists('curl_init')) {
@@ -756,7 +764,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $inv_no = $post_invoice_number !== '' ? $post_invoice_number
         : invoice_generate_number($post_source_quote_id);
 
-      // Any invoice edit invalidates the old Stripe checkout session so the next email sends a fresh hosted payment link.
+      // Any invoice edit invalidates the old Stripe checkout session to prevent Stripe amount mismatches after invoice updates.
       $upd = $pdo->prepare(
         "UPDATE quotes
             SET customer_name     = ?,
