@@ -16,10 +16,14 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 if (empty($_SESSION['admin_backend_csrf'])) {
   $_SESSION['admin_backend_csrf'] = bin2hex(random_bytes(24));
 }
+if (empty($_SESSION['app_request_tracker_csrf'])) {
+  $_SESSION['app_request_tracker_csrf'] = bin2hex(random_bytes(24));
+}
 
 $allowed_sections = [
   'dashboard',
   'users',
+  'bug_reports',
   'time_reports',
   'canned_responses',
   'integrations',
@@ -38,6 +42,10 @@ $cr_success = '';
 $cr_errors  = [];
 $integrations_success = '';
 $integrations_errors = [];
+$users_errors = [];
+$users_success = '';
+$bug_errors = [];
+$bug_success = '';
 $hubspot_token_is_set = false;
 $hubspot_token_updated_at = '';
 
@@ -124,6 +132,187 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'integrations') {
         $integrations_errors[] = 'Unable to save token right now. Please try again. If this continues, check server error logs.';
       }
     }
+  }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'users') {
+  $users_action = (string)($_POST['action'] ?? '');
+
+  // ADD USER
+  if ($users_action === 'add') {
+    $new_username  = trim($_POST['new_username'] ?? '');
+    $new_password  = (string)($_POST['new_password'] ?? '');
+    $new_password2 = (string)($_POST['new_password2'] ?? '');
+    $new_role      = (string)($_POST['new_role'] ?? 'user');
+    if (!in_array($new_role, ['admin','moderator','user'], true)) $new_role = 'user';
+    $new_is_admin  = ($new_role === 'admin') ? 1 : 0;
+
+    if ($new_username === '') {
+      $users_errors[] = 'Username is required.';
+    } elseif (strlen($new_username) > 64) {
+      $users_errors[] = 'Username must be 64 characters or fewer.';
+    } elseif (!preg_match('/^[A-Za-z0-9][A-Za-z0-9_.\-]*[A-Za-z0-9]$|^[A-Za-z0-9]$/', $new_username)
+              || str_contains($new_username, '..')) {
+      $users_errors[] = 'Username may only contain letters, numbers, underscores, hyphens, and dots; it must start and end with a letter or number and must not contain consecutive dots.';
+    } elseif (strlen($new_password) < 6) {
+      $users_errors[] = 'Password must be at least 6 characters.';
+    } elseif ($new_password !== $new_password2) {
+      $users_errors[] = 'Passwords do not match.';
+    } else {
+      $ck = $pdo->prepare("SELECT id FROM users WHERE username = ? LIMIT 1");
+      $ck->execute([$new_username]);
+      if ($ck->fetch()) {
+        $users_errors[] = 'That username is already taken.';
+      } else {
+        $hash = password_hash($new_password, PASSWORD_DEFAULT);
+        $ins  = $pdo->prepare("INSERT INTO users (username, password_hash, is_admin, role, email_verified) VALUES (?, ?, ?, ?, 1)");
+        $ins->execute([$new_username, $hash, $new_is_admin, $new_role]);
+        $users_success = 'User "' . htmlspecialchars($new_username, ENT_QUOTES, 'UTF-8') . '" created successfully.';
+      }
+    }
+  }
+
+  // CHANGE PASSWORD
+  elseif ($users_action === 'change_password') {
+    $uid = (int)($_POST['uid'] ?? 0);
+    $pw1 = (string)($_POST['password1'] ?? '');
+    $pw2 = (string)($_POST['password2'] ?? '');
+
+    if ($uid <= 0) {
+      $users_errors[] = 'Invalid user.';
+    } elseif (strlen($pw1) < 6) {
+      $users_errors[] = 'Password must be at least 6 characters.';
+    } elseif ($pw1 !== $pw2) {
+      $users_errors[] = 'Passwords do not match.';
+    } else {
+      $hash = password_hash($pw1, PASSWORD_DEFAULT);
+      $upd  = $pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
+      $upd->execute([$hash, $uid]);
+      $users_success = 'Password updated.';
+    }
+  }
+
+  // TOGGLE ADMIN
+  elseif ($users_action === 'toggle_admin') {
+    $uid = (int)($_POST['uid'] ?? 0);
+    if ($uid <= 0) {
+      $users_errors[] = 'Invalid user.';
+    } elseif ($uid === current_user_id()) {
+      $users_errors[] = 'You cannot change your own admin status.';
+    } else {
+      $row = $pdo->prepare("SELECT is_admin, role FROM users WHERE id = ? LIMIT 1");
+      $row->execute([$uid]);
+      $target = $row->fetch();
+      if (!$target) {
+        $users_errors[] = 'User not found.';
+      } else {
+        if ($target['is_admin']) {
+          $new_admin = 0;
+          $new_role  = ($target['role'] === 'moderator') ? 'moderator' : 'user';
+        } else {
+          $new_admin = 1;
+          $new_role  = 'admin';
+        }
+        $pdo->prepare("UPDATE users SET is_admin = ?, role = ? WHERE id = ?")->execute([$new_admin, $new_role, $uid]);
+        $users_success = 'Admin status updated.';
+      }
+    }
+  }
+
+  // SET ROLE
+  elseif ($users_action === 'set_role') {
+    $uid      = (int)($_POST['uid'] ?? 0);
+    $new_role = (string)($_POST['new_role'] ?? '');
+    if ($uid <= 0) {
+      $users_errors[] = 'Invalid user.';
+    } elseif ($uid === current_user_id()) {
+      $users_errors[] = 'You cannot change your own role.';
+    } elseif (!in_array($new_role, ['admin','moderator','user'], true)) {
+      $users_errors[] = 'Invalid role.';
+    } else {
+      $new_is_admin = ($new_role === 'admin') ? 1 : 0;
+      $pdo->prepare("UPDATE users SET role = ?, is_admin = ? WHERE id = ?")->execute([$new_role, $new_is_admin, $uid]);
+      $users_success = 'Role updated to ' . $new_role . '.';
+    }
+  }
+
+  // DELETE USER
+  elseif ($users_action === 'delete') {
+    $uid = (int)($_POST['uid'] ?? 0);
+    if ($uid <= 0) {
+      $users_errors[] = 'Invalid user.';
+    } elseif ($uid === current_user_id()) {
+      $users_errors[] = 'You cannot delete your own account.';
+    } else {
+      $pdo->prepare("UPDATE tasks SET assigned_to = NULL WHERE assigned_to = ?")->execute([$uid]);
+      $pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$uid]);
+      $users_success = 'User deleted.';
+    }
+  }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'bug_reports') {
+  $csrf = (string)($_POST['csrf_token'] ?? '');
+  if (!hash_equals((string)$_SESSION['app_request_tracker_csrf'], $csrf)) {
+    $bug_errors[] = 'Security token mismatch. Please refresh and try again.';
+  } else {
+    $bug_request_id = (int)($_POST['request_id'] ?? 0);
+    $bug_status     = trim((string)($_POST['status'] ?? ''));
+    $bug_admin_notes = trim((string)($_POST['admin_notes'] ?? ''));
+
+    $bug_status_labels = ['new' => 'New', 'in_review' => 'In Review', 'planned' => 'Planned', 'completed' => 'Completed', 'declined' => 'Declined'];
+
+    if ($bug_request_id <= 0) {
+      $bug_errors[] = 'Invalid request.';
+    }
+    if (!isset($bug_status_labels[$bug_status])) {
+      $bug_errors[] = 'Invalid status.';
+    }
+    if (strlen($bug_admin_notes) > 8000) {
+      $bug_errors[] = 'Admin notes must be 8000 characters or fewer.';
+    }
+
+    if (!$bug_errors) {
+      $pdo->prepare(
+        "UPDATE app_requests SET status = ?, admin_notes = ? WHERE id = ?"
+      )->execute([
+        $bug_status,
+        $bug_admin_notes === '' ? null : $bug_admin_notes,
+        $bug_request_id,
+      ]);
+      $_SESSION['app_request_tracker_csrf'] = bin2hex(random_bytes(24));
+      $bug_success = 'Request updated.';
+    }
+  }
+}
+
+$users_list = [];
+if ($section === 'users') {
+  $users_list = $pdo->query("SELECT id, username, email, is_admin, role FROM users ORDER BY id ASC")->fetchAll();
+}
+
+$bug_rows = [];
+if ($section === 'bug_reports') {
+  $bug_rows = $pdo->query(
+    "SELECT ar.id, ar.request_type, ar.request_title, ar.request_details, ar.priority,
+            ar.status, ar.admin_notes, ar.created_at, ar.updated_at,
+            u.username, u.contact_name, u.email
+     FROM app_requests ar
+     JOIN users u ON u.id = ar.requested_by
+     ORDER BY ar.created_at DESC, ar.id DESC"
+  )->fetchAll();
+}
+
+if (!function_exists('excerpt_text')) {
+  function excerpt_text(string $text, int $limit): string {
+    $text = trim($text);
+    if ($limit <= 0 || $text === '') return '';
+    if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+      if (mb_strlen($text, 'UTF-8') <= $limit) return $text;
+      return rtrim(mb_substr($text, 0, $limit, 'UTF-8')) . '…';
+    }
+    if (strlen($text) <= $limit) return $text;
+    return rtrim(substr($text, 0, $limit)) . '…';
   }
 }
 
@@ -413,6 +602,7 @@ if ($section === 'dashboard') {
 $menu = [
   'dashboard' => ['label' => 'Dashboard', 'subtitle' => 'Overview'],
   'users' => ['label' => 'Users', 'subtitle' => 'Accounts & permissions'],
+  'bug_reports' => ['label' => 'Bug Reports', 'subtitle' => 'Bug & change requests'],
   'time_reports' => ['label' => 'Time Reports', 'subtitle' => 'Payroll and hour tracking'],
   'canned_responses' => ['label' => 'Canned Responses', 'subtitle' => 'RFQ quick responses'],
   'integrations' => ['label' => 'Integrations', 'subtitle' => 'API tokens and external services'],
@@ -764,10 +954,241 @@ render_header('Admin Backend');
 
     <?php elseif ($section === 'users'): ?>
 
-      <div class="card admin-placeholder">
-        <h2 style="margin-top:0;">Users</h2>
-        <p class="muted">User management panel placeholder. This section will include account controls and role management.</p>
-        <a class="btn" href="users.php">Open Current Users Page</a>
+      <?php if ($users_errors): ?>
+        <div class="alert error">
+          <ul style="margin:0; padding-left:18px;">
+            <?php foreach ($users_errors as $e): ?><li><?= h($e) ?></li><?php endforeach; ?>
+          </ul>
+        </div>
+      <?php endif; ?>
+
+      <?php if ($users_success): ?>
+        <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">
+          <?= h($users_success) ?>
+        </div>
+      <?php endif; ?>
+
+      <div class="card">
+        <h2 style="margin-top:0;">All Users</h2>
+        <div class="table-wrap">
+          <table class="table-auto">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Username</th>
+                <th>Role</th>
+                <th class="col-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php if (!$users_list): ?>
+                <tr><td colspan="4" class="muted">No users found.</td></tr>
+              <?php endif; ?>
+              <?php foreach ($users_list as $u): ?>
+                <tr>
+                  <td class="muted"><?= (int)$u['id'] ?></td>
+                  <td>
+                    <strong><?= h($u['username']) ?></strong>
+                    <?php if ((int)$u['id'] === current_user_id()): ?>
+                      <span class="badge" style="margin-left:6px;">You</span>
+                    <?php endif; ?>
+                    <?php if (!empty($u['email'])): ?>
+                      <br><span class="muted" style="font-size:12px;"><?= h($u['email']) ?></span>
+                    <?php endif; ?>
+                  </td>
+                  <td>
+                    <?php $role = $u['role'] ?? ($u['is_admin'] ? 'admin' : 'user'); ?>
+                    <?php if ($role === 'admin'): ?>
+                      <span class="badge priority-high">Admin</span>
+                    <?php elseif ($role === 'moderator'): ?>
+                      <span class="badge priority-medium">Moderator</span>
+                    <?php else: ?>
+                      <span class="badge">User</span>
+                    <?php endif; ?>
+                  </td>
+                  <td class="col-actions">
+                    <div class="actions">
+                      <button type="button" class="btn"
+                        onclick="togglePasswordForm(<?= (int)$u['id'] ?>)">
+                        Change Password
+                      </button>
+
+                      <?php if ((int)$u['id'] !== current_user_id()): ?>
+                        <form method="post" style="display:inline;" action="admin_backend.php?section=users">
+                          <input type="hidden" name="action" value="set_role">
+                          <input type="hidden" name="uid" value="<?= (int)$u['id'] ?>">
+                          <select name="new_role" style="width:auto; padding:4px 8px; display:inline-block;">
+                            <option value="user"      <?= ($role === 'user')      ? 'selected' : '' ?>>User</option>
+                            <option value="moderator" <?= ($role === 'moderator') ? 'selected' : '' ?>>Moderator</option>
+                            <option value="admin"     <?= ($role === 'admin')     ? 'selected' : '' ?>>Admin</option>
+                          </select>
+                          <button type="submit" class="btn">Set Role</button>
+                        </form>
+
+                        <form method="post" style="display:inline;" action="admin_backend.php?section=users"
+                          onsubmit="return confirm('Delete user <?= h($u['username']) ?>? This cannot be undone.');">
+                          <input type="hidden" name="action" value="delete">
+                          <input type="hidden" name="uid" value="<?= (int)$u['id'] ?>">
+                          <button type="submit" class="btn danger">Delete</button>
+                        </form>
+                      <?php endif; ?>
+                    </div>
+
+                    <div id="pwform-<?= (int)$u['id'] ?>" style="display:none; margin-top:10px;">
+                      <form method="post" action="admin_backend.php?section=users">
+                        <input type="hidden" name="action" value="change_password">
+                        <input type="hidden" name="uid" value="<?= (int)$u['id'] ?>">
+                        <div class="form-grid" style="max-width:400px;">
+                          <div>
+                            <label>New Password</label>
+                            <input type="password" name="password1" autocomplete="new-password" required minlength="6" />
+                          </div>
+                          <div>
+                            <label>Confirm Password</label>
+                            <input type="password" name="password2" autocomplete="new-password" required minlength="6" />
+                          </div>
+                          <div class="full">
+                            <div class="row" style="margin-top:6px;">
+                              <button type="submit" class="btn primary">Save Password</button>
+                              <button type="button" class="btn"
+                                onclick="togglePasswordForm(<?= (int)$u['id'] ?>)">Cancel</button>
+                            </div>
+                          </div>
+                        </div>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 style="margin-top:0;">Add New User</h2>
+        <form method="post" action="admin_backend.php?section=users" style="max-width:480px;">
+          <input type="hidden" name="action" value="add">
+
+          <label>Username</label>
+          <input type="text" name="new_username" value="<?= h($_POST['new_username'] ?? '') ?>"
+                 autocomplete="off" required maxlength="64" />
+
+          <label>Password</label>
+          <input type="password" name="new_password" autocomplete="new-password" required minlength="6" />
+
+          <label>Confirm Password</label>
+          <input type="password" name="new_password2" autocomplete="new-password" required minlength="6" />
+
+          <label>Role</label>
+          <select name="new_role" style="width:auto; max-width:200px;">
+            <option value="user">User</option>
+            <option value="moderator">Moderator</option>
+            <option value="admin">Admin</option>
+          </select>
+
+          <div class="row" style="margin-top:14px;">
+            <button type="submit" class="btn primary">Create User</button>
+          </div>
+        </form>
+      </div>
+
+      <script>
+      function togglePasswordForm(uid) {
+        var el = document.getElementById('pwform-' + uid);
+        if (el) {
+          el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+      }
+      </script>
+
+    <?php elseif ($section === 'bug_reports'): ?>
+
+      <?php
+        $bug_type_labels = ['bug' => 'Bug', 'software_change' => 'Software Change', 'feature_request' => 'Feature Request'];
+        $bug_priority_labels = ['low' => 'Low', 'medium' => 'Medium', 'high' => 'High'];
+        $bug_status_labels = ['new' => 'New', 'in_review' => 'In Review', 'planned' => 'Planned', 'completed' => 'Completed', 'declined' => 'Declined'];
+      ?>
+
+      <?php if ($bug_errors): ?>
+        <div class="alert error">
+          <ul style="margin:0; padding-left:18px;">
+            <?php foreach ($bug_errors as $e): ?><li><?= h($e) ?></li><?php endforeach; ?>
+          </ul>
+        </div>
+      <?php endif; ?>
+
+      <?php if ($bug_success): ?>
+        <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">
+          <?= h($bug_success) ?>
+        </div>
+      <?php endif; ?>
+
+      <div class="card">
+        <h2 style="margin-top:0;">Bug Reports &amp; Change Requests</h2>
+        <p class="muted" style="margin-bottom:16px;">Review and triage user-submitted bug reports, software changes, and feature requests.</p>
+        <div class="table-wrap" style="overflow-x:auto;">
+          <table class="table-auto" style="min-width:1100px;">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Submitted By</th>
+                <th>Type</th>
+                <th>Priority</th>
+                <th>Title</th>
+                <th>Details</th>
+                <th>Status</th>
+                <th>Admin Notes</th>
+                <th>Created</th>
+                <th>Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php if (!$bug_rows): ?>
+                <tr>
+                  <td colspan="11" class="muted">No bug reports or change requests found.</td>
+                </tr>
+              <?php endif; ?>
+              <?php foreach ($bug_rows as $bug_row): ?>
+                <tr>
+                  <td class="muted"><?= (int)$bug_row['id'] ?></td>
+                  <td>
+                    <strong><?= h($bug_row['contact_name'] ?: $bug_row['username']) ?></strong><br>
+                    <span class="muted"><?= h($bug_row['email']) ?></span>
+                  </td>
+                  <td><?= h($bug_type_labels[$bug_row['request_type']] ?? $bug_row['request_type']) ?></td>
+                  <td><?= h($bug_priority_labels[$bug_row['priority']] ?? $bug_row['priority']) ?></td>
+                  <td style="max-width:220px; white-space:normal;"><?= h($bug_row['request_title']) ?></td>
+                  <td style="max-width:300px; white-space:normal;">
+                    <?= nl2br(h(excerpt_text((string)$bug_row['request_details'], 180))) ?>
+                  </td>
+                  <td><span class="badge <?= h($bug_row['status']) ?>"><?= h($bug_status_labels[$bug_row['status']] ?? $bug_row['status']) ?></span></td>
+                  <td style="max-width:240px; white-space:normal;">
+                    <?= nl2br(h(excerpt_text((string)($bug_row['admin_notes'] ?? ''), 160))) ?>
+                  </td>
+                  <td class="muted" style="white-space:nowrap;"><?= h($bug_row['created_at']) ?></td>
+                  <td class="muted" style="white-space:nowrap;"><?= h($bug_row['updated_at']) ?></td>
+                  <td class="col-actions">
+                    <form method="post" action="admin_backend.php?section=bug_reports" style="display:grid; gap:6px; min-width:220px;">
+                      <input type="hidden" name="csrf_token" value="<?= h($_SESSION['app_request_tracker_csrf']) ?>" />
+                      <input type="hidden" name="request_id" value="<?= (int)$bug_row['id'] ?>" />
+                      <select name="status" required>
+                        <?php foreach ($bug_status_labels as $sv => $sl): ?>
+                          <option value="<?= h($sv) ?>" <?= $bug_row['status'] === $sv ? 'selected' : '' ?>>
+                            <?= h($sl) ?>
+                          </option>
+                        <?php endforeach; ?>
+                      </select>
+                      <textarea name="admin_notes" rows="3" maxlength="8000" placeholder="Optional notes"><?= h((string)($bug_row['admin_notes'] ?? '')) ?></textarea>
+                      <button type="submit" class="btn primary">Update</button>
+                    </form>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
       </div>
 
     <?php elseif ($section === 'time_reports'): ?>
