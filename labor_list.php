@@ -27,7 +27,8 @@ function fmt_labor_rate($value): string {
 function fmt_labor_hours($value): string {
   if ($value === null || $value === '') return '—';
   $n = (float)$value;
-  return $n == (int)$n ? (string)(int)$n . ' hr' : number_format($n, 1) . ' hr';
+  $formatted = $n == (int)$n ? (string)(int)$n : number_format($n, 1);
+  return $formatted . ($n == 1 ? ' hr' : ' hrs');
 }
 
 $q = trim((string)($_GET['q'] ?? ''));
