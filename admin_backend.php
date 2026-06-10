@@ -226,6 +226,7 @@ if ($section === 'dashboard') {
            pv.viewed_at AS occurred_at
          FROM page_views pv
          LEFT JOIN users u ON u.id = pv.user_id
+         WHERE pv.viewed_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
        ) activity
        ORDER BY occurred_at DESC
        LIMIT 8"

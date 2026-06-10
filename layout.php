@@ -457,7 +457,8 @@ function render_header(string $title): void {
 
     try {
       $pv_page = mb_substr(basename((string)($_SERVER['PHP_SELF'] ?? '')), 0, 100);
-      $pv_url  = mb_substr((string)($_SERVER['REQUEST_URI'] ?? ''), 0, 512);
+      $pv_uri  = (string)($_SERVER['REQUEST_URI'] ?? '');
+      $pv_url  = mb_substr(strtok($pv_uri, '?'), 0, 512);
       $pv_stmt = $pdo->prepare("INSERT INTO page_views (user_id, page, url) VALUES (?, ?, ?)");
       $pv_stmt->execute([$user_id, $pv_page, $pv_url]);
     } catch (Throwable $e) {
