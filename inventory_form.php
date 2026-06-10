@@ -48,6 +48,7 @@ foreach ([
   "ALTER TABLE inventory_items ADD COLUMN supplier_3_url VARCHAR(1000) NULL AFTER supplier_3_name",
   "ALTER TABLE inventory_items ADD COLUMN purchased_from VARCHAR(50) NOT NULL DEFAULT '' AFTER supplier_3_url",
   "ALTER TABLE inventory_items ADD COLUMN markup_percent DECIMAL(7,2) NULL AFTER cost_price",
+  "ALTER TABLE inventory_items ADD COLUMN purchase_link VARCHAR(1000) NULL AFTER purchased_from",
 ] as $sql) {
   try {
     $pdo->exec($sql);
@@ -79,6 +80,17 @@ try {
     throw $e;
   }
 }
+
+// Migrate old vendor values to new names.
+$pdo->exec("
+  UPDATE inventory_items
+  SET purchased_from = CASE
+    WHEN purchased_from = 'Alibaba / Wholesale' THEN 'Alibaba'
+    WHEN purchased_from = 'Other' THEN 'Other Supplier'
+    ELSE purchased_from
+  END
+  WHERE purchased_from IN ('Alibaba / Wholesale', 'Other')
+");
 
 function next_inventory_part_number_from_seed(int $seed, array &$used): string {
   $suffix = max(1, $seed);
@@ -235,13 +247,8 @@ $fields = [
   'item_name' => '',
   'description' => '',
   'category' => 'Part',
-  'supplier_1_name' => '',
-  'supplier_1_url' => '',
-  'supplier_2_name' => '',
-  'supplier_2_url' => '',
-  'supplier_3_name' => '',
-  'supplier_3_url' => '',
   'purchased_from' => '',
+  'purchase_link' => '',
   'markup_percent' => '',
   'cost_price' => '',
   'retail_price' => '',
@@ -260,8 +267,7 @@ if ($is_edit) {
   $stmt = $pdo->prepare("
     SELECT
       id, part_number, item_name, description, category,
-      supplier_1_name, supplier_1_url, supplier_2_name, supplier_2_url, supplier_3_name, supplier_3_url,
-      purchased_from, cost_price, markup_percent, retail_price,
+      purchased_from, purchase_link, cost_price, markup_percent, retail_price,
       current_stock, low_stock_alert, location,
       image_original_name, image_stored_name, image_mime_type
     FROM inventory_items
@@ -309,18 +315,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_view) {
     if (!in_array($fields['category'], $categories, true)) {
       $errors[] = 'Category is invalid.';
     }
-    $supplier_urls = [];
-    for ($supplier_number = 1; $supplier_number <= 3; $supplier_number++) {
-      $supplier_name_key = 'supplier_' . $supplier_number . '_name';
-      $supplier_url_key = 'supplier_' . $supplier_number . '_url';
-      if (mb_strlen($fields[$supplier_name_key]) > 255) {
-        $errors[] = 'Supplier ' . $supplier_number . ' name must be 255 characters or fewer.';
-      }
-      $supplier_urls[$supplier_number] = normalize_optional_url($fields[$supplier_url_key], 'Supplier ' . $supplier_number . ' Link', $errors);
-      if ($supplier_urls[$supplier_number] !== '' && $fields[$supplier_name_key] === '') {
-        $errors[] = 'Supplier ' . $supplier_number . ' name is required when a link is provided.';
-      }
-    }
+    $purchase_link_normalized = normalize_optional_url($fields['purchase_link'], 'Purchase Link', $errors);
     if (mb_strlen($fields['location']) > 255) {
       $errors[] = 'Location must be 255 characters or fewer.';
     }
@@ -332,7 +327,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_view) {
       $errors[] = 'Markup % must be a non-negative number with up to 2 decimals.';
       $markup_percent = null;
     }
-    $allowed_vendors = ['Alibaba / Wholesale', 'Amazon', 'Other'];
+    $allowed_vendors = ['Alibaba', 'Amazon', 'Other Supplier'];
     if ($fields['purchased_from'] !== '' && !in_array($fields['purchased_from'], $allowed_vendors, true)) {
       $errors[] = 'Purchased From value is invalid.';
     }
@@ -414,8 +409,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_view) {
         $upd = $pdo->prepare("
           UPDATE inventory_items SET
             item_name = ?, description = ?, category = ?,
-            supplier_1_name = ?, supplier_1_url = ?, supplier_2_name = ?, supplier_2_url = ?, supplier_3_name = ?, supplier_3_url = ?,
-            purchased_from = ?, cost_price = ?, markup_percent = ?, retail_price = ?,
+            purchased_from = ?, purchase_link = ?, cost_price = ?, markup_percent = ?, retail_price = ?,
             current_stock = ?, low_stock_alert = ?, location = ?,
             image_original_name = ?, image_stored_name = ?, image_mime_type = ?
           WHERE id = ?
@@ -424,13 +418,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_view) {
           $fields['item_name'],
           $fields['description'] !== '' ? $fields['description'] : null,
           $fields['category'],
-          $fields['supplier_1_name'],
-          $supplier_urls[1] !== '' ? $supplier_urls[1] : null,
-          $fields['supplier_2_name'],
-          $supplier_urls[2] !== '' ? $supplier_urls[2] : null,
-          $fields['supplier_3_name'],
-          $supplier_urls[3] !== '' ? $supplier_urls[3] : null,
           $fields['purchased_from'] !== '' ? $fields['purchased_from'] : '',
+          $purchase_link_normalized !== '' ? $purchase_link_normalized : null,
           $cost_price,
           $markup_percent,
           $retail_price,
@@ -467,24 +456,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_view) {
           $ins = $pdo->prepare("
             INSERT INTO inventory_items (
               part_number, item_name, description, category,
-              supplier_1_name, supplier_1_url, supplier_2_name, supplier_2_url, supplier_3_name, supplier_3_url,
-              purchased_from, cost_price, markup_percent, retail_price,
+              purchased_from, purchase_link, cost_price, markup_percent, retail_price,
               current_stock, low_stock_alert, location,
               image_original_name, image_stored_name, image_mime_type
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ");
           $ins->execute([
             $placeholder_part_number,
             $fields['item_name'],
             $fields['description'] !== '' ? $fields['description'] : null,
             $fields['category'],
-            $fields['supplier_1_name'],
-            $supplier_urls[1] !== '' ? $supplier_urls[1] : null,
-            $fields['supplier_2_name'],
-            $supplier_urls[2] !== '' ? $supplier_urls[2] : null,
-            $fields['supplier_3_name'],
-            $supplier_urls[3] !== '' ? $supplier_urls[3] : null,
             $fields['purchased_from'] !== '' ? $fields['purchased_from'] : '',
+            $purchase_link_normalized !== '' ? $purchase_link_normalized : null,
             $cost_price,
             $markup_percent,
             $retail_price,
@@ -592,6 +575,16 @@ render_header($page_title);
           <td><?= $fields['purchased_from'] !== '' ? h($fields['purchased_from']) : '—' ?></td>
         </tr>
         <tr>
+          <th>Purchase Link</th>
+          <td>
+            <?php if ($fields['purchase_link'] !== ''): ?>
+              <a href="<?= h($fields['purchase_link']) ?>" target="_blank" rel="noopener noreferrer"><?= h($fields['purchase_link']) ?></a>
+            <?php else: ?>
+              —
+            <?php endif; ?>
+          </td>
+        </tr>
+        <tr>
           <th>Markup %</th>
           <td><?= $fields['markup_percent'] !== '' ? h($fields['markup_percent']) . '%' : '—' ?></td>
         </tr>
@@ -610,26 +603,6 @@ render_header($page_title);
         <tr>
           <th>Location</th>
           <td><?= $fields['location'] !== '' ? h($fields['location']) : '—' ?></td>
-        </tr>
-        <tr>
-          <th>Suppliers</th>
-          <td>
-            <div style="display:grid; gap:8px;">
-              <?php for ($supplier_number = 1; $supplier_number <= 3; $supplier_number++): ?>
-                <?php
-                  $supplier_name = trim((string)($fields['supplier_' . $supplier_number . '_name'] ?? ''));
-                  $supplier_url = trim((string)($fields['supplier_' . $supplier_number . '_url'] ?? ''));
-                ?>
-                <div>
-                  <strong>Supplier <?= $supplier_number ?>:</strong>
-                  <?= $supplier_name !== '' ? h($supplier_name) : '—' ?>
-                  <?php if ($supplier_url !== ''): ?>
-                    &nbsp;<a href="<?= h($supplier_url) ?>" target="_blank" rel="noopener noreferrer">Open Link</a>
-                  <?php endif; ?>
-                </div>
-              <?php endfor; ?>
-            </div>
-          </td>
         </tr>
         <tr>
           <th>Image</th>
@@ -676,41 +649,18 @@ render_header($page_title);
             <?php endforeach; ?>
           </select>
         </div>
-        <div class="full">
-          <label>Suppliers</label>
-        </div>
-        <div>
-          <label>Supplier 1</label>
-          <input type="text" name="supplier_1_name" maxlength="255" value="<?= h($fields['supplier_1_name']) ?>" />
-        </div>
-        <div>
-          <label>Supplier 1 Link</label>
-          <input type="url" name="supplier_1_url" maxlength="1000" placeholder="https://..." value="<?= h($fields['supplier_1_url']) ?>" />
-        </div>
-        <div>
-          <label>Supplier 2</label>
-          <input type="text" name="supplier_2_name" maxlength="255" value="<?= h($fields['supplier_2_name']) ?>" />
-        </div>
-        <div>
-          <label>Supplier 2 Link</label>
-          <input type="url" name="supplier_2_url" maxlength="1000" placeholder="https://..." value="<?= h($fields['supplier_2_url']) ?>" />
-        </div>
-        <div>
-          <label>Supplier 3</label>
-          <input type="text" name="supplier_3_name" maxlength="255" value="<?= h($fields['supplier_3_name']) ?>" />
-        </div>
-        <div>
-          <label>Supplier 3 Link</label>
-          <input type="url" name="supplier_3_url" maxlength="1000" placeholder="https://..." value="<?= h($fields['supplier_3_url']) ?>" />
-        </div>
         <div>
           <label>Purchased From</label>
           <select name="purchased_from" id="purchased_from">
             <option value="" <?= $fields['purchased_from'] === '' ? 'selected' : '' ?>>— Select —</option>
-            <option value="Alibaba / Wholesale" <?= $fields['purchased_from'] === 'Alibaba / Wholesale' ? 'selected' : '' ?>>Alibaba / Wholesale</option>
+            <option value="Alibaba" <?= $fields['purchased_from'] === 'Alibaba' ? 'selected' : '' ?>>Alibaba</option>
             <option value="Amazon" <?= $fields['purchased_from'] === 'Amazon' ? 'selected' : '' ?>>Amazon</option>
-            <option value="Other" <?= $fields['purchased_from'] === 'Other' ? 'selected' : '' ?>>Other</option>
+            <option value="Other Supplier" <?= $fields['purchased_from'] === 'Other Supplier' ? 'selected' : '' ?>>Other Supplier</option>
           </select>
+        </div>
+        <div>
+          <label>Purchase Link</label>
+          <input type="url" name="purchase_link" maxlength="1000" placeholder="https://..." value="<?= h($fields['purchase_link']) ?>" />
         </div>
         <div>
           <label>Markup %</label>
@@ -771,9 +721,9 @@ render_header($page_title);
 <script>
 (function () {
   var vendorMarkups = {
-    'Alibaba / Wholesale': 90,
+    'Alibaba': 90,
     'Amazon': 35,
-    'Other': 50
+    'Other Supplier': 50
   };
 
   var vendorSel   = document.getElementById('purchased_from');
