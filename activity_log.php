@@ -4,13 +4,26 @@ if (isset($pdo) && ($pdo instanceof PDO)) {
   echo '<pre>';
   echo "=== RAW created_at VALUES ===\n\n";
 
+  $allowed_tables = ['app_requests', 'rfq_requests', 'customer_phone_inquiries'];
   $tables = ['app_requests', 'rfq_requests', 'customer_phone_inquiries'];
 
   foreach ($tables as $table) {
-    $stmt = $pdo->query("SELECT id, created_at FROM `$table` ORDER BY created_at DESC LIMIT 5");
-    echo "Table: <b>$table</b>\n";
-    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-      echo "  ID " . $row['id'] . " → " . $row['created_at'] . "\n";
+    if (!in_array($table, $allowed_tables, true)) {
+      continue;
+    }
+
+    echo "Table: <b>" . htmlspecialchars($table, ENT_QUOTES, 'UTF-8') . "</b>\n";
+    try {
+      $stmt = $pdo->query("SELECT id, created_at FROM `$table` ORDER BY created_at DESC LIMIT 5");
+      if ($stmt === false) {
+        echo "  Query failed.\n\n";
+        continue;
+      }
+      while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        echo "  ID " . htmlspecialchars((string)$row['id'], ENT_QUOTES, 'UTF-8') . " → " . htmlspecialchars((string)$row['created_at'], ENT_QUOTES, 'UTF-8') . "\n";
+      }
+    } catch (Throwable $e) {
+      echo "  Query error: " . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . "\n";
     }
     echo "\n";
   }
