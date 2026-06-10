@@ -178,12 +178,8 @@ if ($activity_type_filter !== 'all' && !in_array($activity_type_filter, $activit
   $activity_type_filter = 'all';
 }
 $activity_sort = (string)($_GET['activity_sort'] ?? 'when');
-$activity_sort_map = [
-  'type' => ['asc' => 'kind ASC', 'desc' => 'kind DESC'],
-  'actor' => ['asc' => 'actor ASC', 'desc' => 'actor DESC'],
-  'when' => ['asc' => 'occurred_at ASC', 'desc' => 'occurred_at DESC'],
-];
-if (!isset($activity_sort_map[$activity_sort])) {
+$activity_sort_options = ['type', 'actor', 'when'];
+if (!in_array($activity_sort, $activity_sort_options, true)) {
   $activity_sort = 'when';
 }
 $activity_dir = strtolower((string)($_GET['activity_dir'] ?? 'desc'));
@@ -329,20 +325,44 @@ if ($section === 'dashboard') {
       $recent_activity_page = $activity_total_pages;
     }
     $activity_offset = ($recent_activity_page - 1) * RECENT_ACTIVITY_PER_PAGE;
-    if ($activity_sort === 'type') {
-      $activity_order_sql = $activity_dir === 'asc' ? 'kind ASC' : 'kind DESC';
-    } elseif ($activity_sort === 'actor') {
-      $activity_order_sql = $activity_dir === 'asc' ? 'actor ASC' : 'actor DESC';
-    } else {
-      $activity_order_sql = $activity_dir === 'asc' ? 'occurred_at ASC' : 'occurred_at DESC';
-    }
-    $activity_stmt = $pdo->prepare(
-      "SELECT kind, actor, details, occurred_at
+    if ($activity_sort === 'type' && $activity_dir === 'asc') {
+      $activity_query_sql = "SELECT kind, actor, details, occurred_at
        FROM ({$activity_sql}) activity{$activity_where_sql}
-       ORDER BY {$activity_order_sql}
+       ORDER BY kind ASC
        LIMIT :activity_limit
-       OFFSET :activity_offset"
-    );
+       OFFSET :activity_offset";
+    } elseif ($activity_sort === 'type') {
+      $activity_query_sql = "SELECT kind, actor, details, occurred_at
+       FROM ({$activity_sql}) activity{$activity_where_sql}
+       ORDER BY kind DESC
+       LIMIT :activity_limit
+       OFFSET :activity_offset";
+    } elseif ($activity_sort === 'actor' && $activity_dir === 'asc') {
+      $activity_query_sql = "SELECT kind, actor, details, occurred_at
+       FROM ({$activity_sql}) activity{$activity_where_sql}
+       ORDER BY actor ASC
+       LIMIT :activity_limit
+       OFFSET :activity_offset";
+    } elseif ($activity_sort === 'actor') {
+      $activity_query_sql = "SELECT kind, actor, details, occurred_at
+       FROM ({$activity_sql}) activity{$activity_where_sql}
+       ORDER BY actor DESC
+       LIMIT :activity_limit
+       OFFSET :activity_offset";
+    } elseif ($activity_dir === 'asc') {
+      $activity_query_sql = "SELECT kind, actor, details, occurred_at
+       FROM ({$activity_sql}) activity{$activity_where_sql}
+       ORDER BY occurred_at ASC
+       LIMIT :activity_limit
+       OFFSET :activity_offset";
+    } else {
+      $activity_query_sql = "SELECT kind, actor, details, occurred_at
+       FROM ({$activity_sql}) activity{$activity_where_sql}
+       ORDER BY occurred_at DESC
+       LIMIT :activity_limit
+       OFFSET :activity_offset";
+    }
+    $activity_stmt = $pdo->prepare($activity_query_sql);
     foreach ($activity_params as $name => $value) {
       $activity_stmt->bindValue($name, $value, PDO::PARAM_STR);
     }
