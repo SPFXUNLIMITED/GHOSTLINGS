@@ -993,9 +993,13 @@ render_header('Admin Backend');
       // TEMPORARY DEBUG - Remove after fixing
       echo '<pre>';
       echo "Raw viewed_at values from database:\n";
-      $stmt = $pdo->query("SELECT page, viewed_at FROM page_views ORDER BY viewed_at DESC LIMIT 8");
-      while ($row = $stmt->fetch()) {
-        echo htmlspecialchars($row['page']) . " → " . htmlspecialchars($row['viewed_at']) . "\n";
+      try {
+        $stmt = $pdo->query("SELECT page, viewed_at FROM page_views ORDER BY viewed_at DESC LIMIT 8");
+        while ($row = $stmt->fetch()) {
+          echo htmlspecialchars($row['page']) . " → " . htmlspecialchars($row['viewed_at']) . "\n";
+        }
+      } catch (Throwable $e) {
+        echo "Debug query failed: " . htmlspecialchars($e->getMessage()) . "\n";
       }
       echo '</pre>';
       ?>
