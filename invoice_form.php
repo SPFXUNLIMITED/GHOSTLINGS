@@ -577,7 +577,7 @@ render_header($invoice_heading);
     if (!rows.length) { hideSuggestions(); return; }
     rows.forEach((row) => {
       const rowCompany = row.company_name || '';
-      const rowPhone = row.phone || row.phone_number || '';
+      const rowPhone = row.phone || '';
       const rowEmail = row.email || '';
       const btn = document.createElement('button');
       btn.type = 'button';
