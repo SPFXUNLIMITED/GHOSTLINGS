@@ -1220,7 +1220,18 @@ render_header('Quotes');
             <td><?= h((string)($quote['company_name'] ?: '—')) ?></td>
             <td><?= (int)$quote['line_count'] ?></td>
             <td><strong>$<?= h(quote_format_money($quote['subtotal_amount'])) ?></strong></td>
-            <td><?= h(ucfirst((string)$quote['status'])) ?><?= !empty($quote['converted_invoice_no']) ? ' (' . h((string)$quote['converted_invoice_no']) . ')' : '' ?></td>
+            <?php
+              $row_status = (string)$quote['status'];
+              $row_status_colors = [
+                'draft'     => ['#fef9c3', '#854d0e'],
+                'sent'      => ['#dbeafe', '#1d4ed8'],
+                'converted' => ['#dcfce7', '#166534'],
+              ];
+              [$row_badge_bg, $row_badge_color] = $row_status_colors[$row_status] ?? ['#f1f5f9', '#334155'];
+            ?>
+            <td style="white-space:nowrap;">
+              <span style="display:inline-flex;align-items:center;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;background:<?= h($row_badge_bg) ?>;color:<?= h($row_badge_color) ?>;"><?= h(ucfirst($row_status)) ?></span><?= !empty($quote['converted_invoice_no']) ? ' <span style="font-size:12px;color:#64748b;">(' . h((string)$quote['converted_invoice_no']) . ')</span>' : '' ?>
+            </td>
             <td style="white-space:nowrap;">
               <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote['id'] ?>">View</a>
               <a class="btn" href="quotes.php?edit=<?= (int)$quote['id'] ?>">Edit</a>
