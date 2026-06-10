@@ -12,6 +12,7 @@ $pdo->exec("
   CREATE TABLE IF NOT EXISTS labor_items (
     id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
     service_name    VARCHAR(255) NOT NULL,
+    pricing_type    ENUM('Hourly','Flat Rate') NOT NULL DEFAULT 'Hourly',
     hourly_rate     DECIMAL(12,2) NULL,
     typical_hours   DECIMAL(8,2) NULL,
     category        ENUM('Repair','Maintenance','Training','Travel','Other') NOT NULL DEFAULT 'Repair',
@@ -22,6 +23,11 @@ $pdo->exec("
     KEY idx_labor_service_name (service_name)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+try {
+  $pdo->exec("ALTER TABLE labor_items ADD COLUMN pricing_type ENUM('Hourly','Flat Rate') NOT NULL DEFAULT 'Hourly' AFTER service_name");
+} catch (PDOException $e) {
+  // Column already exists
+}
 
 if (empty($_SESSION['labor_form_csrf'])) {
   $_SESSION['labor_form_csrf'] = bin2hex(random_bytes(24));
@@ -38,6 +44,7 @@ $is_view = $is_edit && (string)($_GET['view'] ?? '') === '1';
 
 $fields = [
   'service_name'  => '',
+  'pricing_type'  => 'Hourly',
   'hourly_rate'   => '',
   'typical_hours' => '',
   'category'      => 'Repair',
@@ -47,7 +54,7 @@ $fields = [
 $errors = [];
 
 if ($is_edit) {
-  $stmt = $pdo->prepare("SELECT id, service_name, hourly_rate, typical_hours, category, description FROM labor_items WHERE id = ? LIMIT 1");
+  $stmt = $pdo->prepare("SELECT id, service_name, pricing_type, hourly_rate, typical_hours, category, description FROM labor_items WHERE id = ? LIMIT 1");
   $stmt->execute([$id]);
   $existing = $stmt->fetch();
   if (!$existing) {
@@ -93,13 +100,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['_delete']) && !$is_v
       $errors[] = 'Service Name must be 255 characters or fewer.';
     }
 
+    if (!in_array($fields['pricing_type'], ['Hourly', 'Flat Rate'], true)) {
+      $fields['pricing_type'] = 'Hourly';
+    }
+
     if ($fields['hourly_rate'] !== '') {
       if (!preg_match('/^\d+(?:\.\d{1,2})?$/', $fields['hourly_rate'])) {
-        $errors[] = 'Hourly Rate must be a non-negative number with up to 2 decimals.';
+        $errors[] = 'Rate must be a non-negative number with up to 2 decimals.';
       }
     }
 
-    if ($fields['typical_hours'] !== '') {
+    if ($fields['pricing_type'] === 'Hourly' && $fields['typical_hours'] !== '') {
       if (!preg_match('/^\d+(?:\.\d{1,2})?$/', $fields['typical_hours'])) {
         $errors[] = 'Typical Hours must be a non-negative number with up to 2 decimals.';
       }
@@ -111,24 +122,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['_delete']) && !$is_v
 
     if (empty($errors)) {
       $hourly_rate   = $fields['hourly_rate']   !== '' ? $fields['hourly_rate']   : null;
-      $typical_hours = $fields['typical_hours'] !== '' ? $fields['typical_hours'] : null;
+      $typical_hours = ($fields['pricing_type'] === 'Hourly' && $fields['typical_hours'] !== '') ? $fields['typical_hours'] : null;
       $description   = $fields['description']   !== '' ? $fields['description']   : null;
 
       if ($is_edit) {
         $stmt = $pdo->prepare("
           UPDATE labor_items
-          SET service_name = ?, hourly_rate = ?, typical_hours = ?, category = ?, description = ?
+          SET service_name = ?, pricing_type = ?, hourly_rate = ?, typical_hours = ?, category = ?, description = ?
           WHERE id = ?
         ");
-        $stmt->execute([$fields['service_name'], $hourly_rate, $typical_hours, $fields['category'], $description, $id]);
+        $stmt->execute([$fields['service_name'], $fields['pricing_type'], $hourly_rate, $typical_hours, $fields['category'], $description, $id]);
         header('Location: labor_list.php?success=updated');
         exit;
       } else {
         $stmt = $pdo->prepare("
-          INSERT INTO labor_items (service_name, hourly_rate, typical_hours, category, description)
-          VALUES (?, ?, ?, ?, ?)
+          INSERT INTO labor_items (service_name, pricing_type, hourly_rate, typical_hours, category, description)
+          VALUES (?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$fields['service_name'], $hourly_rate, $typical_hours, $fields['category'], $description]);
+        $stmt->execute([$fields['service_name'], $fields['pricing_type'], $hourly_rate, $typical_hours, $fields['category'], $description]);
         header('Location: labor_list.php?success=created');
         exit;
       }
@@ -193,7 +204,19 @@ render_header($page_title);
     </div>
 
     <div>
-      <label for="hourly_rate">Hourly Rate ($)</label>
+      <label for="pricing_type">Pricing Type</label>
+      <?php if ($is_view): ?>
+        <div style="padding:10px 0;"><?= h($fields['pricing_type'] ?: 'Hourly') ?></div>
+      <?php else: ?>
+        <select id="pricing_type" name="pricing_type" onchange="toggleTypicalHours()">
+          <option value="Hourly"<?= $fields['pricing_type'] !== 'Flat Rate' ? ' selected' : '' ?>>Hourly</option>
+          <option value="Flat Rate"<?= $fields['pricing_type'] === 'Flat Rate' ? ' selected' : '' ?>>Flat Rate</option>
+        </select>
+      <?php endif; ?>
+    </div>
+
+    <div>
+      <label for="hourly_rate">Rate ($)</label>
       <?php if ($is_view): ?>
         <div style="padding:10px 0;"><?= $fields['hourly_rate'] !== '' ? h('$' . number_format((float)$fields['hourly_rate'], 2)) : '<span class="muted">—</span>' ?></div>
       <?php else: ?>
@@ -201,10 +224,14 @@ render_header($page_title);
       <?php endif; ?>
     </div>
 
-    <div>
+    <div id="typical_hours_row"<?= (!$is_view && $fields['pricing_type'] === 'Flat Rate') ? ' style="display:none;"' : '' ?>>
       <label for="typical_hours">Typical Hours</label>
       <?php if ($is_view): ?>
-        <div style="padding:10px 0;"><?= $fields['typical_hours'] !== '' ? h(number_format((float)$fields['typical_hours'], 2)) : '<span class="muted">—</span>' ?></div>
+        <?php if ($fields['pricing_type'] === 'Flat Rate'): ?>
+          <div style="padding:10px 0;"><span class="muted">—</span></div>
+        <?php else: ?>
+          <div style="padding:10px 0;"><?= $fields['typical_hours'] !== '' ? h(number_format((float)$fields['typical_hours'], 2)) : '<span class="muted">—</span>' ?></div>
+        <?php endif; ?>
       <?php else: ?>
         <input id="typical_hours" type="number" name="typical_hours" step="0.01" min="0" value="<?= h($fields['typical_hours']) ?>" placeholder="e.g. 2.00" />
       <?php endif; ?>
@@ -230,6 +257,15 @@ render_header($page_title);
 
 <?php if (!$is_view): ?>
 </form>
+<script>
+function toggleTypicalHours() {
+  var type = document.getElementById('pricing_type').value;
+  var row = document.getElementById('typical_hours_row');
+  if (row) {
+    row.style.display = type === 'Flat Rate' ? 'none' : '';
+  }
+}
+</script>
 <?php endif; ?>
 
 <?php if ($is_edit && !$is_view): ?>

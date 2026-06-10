@@ -8,6 +8,7 @@ $pdo->exec("
   CREATE TABLE IF NOT EXISTS labor_items (
     id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
     service_name    VARCHAR(255) NOT NULL,
+    pricing_type    ENUM('Hourly','Flat Rate') NOT NULL DEFAULT 'Hourly',
     hourly_rate     DECIMAL(12,2) NULL,
     typical_hours   DECIMAL(8,2) NULL,
     category        ENUM('Repair','Maintenance','Training','Travel','Other') NOT NULL DEFAULT 'Repair',
@@ -18,10 +19,16 @@ $pdo->exec("
     KEY idx_labor_service_name (service_name)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+try {
+  $pdo->exec("ALTER TABLE labor_items ADD COLUMN pricing_type ENUM('Hourly','Flat Rate') NOT NULL DEFAULT 'Hourly' AFTER service_name");
+} catch (PDOException $e) {
+  // Column already exists
+}
 
-function fmt_labor_rate($value): string {
+function fmt_labor_rate($value, string $pricing_type = 'Hourly'): string {
   if ($value === null || $value === '') return '—';
-  return '$' . number_format((float)$value, 2) . '/hr';
+  $formatted = '$' . number_format((float)$value, 2);
+  return $pricing_type === 'Hourly' ? $formatted . '/hr' : $formatted;
 }
 
 function fmt_labor_hours($value): string {
@@ -45,7 +52,7 @@ if ($success_param === 'created') {
 if ($q !== '') {
   $like = '%' . $q . '%';
   $stmt = $pdo->prepare("
-    SELECT id, service_name, hourly_rate, typical_hours, category, description
+    SELECT id, service_name, pricing_type, hourly_rate, typical_hours, category, description
     FROM labor_items
     WHERE service_name LIKE ? OR category LIKE ? OR description LIKE ?
     ORDER BY service_name ASC
@@ -53,7 +60,7 @@ if ($q !== '') {
   $stmt->execute([$like, $like, $like]);
 } else {
   $stmt = $pdo->query("
-    SELECT id, service_name, hourly_rate, typical_hours, category, description
+    SELECT id, service_name, pricing_type, hourly_rate, typical_hours, category, description
     FROM labor_items
     ORDER BY service_name ASC
   ");
@@ -98,22 +105,23 @@ render_header('Labor / Services');
         <tr>
           <th>Service Name</th>
           <th>Category</th>
-          <th>Hourly Rate</th>
+          <th>Pricing Type</th>
+          <th>Rate</th>
           <th>Typical Hours</th>
-          <th>Description</th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody>
         <?php foreach ($items as $item): ?>
+          <?php $ptype = (string)($item['pricing_type'] ?? 'Hourly'); ?>
           <tr>
             <td><strong><?= h((string)$item['service_name']) ?></strong></td>
             <td><?= h((string)$item['category']) ?></td>
-            <td style="white-space:nowrap; font-weight:600;"><?= h(fmt_labor_rate($item['hourly_rate'])) ?></td>
-            <td style="white-space:nowrap;"><?= h(fmt_labor_hours($item['typical_hours'])) ?></td>
-            <td>
-              <?php if (!empty($item['description'])): ?>
-                <span class="muted" style="max-width:320px; display:block; white-space:normal;"><?= nl2br(h((string)$item['description'])) ?></span>
+            <td><?= h($ptype) ?></td>
+            <td style="white-space:nowrap; font-weight:600;"><?= h(fmt_labor_rate($item['hourly_rate'], $ptype)) ?></td>
+            <td style="white-space:nowrap;">
+              <?php if ($ptype === 'Hourly'): ?>
+                <?= h(fmt_labor_hours($item['typical_hours'])) ?>
               <?php else: ?>
                 <span class="muted">—</span>
               <?php endif; ?>
