@@ -213,14 +213,19 @@ function render_attachment_preview(?string $file_url, ?string $display_name, ?st
 function render_pagination(int $current_page, int $total, int $per_page, string $page_param): void {
   $total_pages = max(1, (int)ceil($total / $per_page));
   if ($total_pages <= 1) return;
-  // Preserve only the known pagination params to prevent parameter pollution.
-  $allowed = ['proj_page', 'task_page'];
+  $allowed = ['section', 'proj_page', 'task_page', 'cat_page', 'doc_page', 'activity_page', 'activity_type', 'activity_sort', 'activity_dir'];
   $params = [];
   foreach ($allowed as $key) {
-    if (isset($_GET[$key])) {
-      $params[$key] = (int)$_GET[$key];
+    if (isset($_GET[$key]) && is_scalar($_GET[$key])) {
+      $value = $_GET[$key];
+      if ($key === $page_param || str_ends_with($key, '_page')) {
+        $params[$key] = (string)max(1, (int)$value);
+      } else {
+        $params[$key] = (string)$value;
+      }
     }
   }
+  unset($params[$page_param]);
   ?>
   <div class="pagination">
     <?php if ($current_page > 1): ?>
