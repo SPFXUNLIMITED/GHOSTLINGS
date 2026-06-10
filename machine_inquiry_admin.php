@@ -307,6 +307,8 @@ render_header('Machine Inquiry Admin');
                   <button type="button" class="btn"
                           onclick="openDetail(<?= (int)$inq['id'] ?>)"
                           style="margin-bottom:4px;">View</button>
+                  <a class="btn" href="machine_inquiry_edit.php?id=<?= (int)$inq['id'] ?>"
+                     style="margin-bottom:4px;">Edit</a>
                   <?php if (is_admin()): ?>
                   <form method="post" style="display:inline;" action="machine_inquiry_admin.php?section=inquiries"
                         onsubmit="return confirm('Delete this inquiry? This cannot be undone.')">
