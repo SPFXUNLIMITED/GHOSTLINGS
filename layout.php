@@ -585,12 +585,13 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
   Quick Menu
 </button>
 <aside id="leftQuickAccessPanel" class="left-quick-access-panel" aria-hidden="true">
+  <a class="left-quick-access-link <?= $current === 'customers.php' ? 'active' : '' ?>" href="customers.php">Customers</a>
+  <a class="left-quick-access-link <?= in_array($current, ['vendors.php', 'vendor_form.php', 'vendor_details.php'], true) ? 'active' : '' ?>" href="vendors.php">Vendors</a>
+  <a class="left-quick-access-link <?= in_array($current, ['inventory_list.php', 'inventory_form.php'], true) ? 'active' : '' ?>" href="inventory_list.php">Inventory</a>
+  <a class="left-quick-access-link <?= $current === 'alibaba_responses.php' ? 'active' : '' ?>" href="alibaba_responses.php">Alibaba Responses</a>
   <a class="left-quick-access-link <?= $current === 'quick_order_form.php' ? 'active' : '' ?>" href="quick_order_form.php">Quick Order Form</a>
   <a class="left-quick-access-link <?= $current === 'quick_order_list.php' ? 'active' : '' ?>" href="quick_order_list.php">Quick Order Tracker</a>
-  <a class="left-quick-access-link <?= $current === 'customers.php' ? 'active' : '' ?>" href="customers.php">Customers</a>
-  <a class="left-quick-access-link <?= in_array($current, ['inventory_list.php', 'inventory_form.php'], true) ? 'active' : '' ?>" href="inventory_list.php">Inventory</a>
-  <a class="left-quick-access-link <?= in_array($current, ['vendors.php', 'vendor_form.php', 'vendor_details.php'], true) ? 'active' : '' ?>" href="vendors.php">Vendors</a>
-  <a class="left-quick-access-link <?= $current === 'alibaba_responses.php' ? 'active' : '' ?>" href="alibaba_responses.php">Alibaba Responses</a>
+  <a class="left-quick-access-link <?= $current === 'app_request_form.php' ? 'active' : '' ?>" href="app_request_form.php">Bug Reports</a>
 </aside>
 <?php endif; ?>
 
