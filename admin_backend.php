@@ -814,6 +814,7 @@ $menu = [
 ];
 
 $format_activity_datetime = static function ($value): string {
+  if (empty($value)) return '—';
   $dt = DateTime::createFromFormat('Y-m-d H:i:s', (string)$value, new DateTimeZone('UTC'));
   if ($dt === false) return '—';
   $dt->setTimezone(new DateTimeZone(APP_TZ));
