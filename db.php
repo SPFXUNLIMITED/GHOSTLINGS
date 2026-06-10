@@ -1559,6 +1559,16 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// One-time cleanup: reset page_views rows with impossible timestamps
+$_pv_cleanup_done = $pdo->query(
+  "SELECT setting_val FROM integration_settings WHERE setting_key = 'page_views_ts_cleanup_v1'"
+)->fetchColumn();
+if (!$_pv_cleanup_done) {
+  $pdo->exec("UPDATE page_views SET viewed_at = NOW() WHERE viewed_at > '2026-06-11' OR viewed_at < '2025-01-01'");
+  $pdo->exec("INSERT INTO integration_settings (setting_key, setting_val) VALUES ('page_views_ts_cleanup_v1', '1') ON DUPLICATE KEY UPDATE setting_val = '1'");
+}
+unset($_pv_cleanup_done);
+
 if (!function_exists('log_admin_activity')) {
   function log_admin_activity(PDO $pdo, ?int $user_id, string $action_name, string $details = '', ?string $fallback_user = null): void {
     $safe_user_id = $user_id !== null && $user_id > 0 ? $user_id : null;

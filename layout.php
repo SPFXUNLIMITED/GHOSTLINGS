@@ -468,7 +468,6 @@ function render_header(string $title): void {
       $tz = new DateTimeZone(APP_TZ);
       $now = new DateTime('now', $tz);
 
-      error_log("APP_TZ value = '" . APP_TZ . "' | Current PT time = " . (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Y-m-d H:i:s'));
       $pv_stmt = $pdo->prepare("INSERT INTO page_views (user_id, page, url, viewed_at) VALUES (?, ?, ?, ?)");
       $pv_stmt->execute([$user_id, $pv_page, $pv_url, $now->format('Y-m-d H:i:s')]);
     } catch (Throwable $e) {
