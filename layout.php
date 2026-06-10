@@ -624,6 +624,7 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
   <a class="left-quick-access-link <?= $current === 'quick_order_form.php' ? 'active' : '' ?>" href="quick_order_form.php">Quick Order Form</a>
   <a class="left-quick-access-link <?= $current === 'quick_order_list.php' ? 'active' : '' ?>" href="quick_order_list.php">Quick Order Tracker</a>
   <a class="left-quick-access-link <?= $current === 'app_request_form.php' ? 'active' : '' ?>" href="app_request_form.php">Bug Reports</a>
+  <a class="left-quick-access-link <?= $current === 'app_request_tracker.php' ? 'active' : '' ?>" href="app_request_tracker.php">Bug Tracker</a>
 </aside>
 <?php endif; ?>
 
