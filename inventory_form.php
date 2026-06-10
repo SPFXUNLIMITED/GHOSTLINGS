@@ -714,7 +714,7 @@ render_header($page_title);
         </div>
         <div>
           <label>Markup %</label>
-          <input type="number" name="markup_percent" id="markup_percent" inputmode="decimal" step="0.01" min="0" placeholder="e.g. 90" value="<?= h($fields['markup_percent']) ?>" />
+          <input type="number" name="markup_percent" id="markup_percent" step="0.01" min="0" placeholder="e.g. 90" value="<?= h($fields['markup_percent']) ?>" />
         </div>
         <div>
           <label>Our Cost</label>
@@ -783,11 +783,13 @@ render_header($page_title);
   if (!vendorSel || !markupInput || !costInput || !sellingInput) return;
 
   function recalcSellingPrice() {
-    var cost   = parseFloat(costInput.value.replace(/[^0-9.]/g, ''));
+    var cost   = parseFloat(costInput.value);
     var markup = parseFloat(markupInput.value);
-    if (!isNaN(cost) && !isNaN(markup)) {
+    if (!isNaN(cost) && !isNaN(markup) && cost >= 0 && markup >= 0) {
       var selling = cost * (1 + markup / 100);
       sellingInput.value = selling.toFixed(2);
+    } else {
+      sellingInput.value = '';
     }
   }
 
