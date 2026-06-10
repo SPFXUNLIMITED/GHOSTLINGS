@@ -285,10 +285,32 @@ if ($section === 'dashboard') {
 
       SELECT
         'Quick Order' AS kind,
-        COALESCE(NULLIF(TRIM(customer_name), ''), 'Unknown caller') AS actor,
-        COALESCE(NULLIF(TRIM(company_name), ''), 'Customer inquiry logged') AS details,
-        created_at AS occurred_at
-      FROM customer_phone_inquiries
+        COALESCE(
+          NULLIF(TRIM(u.contact_name), ''),
+          NULLIF(TRIM(u.username), ''),
+          CASE
+            WHEN cpi.created_by IS NOT NULL THEN CONCAT('User #', cpi.created_by)
+            ELSE NULL
+          END,
+          'Unknown user'
+        ) AS actor,
+        CONCAT(
+          'Created Quick Order for ',
+          COALESCE(
+            NULLIF(TRIM(cpi.company_name), ''),
+            NULLIF(TRIM(cpi.customer_name), ''),
+            'Unknown customer'
+          ),
+          CASE
+            WHEN NULLIF(TRIM(cpi.company_name), '') IS NOT NULL
+              AND NULLIF(TRIM(cpi.customer_name), '') IS NOT NULL
+            THEN CONCAT(' (Contact: ', TRIM(cpi.customer_name), ')')
+            ELSE ''
+          END
+        ) AS details,
+        cpi.created_at AS occurred_at
+      FROM customer_phone_inquiries cpi
+      LEFT JOIN users u ON u.id = cpi.created_by
 
       UNION ALL
 
