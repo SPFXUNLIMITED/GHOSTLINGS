@@ -23,7 +23,6 @@ if (empty($_SESSION['app_request_tracker_csrf'])) {
 $allowed_sections = [
   'dashboard',
   'users',
-  'bug_reports',
   'time_reports',
   'canned_responses',
   'integrations',
@@ -44,11 +43,6 @@ $integrations_success = '';
 $integrations_errors = [];
 $users_errors = [];
 $users_success = '';
-$bug_errors = [];
-$bug_success = '';
-$bug_type_labels     = ['bug' => 'Bug', 'software_change' => 'Software Change', 'feature_request' => 'Feature Request'];
-$bug_priority_labels = ['low' => 'Low', 'medium' => 'Medium', 'high' => 'High'];
-$bug_status_labels   = ['new' => 'New', 'in_review' => 'In Review', 'planned' => 'Planned', 'completed' => 'Completed', 'declined' => 'Declined'];
 $hubspot_token_is_set = false;
 $hubspot_token_updated_at = '';
 
@@ -254,54 +248,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'users') {
   }
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'bug_reports') {
-  $csrf = (string)($_POST['csrf_token'] ?? '');
-  if (!hash_equals((string)$_SESSION['app_request_tracker_csrf'], $csrf)) {
-    $bug_errors[] = 'Security token mismatch. Please refresh and try again.';
-  } else {
-    $bug_request_id  = (int)($_POST['request_id'] ?? 0);
-    $bug_status      = trim((string)($_POST['status'] ?? ''));
-    $bug_admin_notes = trim((string)($_POST['admin_notes'] ?? ''));
-
-    if ($bug_request_id <= 0) {
-      $bug_errors[] = 'Invalid request.';
-    }
-    if (!isset($bug_status_labels[$bug_status])) {
-      $bug_errors[] = 'Invalid status.';
-    }
-    if (strlen($bug_admin_notes) > 8000) {
-      $bug_errors[] = 'Admin notes must be 8000 characters or fewer.';
-    }
-
-    if (!$bug_errors) {
-      $pdo->prepare(
-        "UPDATE app_requests SET status = ?, admin_notes = ? WHERE id = ?"
-      )->execute([
-        $bug_status,
-        $bug_admin_notes === '' ? null : $bug_admin_notes,
-        $bug_request_id,
-      ]);
-      $_SESSION['app_request_tracker_csrf'] = bin2hex(random_bytes(24));
-      $bug_success = 'Request updated.';
-    }
-  }
-}
-
 $users_list = [];
 if ($section === 'users') {
   $users_list = $pdo->query("SELECT id, username, email, is_admin, role FROM users ORDER BY id ASC")->fetchAll();
-}
-
-$bug_rows = [];
-if ($section === 'bug_reports') {
-  $bug_rows = $pdo->query(
-    "SELECT ar.id, ar.request_type, ar.request_title, ar.request_details, ar.priority,
-            ar.status, ar.admin_notes, ar.created_at, ar.updated_at,
-            u.username, u.contact_name, u.email
-     FROM app_requests ar
-     JOIN users u ON u.id = ar.requested_by
-     ORDER BY ar.created_at DESC, ar.id DESC"
-  )->fetchAll();
 }
 
 if (!function_exists('excerpt_text')) {
@@ -603,7 +552,6 @@ if ($section === 'dashboard') {
 $menu = [
   'dashboard' => ['label' => 'Dashboard', 'subtitle' => 'Overview'],
   'users' => ['label' => 'Users', 'subtitle' => 'Accounts & permissions'],
-  'bug_reports' => ['label' => 'Bug Reports', 'subtitle' => 'Bug & change requests'],
   'time_reports' => ['label' => 'Time Reports', 'subtitle' => 'Payroll and hour tracking'],
   'canned_responses' => ['label' => 'Canned Responses', 'subtitle' => 'RFQ quick responses'],
   'integrations' => ['label' => 'Integrations', 'subtitle' => 'API tokens and external services'],
@@ -1102,89 +1050,6 @@ render_header('Admin Backend');
         }
       }
       </script>
-
-    <?php elseif ($section === 'bug_reports'): ?>
-
-      <?php if ($bug_errors): ?>
-        <div class="alert error">
-          <ul style="margin:0; padding-left:18px;">
-            <?php foreach ($bug_errors as $e): ?><li><?= h($e) ?></li><?php endforeach; ?>
-          </ul>
-        </div>
-      <?php endif; ?>
-
-      <?php if ($bug_success): ?>
-        <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">
-          <?= h($bug_success) ?>
-        </div>
-      <?php endif; ?>
-
-      <div class="card">
-        <h2 style="margin-top:0;">Bug Reports &amp; Change Requests</h2>
-        <p class="muted" style="margin-bottom:16px;">Review and triage user-submitted bug reports, software changes, and feature requests.</p>
-        <div class="table-wrap" style="overflow-x:auto;">
-          <table class="table-auto" style="min-width:1100px;">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Submitted By</th>
-                <th>Type</th>
-                <th>Priority</th>
-                <th>Title</th>
-                <th>Details</th>
-                <th>Status</th>
-                <th>Admin Notes</th>
-                <th>Created</th>
-                <th>Updated</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php if (!$bug_rows): ?>
-                <tr>
-                  <td colspan="11" class="muted">No bug reports or change requests found.</td>
-                </tr>
-              <?php endif; ?>
-              <?php foreach ($bug_rows as $bug_row): ?>
-                <tr>
-                  <td class="muted"><?= (int)$bug_row['id'] ?></td>
-                  <td>
-                    <strong><?= h($bug_row['contact_name'] ?: $bug_row['username']) ?></strong><br>
-                    <span class="muted"><?= h($bug_row['email']) ?></span>
-                  </td>
-                  <td><?= h($bug_type_labels[$bug_row['request_type']] ?? $bug_row['request_type']) ?></td>
-                  <td><?= h($bug_priority_labels[$bug_row['priority']] ?? $bug_row['priority']) ?></td>
-                  <td style="max-width:220px; white-space:normal;"><?= h($bug_row['request_title']) ?></td>
-                  <td style="max-width:300px; white-space:normal;">
-                    <?= nl2br(h(excerpt_text((string)$bug_row['request_details'], 180))) ?>
-                  </td>
-                  <td><span class="badge <?= h($bug_row['status']) ?>"><?= h($bug_status_labels[$bug_row['status']] ?? $bug_row['status']) ?></span></td>
-                  <td style="max-width:240px; white-space:normal;">
-                    <?= nl2br(h(excerpt_text((string)($bug_row['admin_notes'] ?? ''), 160))) ?>
-                  </td>
-                  <td class="muted" style="white-space:nowrap;"><?= h($bug_row['created_at']) ?></td>
-                  <td class="muted" style="white-space:nowrap;"><?= h($bug_row['updated_at']) ?></td>
-                  <td class="col-actions">
-                    <form method="post" action="admin_backend.php?section=bug_reports" style="display:grid; gap:6px; min-width:220px;">
-                      <input type="hidden" name="csrf_token" value="<?= h($_SESSION['app_request_tracker_csrf']) ?>" />
-                      <input type="hidden" name="request_id" value="<?= (int)$bug_row['id'] ?>" />
-                      <select name="status" required>
-                        <?php foreach ($bug_status_labels as $sv => $sl): ?>
-                          <option value="<?= h($sv) ?>" <?= $bug_row['status'] === $sv ? 'selected' : '' ?>>
-                            <?= h($sl) ?>
-                          </option>
-                        <?php endforeach; ?>
-                      </select>
-                      <textarea name="admin_notes" rows="3" maxlength="8000" placeholder="Optional notes"><?= h((string)($bug_row['admin_notes'] ?? '')) ?></textarea>
-                      <button type="submit" class="btn primary">Update</button>
-                    </form>
-                  </td>
-                </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
-        </div>
-      </div>
 
     <?php elseif ($section === 'time_reports'): ?>
 
