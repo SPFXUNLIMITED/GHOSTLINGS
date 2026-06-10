@@ -163,7 +163,11 @@ if ($section === 'integrations') {
 }
 
 $total_users = 0;
-$total_inquiries = 0;
+$count_phone_inquiries = 0;
+$count_machine_inquiries = 0;
+$count_rfq_requests = 0;
+$count_shipping_rfq = 0;
+$count_app_requests = 0;
 $recent_activity = [];
 
 if ($section === 'dashboard') {
@@ -174,16 +178,29 @@ if ($section === 'dashboard') {
   }
 
   try {
-    $total_inquiries = (int)$pdo->query(
-      'SELECT
-        (SELECT COUNT(*) FROM customer_phone_inquiries)
-      + (SELECT COUNT(*) FROM machine_inquiries)
-      + (SELECT COUNT(*) FROM rfq_requests)
-      + (SELECT COUNT(*) FROM shipping_rfq_requests)
-      + (SELECT COUNT(*) FROM app_requests) AS total_inquiries'
-    )->fetchColumn();
+    $count_phone_inquiries = (int)$pdo->query('SELECT COUNT(*) FROM customer_phone_inquiries')->fetchColumn();
   } catch (Throwable $e) {
-    $total_inquiries = 0;
+    $count_phone_inquiries = 0;
+  }
+  try {
+    $count_machine_inquiries = (int)$pdo->query('SELECT COUNT(*) FROM machine_inquiries')->fetchColumn();
+  } catch (Throwable $e) {
+    $count_machine_inquiries = 0;
+  }
+  try {
+    $count_rfq_requests = (int)$pdo->query('SELECT COUNT(*) FROM rfq_requests')->fetchColumn();
+  } catch (Throwable $e) {
+    $count_rfq_requests = 0;
+  }
+  try {
+    $count_shipping_rfq = (int)$pdo->query('SELECT COUNT(*) FROM shipping_rfq_requests')->fetchColumn();
+  } catch (Throwable $e) {
+    $count_shipping_rfq = 0;
+  }
+  try {
+    $count_app_requests = (int)$pdo->query('SELECT COUNT(*) FROM app_requests')->fetchColumn();
+  } catch (Throwable $e) {
+    $count_app_requests = 0;
   }
 
   try {
@@ -411,8 +428,24 @@ render_header('Admin Backend');
             <div class="stat-label">Total Users</div>
           </div>
           <div class="stat-card">
-            <div class="stat-value"><?= number_format($total_inquiries) ?></div>
-            <div class="stat-label">Total Inquiries</div>
+            <div class="stat-value"><?= number_format($count_phone_inquiries) ?></div>
+            <div class="stat-label">Customer Phone Inquiries</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value"><?= number_format($count_machine_inquiries) ?></div>
+            <div class="stat-label">Machine Inquiries</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value"><?= number_format($count_rfq_requests) ?></div>
+            <div class="stat-label">RFQ Requests</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value"><?= number_format($count_shipping_rfq) ?></div>
+            <div class="stat-label">Shipping RFQ Requests</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value"><?= number_format($count_app_requests) ?></div>
+            <div class="stat-label">App Requests</div>
           </div>
           <div class="stat-card">
             <div class="stat-value"><?= number_format(count($recent_activity)) ?></div>
