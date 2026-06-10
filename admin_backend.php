@@ -989,20 +989,6 @@ render_header('Admin Backend');
 
   <main class="admin-main">
     <?php if ($section === 'dashboard'): ?>
-      <?php
-      // TEMPORARY DEBUG - Remove after fixing
-      echo '<pre>';
-      echo "Raw viewed_at values from database:\n";
-      try {
-        $stmt = $pdo->query("SELECT page, viewed_at FROM page_views ORDER BY viewed_at DESC LIMIT 8");
-        while ($row = $stmt->fetch()) {
-          echo htmlspecialchars($row['page']) . " → " . htmlspecialchars($row['viewed_at']) . "\n";
-        }
-      } catch (Throwable $e) {
-        echo "Debug query failed: " . htmlspecialchars($e->getMessage()) . "\n";
-      }
-      echo '</pre>';
-      ?>
       <div class="card">
         <h2 style="margin-top:0;">Dashboard Overview</h2>
         <p class="muted">High-level visibility into team activity and incoming requests.</p>
