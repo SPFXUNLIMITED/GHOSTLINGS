@@ -140,7 +140,14 @@ function time_report_query(PDO $pdo, DateTimeZone $tz,
       CASE
         WHEN te.hours_override IS NOT NULL THEN te.hours_override
         WHEN te.clock_out IS NOT NULL
-          THEN ROUND(TIMESTAMPDIFF(SECOND, te.clock_in, te.clock_out) / 3600, 2)
+          THEN ROUND((
+            TIMESTAMPDIFF(SECOND, te.clock_in, te.clock_out) -
+            CASE
+              WHEN te.lunch_start IS NOT NULL
+                THEN GREATEST(TIMESTAMPDIFF(SECOND, te.lunch_start, COALESCE(te.lunch_end, te.clock_out)), 0)
+              ELSE 0
+            END
+          ) / 3600, 2)
         ELSE NULL
       END AS hours
     FROM time_entries te
@@ -214,7 +221,14 @@ $stmt = $pdo->prepare("
     CASE
       WHEN hours_override IS NOT NULL THEN hours_override
       WHEN clock_out IS NOT NULL
-        THEN ROUND(TIMESTAMPDIFF(SECOND, clock_in, clock_out) / 3600, 2)
+        THEN ROUND((
+          TIMESTAMPDIFF(SECOND, clock_in, clock_out) -
+          CASE
+            WHEN lunch_start IS NOT NULL
+              THEN GREATEST(TIMESTAMPDIFF(SECOND, lunch_start, COALESCE(lunch_end, clock_out)), 0)
+            ELSE 0
+          END
+        ) / 3600, 2)
       ELSE 0
     END
   ), 0)
@@ -230,7 +244,14 @@ $stmt2 = $pdo->prepare("
     CASE
       WHEN hours_override IS NOT NULL THEN hours_override
       WHEN clock_out IS NOT NULL
-        THEN ROUND(TIMESTAMPDIFF(SECOND, clock_in, clock_out) / 3600, 2)
+        THEN ROUND((
+          TIMESTAMPDIFF(SECOND, clock_in, clock_out) -
+          CASE
+            WHEN lunch_start IS NOT NULL
+              THEN GREATEST(TIMESTAMPDIFF(SECOND, lunch_start, COALESCE(lunch_end, clock_out)), 0)
+            ELSE 0
+          END
+        ) / 3600, 2)
       ELSE 0
     END
   ), 0)

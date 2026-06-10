@@ -901,133 +901,46 @@ function render_footer(): void {
   <script src="sort.js?v=<?= urlencode((string)filemtime(__DIR__ . '/sort.js')) ?>"></script>
 
 <?php if ($is_logged_in): ?>
-  <!-- Idle-timeout notifications (hidden by default) -->
-  <div id="idle-warning" style="
-    display:none; position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
-    background:#fefce8; border:1px solid #ca8a04; color:#713f12;
-    padding:14px 20px; border-radius:8px; z-index:9999;
-    box-shadow:0 4px 12px rgba(0,0,0,.15); max-width:420px; width:90%; text-align:center;
-    font-size:14px; line-height:1.5;">
-    <strong>Idle warning:</strong> You will be automatically clocked out in
-    <strong id="idle-countdown">5:00</strong> due to inactivity.<br>
-    <span style="font-size:12px; color:#92400e;">Move your mouse or press a key to stay clocked in.</span>
-  </div>
-
-  <div id="idle-clocked-out" style="
-    display:none; position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
-    background:#fef2f2; border:1px solid #dc2626; color:#7f1d1d;
-    padding:14px 20px; border-radius:8px; z-index:9999;
-    box-shadow:0 4px 12px rgba(0,0,0,.15); max-width:420px; width:90%; text-align:center;
-    font-size:14px; line-height:1.5;">
-    <strong>Auto clocked out.</strong> You were clocked out after 30 minutes of inactivity.<br>
-    <a href="time_clock.php" style="color:#dc2626; font-weight:600;">Go to Time Clock →</a>
-  </div>
-
   <script>
   (function () {
-    var IDLE_MS  = 30 * 60 * 1000; // 30 minutes → auto clock-out
-    var WARN_MS  = 25 * 60 * 1000; // 25 minutes → show warning
-    var WARN_DUR = (IDLE_MS - WARN_MS) / 1000; // countdown length in seconds
+    var IDLE_MS = 30 * 60 * 1000;
+    var idleTimer = null;
+    var isIdle = false;
 
-    var idleTimer    = null;
-    var warnTimer    = null;
-    var countdownInt = null;
-    var warned       = false;
-
-    function resetTimer() {
-      clearTimeout(idleTimer);
-      clearTimeout(warnTimer);
-      if (warned) {
-        hideWarning();
-        warned = false;
-      }
-      warnTimer = setTimeout(showWarning, WARN_MS);
-      idleTimer = setTimeout(autoClockOut, IDLE_MS);
-    }
-
-    function playWarningSound() {
-      try {
-        var ctx = new (window.AudioContext || window.webkitAudioContext)();
-        var resumePromise = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
-        resumePromise.then(function () {
-          var osc = ctx.createOscillator();
-          var gain = ctx.createGain();
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(880, ctx.currentTime);
-          gain.gain.setValueAtTime(0.4, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 3);
-          osc.start(ctx.currentTime);
-          osc.stop(ctx.currentTime + 3);
-        }).catch(function () { /* audio not supported */ });
-      } catch (e) { /* audio not supported */ }
-    }
-
-    function showWarning() {
-      warned = true;
-      var el = document.getElementById('idle-warning');
-      if (el) el.style.display = 'block';
-      playWarningSound();
-      startCountdown();
-    }
-
-    function hideWarning() {
-      clearInterval(countdownInt);
-      var el = document.getElementById('idle-warning');
-      if (el) el.style.display = 'none';
-    }
-
-    function startCountdown() {
-      var remaining = WARN_DUR;
-      updateCountdown(remaining);
-      countdownInt = setInterval(function () {
-        remaining -= 1;
-        if (remaining <= 0) {
-          clearInterval(countdownInt);
-          return;
-        }
-        updateCountdown(remaining);
-      }, 1000);
-    }
-
-    function updateCountdown(secs) {
-      var el = document.getElementById('idle-countdown');
-      if (!el) return;
-      var m = Math.floor(secs / 60);
-      var s = secs % 60;
-      el.textContent = m + ':' + (s < 10 ? '0' : '') + s;
-    }
-
-    function autoClockOut() {
-      clearInterval(countdownInt);
+    function postIdleState(state) {
+      var body = new URLSearchParams();
+      body.append('state', state);
       fetch('idle_clockout.php', {
         method: 'POST',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-      })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        hideWarning();
-        if (data.clocked_out) {
-          var el = document.getElementById('idle-clocked-out');
-          if (el) el.style.display = 'block';
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: body
+      }).catch(function () { /* ignore transient network errors */ });
+    }
+
+    function scheduleIdleTimer() {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(function () {
+        if (isIdle) {
+          return;
         }
-      })
-      .catch(function () {
-        hideWarning();
-        var el = document.getElementById('idle-clocked-out');
-        if (el) {
-          el.innerHTML = '<strong>Auto clock-out failed.</strong> Please <a href="time_clock.php" style="color:#dc2626; font-weight:600;">visit Time Clock</a> to clock out manually.';
-          el.style.display = 'block';
-        }
-      });
+        isIdle = true;
+        postIdleState('idle');
+      }, IDLE_MS);
+    }
+
+    function resetTimer() {
+      if (isIdle) {
+        isIdle = false;
+        postIdleState('active');
+      }
+      scheduleIdleTimer();
     }
 
     ['mousemove', 'keydown', 'mousedown', 'scroll', 'touchstart'].forEach(function (ev) {
       document.addEventListener(ev, resetTimer, true);
     });
 
-    resetTimer();
+    scheduleIdleTimer();
 
     // Session keep-alive: ping the server every 10 minutes so the PHP session
     // does not expire while the browser remains open, including hidden tabs.

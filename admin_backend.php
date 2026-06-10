@@ -172,7 +172,7 @@ $count_app_requests = 0;
 $recent_activity = [];
 $recent_activity_total = 0;
 $recent_activity_page = 1;
-$activity_type_options = ['Time Entry', 'Quick Order', 'App Request', 'Page View'];
+$activity_type_options = ['Attendance', 'Time Entry', 'Quick Order', 'App Request', 'Page View'];
 $activity_type_filter = (string)($_GET['activity_type'] ?? 'all');
 if ($activity_type_filter !== 'all' && !in_array($activity_type_filter, $activity_type_options, true)) {
   $activity_type_filter = 'all';
@@ -299,6 +299,17 @@ if ($section === 'dashboard') {
         ar.created_at AS occurred_at
       FROM app_requests ar
       LEFT JOIN users u ON u.id = ar.requested_by
+
+      UNION ALL
+
+      SELECT
+        'Attendance' AS kind,
+        COALESCE(NULLIF(TRIM(u.username), ''), NULLIF(TRIM(aal.user_label), ''), CONCAT('User #', aal.user_id)) AS actor,
+        COALESCE(NULLIF(TRIM(aal.details), ''), 'Attendance activity recorded') AS details,
+        aal.created_at AS occurred_at
+      FROM admin_activity_log aal
+      LEFT JOIN users u ON u.id = aal.user_id
+      WHERE aal.action_name = 'Attendance'
 
       UNION ALL
 
