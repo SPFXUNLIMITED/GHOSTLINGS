@@ -42,6 +42,8 @@ foreach ([
   "ALTER TABLE inventory_items ADD COLUMN supplier_2_url VARCHAR(1000) NULL AFTER supplier_2_name",
   "ALTER TABLE inventory_items ADD COLUMN supplier_3_name VARCHAR(255) NOT NULL DEFAULT '' AFTER supplier_2_url",
   "ALTER TABLE inventory_items ADD COLUMN supplier_3_url VARCHAR(1000) NULL AFTER supplier_3_name",
+  "ALTER TABLE inventory_items ADD COLUMN purchased_from VARCHAR(50) NOT NULL DEFAULT '' AFTER supplier_3_url",
+  "ALTER TABLE inventory_items ADD COLUMN purchase_link VARCHAR(1000) NULL AFTER purchased_from",
 ] as $sql) {
   try {
     $pdo->exec($sql);
@@ -73,6 +75,17 @@ try {
     throw $e;
   }
 }
+
+// Migrate old vendor values to new names.
+$pdo->exec("
+  UPDATE inventory_items
+  SET purchased_from = CASE
+    WHEN purchased_from = 'Alibaba / Wholesale' THEN 'Alibaba'
+    WHEN purchased_from = 'Other' THEN 'Other Supplier'
+    ELSE purchased_from
+  END
+  WHERE purchased_from IN ('Alibaba / Wholesale', 'Other')
+");
 
 function next_inventory_part_number_from_seed(int $seed, array &$used): string {
   $suffix = max(1, $seed);
@@ -158,7 +171,7 @@ if ($q !== '') {
   $stmt = $pdo->prepare("
     SELECT
       id, part_number, item_name, description, category,
-      supplier_1_name, supplier_1_url, supplier_2_name, supplier_2_url, supplier_3_name, supplier_3_url,
+      purchased_from, purchase_link,
       cost_price, retail_price,
       current_stock, low_stock_alert, location,
       image_original_name, image_stored_name, image_mime_type
@@ -166,18 +179,16 @@ if ($q !== '') {
     WHERE part_number LIKE ?
        OR item_name LIKE ?
        OR category LIKE ?
-       OR supplier_1_name LIKE ?
-       OR supplier_2_name LIKE ?
-       OR supplier_3_name LIKE ?
+       OR purchased_from LIKE ?
        OR location LIKE ?
     ORDER BY item_name ASC, id DESC
   ");
-  $stmt->execute([$like, $like, $like, $like, $like, $like, $like]);
+  $stmt->execute([$like, $like, $like, $like, $like]);
 } else {
   $stmt = $pdo->query("
     SELECT
       id, part_number, item_name, description, category,
-      supplier_1_name, supplier_1_url, supplier_2_name, supplier_2_url, supplier_3_name, supplier_3_url,
+      purchased_from, purchase_link,
       cost_price, retail_price,
       current_stock, low_stock_alert, location,
       image_original_name, image_stored_name, image_mime_type
@@ -307,7 +318,7 @@ render_header('Inventory List');
 
 <div class="card">
   <form method="get" action="inventory_list.php" class="row" style="margin-bottom:4px;">
-    <input type="text" name="q" value="<?= h($q) ?>" placeholder="Search by part #, name, category, suppliers, or location…" style="max-width:420px;" />
+    <input type="text" name="q" value="<?= h($q) ?>" placeholder="Search by part #, name, category, supplier, or location…" style="max-width:420px;" />
     <button type="submit" class="btn">Search</button>
     <?php if ($q !== ''): ?><a class="btn" href="inventory_list.php">Clear</a><?php endif; ?>
   </form>
@@ -325,7 +336,7 @@ render_header('Inventory List');
         <th>Image</th>
         <th>Part # / Name</th>
         <th>Category</th>
-        <th>Suppliers</th>
+        <th>Purchased From</th>
         <th>Our Cost</th>
         <th>Selling Price</th>
         <th>Stock</th>
@@ -366,23 +377,15 @@ render_header('Inventory List');
           <td><?= h((string)$item['category']) ?></td>
           <td>
             <?php
-              $supplier_rows = [];
-              for ($supplier_number = 1; $supplier_number <= 3; $supplier_number++) {
-                $supplier_name = trim((string)($item['supplier_' . $supplier_number . '_name'] ?? ''));
-                $supplier_url = trim((string)($item['supplier_' . $supplier_number . '_url'] ?? ''));
-                if ($supplier_name === '' && $supplier_url === '') {
-                  continue;
-                }
-                if ($supplier_url !== '') {
-                  $supplier_label = $supplier_name !== '' ? $supplier_name : $supplier_url;
-                  $supplier_rows[] = '<a href="' . h($supplier_url) . '" target="_blank" rel="noopener noreferrer">' . h($supplier_label) . '</a>';
-                } else {
-                  $supplier_rows[] = h($supplier_name);
-                }
-              }
+              $pf = trim((string)($item['purchased_from'] ?? ''));
+              $pl = trim((string)($item['purchase_link'] ?? ''));
             ?>
-            <?php if ($supplier_rows): ?>
-              <?= implode('<br />', $supplier_rows) ?>
+            <?php if ($pf !== ''): ?>
+              <?php if ($pl !== ''): ?>
+                <a href="<?= h($pl) ?>" target="_blank" rel="noopener noreferrer"><?= h($pf) ?></a>
+              <?php else: ?>
+                <?= h($pf) ?>
+              <?php endif; ?>
             <?php else: ?>
               <span class="muted">—</span>
             <?php endif; ?>
