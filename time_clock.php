@@ -10,6 +10,9 @@ $errors = [];
 $success = '';
 $today = (new DateTime('now', $tz))->format('Y-m-d');
 $week_start = (new DateTime('monday this week', $tz))->format('Y-m-d');
+$idle_session_key = defined('ATTENDANCE_IDLE_SESSION_KEY')
+  ? ATTENDANCE_IDLE_SESSION_KEY
+  : 'attendance_idle_logged';
 
 $load_open_entry = static function () use ($pdo, $uid) {
   $stmt = $pdo->prepare("
@@ -65,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         INSERT INTO time_entries (user_id, clock_in)
         VALUES (?, ?)
       ")->execute([$uid, $now]);
-      unset($_SESSION[ATTENDANCE_IDLE_SESSION_KEY]);
+      unset($_SESSION[$idle_session_key]);
       $success = 'Clocked in at ' . $now_obj->format('g:i A') . '.';
     }
   } elseif ($action === 'start_lunch') {
@@ -112,7 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $params[] = (int)$open_entry['id'];
       $params[] = $uid;
       $pdo->prepare($sql)->execute($params);
-      unset($_SESSION[ATTENDANCE_IDLE_SESSION_KEY]);
+      unset($_SESSION[$idle_session_key]);
       $success = 'Clocked out at ' . $now_obj->format('g:i A') . '.';
     }
   }

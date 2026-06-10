@@ -343,6 +343,10 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+if (!defined('MYSQL_DUPLICATE_COLUMN_ERROR')) {
+  define('MYSQL_DUPLICATE_COLUMN_ERROR', '42S21');
+}
+
 foreach ([
   "ALTER TABLE time_entries ADD COLUMN lunch_start DATETIME NULL DEFAULT NULL",
   "ALTER TABLE time_entries ADD COLUMN lunch_end DATETIME NULL DEFAULT NULL",
@@ -350,7 +354,7 @@ foreach ([
   try {
     $pdo->exec($sql);
   } catch (PDOException $e) {
-    if ($e->getCode() !== '42S21') {
+    if ($e->getCode() !== MYSQL_DUPLICATE_COLUMN_ERROR) {
       throw $e;
     }
   }

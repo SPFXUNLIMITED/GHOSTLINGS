@@ -21,7 +21,9 @@ if (!in_array($state, ['idle', 'active'], true)) {
 $uid = current_user_id();
 $tz = new DateTimeZone('America/Los_Angeles');
 $today = (new DateTime('now', $tz))->format('Y-m-d');
-$session_key = ATTENDANCE_IDLE_SESSION_KEY;
+$session_key = defined('ATTENDANCE_IDLE_SESSION_KEY')
+    ? ATTENDANCE_IDLE_SESSION_KEY
+    : 'attendance_idle_logged';
 $fallback_user = trim((string)($_SESSION['username'] ?? ''));
 
 $stmt = $pdo->prepare("
