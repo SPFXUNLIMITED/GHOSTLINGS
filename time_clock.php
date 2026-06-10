@@ -166,6 +166,9 @@ render_header('Time Clock');
     <span class="muted">Week starts Monday</span>
   </div>
   <p class="muted">Use the buttons below to manage your shift and lunch break.</p>
+  <div style="margin-top:12px; padding:12px 16px; border-radius:6px; background:#f8f9fa; border:1px solid #dee2e6; color:#6c757d; font-size:14px; line-height:1.6;">
+    This page tracks your daily work hours for payroll. Your activity on the website is automatically monitored to help us understand what you're working on. If you are inactive for an extended period, it will be logged in the admin activity report. Please remember to Clock In when you start work, use the lunch buttons, and Clock Out at the end of your day.
+  </div>
 </div>
 
 <?php if ($errors): ?>
