@@ -106,7 +106,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $fields['review'] !== '' ? $fields['review'] : null,
           $id,
         ]);
-        $success = 'Vendor updated.';
+        header("Location: vendors.php");
+        exit;
       } else {
         $pdo->prepare("
           INSERT INTO vendors (company_name, contact_name, email, phone, website, alibaba_store, address, notes, rating, review)
@@ -119,11 +120,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $fields['rating'] !== '' ? (int)$fields['rating'] : null,
           $fields['review'] !== '' ? $fields['review'] : null,
         ]);
-        $id = (int)$pdo->lastInsertId();
-        $is_edit = true;
-        $success = 'Vendor added.';
+        header("Location: vendors.php");
+        exit;
       }
-      $_SESSION['vendor_form_csrf'] = bin2hex(random_bytes(24));
     }
   }
 }
