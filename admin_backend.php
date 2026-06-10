@@ -186,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'payroll_export'
   if (hash_equals((string)$_SESSION['payroll_export_csrf'], $csrf)) {
     $pe_from = trim($_POST['pe_from'] ?? '');
     $pe_to   = trim($_POST['pe_to']   ?? '');
-    $pe_tz   = new DateTimeZone('America/Los_Angeles');
+    $pe_tz   = new DateTimeZone(APP_TZ);
 
     $pe_stmt = $pdo->prepare("
       SELECT u.username,
@@ -242,7 +242,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'payroll_export'
   if (!hash_equals((string)$_SESSION['payroll_export_csrf'], $csrf)) {
     $payroll_save_errors[] = 'Security token mismatch. Please refresh and try again.';
   } else {
-    $pe_tz       = new DateTimeZone('America/Los_Angeles');
+    $pe_tz       = new DateTimeZone(APP_TZ);
     $pe_entry_id = (int)($_POST['entry_id'] ?? 0);
     $pe_uid_save = (int)($_POST['user_id']  ?? 0);
     $pe_ci_raw   = trim($_POST['clock_in']       ?? '');
@@ -424,7 +424,7 @@ if ($section === 'users') {
 }
 
 // ── Payroll Export data ───────────────────────────────────────────────────────
-$pe_tz_obj      = new DateTimeZone('America/Los_Angeles');
+$pe_tz_obj      = new DateTimeZone(APP_TZ);
 $pe_from        = '';
 $pe_to          = '';
 $pe_entries     = [];
@@ -814,10 +814,9 @@ $menu = [
 ];
 
 $format_activity_datetime = static function ($value): string {
-  $ts = strtotime((string)$value);
-  if ($ts === false) return '—';
-  $dt = new DateTime('@' . $ts);
-  $dt->setTimezone(new DateTimeZone('America/Los_Angeles'));
+  $dt = DateTime::createFromFormat('Y-m-d H:i:s', (string)$value, new DateTimeZone('UTC'));
+  if ($dt === false) return '—';
+  $dt->setTimezone(new DateTimeZone(APP_TZ));
   return $dt->format('M j, Y g:i A') . ' PT';
 };
 
