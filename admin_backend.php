@@ -19,11 +19,15 @@ if (empty($_SESSION['admin_backend_csrf'])) {
 if (empty($_SESSION['app_request_tracker_csrf'])) {
   $_SESSION['app_request_tracker_csrf'] = bin2hex(random_bytes(24));
 }
+if (empty($_SESSION['payroll_export_csrf'])) {
+  $_SESSION['payroll_export_csrf'] = bin2hex(random_bytes(24));
+}
 
 $allowed_sections = [
   'dashboard',
   'users',
   'time_reports',
+  'payroll_export',
   'canned_responses',
   'integrations',
   'system_settings',
@@ -129,6 +133,129 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'integrations') {
         $integrations_errors[] = 'Unable to save token right now. Please try again. If this continues, check server error logs.';
       }
     }
+  }
+}
+
+// ── Payroll Export: ADP CSV download (must happen before any output) ──────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'payroll_export'
+    && isset($_POST['export_adp'])) {
+  $csrf = (string)($_POST['payroll_csrf'] ?? '');
+  if (hash_equals((string)$_SESSION['payroll_export_csrf'], $csrf)) {
+    $pe_from = trim($_POST['pe_from'] ?? '');
+    $pe_to   = trim($_POST['pe_to']   ?? '');
+    $pe_tz   = new DateTimeZone('America/Los_Angeles');
+
+    $pe_stmt = $pdo->prepare("
+      SELECT u.username,
+        CASE
+          WHEN te.hours_override IS NOT NULL THEN te.hours_override
+          WHEN te.clock_out IS NOT NULL
+            THEN ROUND((
+              TIMESTAMPDIFF(SECOND, te.clock_in, te.clock_out) -
+              CASE
+                WHEN te.lunch_start IS NOT NULL
+                  THEN GREATEST(TIMESTAMPDIFF(SECOND, te.lunch_start, COALESCE(te.lunch_end, te.clock_out)), 0)
+                ELSE 0
+              END
+            ) / 3600, 4)
+          ELSE NULL
+        END AS hours
+      FROM time_entries te
+      JOIN users u ON u.id = te.user_id
+      WHERE DATE(te.clock_in) >= ? AND DATE(te.clock_in) <= ?
+      ORDER BY u.username ASC, te.clock_in ASC
+    ");
+    $pe_stmt->execute([$pe_from, $pe_to]);
+    $pe_rows = $pe_stmt->fetchAll();
+
+    $pe_by_emp = [];
+    foreach ($pe_rows as $r) {
+      $emp = $r['username'];
+      if (!isset($pe_by_emp[$emp])) {
+        $pe_by_emp[$emp] = 0.0;
+      }
+      if ($r['hours'] !== null) {
+        $pe_by_emp[$emp] += (float)$r['hours'];
+      }
+    }
+
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="payroll_adp_' . date('Ymd') . '.csv"');
+    $fh = fopen('php://output', 'w');
+    fputcsv($fh, ['Employee', 'Regular Hours', 'Pay Period Start', 'Pay Period End']);
+    foreach ($pe_by_emp as $emp => $hrs) {
+      fputcsv($fh, [$emp, number_format($hrs, 2), $pe_from, $pe_to]);
+    }
+    fclose($fh);
+    exit;
+  }
+}
+
+// ── Payroll Export: save edited entry ────────────────────────────────────────
+$payroll_save_errors = [];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'payroll_export'
+    && isset($_POST['pe_save_entry'])) {
+  $csrf = (string)($_POST['payroll_csrf'] ?? '');
+  if (!hash_equals((string)$_SESSION['payroll_export_csrf'], $csrf)) {
+    $payroll_save_errors[] = 'Security token mismatch. Please refresh and try again.';
+  } else {
+    $pe_tz       = new DateTimeZone('America/Los_Angeles');
+    $pe_entry_id = (int)($_POST['entry_id'] ?? 0);
+    $pe_uid_save = (int)($_POST['user_id']  ?? 0);
+    $pe_ci_raw   = trim($_POST['clock_in']       ?? '');
+    $pe_co_raw   = trim($_POST['clock_out']      ?? '');
+    $pe_ho_raw   = trim($_POST['hours_override'] ?? '');
+    $pe_desc     = trim($_POST['description']    ?? '');
+
+    $pe_ci = $pe_ci_raw !== '' ? DateTime::createFromFormat('Y-m-d\TH:i', $pe_ci_raw, $pe_tz) : false;
+    $pe_co = $pe_co_raw !== '' ? DateTime::createFromFormat('Y-m-d\TH:i', $pe_co_raw, $pe_tz) : null;
+    $pe_ho = $pe_ho_raw !== '' ? (float)$pe_ho_raw : null;
+
+    if ($pe_entry_id <= 0)  $payroll_save_errors[] = 'Invalid entry.';
+    if (!$pe_ci)            $payroll_save_errors[] = 'Clock-in date/time is required and must be valid.';
+    if ($pe_uid_save <= 0)  $payroll_save_errors[] = 'Employee is required.';
+
+    if (!$payroll_save_errors) {
+      $pdo->prepare("UPDATE time_entries
+                     SET user_id=?, clock_in=?, clock_out=?, hours_override=?, description=?
+                     WHERE id=?")
+          ->execute([
+            $pe_uid_save,
+            $pe_ci->format('Y-m-d H:i:s'),
+            $pe_co ? $pe_co->format('Y-m-d H:i:s') : null,
+            $pe_ho,
+            $pe_desc ?: null,
+            $pe_entry_id,
+          ]);
+      $_SESSION['payroll_export_csrf'] = bin2hex(random_bytes(24));
+      $qs = http_build_query(array_filter([
+        'section' => 'payroll_export',
+        'pe_from' => $_POST['pe_from'] ?? '',
+        'pe_to'   => $_POST['pe_to']   ?? '',
+      ], fn($v) => $v !== ''));
+      header('Location: admin_backend.php?' . $qs);
+      exit;
+    }
+  }
+}
+
+// ── Payroll Export: delete entry ──────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'payroll_export'
+    && isset($_POST['pe_delete_entry'])) {
+  $csrf = (string)($_POST['payroll_csrf'] ?? '');
+  if (hash_equals((string)$_SESSION['payroll_export_csrf'], $csrf)) {
+    $pe_del_id = (int)($_POST['entry_id'] ?? 0);
+    if ($pe_del_id > 0) {
+      $pdo->prepare("DELETE FROM time_entries WHERE id = ?")->execute([$pe_del_id]);
+    }
+    $_SESSION['payroll_export_csrf'] = bin2hex(random_bytes(24));
+    $qs = http_build_query(array_filter([
+      'section' => 'payroll_export',
+      'pe_from' => $_POST['pe_from'] ?? '',
+      'pe_to'   => $_POST['pe_to']   ?? '',
+    ], fn($v) => $v !== ''));
+    header('Location: admin_backend.php?' . $qs);
+    exit;
   }
 }
 
@@ -251,6 +378,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'users') {
 $users_list = [];
 if ($section === 'users') {
   $users_list = $pdo->query("SELECT id, username, email, is_admin, role FROM users ORDER BY id ASC")->fetchAll();
+}
+
+// ── Payroll Export data ───────────────────────────────────────────────────────
+$pe_tz_obj      = new DateTimeZone('America/Los_Angeles');
+$pe_from        = '';
+$pe_to          = '';
+$pe_entries     = [];
+$pe_by_employee = [];
+$pe_all_users   = [];
+$pe_editing     = null;
+
+if ($section === 'payroll_export') {
+  $pe_default_to   = (new DateTime('now', $pe_tz_obj))->format('Y-m-d');
+  $pe_default_from = (new DateTime('now', $pe_tz_obj))->modify('-13 days')->format('Y-m-d');
+  $pe_from = trim((string)($_GET['pe_from'] ?? $pe_default_from));
+  $pe_to   = trim((string)($_GET['pe_to']   ?? $pe_default_to));
+
+  // Sanitize dates
+  if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $pe_from)) $pe_from = $pe_default_from;
+  if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $pe_to))   $pe_to   = $pe_default_to;
+
+  $pe_all_users = $pdo->query("SELECT id, username FROM users ORDER BY username ASC")->fetchAll();
+
+  $pe_stmt = $pdo->prepare("
+    SELECT
+      te.id,
+      te.user_id,
+      te.clock_in,
+      te.clock_out,
+      te.lunch_start,
+      te.lunch_end,
+      te.hours_override,
+      te.description,
+      u.username,
+      CASE
+        WHEN te.hours_override IS NOT NULL THEN te.hours_override
+        WHEN te.clock_out IS NOT NULL
+          THEN ROUND((
+            TIMESTAMPDIFF(SECOND, te.clock_in, te.clock_out) -
+            CASE
+              WHEN te.lunch_start IS NOT NULL
+                THEN GREATEST(TIMESTAMPDIFF(SECOND, te.lunch_start, COALESCE(te.lunch_end, te.clock_out)), 0)
+              ELSE 0
+            END
+          ) / 3600, 2)
+        ELSE NULL
+      END AS hours
+    FROM time_entries te
+    JOIN users u ON u.id = te.user_id
+    WHERE DATE(te.clock_in) >= ? AND DATE(te.clock_in) <= ?
+    ORDER BY u.username ASC, te.clock_in DESC
+  ");
+  $pe_stmt->execute([$pe_from, $pe_to]);
+  $pe_entries = $pe_stmt->fetchAll();
+
+  foreach ($pe_entries as $r) {
+    $emp = $r['username'];
+    if (!isset($pe_by_employee[$emp])) {
+      $pe_by_employee[$emp] = ['username' => $emp, 'total_hours' => 0.0, 'entries' => 0];
+    }
+    $pe_by_employee[$emp]['entries']++;
+    if ($r['hours'] !== null) {
+      $pe_by_employee[$emp]['total_hours'] += (float)$r['hours'];
+    }
+  }
+
+  // Load entry being edited
+  if (($_GET['pe_action'] ?? '') === 'edit' && isset($_GET['pe_id'])) {
+    $pe_edit_id = (int)$_GET['pe_id'];
+    $pe_stmt2   = $pdo->prepare("SELECT * FROM time_entries WHERE id = ?");
+    $pe_stmt2->execute([$pe_edit_id]);
+    $pe_editing = $pe_stmt2->fetch() ?: null;
+  }
 }
 
 if (!function_exists('excerpt_text')) {
@@ -553,6 +753,7 @@ $menu = [
   'dashboard' => ['label' => 'Dashboard', 'subtitle' => 'Overview'],
   'users' => ['label' => 'Users', 'subtitle' => 'Accounts & permissions'],
   'time_reports' => ['label' => 'Time Reports', 'subtitle' => 'Payroll and hour tracking'],
+  'payroll_export' => ['label' => 'Payroll Export', 'subtitle' => 'Bi-weekly ADP export'],
   'canned_responses' => ['label' => 'Canned Responses', 'subtitle' => 'RFQ quick responses'],
   'integrations' => ['label' => 'Integrations', 'subtitle' => 'API tokens and external services'],
   'system_settings' => ['label' => 'System Settings', 'subtitle' => 'Configuration and controls'],
@@ -1057,6 +1258,286 @@ render_header('Admin Backend');
         <h2 style="margin-top:0;">Time Reports</h2>
         <p class="muted">Time reporting placeholder. This section will host reporting filters, export options, and summaries.</p>
         <a class="btn" href="time_report.php">Open Current Time Reports</a>
+      </div>
+
+    <?php elseif ($section === 'payroll_export'): ?>
+
+      <?php
+        $pe_cancel_url = 'admin_backend.php?' . http_build_query([
+          'section' => 'payroll_export',
+          'pe_from' => $pe_from,
+          'pe_to'   => $pe_to,
+        ]);
+      ?>
+
+      <!-- Date range filter -->
+      <div class="card">
+        <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <div>
+            <h2 style="margin:0;">Payroll Export</h2>
+            <p class="muted" style="margin:4px 0 0;">Review hours for the pay period, make corrections, then export for ADP.</p>
+          </div>
+        </div>
+        <form method="get" style="margin-top:16px; display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+          <input type="hidden" name="section" value="payroll_export" />
+          <div>
+            <label for="pe_from" style="display:block; margin-bottom:4px;">Pay Period Start</label>
+            <input type="date" id="pe_from" name="pe_from" value="<?= h($pe_from) ?>" />
+          </div>
+          <div>
+            <label for="pe_to" style="display:block; margin-bottom:4px;">Pay Period End</label>
+            <input type="date" id="pe_to" name="pe_to" value="<?= h($pe_to) ?>" />
+          </div>
+          <button type="submit" class="btn primary">Apply</button>
+          <a class="btn" href="admin_backend.php?section=payroll_export">Reset (Last 14 Days)</a>
+        </form>
+      </div>
+
+      <!-- Employee summary -->
+      <div class="card">
+        <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+          <div>
+            <h2 style="margin:0;">Hours by Employee</h2>
+            <p class="muted" style="margin:4px 0 0;">
+              <?= h($pe_from) ?> &mdash; <?= h($pe_to) ?>
+              &nbsp;&middot;&nbsp; <?= count($pe_by_employee) ?> employee(s)
+            </p>
+          </div>
+          <!-- Export for ADP button -->
+          <form method="post" action="admin_backend.php?section=payroll_export">
+            <input type="hidden" name="payroll_csrf" value="<?= h($_SESSION['payroll_export_csrf']) ?>" />
+            <input type="hidden" name="export_adp"   value="1" />
+            <input type="hidden" name="pe_from"      value="<?= h($pe_from) ?>" />
+            <input type="hidden" name="pe_to"        value="<?= h($pe_to) ?>" />
+            <button type="submit" class="btn primary">⬇ Export for ADP</button>
+          </form>
+        </div>
+
+        <div class="table-wrap">
+          <table class="table-auto">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Total Hours</th>
+                <th>Entries</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php if (!$pe_by_employee): ?>
+                <tr><td colspan="3" class="muted">No time entries for this pay period.</td></tr>
+              <?php endif; ?>
+              <?php foreach ($pe_by_employee as $emp): ?>
+                <tr>
+                  <td><strong><?= h($emp['username']) ?></strong></td>
+                  <td><?= number_format($emp['total_hours'], 2) ?>h</td>
+                  <td><?= (int)$emp['entries'] ?></td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Edit entry form (shown when pe_action=edit) -->
+      <?php if ($pe_editing && !$payroll_save_errors): ?>
+        <?php
+          $pe_ci_fmt = str_replace(' ', 'T', substr($pe_editing['clock_in'], 0, 16));
+          $pe_co_fmt = $pe_editing['clock_out']
+            ? str_replace(' ', 'T', substr($pe_editing['clock_out'], 0, 16))
+            : '';
+        ?>
+        <div class="card" style="border-color:#93c5fd;">
+          <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h2 style="margin:0;">Edit Time Entry #<?= (int)$pe_editing['id'] ?></h2>
+            <a class="btn" href="<?= h($pe_cancel_url) ?>">Cancel</a>
+          </div>
+          <form method="post" action="admin_backend.php?section=payroll_export">
+            <input type="hidden" name="payroll_csrf" value="<?= h($_SESSION['payroll_export_csrf']) ?>" />
+            <input type="hidden" name="pe_save_entry" value="1" />
+            <input type="hidden" name="entry_id"      value="<?= (int)$pe_editing['id'] ?>" />
+            <input type="hidden" name="pe_from"       value="<?= h($pe_from) ?>" />
+            <input type="hidden" name="pe_to"         value="<?= h($pe_to) ?>" />
+            <div class="form-grid">
+              <div>
+                <label>Employee</label>
+                <select name="user_id">
+                  <?php foreach ($pe_all_users as $pu): ?>
+                    <option value="<?= (int)$pu['id'] ?>"
+                      <?= (int)$pe_editing['user_id'] === (int)$pu['id'] ? 'selected' : '' ?>>
+                      <?= h($pu['username']) ?>
+                    </option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+              <div>
+                <label>Clock In</label>
+                <input type="datetime-local" name="clock_in" value="<?= h($pe_ci_fmt) ?>" required />
+              </div>
+              <div>
+                <label>Clock Out <span class="muted">(leave blank if still open)</span></label>
+                <input type="datetime-local" name="clock_out" value="<?= h($pe_co_fmt) ?>" />
+              </div>
+              <div>
+                <label>Hours Override <span class="muted">(leave blank to use clock times)</span></label>
+                <input type="number" step="0.01" min="0" name="hours_override"
+                       value="<?= $pe_editing['hours_override'] !== null ? h((string)$pe_editing['hours_override']) : '' ?>" />
+              </div>
+              <div class="full">
+                <label>Note</label>
+                <textarea name="description" rows="2"><?= h($pe_editing['description'] ?? '') ?></textarea>
+              </div>
+            </div>
+            <div class="row" style="margin-top:12px; gap:8px;">
+              <button type="submit" class="btn primary">Save Changes</button>
+              <a class="btn" href="<?= h($pe_cancel_url) ?>">Cancel</a>
+            </div>
+          </form>
+        </div>
+      <?php elseif ($pe_editing && $payroll_save_errors): ?>
+        <?php
+          $pe_ci_fmt = str_replace(' ', 'T', substr((string)($_POST['clock_in'] ?? $pe_editing['clock_in']), 0, 16));
+          $pe_co_raw_val = $_POST['clock_out'] ?? ($pe_editing['clock_out'] ? substr($pe_editing['clock_out'], 0, 16) : '');
+          $pe_co_fmt = str_replace(' ', 'T', trim((string)$pe_co_raw_val));
+        ?>
+        <div class="card" style="border-color:#93c5fd;">
+          <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h2 style="margin:0;">Edit Time Entry #<?= (int)$pe_editing['id'] ?></h2>
+            <a class="btn" href="<?= h($pe_cancel_url) ?>">Cancel</a>
+          </div>
+          <div class="alert error" style="margin-bottom:10px;">
+            <ul style="margin:0; padding-left:18px;">
+              <?php foreach ($payroll_save_errors as $pse): ?><li><?= h($pse) ?></li><?php endforeach; ?>
+            </ul>
+          </div>
+          <form method="post" action="admin_backend.php?section=payroll_export">
+            <input type="hidden" name="payroll_csrf" value="<?= h($_SESSION['payroll_export_csrf']) ?>" />
+            <input type="hidden" name="pe_save_entry" value="1" />
+            <input type="hidden" name="entry_id"      value="<?= (int)$pe_editing['id'] ?>" />
+            <input type="hidden" name="pe_from"       value="<?= h($pe_from) ?>" />
+            <input type="hidden" name="pe_to"         value="<?= h($pe_to) ?>" />
+            <div class="form-grid">
+              <div>
+                <label>Employee</label>
+                <select name="user_id">
+                  <?php foreach ($pe_all_users as $pu): ?>
+                    <option value="<?= (int)$pu['id'] ?>"
+                      <?= (int)($_POST['user_id'] ?? $pe_editing['user_id']) === (int)$pu['id'] ? 'selected' : '' ?>>
+                      <?= h($pu['username']) ?>
+                    </option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+              <div>
+                <label>Clock In</label>
+                <input type="datetime-local" name="clock_in" value="<?= h($pe_ci_fmt) ?>" required />
+              </div>
+              <div>
+                <label>Clock Out <span class="muted">(leave blank if still open)</span></label>
+                <input type="datetime-local" name="clock_out" value="<?= h($pe_co_fmt) ?>" />
+              </div>
+              <div>
+                <label>Hours Override <span class="muted">(leave blank to use clock times)</span></label>
+                <input type="number" step="0.01" min="0" name="hours_override"
+                       value="<?= h($_POST['hours_override'] ?? ($pe_editing['hours_override'] !== null ? (string)$pe_editing['hours_override'] : '')) ?>" />
+              </div>
+              <div class="full">
+                <label>Note</label>
+                <textarea name="description" rows="2"><?= h($_POST['description'] ?? ($pe_editing['description'] ?? '')) ?></textarea>
+              </div>
+            </div>
+            <div class="row" style="margin-top:12px; gap:8px;">
+              <button type="submit" class="btn primary">Save Changes</button>
+              <a class="btn" href="<?= h($pe_cancel_url) ?>">Cancel</a>
+            </div>
+          </form>
+        </div>
+      <?php endif; ?>
+
+      <!-- Detailed entries for review -->
+      <div class="card">
+        <h2 style="margin-top:0;">Detailed Entries
+          <span class="muted" style="font-size:14px; font-weight:400; margin-left:8px;"><?= count($pe_entries) ?> entr<?= count($pe_entries) === 1 ? 'y' : 'ies' ?></span>
+        </h2>
+        <p class="muted" style="margin-top:0;">Review each entry below. Use <strong>Edit</strong> to correct mistakes such as incorrect clock-in/out times or manual hours adjustments.</p>
+
+        <div class="table-wrap">
+          <table class="table-auto">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Date</th>
+                <th>Clock In</th>
+                <th>Lunch</th>
+                <th>Clock Out</th>
+                <th>Hours</th>
+                <th>Note</th>
+                <th class="col-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php if (!$pe_entries): ?>
+                <tr><td colspan="8" class="muted">No entries for this pay period.</td></tr>
+              <?php endif; ?>
+              <?php foreach ($pe_entries as $pe_r): ?>
+                <?php
+                  $pe_ci_dt  = new DateTime($pe_r['clock_in'], $pe_tz_obj);
+                  $pe_co_dt  = !empty($pe_r['clock_out']) ? new DateTime($pe_r['clock_out'], $pe_tz_obj) : null;
+                  $pe_lunch  = '<span class="muted">—</span>';
+                  if (!empty($pe_r['lunch_start'])) {
+                    $pe_ls = new DateTime($pe_r['lunch_start'], $pe_tz_obj);
+                    if (!empty($pe_r['lunch_end'])) {
+                      $pe_le = new DateTime($pe_r['lunch_end'], $pe_tz_obj);
+                      $pe_lunch = h($pe_ls->format('g:i A')) . ' – ' . h($pe_le->format('g:i A'));
+                    } else {
+                      $pe_lunch = 'Started ' . h($pe_ls->format('g:i A'));
+                    }
+                  }
+                  $pe_edit_href = 'admin_backend.php?' . http_build_query([
+                    'section'    => 'payroll_export',
+                    'pe_action'  => 'edit',
+                    'pe_id'      => $pe_r['id'],
+                    'pe_from'    => $pe_from,
+                    'pe_to'      => $pe_to,
+                  ]);
+                ?>
+                <tr>
+                  <td><strong><?= h($pe_r['username']) ?></strong></td>
+                  <td><?= h($pe_ci_dt->format('m-d-Y')) ?></td>
+                  <td><?= h($pe_ci_dt->format('g:i A')) ?></td>
+                  <td><?= $pe_lunch ?></td>
+                  <td>
+                    <?php if ($pe_co_dt): ?>
+                      <?= h($pe_co_dt->format('g:i A')) ?>
+                    <?php else: ?>
+                      <span class="badge clocked-in">Open</span>
+                    <?php endif; ?>
+                  </td>
+                  <td>
+                    <?= $pe_r['hours'] !== null
+                      ? number_format((float)$pe_r['hours'], 2) . 'h'
+                      : '<span class="muted">—</span>' ?>
+                  </td>
+                  <td><?= $pe_r['description'] ? h($pe_r['description']) : '<span class="muted">—</span>' ?></td>
+                  <td class="col-actions">
+                    <div class="actions">
+                      <a class="btn" href="<?= h($pe_edit_href) ?>">Edit</a>
+                      <form method="post" style="margin:0;"
+                            action="admin_backend.php?section=payroll_export"
+                            onsubmit="return confirm('Delete this time entry? This cannot be undone.');">
+                        <input type="hidden" name="payroll_csrf"    value="<?= h($_SESSION['payroll_export_csrf']) ?>" />
+                        <input type="hidden" name="pe_delete_entry" value="1" />
+                        <input type="hidden" name="entry_id"        value="<?= (int)$pe_r['id'] ?>" />
+                        <input type="hidden" name="pe_from"         value="<?= h($pe_from) ?>" />
+                        <input type="hidden" name="pe_to"           value="<?= h($pe_to) ?>" />
+                        <button class="btn danger" type="submit">Delete</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
       </div>
 
     <?php elseif ($section === 'system_settings'): ?>
