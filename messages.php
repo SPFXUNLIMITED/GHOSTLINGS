@@ -200,11 +200,11 @@ document.getElementById('msg-form').addEventListener('submit', function () {
   tinymce.triggerSave();
 });
 
-// Scroll message history to bottom on load
-(function () {
+// Scroll message history to bottom on page load and after sending (post-redirect reload)
+window.addEventListener('load', function () {
   var el = document.getElementById('msg-scroll');
   if (el) el.scrollTop = el.scrollHeight;
-})();
+});
 </script>
 
 <?php render_footer(); ?>
