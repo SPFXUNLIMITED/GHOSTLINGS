@@ -91,7 +91,7 @@ render_header('Task Details');
             }
           ?>
         </div>
-        <div><?= nl2br(h((string)($c['body'] ?? ''))) ?></div>
+        <div><?= (string)($c['body'] ?? '') ?></div>
       </div>
     <?php endforeach; ?>
   <?php endif; ?>
