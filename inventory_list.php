@@ -292,7 +292,7 @@ render_header('Inventory List');
 <div class="card page-header">
   <div class="page-header-body">
     <h1>Inventory <span class="muted" style="font-size:0.7em; font-weight:400;">(<?= count($items) ?>)</span></h1>
-    <p class="muted">Track inventory details, pricing tiers, stock alerts, location, and images.</p>
+    <p class="muted">Track inventory details, pricing, stock alerts, location, and images.</p>
   </div>
   <a class="btn primary inventory-add-btn" href="inventory_form.php">Add New Item</a>
 </div>
