@@ -179,9 +179,9 @@ if ($activity_type_filter !== 'all' && !in_array($activity_type_filter, $activit
 }
 $activity_sort = (string)($_GET['activity_sort'] ?? 'when');
 $activity_sort_map = [
-  'type' => 'kind',
-  'actor' => 'actor',
-  'when' => 'occurred_at',
+  'type' => ['asc' => 'kind ASC', 'desc' => 'kind DESC'],
+  'actor' => ['asc' => 'actor ASC', 'desc' => 'actor DESC'],
+  'when' => ['asc' => 'occurred_at ASC', 'desc' => 'occurred_at DESC'],
 ];
 if (!isset($activity_sort_map[$activity_sort])) {
   $activity_sort = 'when';
@@ -220,6 +220,25 @@ $activity_sort_indicator = static function (string $column) use ($activity_sort,
     return '';
   }
   return $activity_dir === 'asc' ? ' ↑' : ' ↓';
+};
+$render_activity_filter = static function () use ($activity_sort, $activity_dir, $activity_type_options, $activity_type_filter): void {
+  ?>
+  <form method="get" action="admin_backend.php" style="display:flex; gap:10px; align-items:end; flex-wrap:wrap;">
+    <input type="hidden" name="section" value="dashboard" />
+    <input type="hidden" name="activity_sort" value="<?= h($activity_sort) ?>" />
+    <input type="hidden" name="activity_dir" value="<?= h($activity_dir) ?>" />
+    <div>
+      <label for="activity_type" style="display:block; margin-bottom:4px;">Type</label>
+      <select id="activity_type" name="activity_type">
+        <option value="all">All</option>
+        <?php foreach ($activity_type_options as $option): ?>
+          <option value="<?= h($option) ?>" <?= $activity_type_filter === $option ? 'selected' : '' ?>><?= h($option) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <button type="submit" class="btn">Filter</button>
+  </form>
+  <?php
 };
 
 if ($section === 'dashboard') {
@@ -299,8 +318,8 @@ if ($section === 'dashboard') {
     $activity_params = [];
     $activity_where_sql = '';
     if ($activity_type_filter !== 'all') {
-      $activity_where_sql = ' WHERE kind = ?';
-      $activity_params[] = $activity_type_filter;
+      $activity_where_sql = ' WHERE kind = :activity_type';
+      $activity_params[':activity_type'] = $activity_type_filter;
     }
     $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM ({$activity_sql}) activity{$activity_where_sql}");
     $count_stmt->execute($activity_params);
@@ -310,15 +329,20 @@ if ($section === 'dashboard') {
       $recent_activity_page = $activity_total_pages;
     }
     $activity_offset = ($recent_activity_page - 1) * RECENT_ACTIVITY_PER_PAGE;
-    $activity_order_sql = $activity_sort_map[$activity_sort] . ' ' . strtoupper($activity_dir);
+    $activity_order_sql = $activity_sort_map[$activity_sort][$activity_dir];
     $activity_stmt = $pdo->prepare(
       "SELECT kind, actor, details, occurred_at
        FROM ({$activity_sql}) activity{$activity_where_sql}
        ORDER BY {$activity_order_sql}
-       LIMIT " . RECENT_ACTIVITY_PER_PAGE . "
-       OFFSET " . $activity_offset
+       LIMIT :activity_limit
+       OFFSET :activity_offset
     );
-    $activity_stmt->execute($activity_params);
+    foreach ($activity_params as $name => $value) {
+      $activity_stmt->bindValue($name, $value, PDO::PARAM_STR);
+    }
+    $activity_stmt->bindValue(':activity_limit', RECENT_ACTIVITY_PER_PAGE, PDO::PARAM_INT);
+    $activity_stmt->bindValue(':activity_offset', $activity_offset, PDO::PARAM_INT);
+    $activity_stmt->execute();
     $recent_activity = $activity_stmt->fetchAll();
   } catch (Throwable $e) {
     $recent_activity = [];
@@ -550,40 +574,12 @@ render_header('Admin Backend');
         <h3 style="margin-top:0;">Recent Activity</h3>
         <?php if (!$recent_activity): ?>
           <div class="admin-recent-toolbar">
-            <form method="get" action="admin_backend.php" style="display:flex; gap:10px; align-items:end; flex-wrap:wrap;">
-              <input type="hidden" name="section" value="dashboard" />
-              <input type="hidden" name="activity_sort" value="<?= h($activity_sort) ?>" />
-              <input type="hidden" name="activity_dir" value="<?= h($activity_dir) ?>" />
-              <div>
-                <label for="activity_type" style="display:block; margin-bottom:4px;">Type</label>
-                <select id="activity_type" name="activity_type">
-                  <option value="all">All</option>
-                  <?php foreach ($activity_type_options as $option): ?>
-                    <option value="<?= h($option) ?>" <?= $activity_type_filter === $option ? 'selected' : '' ?>><?= h($option) ?></option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
-              <button type="submit" class="btn">Filter</button>
-            </form>
+            <?php $render_activity_filter(); ?>
           </div>
           <p class="muted" style="margin:0;"><?= $activity_type_filter === 'all' ? 'No activity has been recorded yet.' : 'No activity matches the selected type.' ?></p>
         <?php else: ?>
           <div class="admin-recent-toolbar">
-            <form method="get" action="admin_backend.php" style="display:flex; gap:10px; align-items:end; flex-wrap:wrap;">
-              <input type="hidden" name="section" value="dashboard" />
-              <input type="hidden" name="activity_sort" value="<?= h($activity_sort) ?>" />
-              <input type="hidden" name="activity_dir" value="<?= h($activity_dir) ?>" />
-              <div>
-                <label for="activity_type" style="display:block; margin-bottom:4px;">Type</label>
-                <select id="activity_type" name="activity_type">
-                  <option value="all">All</option>
-                  <?php foreach ($activity_type_options as $option): ?>
-                    <option value="<?= h($option) ?>" <?= $activity_type_filter === $option ? 'selected' : '' ?>><?= h($option) ?></option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
-              <button type="submit" class="btn">Filter</button>
-            </form>
+            <?php $render_activity_filter(); ?>
             <div class="muted" style="font-size:12px;">
               Showing <?= number_format(count($recent_activity)) ?> of <?= number_format($recent_activity_total) ?> items
             </div>
