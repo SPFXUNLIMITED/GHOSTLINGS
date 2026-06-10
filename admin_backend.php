@@ -288,7 +288,10 @@ if ($section === 'dashboard') {
         COALESCE(
           NULLIF(TRIM(u.contact_name), ''),
           NULLIF(TRIM(u.username), ''),
-          CONCAT('User #', cpi.created_by),
+          CASE
+            WHEN cpi.created_by IS NOT NULL THEN CONCAT('User #', cpi.created_by)
+            ELSE NULL
+          END,
           'Unknown user'
         ) AS actor,
         CONCAT(
