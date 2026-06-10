@@ -1360,7 +1360,7 @@ unset($_quotes_checkout_amount_col);
 $_quotes_emailed_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'invoice_emailed'");
 if ($_quotes_emailed_col === false || $_quotes_emailed_col->fetch(PDO::FETCH_ASSOC) === false) {
   try {
-    $pdo->exec("ALTER TABLE quotes ADD COLUMN invoice_emailed TINYINT(1) NOT NULL DEFAULT 0 AFTER stripe_checkout_amount");
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN invoice_emailed TINYINT(1) NOT NULL DEFAULT 0");
   } catch (Throwable $e) {
     $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'invoice_emailed'");
     if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }

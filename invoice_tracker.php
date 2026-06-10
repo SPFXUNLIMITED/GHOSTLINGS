@@ -359,7 +359,7 @@ render_header('Invoice Tracker');
                       type="checkbox"
                       <?= $online_payment ? 'checked' : '' ?>
                       onchange="this.closest('form').submit()"
-                      aria-label="Online payment enabled"
+                      aria-label="<?= $online_payment ? 'Online payment enabled' : 'Online payment disabled' ?>"
                     />
                     <span class="it-toggle-slider"></span>
                   </label>
@@ -383,7 +383,7 @@ render_header('Invoice Tracker');
                   <button type="submit" class="btn">Email Invoice</button>
                 </form>
 
-                <a class="btn" href="quotes.php?view=id&id=<?= $inv_id ?>">Back to Quote</a>
+                <a class="btn" href="quotes.php?view=id&id=<?= $inv_id ?>">Go back to Quote</a>
 
                 <!-- Delete -->
                 <form method="post" action="invoice_tracker.php" style="display:contents;"
