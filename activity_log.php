@@ -4,17 +4,18 @@ if (isset($pdo) && ($pdo instanceof PDO)) {
   echo '<pre>';
   echo "=== RAW created_at VALUES ===\n\n";
 
-  $allowed_tables = ['app_requests', 'rfq_requests', 'customer_phone_inquiries'];
   $tables = ['app_requests', 'rfq_requests', 'customer_phone_inquiries'];
 
   foreach ($tables as $table) {
-    if (!in_array($table, $allowed_tables, true)) {
-      continue;
-    }
-
     echo "Table: <b>" . htmlspecialchars($table, ENT_QUOTES, 'UTF-8') . "</b>\n";
     try {
-      $stmt = $pdo->query("SELECT id, created_at FROM `$table` ORDER BY created_at DESC LIMIT 5");
+      if ($table === 'app_requests') {
+        $stmt = $pdo->query("SELECT id, created_at FROM app_requests ORDER BY created_at DESC LIMIT 5");
+      } elseif ($table === 'rfq_requests') {
+        $stmt = $pdo->query("SELECT id, created_at FROM rfq_requests ORDER BY created_at DESC LIMIT 5");
+      } else {
+        $stmt = $pdo->query("SELECT id, created_at FROM customer_phone_inquiries ORDER BY created_at DESC LIMIT 5");
+      }
       if ($stmt === false) {
         echo "  Query failed.\n\n";
         continue;
