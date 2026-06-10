@@ -86,6 +86,23 @@ render_header('Vendor Details');
         <td><?= !empty($vendor['notes']) ? nl2br(h($vendor['notes'])) : '<span class="muted">—</span>' ?></td>
       </tr>
       <tr>
+        <th>Internal Rating</th>
+        <td>
+          <?php if (!empty($vendor['rating'])): ?>
+            <span title="<?= (int)$vendor['rating'] ?> out of 5" style="color:#f59e0b; font-size:1.2em; letter-spacing:1px;">
+              <?= str_repeat('★', (int)$vendor['rating']) ?><span style="color:#d1d5db;"><?= str_repeat('★', 5 - (int)$vendor['rating']) ?></span>
+            </span>
+            <span class="muted" style="font-size:0.85em;"> (<?= (int)$vendor['rating'] ?>/5)</span>
+          <?php else: ?>
+            <span class="muted">—</span>
+          <?php endif; ?>
+        </td>
+      </tr>
+      <tr>
+        <th>Internal Review</th>
+        <td><?= !empty($vendor['review']) ? nl2br(h($vendor['review'])) : '<span class="muted">—</span>' ?></td>
+      </tr>
+      <tr>
         <th>Created</th>
         <td><?= !empty($vendor['created_at']) ? h($vendor['created_at']) : '<span class="muted">—</span>' ?></td>
       </tr>

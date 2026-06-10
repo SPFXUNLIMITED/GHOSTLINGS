@@ -26,6 +26,8 @@ $fields = [
   'alibaba_store' => '',
   'address'       => '',
   'notes'         => '',
+  'rating'        => '',
+  'review'        => '',
 ];
 
 // Load existing record for edits
@@ -80,31 +82,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (mb_strlen($fields['address']) > 500) {
       $errors[] = 'Address must be 500 characters or fewer.';
     }
+    if ($fields['rating'] !== '' && (!ctype_digit($fields['rating']) || (int)$fields['rating'] < 1 || (int)$fields['rating'] > 5)) {
+      $errors[] = 'Rating must be a number between 1 and 5.';
+    }
 
     if (!$errors) {
       if ($is_edit) {
         $pdo->prepare("
           UPDATE vendors SET
             company_name = ?, contact_name = ?, email = ?, phone = ?,
-            website = ?, alibaba_store = ?, address = ?, notes = ?
+            website = ?, alibaba_store = ?, address = ?, notes = ?,
+            rating = ?, review = ?
           WHERE id = ?
         ")->execute([
           $fields['company_name'], $fields['contact_name'], $fields['email'],
           $fields['phone'], $fields['website'], $fields['alibaba_store'],
           $fields['address'],
           $fields['notes'] !== '' ? $fields['notes'] : null,
+          $fields['rating'] !== '' ? (int)$fields['rating'] : null,
+          $fields['review'] !== '' ? $fields['review'] : null,
           $id,
         ]);
         $success = 'Vendor updated.';
       } else {
         $pdo->prepare("
-          INSERT INTO vendors (company_name, contact_name, email, phone, website, alibaba_store, address, notes)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO vendors (company_name, contact_name, email, phone, website, alibaba_store, address, notes, rating, review)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ")->execute([
           $fields['company_name'], $fields['contact_name'], $fields['email'],
           $fields['phone'], $fields['website'], $fields['alibaba_store'],
           $fields['address'],
           $fields['notes'] !== '' ? $fields['notes'] : null,
+          $fields['rating'] !== '' ? (int)$fields['rating'] : null,
+          $fields['review'] !== '' ? $fields['review'] : null,
         ]);
         $id = (int)$pdo->lastInsertId();
         $is_edit = true;
@@ -181,6 +191,21 @@ render_header($page_title);
       <div class="full">
         <label>Notes</label>
         <textarea name="notes" rows="4" placeholder="Any additional notes about this vendor…"><?= h($fields['notes']) ?></textarea>
+      </div>
+      <div>
+        <label>Internal Rating</label>
+        <select name="rating">
+          <option value="">— No rating —</option>
+          <?php for ($i = 1; $i <= 5; $i++): ?>
+            <option value="<?= $i ?>"<?= (string)$fields['rating'] === (string)$i ? ' selected' : '' ?>>
+              <?= str_repeat('★', $i) . str_repeat('☆', 5 - $i) ?> (<?= $i ?>)
+            </option>
+          <?php endfor; ?>
+        </select>
+      </div>
+      <div class="full">
+        <label>Internal Review / Notes</label>
+        <textarea name="review" rows="4" placeholder="Internal review or notes about this vendor's performance…"><?= h($fields['review']) ?></textarea>
       </div>
     </div>
 
