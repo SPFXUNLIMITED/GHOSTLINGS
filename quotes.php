@@ -644,6 +644,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
   exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['labor_search'])) {
+  header('Content-Type: application/json; charset=utf-8');
+  $csrf = trim((string)($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
+  if ($csrf === '' || !hash_equals((string)$_SESSION['quotes_csrf'], $csrf)) {
+    http_response_code(403);
+    echo json_encode([]);
+    exit;
+  }
+  $query = trim((string)($_GET['q'] ?? ''));
+  if ($query === '') { echo json_encode([]); exit; }
+  $like = '%' . quote_escape_like($query) . '%';
+  try {
+    $stmt = $pdo->prepare(
+      "SELECT id, service_name, pricing_type, hourly_rate, typical_hours
+       FROM labor_items
+       WHERE service_name LIKE ? ESCAPE '\\\\'
+          OR description LIKE ? ESCAPE '\\\\'
+       ORDER BY service_name ASC
+       LIMIT 8"
+    );
+    $stmt->execute([$like, $like]);
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC), JSON_UNESCAPED_UNICODE);
+  } catch (Throwable $e) {
+    echo json_encode([]);
+  }
+  exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['inventory_search'])) {
+  header('Content-Type: application/json; charset=utf-8');
+  $csrf = trim((string)($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
+  if ($csrf === '' || !hash_equals((string)$_SESSION['quotes_csrf'], $csrf)) {
+    http_response_code(403);
+    echo json_encode([]);
+    exit;
+  }
+  $query = trim((string)($_GET['q'] ?? ''));
+  if ($query === '') { echo json_encode([]); exit; }
+  $like = '%' . quote_escape_like($query) . '%';
+  try {
+    $stmt = $pdo->prepare(
+      "SELECT id, item_name, cost_price, markup_percent
+       FROM inventory_items
+       WHERE item_name LIKE ? ESCAPE '\\\\'
+          OR part_number LIKE ? ESCAPE '\\\\'
+       ORDER BY item_name ASC
+       LIMIT 8"
+    );
+    $stmt->execute([$like, $like]);
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC), JSON_UNESCAPED_UNICODE);
+  } catch (Throwable $e) {
+    echo json_encode([]);
+  }
+  exit;
+}
+
 $errors = [];
 $messages = [];
 $today = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Y-m-d');
@@ -1222,37 +1278,84 @@ render_header('Quotes');
       </div>
     </div>
 
-    <div style="margin-top:16px; overflow-x:auto;">
-      <table style="min-width:900px;" id="lineItemsTable">
-        <thead>
-          <tr>
-            <th>Description</th>
-            <th style="width:100px;">Qty</th>
-            <th style="width:130px;">Cost</th>
-            <th style="width:110px;">Markup %</th>
-            <th style="width:130px;">Price</th>
-            <th style="width:150px;">Line Total</th>
-            <th style="width:90px;">Remove</th>
-          </tr>
-        </thead>
-        <tbody id="lineItemsBody">
-          <?php foreach ($line_items as $row): ?>
-            <tr class="line-item-row">
-              <td><input type="text" name="item_desc[]" maxlength="500" value="<?= h((string)$row['description']) ?>" /></td>
-              <td><input type="number" step="0.01" min="0.01" name="item_qty[]" value="<?= h((string)$row['quantity']) ?>" /></td>
-              <td><input type="number" step="0.01" min="0" name="item_cost[]" value="<?= h((string)$row['cost']) ?>" /></td>
-              <td><input type="number" step="0.01" min="0" name="item_markup[]" value="<?= h((string)$row['markup_percent']) ?>" /></td>
-              <td><input type="number" step="0.01" min="0" name="item_price[]" value="<?= h((string)$row['unit_price']) ?>" readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);" /></td>
-              <td class="line-total" style="white-space:nowrap;">$0.00</td>
-              <td><button type="button" class="btn remove-line">×</button></td>
+    <!-- ── Labor / Services ── -->
+    <div style="margin-top:20px;">
+      <h3 style="margin:0 0 10px;">Labor / Services</h3>
+      <div style="overflow-x:auto;">
+        <table style="min-width:700px;" id="laborItemsTable">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th style="width:100px;">Qty</th>
+              <th style="width:130px;">Cost</th>
+              <th style="width:150px;">Line Total</th>
+              <th style="width:90px;">Remove</th>
             </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
-      <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-        <button type="button" class="btn" id="addLineItem">+ Add Line Item</button>
-        <div><strong>Subtotal: $<span id="quoteSubtotal">0.00</span></strong></div>
+          </thead>
+          <tbody id="laborItemsBody">
+            <tr class="labor-row">
+              <td style="position:relative;">
+                <input type="text" class="item-desc labor-desc" name="item_desc[]" maxlength="500" value="" autocomplete="off" placeholder="Search labor / service…" />
+                <input type="hidden" name="item_markup[]" value="0" />
+                <input type="hidden" name="item_price[]" class="labor-price" value="0.00" />
+                <div class="item-suggestions" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:50; background:#fff; border:1px solid #d1d5db; border-radius:10px; box-shadow:0 12px 24px rgba(2,6,23,.12); margin-top:4px; max-height:200px; overflow:auto;"></div>
+              </td>
+              <td><input type="number" step="0.01" min="0.01" class="labor-qty" name="item_qty[]" value="1" /></td>
+              <td><input type="number" step="0.01" min="0" class="labor-cost" name="item_cost[]" value="0.00" /></td>
+              <td class="labor-line-total" style="white-space:nowrap;">$0.00</td>
+              <td><button type="button" class="btn remove-labor-row">×</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <button type="button" class="btn" id="addLaborRow">+ Add Labor Item</button>
+          <div><strong>Labor Subtotal: $<span id="laborSubtotal">0.00</span></strong></div>
+        </div>
       </div>
+    </div>
+
+    <!-- ── Inventory / Parts ── -->
+    <div style="margin-top:20px;">
+      <h3 style="margin:0 0 10px;">Inventory / Parts</h3>
+      <div style="overflow-x:auto;">
+        <table style="min-width:900px;" id="inventoryItemsTable">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th style="width:100px;">Qty</th>
+              <th style="width:130px;">Cost</th>
+              <th style="width:110px;">Markup %</th>
+              <th style="width:130px;">Price</th>
+              <th style="width:150px;">Line Total</th>
+              <th style="width:90px;">Remove</th>
+            </tr>
+          </thead>
+          <tbody id="inventoryItemsBody">
+            <?php foreach ($line_items as $row): ?>
+              <tr class="inv-row">
+                <td style="position:relative;">
+                  <input type="text" class="item-desc inv-desc" name="item_desc[]" maxlength="500" value="<?= h((string)$row['description']) ?>" autocomplete="off" placeholder="Search inventory / part…" />
+                  <div class="item-suggestions" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:50; background:#fff; border:1px solid #d1d5db; border-radius:10px; box-shadow:0 12px 24px rgba(2,6,23,.12); margin-top:4px; max-height:200px; overflow:auto;"></div>
+                </td>
+                <td><input type="number" step="0.01" min="0.01" class="inv-qty" name="item_qty[]" value="<?= h((string)$row['quantity']) ?>" /></td>
+                <td><input type="number" step="0.01" min="0" class="inv-cost" name="item_cost[]" value="<?= h((string)$row['cost']) ?>" /></td>
+                <td><input type="number" step="0.01" min="0" class="inv-markup" name="item_markup[]" value="<?= h((string)$row['markup_percent']) ?>" /></td>
+                <td><input type="number" step="0.01" min="0" class="inv-price" name="item_price[]" value="<?= h((string)$row['unit_price']) ?>" readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);" /></td>
+                <td class="inv-line-total" style="white-space:nowrap;">$0.00</td>
+                <td><button type="button" class="btn remove-inv-row">×</button></td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+        <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <button type="button" class="btn" id="addInventoryRow">+ Add Inventory Item</button>
+          <div><strong>Parts Subtotal: $<span id="partsSubtotal">0.00</span></strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:10px; text-align:right; font-size:1.05em;">
+      <strong>Grand Total: $<span id="quoteSubtotal">0.00</span></strong>
     </div>
 
     <div style="margin-top:14px;">
@@ -1268,41 +1371,28 @@ render_header('Quotes');
 
   <script>
     (() => {
+      // ── Customer live search ──────────────────────────────────────────
       const customerNameInput = document.getElementById('customer_name');
-      const customerIdInput = document.getElementById('customer_id');
-      const companyInput = document.getElementById('company_name');
-      const phoneInput = document.getElementById('phone_number');
-      const emailInput = document.getElementById('email');
-      const suggestions = document.getElementById('customerSuggestions');
-      let debounceTimer = null;
+      const customerIdInput   = document.getElementById('customer_id');
+      const companyInput      = document.getElementById('company_name');
+      const phoneInput        = document.getElementById('phone_number');
+      const emailInput        = document.getElementById('email');
+      const customerSugg      = document.getElementById('customerSuggestions');
+      let customerDebounce    = null;
 
-      function hideSuggestions() {
-        suggestions.style.display = 'none';
-        suggestions.innerHTML = '';
-      }
+      function hideCustomerSugg() { customerSugg.style.display = 'none'; customerSugg.innerHTML = ''; }
 
-      function renderSuggestions(rows) {
-        suggestions.innerHTML = '';
-        if (!rows.length) {
-          hideSuggestions();
-          return;
-        }
-
+      function renderCustomerSugg(rows) {
+        customerSugg.innerHTML = '';
+        if (!rows.length) { hideCustomerSugg(); return; }
         rows.forEach((row) => {
           const rowCompany = row.company_name || '';
-          const rowPhone = row.phone || '';
-          const rowEmail = row.email || '';
+          const rowPhone   = row.phone        || '';
+          const rowEmail   = row.email        || '';
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'btn';
-          btn.style.display = 'block';
-          btn.style.width = '100%';
-          btn.style.textAlign = 'left';
-          btn.style.borderRadius = '0';
-          btn.style.border = '0';
-          btn.style.borderBottom = '1px solid #e5e7eb';
-          btn.style.background = '#fff';
-          btn.style.padding = '10px 12px';
+          btn.style.cssText = 'display:block;width:100%;text-align:left;border-radius:0;border:0;border-bottom:1px solid #e5e7eb;background:#fff;padding:10px 12px;';
           const title = document.createElement('strong');
           title.textContent = row.customer_name || '';
           btn.appendChild(title);
@@ -1313,112 +1403,292 @@ render_header('Quotes');
           btn.appendChild(meta);
           btn.addEventListener('click', () => {
             customerNameInput.value = row.customer_name || '';
-            customerIdInput.value = row.id || '';
-            companyInput.value = rowCompany;
-            phoneInput.value = rowPhone;
-            emailInput.value = rowEmail;
-            hideSuggestions();
+            customerIdInput.value   = row.id            || '';
+            companyInput.value      = rowCompany;
+            phoneInput.value        = rowPhone;
+            emailInput.value        = rowEmail;
+            hideCustomerSugg();
           });
-          suggestions.appendChild(btn);
+          customerSugg.appendChild(btn);
         });
-
-        suggestions.style.display = 'block';
+        customerSugg.style.display = 'block';
       }
+
+      const csrfToken = '<?= h($_SESSION['quotes_csrf']) ?>';
 
       customerNameInput.addEventListener('input', () => {
         customerIdInput.value = '';
         const q = customerNameInput.value.trim();
-        if (debounceTimer) {
-          clearTimeout(debounceTimer);
-        }
-        if (q.length < 1) {
-          hideSuggestions();
-          return;
-        }
-
-        debounceTimer = setTimeout(() => {
-          const searchUrl = 'quotes.php?customer_search=1&q=' + encodeURIComponent(q);
-          fetch(searchUrl, {
+        if (customerDebounce) clearTimeout(customerDebounce);
+        if (q.length < 1) { hideCustomerSugg(); return; }
+        customerDebounce = setTimeout(() => {
+          fetch('quotes.php?customer_search=1&q=' + encodeURIComponent(q), {
             credentials: 'same-origin',
-            headers: { 'X-CSRF-Token': '<?= h($_SESSION['quotes_csrf']) ?>' }
-          })
-            .then((res) => res.ok ? res.json() : [])
-            .then((rows) => renderSuggestions(Array.isArray(rows) ? rows : []))
-            .catch(() => hideSuggestions());
+            headers: { 'X-CSRF-Token': csrfToken }
+          }).then((r) => r.ok ? r.json() : [])
+            .then((rows) => renderCustomerSugg(Array.isArray(rows) ? rows : []))
+            .catch(() => hideCustomerSugg());
         }, 180);
       });
 
-      document.addEventListener('click', (event) => {
-        if (!event.target.closest('#customerSuggestions') && event.target !== customerNameInput) {
-          hideSuggestions();
-        }
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#customerSuggestions') && e.target !== customerNameInput) hideCustomerSugg();
       });
 
-      const lineItemsBody = document.getElementById('lineItemsBody');
-      const addLineItem = document.getElementById('addLineItem');
-      const subtotalNode = document.getElementById('quoteSubtotal');
+      // ── Shared helpers ────────────────────────────────────────────────
+      function parseNum(v) { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; }
 
-      function parseNumber(value) {
-        const n = parseFloat(value);
-        return Number.isFinite(n) ? n : 0;
+      const laborSubtotalNode = document.getElementById('laborSubtotal');
+      const partsSubtotalNode = document.getElementById('partsSubtotal');
+      const grandTotalNode    = document.getElementById('quoteSubtotal');
+
+      function updateGrandTotal() {
+        grandTotalNode.textContent = (parseNum(laborSubtotalNode.textContent) + parseNum(partsSubtotalNode.textContent)).toFixed(2);
       }
 
-      function computeTotals() {
-        let subtotal = 0;
-        Array.from(lineItemsBody.querySelectorAll('tr.line-item-row')).forEach((row) => {
-          const qtyInput = row.querySelector('input[name="item_qty[]"]');
-          const costInput = row.querySelector('input[name="item_cost[]"]');
-          const markupInput = row.querySelector('input[name="item_markup[]"]');
-          const priceInput = row.querySelector('input[name="item_price[]"]');
-          const lineTotalCell = row.querySelector('.line-total');
-          const cost = parseNumber(costInput?.value);
-          const markup = parseNumber(markupInput?.value);
-          const price = cost * (1 + markup / 100);
-          if (priceInput) { priceInput.value = price.toFixed(2); }
-          const lineTotal = parseNumber(qtyInput?.value) * price;
-          subtotal += lineTotal;
-          lineTotalCell.textContent = '$' + lineTotal.toFixed(2);
-        });
-        subtotalNode.textContent = subtotal.toFixed(2);
+      function makeSuggestDropdown() {
+        return 'display:none; position:absolute; top:100%; left:0; right:0; z-index:50; '
+          + 'background:#fff; border:1px solid #d1d5db; border-radius:10px; '
+          + 'box-shadow:0 12px 24px rgba(2,6,23,.12); margin-top:4px; max-height:200px; overflow:auto;';
       }
 
-      function bindRow(row) {
-        row.querySelectorAll('input').forEach((input) => {
-          input.addEventListener('input', computeTotals);
+      function buildSuggestBtn(mainText, subText) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.style.cssText = 'display:block;width:100%;text-align:left;border-radius:0;border:0;border-bottom:1px solid #e5e7eb;background:#fff;padding:10px 12px;cursor:pointer;';
+        const t = document.createElement('strong');
+        t.textContent = mainText;
+        btn.appendChild(t);
+        if (subText) {
+          const m = document.createElement('div');
+          m.className = 'muted';
+          m.style.marginTop = '3px';
+          m.textContent = subText;
+          btn.appendChild(m);
+        }
+        return btn;
+      }
+
+      // ── Labor section ─────────────────────────────────────────────────
+      const laborBody = document.getElementById('laborItemsBody');
+      const addLaborBtn = document.getElementById('addLaborRow');
+
+      function computeLaborTotals() {
+        let total = 0;
+        laborBody.querySelectorAll('tr.labor-row').forEach((row) => {
+          const qty  = parseNum(row.querySelector('.labor-qty')?.value);
+          const cost = parseNum(row.querySelector('.labor-cost')?.value);
+          const lineTotal = qty * cost;
+          const ltCell = row.querySelector('.labor-line-total');
+          if (ltCell) ltCell.textContent = '$' + lineTotal.toFixed(2);
+          const priceHidden = row.querySelector('.labor-price');
+          if (priceHidden) priceHidden.value = cost.toFixed(2);
+          total += lineTotal;
+        });
+        laborSubtotalNode.textContent = total.toFixed(2);
+        updateGrandTotal();
+      }
+
+      function setupLaborSearch(row) {
+        const descInput = row.querySelector('.labor-desc');
+        const costInput = row.querySelector('.labor-cost');
+        const qtyInput  = row.querySelector('.labor-qty');
+        const suggestBox = row.querySelector('.item-suggestions');
+        let timer = null;
+
+        descInput.addEventListener('input', () => {
+          const q = descInput.value.trim();
+          if (timer) clearTimeout(timer);
+          if (q.length < 1) { suggestBox.style.display = 'none'; suggestBox.innerHTML = ''; return; }
+          timer = setTimeout(() => {
+            fetch('quotes.php?labor_search=1&q=' + encodeURIComponent(q), {
+              credentials: 'same-origin',
+              headers: { 'X-CSRF-Token': csrfToken }
+            }).then((r) => r.ok ? r.json() : []).then((items) => {
+              suggestBox.innerHTML = '';
+              if (!items.length) { suggestBox.style.display = 'none'; return; }
+              items.forEach((item) => {
+                const rate = item.hourly_rate ? '$' + parseFloat(item.hourly_rate).toFixed(2) : '';
+                const sub  = item.pricing_type + (rate ? ' • ' + rate : '');
+                const btn  = buildSuggestBtn(item.service_name, sub);
+                btn.addEventListener('click', () => {
+                  descInput.value = item.service_name;
+                  if (item.hourly_rate != null) costInput.value = parseFloat(item.hourly_rate).toFixed(2);
+                  if (item.typical_hours && parseFloat(item.typical_hours) > 0) qtyInput.value = parseFloat(item.typical_hours).toFixed(2);
+                  suggestBox.style.display = 'none'; suggestBox.innerHTML = '';
+                  computeLaborTotals();
+                });
+                suggestBox.appendChild(btn);
+              });
+              suggestBox.style.display = 'block';
+            }).catch(() => { suggestBox.style.display = 'none'; });
+          }, 200);
         });
 
-        const removeBtn = row.querySelector('.remove-line');
+        descInput.addEventListener('blur', () => {
+          setTimeout(() => { suggestBox.style.display = 'none'; suggestBox.innerHTML = ''; }, 200);
+        });
+      }
+
+      function bindLaborRow(row) {
+        setupLaborSearch(row);
+        row.querySelector('.labor-qty')?.addEventListener('input', computeLaborTotals);
+        row.querySelector('.labor-cost')?.addEventListener('input', computeLaborTotals);
+        const removeBtn = row.querySelector('.remove-labor-row');
+        if (!removeBtn) return;
         removeBtn.addEventListener('click', () => {
-          if (lineItemsBody.querySelectorAll('tr.line-item-row').length <= 1) {
-            row.querySelector('input[name="item_desc[]"]').value = '';
-            row.querySelector('input[name="item_qty[]"]').value = '1';
-            row.querySelector('input[name="item_cost[]"]').value = '0.00';
-            row.querySelector('input[name="item_markup[]"]').value = '20';
-            row.querySelector('input[name="item_price[]"]').value = '0.00';
+          if (laborBody.querySelectorAll('tr.labor-row').length <= 1) {
+            row.querySelector('.labor-desc').value = '';
+            row.querySelector('.labor-qty').value  = '1';
+            row.querySelector('.labor-cost').value = '0.00';
           } else {
             row.remove();
           }
-          computeTotals();
+          computeLaborTotals();
         });
       }
 
-      addLineItem.addEventListener('click', () => {
+      addLaborBtn.addEventListener('click', () => {
         const tr = document.createElement('tr');
-        tr.className = 'line-item-row';
-        tr.innerHTML = '<td><input type="text" name="item_desc[]" maxlength="500" /></td>'
-          + '<td><input type="number" step="0.01" min="0.01" name="item_qty[]" value="1" /></td>'
-          + '<td><input type="number" step="0.01" min="0" name="item_cost[]" value="0.00" /></td>'
-          + '<td><input type="number" step="0.01" min="0" name="item_markup[]" value="20" /></td>'
-          + '<td><input type="number" step="0.01" min="0" name="item_price[]" value="0.00" readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);" /></td>'
-          + '<td class="line-total" style="white-space:nowrap;">$0.00</td>'
-          + '<td><button type="button" class="btn remove-line">×</button></td>';
-        lineItemsBody.appendChild(tr);
-        bindRow(tr);
-        computeTotals();
+        tr.className = 'labor-row';
+        tr.innerHTML = '<td style="position:relative;">'
+          + '<input type="text" class="item-desc labor-desc" name="item_desc[]" maxlength="500" autocomplete="off" placeholder="Search labor / service…" />'
+          + '<input type="hidden" name="item_markup[]" value="0" />'
+          + '<input type="hidden" name="item_price[]" class="labor-price" value="0.00" />'
+          + '<div class="item-suggestions" style="' + makeSuggestDropdown() + '"></div>'
+          + '</td>'
+          + '<td><input type="number" step="0.01" min="0.01" class="labor-qty" name="item_qty[]" value="1" /></td>'
+          + '<td><input type="number" step="0.01" min="0" class="labor-cost" name="item_cost[]" value="0.00" /></td>'
+          + '<td class="labor-line-total" style="white-space:nowrap;">$0.00</td>'
+          + '<td><button type="button" class="btn remove-labor-row">×</button></td>';
+        laborBody.appendChild(tr);
+        bindLaborRow(tr);
+        computeLaborTotals();
+        tr.querySelector('.labor-desc').focus();
       });
 
-      Array.from(lineItemsBody.querySelectorAll('tr.line-item-row')).forEach(bindRow);
-      computeTotals();
+      // ── Inventory section ─────────────────────────────────────────────
+      const invBody    = document.getElementById('inventoryItemsBody');
+      const addInvBtn  = document.getElementById('addInventoryRow');
+
+      function computeInvTotals() {
+        let total = 0;
+        invBody.querySelectorAll('tr.inv-row').forEach((row) => {
+          const qty    = parseNum(row.querySelector('.inv-qty')?.value);
+          const cost   = parseNum(row.querySelector('.inv-cost')?.value);
+          const markup = parseNum(row.querySelector('.inv-markup')?.value);
+          const price  = cost * (1 + markup / 100);
+          const priceInput = row.querySelector('.inv-price');
+          if (priceInput) priceInput.value = price.toFixed(2);
+          const lineTotal = qty * price;
+          const ltCell = row.querySelector('.inv-line-total');
+          if (ltCell) ltCell.textContent = '$' + lineTotal.toFixed(2);
+          total += lineTotal;
+        });
+        partsSubtotalNode.textContent = total.toFixed(2);
+        updateGrandTotal();
+      }
+
+      function setupInvSearch(row) {
+        const descInput   = row.querySelector('.inv-desc');
+        const costInput   = row.querySelector('.inv-cost');
+        const markupInput = row.querySelector('.inv-markup');
+        const suggestBox  = row.querySelector('.item-suggestions');
+        let timer = null;
+
+        descInput.addEventListener('input', () => {
+          const q = descInput.value.trim();
+          if (timer) clearTimeout(timer);
+          if (q.length < 1) { suggestBox.style.display = 'none'; suggestBox.innerHTML = ''; return; }
+          timer = setTimeout(() => {
+            fetch('quotes.php?inventory_search=1&q=' + encodeURIComponent(q), {
+              credentials: 'same-origin',
+              headers: { 'X-CSRF-Token': csrfToken }
+            }).then((r) => r.ok ? r.json() : []).then((items) => {
+              suggestBox.innerHTML = '';
+              if (!items.length) { suggestBox.style.display = 'none'; return; }
+              items.forEach((item) => {
+                const costVal   = item.cost_price   != null ? '$' + parseFloat(item.cost_price).toFixed(2)   : '';
+                const markupVal = item.markup_percent != null ? parseFloat(item.markup_percent).toFixed(0) + '%' : '20%';
+                const sub = (costVal ? 'Cost: ' + costVal + ' • ' : '') + 'Markup: ' + markupVal;
+                const btn = buildSuggestBtn(item.item_name, sub);
+                btn.addEventListener('click', () => {
+                  descInput.value   = item.item_name;
+                  costInput.value   = item.cost_price   != null ? parseFloat(item.cost_price).toFixed(2)   : '0.00';
+                  markupInput.value = item.markup_percent != null ? parseFloat(item.markup_percent).toFixed(2) : '20.00';
+                  suggestBox.style.display = 'none'; suggestBox.innerHTML = '';
+                  computeInvTotals();
+                });
+                suggestBox.appendChild(btn);
+              });
+              suggestBox.style.display = 'block';
+            }).catch(() => { suggestBox.style.display = 'none'; });
+          }, 200);
+        });
+
+        descInput.addEventListener('blur', () => {
+          setTimeout(() => { suggestBox.style.display = 'none'; suggestBox.innerHTML = ''; }, 200);
+        });
+      }
+
+      function bindInvRow(row) {
+        setupInvSearch(row);
+        row.querySelector('.inv-qty')?.addEventListener('input', computeInvTotals);
+        row.querySelector('.inv-cost')?.addEventListener('input', computeInvTotals);
+        row.querySelector('.inv-markup')?.addEventListener('input', computeInvTotals);
+        const removeBtn = row.querySelector('.remove-inv-row');
+        if (!removeBtn) return;
+        removeBtn.addEventListener('click', () => {
+          if (invBody.querySelectorAll('tr.inv-row').length <= 1) {
+            row.querySelector('.inv-desc').value   = '';
+            row.querySelector('.inv-qty').value    = '1';
+            row.querySelector('.inv-cost').value   = '0.00';
+            row.querySelector('.inv-markup').value = '20.00';
+            row.querySelector('.inv-price').value  = '0.00';
+          } else {
+            row.remove();
+          }
+          computeInvTotals();
+        });
+      }
+
+      addInvBtn.addEventListener('click', () => {
+        const tr = document.createElement('tr');
+        tr.className = 'inv-row';
+        tr.innerHTML = '<td style="position:relative;">'
+          + '<input type="text" class="item-desc inv-desc" name="item_desc[]" maxlength="500" autocomplete="off" placeholder="Search inventory / part…" />'
+          + '<div class="item-suggestions" style="' + makeSuggestDropdown() + '"></div>'
+          + '</td>'
+          + '<td><input type="number" step="0.01" min="0.01" class="inv-qty" name="item_qty[]" value="1" /></td>'
+          + '<td><input type="number" step="0.01" min="0" class="inv-cost" name="item_cost[]" value="0.00" /></td>'
+          + '<td><input type="number" step="0.01" min="0" class="inv-markup" name="item_markup[]" value="20.00" /></td>'
+          + '<td><input type="number" step="0.01" min="0" class="inv-price" name="item_price[]" value="0.00" readonly style="background:var(--surface,#f8fafc);color:var(--muted,#64748b);" /></td>'
+          + '<td class="inv-line-total" style="white-space:nowrap;">$0.00</td>'
+          + '<td><button type="button" class="btn remove-inv-row">×</button></td>';
+        invBody.appendChild(tr);
+        bindInvRow(tr);
+        computeInvTotals();
+        tr.querySelector('.inv-desc').focus();
+      });
+
+      // ── Pre-submit: strip blank rows so backend counts stay consistent ──
+      const quoteForm = laborBody.closest('form');
+      if (quoteForm) {
+        quoteForm.addEventListener('submit', () => {
+          laborBody.querySelectorAll('tr.labor-row').forEach((row) => {
+            if ((row.querySelector('.labor-desc')?.value ?? '').trim() === '') row.remove();
+          });
+          invBody.querySelectorAll('tr.inv-row').forEach((row) => {
+            if ((row.querySelector('.inv-desc')?.value ?? '').trim() === '') row.remove();
+          });
+        });
+      }
+
+      // ── Init ─────────────────────────────────────────────────────────
+      laborBody.querySelectorAll('tr.labor-row').forEach(bindLaborRow);
+      invBody.querySelectorAll('tr.inv-row').forEach(bindInvRow);
+      computeLaborTotals();
+      computeInvTotals();
     })();
   </script>
 <?php endif; ?>
