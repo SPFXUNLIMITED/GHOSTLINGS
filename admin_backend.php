@@ -329,7 +329,13 @@ if ($section === 'dashboard') {
       $recent_activity_page = $activity_total_pages;
     }
     $activity_offset = ($recent_activity_page - 1) * RECENT_ACTIVITY_PER_PAGE;
-    $activity_order_sql = $activity_sort_map[$activity_sort][$activity_dir];
+    if ($activity_sort === 'type') {
+      $activity_order_sql = $activity_dir === 'asc' ? 'kind ASC' : 'kind DESC';
+    } elseif ($activity_sort === 'actor') {
+      $activity_order_sql = $activity_dir === 'asc' ? 'actor ASC' : 'actor DESC';
+    } else {
+      $activity_order_sql = $activity_dir === 'asc' ? 'occurred_at ASC' : 'occurred_at DESC';
+    }
     $activity_stmt = $pdo->prepare(
       "SELECT kind, actor, details, occurred_at
        FROM ({$activity_sql}) activity{$activity_where_sql}

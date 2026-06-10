@@ -219,9 +219,9 @@ function render_pagination(int $current_page, int $total, int $per_page, string 
     if (isset($_GET[$key]) && is_scalar($_GET[$key])) {
       $value = $_GET[$key];
       if ($key === $page_param || str_ends_with($key, '_page')) {
-      $params[$key] = (string)max(1, (int)$value);
+        $params[$key] = (string)max(1, (int)$value);
       } else {
-      $params[$key] = (string)$value;
+        $params[$key] = (string)$value;
       }
     }
   }
