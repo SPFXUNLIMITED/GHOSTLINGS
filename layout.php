@@ -586,8 +586,6 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
     <?php render_menu_dropdown('Quotes & Invoices', [
       ['href' => 'quotes.php', 'files' => ['quotes.php'], 'label' => 'Quotes'],
       ['href' => 'invoice_tracker.php', 'files' => ['invoice_tracker.php'], 'label' => 'Invoices'],
-      ['type' => 'separator'],
-      ['href' => 'labor_list.php', 'files' => ['labor_list.php', 'labor_form.php'], 'label' => 'Labor / Services'],
     ], $current); ?>
     <?php if ($show_admin_menu): ?>
     <?php render_menu_link(['href' => 'admin_backend.php', 'files' => ['admin_backend.php', 'users.php', 'user_profiles.php', 'form_admin.php'], 'label' => 'Admin Backend'], $current); ?>
