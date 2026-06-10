@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         INSERT INTO time_entries (user_id, clock_in)
         VALUES (?, ?)
       ")->execute([$uid, $now]);
-      unset($_SESSION['attendance_idle_logged']);
+      unset($_SESSION[ATTENDANCE_IDLE_SESSION_KEY]);
       $success = 'Clocked in at ' . $now_obj->format('g:i A') . '.';
     }
   } elseif ($action === 'start_lunch') {
@@ -112,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $params[] = (int)$open_entry['id'];
       $params[] = $uid;
       $pdo->prepare($sql)->execute($params);
-      unset($_SESSION['attendance_idle_logged']);
+      unset($_SESSION[ATTENDANCE_IDLE_SESSION_KEY]);
       $success = 'Clocked out at ' . $now_obj->format('g:i A') . '.';
     }
   }

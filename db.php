@@ -354,6 +354,10 @@ foreach ([
       throw $e;
     }
   }
+
+  if (!defined('ATTENDANCE_IDLE_SESSION_KEY')) {
+    define('ATTENDANCE_IDLE_SESSION_KEY', 'attendance_idle_logged');
+  }
 }
 
 // Add email column to users if it does not exist yet
