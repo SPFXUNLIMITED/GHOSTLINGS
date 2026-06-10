@@ -146,7 +146,7 @@ render_header('Bug Tracker');
             <td style="max-width:300px; white-space:normal;">
               <?= nl2br(h(excerpt_text((string)$row['request_details'], 180))) ?>
             </td>
-            <td><?= h($status_labels[$row['status']] ?? $row['status']) ?></td>
+            <td><span class="badge <?= h($row['status']) ?>"><?= h($status_labels[$row['status']] ?? $row['status']) ?></span></td>
             <td style="max-width:240px; white-space:normal;">
               <?= nl2br(h(excerpt_text((string)($row['admin_notes'] ?? ''), 160))) ?>
             </td>
