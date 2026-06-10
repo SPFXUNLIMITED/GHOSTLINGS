@@ -586,20 +586,6 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
   }
 }
 
-function quote_send_twilio_sms_placeholder(array $quote): string {
-  $phone = trim((string)($quote['phone_number'] ?? ''));
-  if ($phone === '') {
-    return 'SMS skipped: no customer phone number on this quote.';
-  }
-
-  // Twilio placeholder:
-  // 1) Install Twilio SDK with Composer.
-  // 2) Read TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER from env.
-  // 3) Send message body such as: "Quote #123 is ready."
-  // 4) Handle API errors and log failures.
-  return 'Twilio SMS placeholder executed for ' . $phone . '. Integrate Twilio credentials/API to send real messages.';
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
   header('Content-Type: application/json; charset=utf-8');
 
@@ -733,6 +719,7 @@ $saved = isset($_GET['saved']) && $_GET['saved'] === '1';
 $updated = isset($_GET['updated']) && $_GET['updated'] === '1';
 $invoice_converted = isset($_GET['invoice_converted']) && $_GET['invoice_converted'] === '1';
 $email_sent = isset($_GET['email_sent']) && $_GET['email_sent'] === '1';
+$deleted = isset($_GET['deleted']) && $_GET['deleted'] === '1';
 
 $edit_id = null;
 $raw_edit = $_GET['edit'] ?? $_POST['edit_id'] ?? null;
@@ -780,7 +767,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (!hash_equals((string)$_SESSION['quotes_csrf'], $csrf)) {
     $errors[] = 'Security token mismatch. Please refresh and try again.';
   } else {
-    if ($action === 'convert_invoice') {
+    if ($action === 'delete_quote') {
+      $row_id = (int)($_POST['row_id'] ?? 0);
+      if ($row_id <= 0) {
+        $errors[] = 'Invalid quote selected for deletion.';
+      } else {
+        $stmt = $pdo->prepare("DELETE FROM quotes WHERE id = ?");
+        $stmt->execute([$row_id]);
+        if ($stmt->rowCount() < 1) {
+          $errors[] = 'Quote not found or already deleted.';
+        } else {
+          $_SESSION['quotes_csrf'] = bin2hex(random_bytes(24));
+          header('Location: quotes.php?view=all&deleted=1');
+          exit;
+        }
+      }
+    } elseif ($action === 'convert_invoice') {
       $row_id = (int)($_POST['row_id'] ?? 0);
       if ($row_id <= 0) {
         $errors[] = 'Invalid quote selected for invoice conversion.';
@@ -826,16 +828,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
           }
         }
-      }
-    } elseif ($action === 'send_sms') {
-      $row_id = (int)($_POST['row_id'] ?? 0);
-      $stmt = $pdo->prepare("SELECT * FROM quotes WHERE id = ? LIMIT 1");
-      $stmt->execute([$row_id]);
-      $quote = $stmt->fetch();
-      if (!$quote) {
-        $errors[] = 'Quote not found.';
-      } else {
-        $messages[] = quote_send_twilio_sms_placeholder($quote);
       }
     } else {
       foreach (array_keys($fields) as $key) {
@@ -1106,6 +1098,9 @@ render_header('Quotes');
 <?php if ($email_sent): ?>
   <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Quote email sent successfully.</div>
 <?php endif; ?>
+<?php if ($deleted): ?>
+  <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Quote deleted successfully.</div>
+<?php endif; ?>
 <?php foreach ($messages as $msg): ?>
   <div class="alert" style="border-color:#bfdbfe; background:#eff6ff; color:#1e3a8a;"><?= h($msg) ?></div>
 <?php endforeach; ?>
@@ -1186,13 +1181,6 @@ render_header('Quotes');
         <button type="submit" class="btn">Email Quote</button>
       </form>
 
-      <form method="post" style="margin:0;">
-        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
-        <input type="hidden" name="action" value="send_sms" />
-        <input type="hidden" name="row_id" value="<?= (int)$detail_quote['id'] ?>" />
-        <button type="submit" class="btn">Send SMS (Twilio)</button>
-      </form>
-
       <?php if ((string)$detail_quote['status'] !== 'converted'): ?>
         <form method="post" style="margin:0;" onsubmit="return confirm('Convert this quote to invoice?');">
           <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
@@ -1236,6 +1224,26 @@ render_header('Quotes');
             <td style="white-space:nowrap;">
               <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote['id'] ?>">View</a>
               <a class="btn" href="quotes.php?edit=<?= (int)$quote['id'] ?>">Edit</a>
+              <form method="post" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
+                <input type="hidden" name="action" value="send_email" />
+                <input type="hidden" name="row_id" value="<?= (int)$quote['id'] ?>" />
+                <button type="submit" class="btn">Email Quote</button>
+              </form>
+              <?php if ((string)$quote['status'] !== 'converted'): ?>
+                <form method="post" style="display:inline;" onsubmit="return confirm('Convert this quote to invoice?');">
+                  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
+                  <input type="hidden" name="action" value="convert_invoice" />
+                  <input type="hidden" name="row_id" value="<?= (int)$quote['id'] ?>" />
+                  <button type="submit" class="btn primary">Convert to Invoice</button>
+                </form>
+              <?php endif; ?>
+              <form method="post" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this quote? This cannot be undone.');">
+                <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
+                <input type="hidden" name="action" value="delete_quote" />
+                <input type="hidden" name="row_id" value="<?= (int)$quote['id'] ?>" />
+                <button type="submit" class="btn danger">Delete</button>
+              </form>
             </td>
           </tr>
         <?php endforeach; ?>
