@@ -1302,6 +1302,61 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+$_quotes_online_payment_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'enable_online_payment'");
+if ($_quotes_online_payment_col === false || $_quotes_online_payment_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN enable_online_payment TINYINT(1) NOT NULL DEFAULT 0 AFTER subtotal_amount");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'enable_online_payment'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_online_payment_col);
+
+$_quotes_checkout_url_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'stripe_checkout_url'");
+if ($_quotes_checkout_url_col === false || $_quotes_checkout_url_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN stripe_checkout_url TEXT NULL AFTER enable_online_payment");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'stripe_checkout_url'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_checkout_url_col);
+
+$_quotes_checkout_session_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'stripe_checkout_session_id'");
+if ($_quotes_checkout_session_col === false || $_quotes_checkout_session_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN stripe_checkout_session_id VARCHAR(255) NULL AFTER stripe_checkout_url");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'stripe_checkout_session_id'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_checkout_session_col);
+
+$_quotes_checkout_created_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'stripe_checkout_created_at'");
+if ($_quotes_checkout_created_col === false || $_quotes_checkout_created_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN stripe_checkout_created_at DATETIME NULL AFTER stripe_checkout_session_id");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'stripe_checkout_created_at'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_checkout_created_col);
+
+$_quotes_checkout_amount_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'stripe_checkout_amount'");
+if ($_quotes_checkout_amount_col === false || $_quotes_checkout_amount_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN stripe_checkout_amount DECIMAL(12,2) NULL AFTER stripe_checkout_created_at");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'stripe_checkout_amount'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_checkout_amount_col);
+
 // Create quote_items table for line items on quotes
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS quote_items (
