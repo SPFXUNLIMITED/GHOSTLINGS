@@ -31,3 +31,758 @@ Stack trace:
 #0 /home3/spfx/public_html/website_a844b2f2/project/playbook_tasks.php(26): PDOStatement->execute(Array)
 #1 {main}
   thrown in /home3/spfx/public_html/website_a844b2f2/project/playbook_tasks.php on line 26
+[03-May-2026 17:51:24 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'spfx_ghostlaser.time_entries' doesn't exist in /home3/spfx/public_html/website_a844b2f2/project/time_clock.php:23
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/time_clock.php(23): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/time_clock.php on line 23
+[03-May-2026 17:51:27 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'spfx_ghostlaser.time_entries' doesn't exist in /home3/spfx/public_html/website_a844b2f2/project/time_clock.php:23
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/time_clock.php(23): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/time_clock.php on line 23
+[03-May-2026 17:51:30 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'spfx_ghostlaser.time_entries' doesn't exist in /home3/spfx/public_html/website_a844b2f2/project/time_report.php:83
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/time_report.php(83): PDOStatement->execute(Array)
+#1 /home3/spfx/public_html/website_a844b2f2/project/time_report.php(127): time_report_query(Object(PDO), Object(DateTimeZone), NULL, NULL, '2026-04-27', '2026-05-03')
+#2 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/time_report.php on line 83
+[03-May-2026 17:51:32 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'spfx_ghostlaser.time_entries' doesn't exist in /home3/spfx/public_html/website_a844b2f2/project/time_clock.php:23
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/time_clock.php(23): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/time_clock.php on line 23
+[03-May-2026 20:11:54 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:11:57 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:12:04 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:12:09 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:12:11 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:12:12 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:12:15 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:12:22 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:13:05 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:13:40 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:13:42 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:13:44 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:22:26 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:22:31 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:31:46 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:39:38 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:39:42 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:39:48 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:39:49 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:43:12 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:43:15 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:43:16 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:43:35 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:43:37 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:44:37 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:44:39 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:44:40 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:44:43 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:51:35 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:51:37 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:51:37 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:51:38 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:52:44 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:52:46 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:52:47 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:52:48 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:52:49 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:52:49 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[03-May-2026 20:52:49 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters in /home3/spfx/public_html/website_a844b2f2/project/index.php:76
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/index.php(76): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 76
+[12-May-2026 09:41:28 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'spfx_ghostlaser.project_uploads' doesn't exist in /home3/spfx/public_html/website_a844b2f2/project/project_details.php:118
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/project_details.php(118): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/project_details.php on line 118
+[12-May-2026 09:41:36 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'spfx_ghostlaser.project_uploads' doesn't exist in /home3/spfx/public_html/website_a844b2f2/project/project_details.php:118
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/project_details.php(118): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/project_details.php on line 118
+[12-May-2026 09:42:05 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'spfx_ghostlaser.project_uploads' doesn't exist in /home3/spfx/public_html/website_a844b2f2/project/project_details.php:118
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/project_details.php(118): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/project_details.php on line 118
+[17-May-2026 21:33:08 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/search.php:32
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/search.php(32): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/search.php on line 32
+[17-May-2026 21:33:10 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/search.php:32
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/search.php(32): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/search.php on line 32
+[17-May-2026 21:33:34 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/search.php:32
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/search.php(32): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/search.php on line 32
+[17-May-2026 21:33:58 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/search.php:32
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/search.php(32): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/search.php on line 32
+[17-May-2026 21:43:25 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/search.php:32
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/search.php(32): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/search.php on line 32
+[17-May-2026 21:43:33 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/search.php:32
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/search.php(32): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/search.php on line 32
+[17-May-2026 21:43:41 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/search.php:32
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/search.php(32): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/search.php on line 32
+[17-May-2026 21:43:43 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/search.php:32
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/search.php(32): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/search.php on line 32
+[17-May-2026 21:48:40 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/search.php:32
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/search.php(32): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/search.php on line 32
+[17-May-2026 21:48:43 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/search.php:32
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/search.php(32): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/search.php on line 32
+[22-May-2026 13:33:55 America/Los_Angeles] PHP Fatal error:  Uncaught Error: Undefined constant "MAX_RFQ_QUANTITY" in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php:694
+Stack trace:
+#0 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php on line 694
+[22-May-2026 13:34:03 America/Los_Angeles] PHP Fatal error:  Uncaught Error: Undefined constant "MAX_RFQ_QUANTITY" in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php:694
+Stack trace:
+#0 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php on line 694
+[22-May-2026 13:34:13 America/Los_Angeles] PHP Fatal error:  Uncaught Error: Undefined constant "MAX_RFQ_QUANTITY" in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php:694
+Stack trace:
+#0 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php on line 694
+[30-May-2026 20:40:48 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'r.urgency' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php:835
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php(835): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php on line 835
+[30-May-2026 20:40:51 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'r.urgency' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php:835
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php(835): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php on line 835
+[30-May-2026 20:40:53 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'r.urgency' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php:835
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php(835): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php on line 835
+[30-May-2026 20:40:56 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'r.urgency' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php:835
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php(835): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php on line 835
+[30-May-2026 20:42:57 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'r.urgency' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php:835
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php(835): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php on line 835
+[30-May-2026 20:43:08 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'r.urgency' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php:835
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php(835): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php on line 835
+[30-May-2026 20:43:23 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'r.urgency' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php:835
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php(835): PDOStatement->execute()
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/rfq_tracker.php on line 835
+[02-Jun-2026 09:27:08 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_form.php:355
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_form.php(355): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_form.php on line 355
+[03-Jun-2026 20:33:24 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[03-Jun-2026 20:33:56 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[03-Jun-2026 21:26:36 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[03-Jun-2026 21:47:56 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[03-Jun-2026 21:48:27 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[03-Jun-2026 22:22:25 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[03-Jun-2026 22:23:46 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[03-Jun-2026 22:23:52 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[03-Jun-2026 22:25:02 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[03-Jun-2026 22:25:20 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[03-Jun-2026 22:48:31 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[03-Jun-2026 23:05:00 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[04-Jun-2026 17:50:13 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 440
+[04-Jun-2026 17:50:13 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 494
+[04-Jun-2026 17:50:13 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 615
+[04-Jun-2026 17:50:13 America/Los_Angeles] PHP Warning:  Undefined variable $show_form in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 654
+[04-Jun-2026 17:50:17 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 440
+[04-Jun-2026 17:50:17 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 494
+[04-Jun-2026 17:50:17 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 615
+[04-Jun-2026 17:50:17 America/Los_Angeles] PHP Warning:  Undefined variable $show_form in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 654
+[04-Jun-2026 17:50:32 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 440
+[04-Jun-2026 17:50:32 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 494
+[04-Jun-2026 17:50:32 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 615
+[04-Jun-2026 17:50:32 America/Los_Angeles] PHP Warning:  Undefined variable $show_form in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 654
+[04-Jun-2026 17:50:35 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 440
+[04-Jun-2026 17:50:35 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 494
+[04-Jun-2026 17:50:35 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 615
+[04-Jun-2026 17:50:35 America/Los_Angeles] PHP Warning:  Undefined variable $show_form in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 654
+[04-Jun-2026 17:50:37 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 440
+[04-Jun-2026 17:50:37 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 494
+[04-Jun-2026 17:50:37 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 615
+[04-Jun-2026 17:50:37 America/Los_Angeles] PHP Warning:  Undefined variable $show_form in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 654
+[04-Jun-2026 17:51:09 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 440
+[04-Jun-2026 17:51:09 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 494
+[04-Jun-2026 17:51:09 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 615
+[04-Jun-2026 17:51:09 America/Los_Angeles] PHP Warning:  Undefined variable $show_form in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 654
+[04-Jun-2026 17:51:12 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 440
+[04-Jun-2026 17:51:12 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 494
+[04-Jun-2026 17:51:12 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 615
+[04-Jun-2026 17:51:12 America/Los_Angeles] PHP Warning:  Undefined variable $show_form in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 654
+[04-Jun-2026 17:51:38 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 440
+[04-Jun-2026 17:51:38 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 494
+[04-Jun-2026 17:51:38 America/Los_Angeles] PHP Warning:  Undefined variable $show_all in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 615
+[04-Jun-2026 17:51:38 America/Los_Angeles] PHP Warning:  Undefined variable $show_form in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 654
+[04-Jun-2026 18:00:28 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:00:28 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:00:29 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:00:30 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:00:34 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:00:34 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:00:35 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:00:35 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:00:37 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:00:39 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:00:40 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:00:42 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:00:43 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:00:43 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:00:44 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:00:45 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:00:45 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:00:46 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:00:47 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:03:58 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:03:59 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:03:59 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:04:00 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:04:02 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:04:02 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:04:09 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:04:12 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:04:13 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:04:14 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:04:15 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:04:15 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:04:31 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:04:33 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:04:34 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:04:35 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:04:35 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:45:04 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:45:05 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:45:05 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:45:06 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:45:07 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:45:09 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'customer_name' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:120
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(120): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 120
+[04-Jun-2026 18:53:08 America/Los_Angeles] Failed to save quote: SQLSTATE[23000]: Integrity constraint violation: 1452 Cannot add or update a child row: a foreign key constraint fails (`spfx_ghostlaser`.`quote_items`, CONSTRAINT `fk_quote_items_quote` FOREIGN KEY (`quote_id`) REFERENCES `quotes` (`id`) ON DELETE CASCADE)
+[04-Jun-2026 18:53:13 America/Los_Angeles] Failed to save quote: SQLSTATE[23000]: Integrity constraint violation: 1452 Cannot add or update a child row: a foreign key constraint fails (`spfx_ghostlaser`.`quote_items`, CONSTRAINT `fk_quote_items_quote` FOREIGN KEY (`quote_id`) REFERENCES `quotes` (`id`) ON DELETE CASCADE)
+[04-Jun-2026 18:53:24 America/Los_Angeles] Failed to save quote: SQLSTATE[23000]: Integrity constraint violation: 1452 Cannot add or update a child row: a foreign key constraint fails (`spfx_ghostlaser`.`quote_items`, CONSTRAINT `fk_quote_items_quote` FOREIGN KEY (`quote_id`) REFERENCES `quotes` (`id`) ON DELETE CASCADE)
+[04-Jun-2026 18:54:49 America/Los_Angeles] Failed to save quote: SQLSTATE[23000]: Integrity constraint violation: 1452 Cannot add or update a child row: a foreign key constraint fails (`spfx_ghostlaser`.`quote_items`, CONSTRAINT `fk_quote_items_quote` FOREIGN KEY (`quote_id`) REFERENCES `quotes` (`id`) ON DELETE CASCADE)
+[04-Jun-2026 19:00:24 America/Los_Angeles] Quote save failed: SQLSTATE[23000]: Integrity constraint violation: 1452 Cannot add or update a child row: a foreign key constraint fails (`spfx_ghostlaser`.`quote_items`, CONSTRAINT `fk_quote_items_quote` FOREIGN KEY (`quote_id`) REFERENCES `quotes` (`id`) ON DELETE CASCADE)
+[04-Jun-2026 20:53:39 America/Los_Angeles] PHP Warning:  require_once(/home3/spfx/public_html/website_a844b2f2/project/lib/PHPMailer/src/Exception.php): Failed to open stream: No such file or directory in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 5
+[04-Jun-2026 20:53:39 America/Los_Angeles] PHP Fatal error:  Uncaught Error: Failed opening required '/home3/spfx/public_html/website_a844b2f2/project/lib/PHPMailer/src/Exception.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:5
+Stack trace:
+#0 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 5
+[04-Jun-2026 20:54:12 America/Los_Angeles] PHP Warning:  require_once(/home3/spfx/public_html/website_a844b2f2/project/lib/PHPMailer/src/Exception.php): Failed to open stream: No such file or directory in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 5
+[04-Jun-2026 20:54:12 America/Los_Angeles] PHP Fatal error:  Uncaught Error: Failed opening required '/home3/spfx/public_html/website_a844b2f2/project/lib/PHPMailer/src/Exception.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:5
+Stack trace:
+#0 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 5
+[04-Jun-2026 20:54:14 America/Los_Angeles] PHP Warning:  require_once(/home3/spfx/public_html/website_a844b2f2/project/lib/PHPMailer/src/Exception.php): Failed to open stream: No such file or directory in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 5
+[04-Jun-2026 20:54:14 America/Los_Angeles] PHP Fatal error:  Uncaught Error: Failed opening required '/home3/spfx/public_html/website_a844b2f2/project/lib/PHPMailer/src/Exception.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:5
+Stack trace:
+#0 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 5
+[04-Jun-2026 20:54:22 America/Los_Angeles] PHP Warning:  require_once(/home3/spfx/public_html/website_a844b2f2/project/lib/PHPMailer/src/Exception.php): Failed to open stream: No such file or directory in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 5
+[04-Jun-2026 20:54:22 America/Los_Angeles] PHP Fatal error:  Uncaught Error: Failed opening required '/home3/spfx/public_html/website_a844b2f2/project/lib/PHPMailer/src/Exception.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:5
+Stack trace:
+#0 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 5
+[04-Jun-2026 20:54:43 America/Los_Angeles] PHP Warning:  require_once(/home3/spfx/public_html/website_a844b2f2/project/lib/PHPMailer/src/Exception.php): Failed to open stream: No such file or directory in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 5
+[04-Jun-2026 20:54:43 America/Los_Angeles] PHP Fatal error:  Uncaught Error: Failed opening required '/home3/spfx/public_html/website_a844b2f2/project/lib/PHPMailer/src/Exception.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home3/spfx/public_html/website_a844b2f2/project/quotes.php:5
+Stack trace:
+#0 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/quotes.php on line 5
+[04-Jun-2026 21:00:19 America/Los_Angeles] Quote email send failed due to missing or invalid SMTP configuration: SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM_EMAIL
+[04-Jun-2026 21:01:08 America/Los_Angeles] Quote email send failed due to missing or invalid SMTP configuration: SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM_EMAIL
+[04-Jun-2026 21:01:14 America/Los_Angeles] Quote email send failed due to missing or invalid SMTP configuration: SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM_EMAIL
+[04-Jun-2026 21:06:25 America/Los_Angeles] Quote email send failed due to missing or invalid SMTP configuration: SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM_EMAIL
+[04-Jun-2026 21:14:40 America/Los_Angeles] Quote email send failed for quote #11 to lasercutterrepair@gmail.com: SMTP Error: Could not connect to SMTP host. Connection failed. stream_socket_enable_crypto(): Peer certificate CN=`*.hostgator.com' did not match expected CN=`mail.LaserCutterRepair.com'
+[04-Jun-2026 21:21:12 America/Los_Angeles] Quote email send failed for quote #11 to lasercutterrepair@gmail.com: SMTP Error: Could not connect to SMTP host. Failed to connect to server
+[04-Jun-2026 21:22:15 America/Los_Angeles] Quote email send failed for quote #11 to lasercutterrepair@gmail.com: SMTP Error: Could not connect to SMTP host. Connection failed. stream_socket_enable_crypto(): Peer certificate CN=`*.hostgator.com' did not match expected CN=`mail.LaserCutterRepair.com'
+[04-Jun-2026 21:27:17 America/Los_Angeles] Quote email send failed for quote #11 to lasercutterrepair@gmail.com: SMTP Error: Could not connect to SMTP host. Failed to connect to server
+[04-Jun-2026 21:27:23 America/Los_Angeles] Quote email send failed for quote #11 to lasercutterrepair@gmail.com: SMTP Error: Could not connect to SMTP host. Failed to connect to server
+[04-Jun-2026 21:29:28 America/Los_Angeles] Quote email send failed for quote #11 to lasercutterrepair@gmail.com: SMTP Error: Could not connect to SMTP host. Connection failed. stream_socket_enable_crypto(): Peer certificate CN=`*.hostgator.com' did not match expected CN=`mail.LaserCutterRepair.com'
+[04-Jun-2026 21:30:08 America/Los_Angeles] Quote email send failed for quote #11 to lasercutterrepair@gmail.com: SMTP Error: Could not connect to SMTP host. Connection failed. stream_socket_enable_crypto(): Peer certificate CN=`*.hostgator.com' did not match expected CN=`mail.LaserCutterRepair.com'
+[04-Jun-2026 21:36:01 America/Los_Angeles] Quote email send failed for quote #11 to lasercutterrepair@gmail.com: SMTP Error: Could not connect to SMTP host. Connection failed. stream_socket_enable_crypto(): Peer certificate CN=`*.hostgator.com' did not match expected CN=`216.172.184.195'
+[04-Jun-2026 23:25:52 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[04-Jun-2026 23:30:09 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[04-Jun-2026 23:32:31 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[04-Jun-2026 23:46:24 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[04-Jun-2026 23:46:37 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[04-Jun-2026 23:47:14 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[04-Jun-2026 23:47:31 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[04-Jun-2026 23:47:56 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[04-Jun-2026 23:49:20 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[05-Jun-2026 00:50:09 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[05-Jun-2026 00:51:31 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1359 Trigger already exists in /home3/spfx/public_html/website_a844b2f2/project/db.php:790
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/db.php(790): PDO->exec('\n    CREATE TRI...')
+#1 /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_image.php(2): require('/home3/spfx/pub...')
+#2 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 790
+[05-Jun-2026 02:24:04 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1359 Trigger already exists in /home3/spfx/public_html/website_a844b2f2/project/db.php:790
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/db.php(790): PDO->exec('\n    CREATE TRI...')
+#1 /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_image.php(2): require('/home3/spfx/pub...')
+#2 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 790
+[05-Jun-2026 11:17:08 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[05-Jun-2026 11:19:31 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[05-Jun-2026 11:52:33 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[05-Jun-2026 11:52:55 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[05-Jun-2026 12:05:51 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[05-Jun-2026 12:05:53 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[05-Jun-2026 13:10:46 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[05-Jun-2026 13:13:24 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[05-Jun-2026 13:15:41 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[05-Jun-2026 14:26:21 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[05-Jun-2026 15:00:11 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[05-Jun-2026 15:00:35 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[05-Jun-2026 15:13:47 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[05-Jun-2026 15:14:22 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[05-Jun-2026 15:23:52 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[05-Jun-2026 15:24:00 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 689
+[08-Jun-2026 12:17:43 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php:467
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php(467): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php on line 467
+[08-Jun-2026 12:26:14 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php:467
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php(467): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php on line 467
+[08-Jun-2026 12:29:44 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php:467
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php(467): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php on line 467
+[08-Jun-2026 12:34:45 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php:467
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php(467): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php on line 467
+[08-Jun-2026 12:41:35 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php:467
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php(467): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php on line 467
+[08-Jun-2026 13:00:43 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php:467
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php(467): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php on line 467
+[09-Jun-2026 08:40:02 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php:467
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php(467): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php on line 467
+[09-Jun-2026 08:57:59 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php:467
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php(467): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php on line 467
+[09-Jun-2026 09:40:55 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php:467
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php(467): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php on line 467
+[09-Jun-2026 10:54:12 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php:467
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php(467): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php on line 467
+[09-Jun-2026 12:35:48 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php:467
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php(467): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php on line 467
+[09-Jun-2026 13:27:18 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php:467
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php(467): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php on line 467
+[09-Jun-2026 14:04:21 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php:467
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php(467): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php on line 467
+[09-Jun-2026 16:21:49 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php:467
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php(467): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/inventory_form.php on line 467
+[10-Jun-2026 09:51:13 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1359 Trigger already exists in /home3/spfx/public_html/website_a844b2f2/project/db.php:819
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/db.php(819): PDO->exec('\n    CREATE TRI...')
+#1 /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_image.php(2): require('/home3/spfx/pub...')
+#2 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 819
+[10-Jun-2026 14:27:47 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1359 Trigger already exists in /home3/spfx/public_html/website_a844b2f2/project/db.php:819
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/db.php(819): PDO->exec('\n    CREATE TRI...')
+#1 /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_image.php(2): require('/home3/spfx/pub...')
+#2 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 819
+[10-Jun-2026 15:11:15 America/Los_Angeles] APP_TZ value = 'America/Los_Angeles' | Current PT time = 2026-06-10 15:11:15
+[10-Jun-2026 15:11:20 America/Los_Angeles] APP_TZ value = 'America/Los_Angeles' | Current PT time = 2026-06-10 15:11:20
+[10-Jun-2026 15:12:19 America/Los_Angeles] APP_TZ value = 'America/Los_Angeles' | Current PT time = 2026-06-10 15:12:19
+[10-Jun-2026 15:13:14 America/Los_Angeles] APP_TZ value = 'America/Los_Angeles' | Current PT time = 2026-06-10 15:13:14
+[10-Jun-2026 15:13:21 America/Los_Angeles] APP_TZ value = 'America/Los_Angeles' | Current PT time = 2026-06-10 15:13:21
+[10-Jun-2026 15:13:25 America/Los_Angeles] APP_TZ value = 'America/Los_Angeles' | Current PT time = 2026-06-10 15:13:25
