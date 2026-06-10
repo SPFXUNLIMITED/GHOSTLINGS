@@ -2,6 +2,9 @@
 require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
+require_once __DIR__ . '/lib/PHPMailer/src/Exception.php';
+require_once __DIR__ . '/lib/PHPMailer/src/PHPMailer.php';
+require_once __DIR__ . '/lib/PHPMailer/src/SMTP.php';
 require_admin_or_moderator();
 
 const INVOICE_DEFAULT_QTY = '1.00';
@@ -16,6 +19,308 @@ if (empty($_SESSION['invoice_form_csrf'])) {
 }
 
 $view_mode_requested = isset($_GET['mode']) && $_GET['mode'] === 'view';
+
+// ---------- Invoice email helpers ----------
+
+function invoice_env_value(string $key): string {
+  static $dotenv_values = null;
+
+  if ($dotenv_values === null) {
+    $dotenv_values = [];
+    $dotenv_path = __DIR__ . '/.env';
+    if (is_file($dotenv_path) && is_readable($dotenv_path)) {
+      $lines = file($dotenv_path, FILE_IGNORE_NEW_LINES);
+      if (is_array($lines)) {
+        foreach ($lines as $line) {
+          $line = trim((string)$line);
+          if ($line === '' || str_starts_with($line, '#')) continue;
+          $separator_pos = strpos($line, '=');
+          if ($separator_pos === false) continue;
+          $name = trim(substr($line, 0, $separator_pos));
+          if ($name === '' || !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $name)) continue;
+          $value = trim(substr($line, $separator_pos + 1));
+          if (strlen($value) >= 2) {
+            $first = $value[0]; $last = $value[strlen($value) - 1];
+            if ($first === '"' && $last === '"') {
+              $value = substr($value, 1, -1);
+              $value = strtr($value, ['\\\\' => '\\', '\\"' => '"', '\\n' => "\n", '\\r' => "\r", '\\t' => "\t"]);
+            } elseif ($first === "'" && $last === "'") {
+              $value = substr($value, 1, -1);
+              $value = strtr($value, ['\\\\' => '\\', "\\'" => "'"]);
+            }
+          } else {
+            $value = rtrim(preg_replace('/\s+#.*$/', '', $value) ?? $value);
+          }
+          $dotenv_values[$name] = $value;
+        }
+      }
+    }
+  }
+
+  foreach ([getenv($key), $_ENV[$key] ?? null, $_SERVER[$key] ?? null, $dotenv_values[$key] ?? null] as $candidate) {
+    $v = trim((string)$candidate);
+    if ($v !== '') return $v;
+  }
+  return '';
+}
+
+function invoice_sender_profile(PDO $pdo, ?int $created_by): array {
+  $profile = ['sender_name' => '', 'company_name' => '', 'address' => '', 'phone' => '', 'email' => ''];
+
+  $candidate_ids = [];
+  if ($created_by !== null && $created_by > 0) {
+    $candidate_ids[] = $created_by;
+  }
+  $session_user_id = (int)($_SESSION['user_id'] ?? 0);
+  if ($session_user_id > 0 && !in_array($session_user_id, $candidate_ids, true)) {
+    $candidate_ids[] = $session_user_id;
+  }
+  if (!$candidate_ids) return $profile;
+
+  $stmt = $pdo->prepare(
+    "SELECT username, contact_name, company_name, delivery_address, contact_phone, email
+     FROM users WHERE id = ? LIMIT 1"
+  );
+  foreach ($candidate_ids as $uid) {
+    $stmt->execute([$uid]);
+    $row = $stmt->fetch();
+    if (!$row) continue;
+    $contact_name        = trim((string)($row['contact_name'] ?? ''));
+    $username            = trim((string)($row['username']     ?? ''));
+    $profile['sender_name']  = $contact_name !== '' ? $contact_name : $username;
+    $profile['company_name'] = trim((string)($row['company_name']     ?? ''));
+    $profile['address']      = trim((string)($row['delivery_address'] ?? ''));
+    $profile['phone']        = trim((string)($row['contact_phone']    ?? ''));
+    $profile['email']        = trim((string)($row['email']            ?? ''));
+    break;
+  }
+  return $profile;
+}
+
+function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$error_message = null): bool {
+  $error_message = null;
+  $to = trim((string)($quote['email'] ?? ''));
+  if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+    $error_message = 'Invoice email address is missing or invalid.';
+    return false;
+  }
+
+  $smtp_host     = invoice_env_value('SMTP_HOST');
+  $smtp_port     = (int)invoice_env_value('SMTP_PORT');
+  $smtp_username = invoice_env_value('SMTP_USERNAME');
+  $smtp_password = invoice_env_value('SMTP_PASSWORD');
+  $smtp_from_email = invoice_env_value('SMTP_FROM_EMAIL');
+  $smtp_from_name  = trim(str_replace(["\r", "\n"], ' ', invoice_env_value('SMTP_FROM_NAME')));
+
+  $smtp_errors = [];
+  if ($smtp_host === '') $smtp_errors[] = 'SMTP_HOST';
+  if ($smtp_port <= 0)   $smtp_errors[] = 'SMTP_PORT';
+  if ($smtp_username === '') $smtp_errors[] = 'SMTP_USERNAME';
+  if ($smtp_password === '') $smtp_errors[] = 'SMTP_PASSWORD';
+  if ($smtp_from_email === '' || !filter_var($smtp_from_email, FILTER_VALIDATE_EMAIL)) $smtp_errors[] = 'SMTP_FROM_EMAIL';
+  if ($smtp_errors) {
+    $error_message = 'Missing or invalid SMTP configuration: ' . implode(', ', $smtp_errors);
+    error_log('Invoice email send failed — missing SMTP config: ' . implode(', ', $smtp_errors));
+    return false;
+  }
+
+  $created_by    = isset($quote['created_by']) && $quote['created_by'] !== null ? (int)$quote['created_by'] : null;
+  $sender        = invoice_sender_profile($pdo, $created_by);
+  $sender_name   = $sender['sender_name'];
+  $sender_company = $sender['company_name'] !== '' ? $sender['company_name'] : $smtp_from_name;
+  if ($sender_company === '') $sender_company = 'Our Company';
+  $sender_address = $sender['address'];
+  $sender_phone   = $sender['phone'];
+  $sender_email   = $sender['email'] !== '' ? $sender['email'] : $smtp_from_email;
+
+  $inv_no        = trim((string)($quote['converted_invoice_no'] ?? ''));
+  $customer_name = trim((string)($quote['customer_name'] ?? ''));
+  $inv_date      = trim((string)($quote['quote_date'] ?? ''));
+  $subtotal      = number_format((float)($quote['subtotal_amount'] ?? 0), 2);
+
+  $subject = htmlspecialchars($sender_company, ENT_QUOTES, 'UTF-8') . ' — Invoice ' . ($inv_no !== '' ? $inv_no : '#' . (int)$quote['id']);
+
+  // ---- Build HTML rows ----
+  $rows_html = [];
+  $rows_text = [];
+  $row_index = 0;
+  foreach ($items as $item) {
+    $desc       = trim((string)($item['description'] ?? ''));
+    $qty        = number_format((float)($item['quantity']   ?? 0), 2);
+    $unit_price = number_format((float)($item['unit_price'] ?? 0), 2);
+    $line_total = number_format((float)($item['line_total'] ?? 0), 2);
+    $row_bg     = ($row_index % 2 === 0) ? '#ffffff' : '#f9fafb';
+    $rows_html[] = '<tr style="background:' . $row_bg . ';">'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">' . htmlspecialchars($desc, ENT_QUOTES, 'UTF-8') . '</td>'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">' . htmlspecialchars($qty, ENT_QUOTES, 'UTF-8') . '</td>'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . htmlspecialchars($unit_price, ENT_QUOTES, 'UTF-8') . '</td>'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . htmlspecialchars($line_total, ENT_QUOTES, 'UTF-8') . '</td>'
+      . '</tr>';
+    $rows_text[] = '- ' . $desc . ' | Qty: ' . $qty . ' | Price: $' . $unit_price . ' | Total: $' . $line_total;
+    $row_index++;
+  }
+  if (!$rows_html) {
+    $rows_html[] = '<tr><td colspan="4" style="padding:10px 12px;text-align:center;color:#6b7280;">No line items.</td></tr>';
+    $rows_text[] = '- No line items.';
+  }
+
+  // ---- Contact / footer parts ----
+  $h = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+
+  $header_parts = [];
+  if ($sender_address !== '') {
+    $header_parts[] = $h(preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ' · ', $sender_address)));
+  }
+  if ($sender_phone !== '') $header_parts[] = $h($sender_phone);
+  if ($sender_email !== '') {
+    $header_parts[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($sender_email) . '</a>';
+  }
+  $header_contact_html = implode(' &nbsp;·&nbsp; ', $header_parts);
+
+  $prepared_by_html = '';
+  if ($sender_name !== '') {
+    $prepared_by_html = 'This invoice was prepared by <strong style="color:#1e293b;">' . $h($sender_name) . '</strong>';
+    if ($sender_company !== 'Our Company') {
+      $prepared_by_html .= ' at <strong style="color:#1e293b;">' . $h($sender_company) . '</strong>';
+    }
+    $prepared_by_html .= '.';
+  }
+
+  $footer_parts = [];
+  if ($sender_address !== '') {
+    $footer_parts[] = $h(preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ', ', $sender_address)));
+  }
+  if ($sender_phone !== '') $footer_parts[] = $h($sender_phone);
+  if ($sender_email !== '') {
+    $footer_parts[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($sender_email) . '</a>';
+  }
+  $footer_contact_html = implode(' &nbsp;·&nbsp; ', $footer_parts);
+
+  $inv_label = $inv_no !== '' ? $h($inv_no) : '#' . (int)$quote['id'];
+
+  // ---- Assemble HTML email ----
+  $html_body = '<!doctype html>'
+    . '<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
+    . '<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">'
+
+    . '<div style="max-width:680px;margin:32px auto 32px;">'
+
+    // ── Header banner ──
+    . '<div style="background:#1e3a5f;border-radius:8px 8px 0 0;padding:28px 32px 24px;">'
+      . '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $h($sender_company) . '</p>'
+      . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '')
+    . '</div>'
+
+    // ── Document title strip ──
+    . '<div style="background:#ffffff;padding:20px 32px 0;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
+      . '<table style="width:100%;border-collapse:collapse;">'
+        . '<tr>'
+          . '<td style="padding:0 0 16px;">'
+            . '<p style="margin:0;font-size:18px;font-weight:700;color:#0f172a;">Invoice ' . $inv_label . '</p>'
+          . '</td>'
+          . '<td style="padding:0 0 16px;text-align:right;">'
+            . '<p style="margin:0;font-size:13px;color:#64748b;">Date: ' . $h($inv_date) . '</p>'
+          . '</td>'
+        . '</tr>'
+      . '</table>'
+      . '<hr style="margin:0;border:none;border-top:2px solid #e2e8f0;">'
+    . '</div>'
+
+    // ── Body ──
+    . '<div style="background:#ffffff;padding:24px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
+
+      . '<p style="margin:0 0 8px;font-size:15px;color:#1e293b;">Hello' . ($customer_name !== '' ? ', ' . $h($customer_name) : '') . ',</p>'
+      . '<p style="margin:0 0 24px;font-size:14px;color:#475569;">Please find your invoice details below. Thank you for your business.</p>'
+
+      // Line items table
+      . '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">'
+        . '<thead>'
+          . '<tr style="background:#f8fafc;">'
+            . '<th style="padding:10px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Description</th>'
+            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Qty</th>'
+            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Unit Price</th>'
+            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Total</th>'
+          . '</tr>'
+        . '</thead>'
+        . '<tbody>' . implode('', $rows_html) . '</tbody>'
+        . '<tfoot>'
+          . '<tr>'
+            . '<td colspan="3" style="padding:14px 12px;text-align:right;font-weight:700;font-size:14px;color:#1e293b;border-top:2px solid #e2e8f0;">Subtotal:</td>'
+            . '<td style="padding:14px 12px;text-align:right;font-weight:700;font-size:16px;color:#1e3a5f;border-top:2px solid #e2e8f0;">$' . $h($subtotal) . '</td>'
+          . '</tr>'
+        . '</tfoot>'
+      . '</table>'
+
+      . '<p style="margin:0;font-size:14px;color:#475569;">If you have any questions regarding this invoice, please don\'t hesitate to contact us.</p>'
+    . '</div>'
+
+    // ── Prepared-by strip ──
+    . ($prepared_by_html !== ''
+        ? '<div style="background:#f8fafc;padding:14px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:1px solid #e2e8f0;">'
+            . '<p style="margin:0;font-size:13px;color:#64748b;">' . $prepared_by_html . '</p>'
+          . '</div>'
+        : '')
+
+    // ── Footer ──
+    . '<div style="background:#1e3a5f;border-radius:0 0 8px 8px;padding:18px 32px;">'
+      . '<p style="margin:0;font-size:12px;color:#93c5fd;line-height:1.6;">'
+        . $h($sender_company)
+        . ($footer_contact_html !== '' ? ' &nbsp;·&nbsp; ' . $footer_contact_html : '')
+      . '</p>'
+    . '</div>'
+
+    . '</div>'
+    . '</body></html>';
+
+  // ---- Plain-text fallback ----
+  $text_body  = $sender_company . "\r\n";
+  if ($sender_address !== '') $text_body .= preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ', ', $sender_address)) . "\r\n";
+  if ($sender_phone !== '')   $text_body .= $sender_phone . "\r\n";
+  if ($sender_email !== '')   $text_body .= $sender_email . "\r\n";
+  $text_body .= "\r\nInvoice " . ($inv_no !== '' ? $inv_no : '#' . (int)$quote['id']) . "  |  Date: {$inv_date}\r\n";
+  $text_body .= str_repeat('-', 40) . "\r\n\r\n";
+  $text_body .= "Hello" . ($customer_name !== '' ? ", {$customer_name}" : '') . ",\r\n\r\n";
+  $text_body .= "Please find your invoice details below.\r\n\r\nLine Items:\r\n";
+  $text_body .= implode("\r\n", $rows_text) . "\r\n\r\nSubtotal: \${$subtotal}\r\n\r\n";
+  $text_body .= "Thank you for your business.\r\n";
+  if ($sender_name !== '') {
+    $text_body .= "\r\nPrepared by: {$sender_name}" . ($sender_company !== 'Our Company' ? " at {$sender_company}" : '') . "\r\n";
+  }
+
+  try {
+    $mailer = new \PHPMailer\PHPMailer\PHPMailer(true);
+    $mailer->isSMTP();
+    $mailer->SMTPOptions = ['ssl' => ['verify_peer' => false, 'verify_peer_name' => false, 'allow_self_signed' => true]];
+    $mailer->Host       = $smtp_host;
+    $mailer->Port       = $smtp_port;
+    $mailer->SMTPAuth   = true;
+    $mailer->Username   = $smtp_username;
+    $mailer->Password   = $smtp_password;
+    if ($smtp_port === 465) {
+      $mailer->SMTPSecure  = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+      $mailer->SMTPAutoTLS = false;
+    } else {
+      $mailer->SMTPSecure  = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+      $mailer->SMTPAutoTLS = true;
+    }
+    $mailer->CharSet = 'UTF-8';
+    $mailer->setFrom($smtp_from_email, $smtp_from_name);
+    $mailer->addAddress($to);
+    $mailer->Subject  = $subject;
+    $mailer->isHTML(true);
+    $mailer->Body     = $html_body;
+    $mailer->AltBody  = $text_body;
+    if (!$mailer->send()) {
+      $error_message = trim((string)$mailer->ErrorInfo);
+      return false;
+    }
+    return true;
+  } catch (Throwable $e) {
+    $error_message = $e->getMessage();
+    error_log('Invoice email send failed for quote #' . (int)$quote['id'] . ' to ' . $to . ': ' . $e->getMessage());
+    return false;
+  }
+}
 
 // ---------- GET: Customer live search ----------
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
@@ -62,16 +367,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
   exit;
 }
 
-// ---------- POST: Save invoice ----------
+// ---------- POST: Save invoice / Email invoice ----------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  if ($view_mode_requested) {
-    http_response_code(405);
-    exit('Viewing mode is read only.');
-  }
   $csrf = (string)($_POST['csrf_token'] ?? '');
   if (!hash_equals((string)$_SESSION['invoice_form_csrf'], $csrf)) {
     http_response_code(403);
     exit('Invalid CSRF token.');
+  }
+
+  // Handle email action — allowed even in view mode
+  if (trim((string)($_POST['action'] ?? '')) === 'send_email') {
+    $row_id = (int)($_POST['row_id'] ?? 0);
+    $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
+    if ($row_id > 0) {
+      $eq_stmt = $pdo->prepare("SELECT * FROM quotes WHERE id = ? LIMIT 1");
+      $eq_stmt->execute([$row_id]);
+      $eq_quote = $eq_stmt->fetch(PDO::FETCH_ASSOC);
+      if ($eq_quote) {
+        $eq_items_stmt = $pdo->prepare("SELECT description, quantity, unit_price, line_total FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC");
+        $eq_items_stmt->execute([$row_id]);
+        $eq_items = $eq_items_stmt->fetchAll(PDO::FETCH_ASSOC);
+        $eq_error = null;
+        if (invoice_send_email_msg($pdo, $eq_quote, $eq_items, $eq_error)) {
+          $mode_param = $view_mode_requested ? '&mode=view' : '';
+          header('Location: invoice_form.php?id=' . $row_id . $mode_param . '&email_sent=1');
+        } else {
+          $mode_param = $view_mode_requested ? '&mode=view' : '';
+          header('Location: invoice_form.php?id=' . $row_id . $mode_param . '&email_error=' . urlencode($eq_error ?? 'Unknown error'));
+        }
+      } else {
+        header('Location: invoice_tracker.php');
+      }
+    } else {
+      header('Location: invoice_tracker.php');
+    }
+    exit;
+  }
+
+  if ($view_mode_requested) {
+    http_response_code(405);
+    exit('Viewing mode is read only.');
   }
   $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
 
@@ -343,6 +678,8 @@ if (!$line_items) {
 }
 
 $invoice_converted = isset($_GET['invoice_converted']) && $_GET['invoice_converted'] === '1';
+$invoice_email_sent  = isset($_GET['email_sent'])  && $_GET['email_sent']  === '1';
+$invoice_email_error = isset($_GET['email_error']) && $_GET['email_error'] !== '' ? trim((string)$_GET['email_error']) : '';
 
 render_header($invoice_heading);
 ?>
@@ -356,6 +693,14 @@ render_header($invoice_heading);
     <?php if ($is_view_mode && $quote): ?>
       <a class="btn primary" href="invoice_form.php?id=<?= (int)$quote_id ?>">Edit Invoice</a>
     <?php endif; ?>
+    <?php if ($quote && trim((string)($quote['email'] ?? '')) !== ''): ?>
+      <form method="post" style="margin:0;" action="">
+        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
+        <input type="hidden" name="action" value="send_email" />
+        <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
+        <button type="submit" class="btn">Email Invoice</button>
+      </form>
+    <?php endif; ?>
     <a class="btn" href="invoice_tracker.php">Invoice Tracker</a>
     <?php if ($quote): ?>
       <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
@@ -367,6 +712,12 @@ render_header($invoice_heading);
 <div class="card">
   <?php if ($invoice_converted): ?>
     <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">Quote converted to invoice successfully.</div>
+  <?php endif; ?>
+  <?php if ($invoice_email_sent): ?>
+    <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">Invoice email sent successfully.</div>
+  <?php endif; ?>
+  <?php if ($invoice_email_error !== ''): ?>
+    <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b; margin-bottom:14px;">Failed to send invoice email: <?= h($invoice_email_error) ?></div>
   <?php endif; ?>
 
   <?php if (!$is_view_mode): ?>
@@ -465,6 +816,18 @@ render_header($invoice_heading);
         <button type="submit" class="btn primary" style="font-size:18px; padding:14px 22px;">Save Invoice</button>
       <?php else: ?>
         <a class="btn primary" href="invoice_form.php?id=<?= (int)$quote_id ?>">Edit Invoice</a>
+      <?php endif; ?>
+      <?php if ($quote && trim((string)($quote['email'] ?? '')) !== ''): ?>
+        <?php if ($is_view_mode): ?>
+          <form method="post" style="margin:0;" action="">
+            <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
+            <input type="hidden" name="action" value="send_email" />
+            <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
+            <button type="submit" class="btn">Email Invoice</button>
+          </form>
+        <?php else: ?>
+          <a class="btn" href="invoice_form.php?id=<?= (int)$quote_id ?>&mode=view">Email Invoice</a>
+        <?php endif; ?>
       <?php endif; ?>
       <a class="btn" href="invoice_tracker.php">Invoice Tracker</a>
       <?php if ($quote): ?>

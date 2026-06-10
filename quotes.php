@@ -286,10 +286,11 @@ function quote_backfill_customer(PDO $pdo, ?int $customer_id, array $fields): vo
 
 function quote_sender_profile(PDO $pdo, array $quote): array {
   $profile = [
+    'sender_name'  => '',
     'company_name' => '',
-    'address' => '',
-    'phone' => '',
-    'email' => '',
+    'address'      => '',
+    'phone'        => '',
+    'email'        => '',
   ];
 
   $candidate_ids = [];
@@ -307,7 +308,7 @@ function quote_sender_profile(PDO $pdo, array $quote): array {
   }
 
   $stmt = $pdo->prepare(
-    "SELECT company_name, delivery_address, contact_phone, email
+    "SELECT username, contact_name, company_name, delivery_address, contact_phone, email
      FROM users
      WHERE id = ?
      LIMIT 1"
@@ -319,10 +320,13 @@ function quote_sender_profile(PDO $pdo, array $quote): array {
       continue;
     }
 
-    $profile['company_name'] = trim((string)($row['company_name'] ?? ''));
-    $profile['address'] = trim((string)($row['delivery_address'] ?? ''));
-    $profile['phone'] = trim((string)($row['contact_phone'] ?? ''));
-    $profile['email'] = trim((string)($row['email'] ?? ''));
+    $contact_name = trim((string)($row['contact_name'] ?? ''));
+    $username     = trim((string)($row['username']     ?? ''));
+    $profile['sender_name']  = $contact_name !== '' ? $contact_name : $username;
+    $profile['company_name'] = trim((string)($row['company_name']      ?? ''));
+    $profile['address']      = trim((string)($row['delivery_address']  ?? ''));
+    $profile['phone']        = trim((string)($row['contact_phone']     ?? ''));
+    $profile['email']        = trim((string)($row['email']             ?? ''));
     break;
   }
 
@@ -358,101 +362,181 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
   }
 
   $sender_profile = quote_sender_profile($pdo, $quote);
-  $sender_company_name = $sender_profile['company_name'] !== '' ? $sender_profile['company_name'] : $smtp_from_name;
-  if ($sender_company_name === '') {
-    $sender_company_name = 'Our Company';
+  $sender_name    = $sender_profile['sender_name'];
+  $sender_company = $sender_profile['company_name'] !== '' ? $sender_profile['company_name'] : $smtp_from_name;
+  if ($sender_company === '') {
+    $sender_company = 'Our Company';
   }
   $sender_address = $sender_profile['address'];
-  $sender_phone = $sender_profile['phone'];
-  $sender_email = $sender_profile['email'] !== '' ? $sender_profile['email'] : $smtp_from_email;
+  $sender_phone   = $sender_profile['phone'];
+  $sender_email   = $sender_profile['email'] !== '' ? $sender_profile['email'] : $smtp_from_email;
 
-  $subject = 'Quote #' . (int)$quote['id'];
+  $quote_id      = (int)($quote['id'] ?? 0);
+  $customer_name = trim((string)($quote['customer_name'] ?? ''));
+  $quote_date    = trim((string)($quote['quote_date'] ?? ''));
+  $subtotal      = quote_format_money($quote['subtotal_amount'] ?? 0);
+
+  $subject = htmlspecialchars($sender_company, ENT_QUOTES, 'UTF-8') . ' — Quote #' . $quote_id;
+
+  // ---- Build HTML rows ----
   $rows_html = [];
   $rows_text = [];
+  $row_index = 0;
   foreach ($items as $item) {
     $description = trim((string)($item['description'] ?? ''));
-    $quantity = quote_format_money($item['quantity'] ?? 0);
-    $unit_price = quote_format_money($item['unit_price'] ?? 0);
-    $line_total = quote_format_money($item['line_total'] ?? 0);
-    $rows_html[] = '<tr>'
-      . '<td style="padding:8px;border:1px solid #ddd;">' . htmlspecialchars($description, ENT_QUOTES, 'UTF-8') . '</td>'
-      . '<td style="padding:8px;border:1px solid #ddd;text-align:right;">' . htmlspecialchars($quantity, ENT_QUOTES, 'UTF-8') . '</td>'
-      . '<td style="padding:8px;border:1px solid #ddd;text-align:right;">$' . htmlspecialchars($unit_price, ENT_QUOTES, 'UTF-8') . '</td>'
-      . '<td style="padding:8px;border:1px solid #ddd;text-align:right;">$' . htmlspecialchars($line_total, ENT_QUOTES, 'UTF-8') . '</td>'
+    $quantity    = quote_format_money($item['quantity']   ?? 0);
+    $unit_price  = quote_format_money($item['unit_price'] ?? 0);
+    $line_total  = quote_format_money($item['line_total'] ?? 0);
+    $row_bg      = ($row_index % 2 === 0) ? '#ffffff' : '#f9fafb';
+    $rows_html[] = '<tr style="background:' . $row_bg . ';">'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">' . htmlspecialchars($description, ENT_QUOTES, 'UTF-8') . '</td>'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">' . htmlspecialchars($quantity, ENT_QUOTES, 'UTF-8') . '</td>'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . htmlspecialchars($unit_price, ENT_QUOTES, 'UTF-8') . '</td>'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . htmlspecialchars($line_total, ENT_QUOTES, 'UTF-8') . '</td>'
       . '</tr>';
     $rows_text[] = '- ' . $description . ' | Qty: ' . $quantity . ' | Price: $' . $unit_price . ' | Total: $' . $line_total;
+    $row_index++;
   }
 
   if (!$rows_html) {
-    $rows_html[] = '<tr><td colspan="4" style="padding:8px;border:1px solid #ddd;text-align:center;">No line items.</td></tr>';
+    $rows_html[] = '<tr><td colspan="4" style="padding:10px 12px;text-align:center;color:#6b7280;">No line items.</td></tr>';
     $rows_text[] = '- No line items.';
   }
 
-  $quote_id = (int)($quote['id'] ?? 0);
-  $customer_name = trim((string)($quote['customer_name'] ?? ''));
-  $quote_date = trim((string)($quote['quote_date'] ?? ''));
-  $subtotal = quote_format_money($quote['subtotal_amount'] ?? 0);
-
-  $html_body = '<!doctype html><html><body style="margin:0;padding:0;background:#f7f7f7;">'
-    . '<div style="max-width:700px;margin:24px auto;padding:24px;background:#ffffff;border:1px solid #e5e5e5;border-radius:6px;font-family:Arial,sans-serif;color:#222;">'
-    . '<p style="margin:0 0 10px;font-size:20px;font-weight:700;">' . htmlspecialchars($sender_company_name, ENT_QUOTES, 'UTF-8') . '</p>'
-    . '<h2 style="margin:0 0 12px;">Quote #' . htmlspecialchars((string)$quote_id, ENT_QUOTES, 'UTF-8') . '</h2>'
-    . '<p style="margin:0 0 8px;">Hello,</p>'
-    . '<p style="margin:0 0 16px;">Here is your quote summary.</p>'
-    . '<p style="margin:0 0 6px;"><strong>Customer:</strong> ' . htmlspecialchars($customer_name, ENT_QUOTES, 'UTF-8') . '</p>'
-    . '<p style="margin:0 0 16px;"><strong>Quote Date:</strong> ' . htmlspecialchars($quote_date, ENT_QUOTES, 'UTF-8') . '</p>'
-    . '<table style="width:100%;border-collapse:collapse;margin:0 0 16px;">'
-    . '<thead><tr>'
-    . '<th style="padding:8px;border:1px solid #ddd;background:#fafafa;text-align:left;">Description</th>'
-    . '<th style="padding:8px;border:1px solid #ddd;background:#fafafa;text-align:right;">Qty</th>'
-    . '<th style="padding:8px;border:1px solid #ddd;background:#fafafa;text-align:right;">Unit Price</th>'
-    . '<th style="padding:8px;border:1px solid #ddd;background:#fafafa;text-align:right;">Total</th>'
-    . '</tr></thead><tbody>'
-    . implode('', $rows_html)
-    . '</tbody></table>'
-    . '<p style="margin:0 0 12px;"><strong>Subtotal:</strong> $' . htmlspecialchars($subtotal, ENT_QUOTES, 'UTF-8') . '</p>'
-    . '<p style="margin:0;">Thank you.</p>';
-
-  $footer_html_lines = [];
+  // ---- Build company header contact line ----
+  $header_contact_parts = [];
   if ($sender_address !== '') {
-    $footer_html_lines[] = '<p style="margin:0 0 4px;"><strong>Address:</strong> ' . nl2br(htmlspecialchars($sender_address, ENT_QUOTES, 'UTF-8')) . '</p>';
+    $header_contact_parts[] = nl2br(htmlspecialchars(preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ' · ', $sender_address)), ENT_QUOTES, 'UTF-8'));
   }
   if ($sender_phone !== '') {
-    $footer_html_lines[] = '<p style="margin:0 0 4px;"><strong>Phone:</strong> ' . htmlspecialchars($sender_phone, ENT_QUOTES, 'UTF-8') . '</p>';
+    $header_contact_parts[] = htmlspecialchars($sender_phone, ENT_QUOTES, 'UTF-8');
   }
   if ($sender_email !== '') {
-    $footer_html_lines[] = '<p style="margin:0;"><strong>Email:</strong> <a href="mailto:' . htmlspecialchars($sender_email, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($sender_email, ENT_QUOTES, 'UTF-8') . '</a></p>';
+    $header_contact_parts[] = '<a href="mailto:' . htmlspecialchars($sender_email, ENT_QUOTES, 'UTF-8') . '" style="color:#93c5fd;text-decoration:none;">' . htmlspecialchars($sender_email, ENT_QUOTES, 'UTF-8') . '</a>';
   }
-  if ($footer_html_lines) {
-    $html_body .= '<div style="margin-top:18px;padding-top:12px;border-top:1px solid #e5e5e5;">'
-      . implode('', $footer_html_lines)
-      . '</div>';
+  $header_contact_html = implode(' &nbsp;·&nbsp; ', $header_contact_parts);
+
+  // ---- "Prepared by" line ----
+  $prepared_by_html = '';
+  if ($sender_name !== '') {
+    $prepared_by_html = 'This quote was prepared by <strong style="color:#1e293b;">' . htmlspecialchars($sender_name, ENT_QUOTES, 'UTF-8') . '</strong>';
+    if ($sender_company !== 'Our Company') {
+      $prepared_by_html .= ' at <strong style="color:#1e293b;">' . htmlspecialchars($sender_company, ENT_QUOTES, 'UTF-8') . '</strong>';
+    }
+    $prepared_by_html .= '.';
   }
 
-  $html_body .= '</div></body></html>';
-
-  $text_body = $sender_company_name . "\r\n\r\n"
-    . "Hello,\r\n\r\n"
-    . "Here is your quote #{$quote_id}.\r\n"
-    . "Customer: {$customer_name}\r\n"
-    . "Quote Date: {$quote_date}\r\n\r\n"
-    . "Line Items:\r\n"
-    . implode("\r\n", $rows_text) . "\r\n\r\n"
-    . "Subtotal: \${$subtotal}\r\n\r\n"
-    . "Thank you.\r\n";
-
-  $footer_text_lines = [];
+  // ---- Footer contact line (plain) ----
+  $footer_parts = [];
   if ($sender_address !== '') {
-    $footer_text_lines[] = 'Address: ' . preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ', ', $sender_address));
+    $footer_parts[] = htmlspecialchars(preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ', ', $sender_address)), ENT_QUOTES, 'UTF-8');
   }
   if ($sender_phone !== '') {
-    $footer_text_lines[] = 'Phone: ' . $sender_phone;
+    $footer_parts[] = htmlspecialchars($sender_phone, ENT_QUOTES, 'UTF-8');
   }
   if ($sender_email !== '') {
-    $footer_text_lines[] = 'Email: ' . $sender_email;
+    $footer_parts[] = '<a href="mailto:' . htmlspecialchars($sender_email, ENT_QUOTES, 'UTF-8') . '" style="color:#93c5fd;text-decoration:none;">' . htmlspecialchars($sender_email, ENT_QUOTES, 'UTF-8') . '</a>';
   }
-  if ($footer_text_lines) {
-    $text_body .= "\r\n" . implode("\r\n", $footer_text_lines) . "\r\n";
+  $footer_contact_html = implode(' &nbsp;·&nbsp; ', $footer_parts);
+
+  // ---- Assemble HTML email ----
+  $h = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+
+  $html_body = '<!doctype html>'
+    . '<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
+    . '<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">'
+
+    // Outer wrapper
+    . '<div style="max-width:680px;margin:32px auto 32px;">'
+
+    // ── Header banner ──
+    . '<div style="background:#1e3a5f;border-radius:8px 8px 0 0;padding:28px 32px 24px;">'
+      . '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $h($sender_company) . '</p>'
+      . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '')
+    . '</div>'
+
+    // ── Document title strip ──
+    . '<div style="background:#ffffff;padding:20px 32px 0;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
+      . '<table style="width:100%;border-collapse:collapse;">'
+        . '<tr>'
+          . '<td style="padding:0 0 16px;">'
+            . '<p style="margin:0;font-size:18px;font-weight:700;color:#0f172a;">Quote #' . $h((string)$quote_id) . '</p>'
+          . '</td>'
+          . '<td style="padding:0 0 16px;text-align:right;">'
+            . '<p style="margin:0;font-size:13px;color:#64748b;">Date: ' . $h($quote_date) . '</p>'
+          . '</td>'
+        . '</tr>'
+      . '</table>'
+      . '<hr style="margin:0;border:none;border-top:2px solid #e2e8f0;">'
+    . '</div>'
+
+    // ── Body ──
+    . '<div style="background:#ffffff;padding:24px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
+
+      // Greeting
+      . '<p style="margin:0 0 8px;font-size:15px;color:#1e293b;">Hello' . ($customer_name !== '' ? ', ' . $h($customer_name) : '') . ',</p>'
+      . '<p style="margin:0 0 24px;font-size:14px;color:#475569;">Please find your quote details below. We appreciate the opportunity to earn your business.</p>'
+
+      // Line items table
+      . '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">'
+        . '<thead>'
+          . '<tr style="background:#f8fafc;">'
+            . '<th style="padding:10px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Description</th>'
+            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Qty</th>'
+            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Unit Price</th>'
+            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Total</th>'
+          . '</tr>'
+        . '</thead>'
+        . '<tbody>'
+          . implode('', $rows_html)
+        . '</tbody>'
+        . '<tfoot>'
+          . '<tr>'
+            . '<td colspan="3" style="padding:14px 12px;text-align:right;font-weight:700;font-size:14px;color:#1e293b;border-top:2px solid #e2e8f0;">Subtotal:</td>'
+            . '<td style="padding:14px 12px;text-align:right;font-weight:700;font-size:16px;color:#1e3a5f;border-top:2px solid #e2e8f0;">$' . $h($subtotal) . '</td>'
+          . '</tr>'
+        . '</tfoot>'
+      . '</table>'
+
+      . '<p style="margin:0;font-size:14px;color:#475569;">Thank you for considering our services. Please don\'t hesitate to reach out if you have any questions.</p>'
+    . '</div>'
+
+    // ── Prepared-by strip ──
+    . ($prepared_by_html !== ''
+        ? '<div style="background:#f8fafc;padding:14px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:1px solid #e2e8f0;">'
+            . '<p style="margin:0;font-size:13px;color:#64748b;">' . $prepared_by_html . '</p>'
+          . '</div>'
+        : '')
+
+    // ── Footer ──
+    . '<div style="background:#1e3a5f;border-radius:0 0 8px 8px;padding:18px 32px;">'
+      . '<p style="margin:0;font-size:12px;color:#93c5fd;line-height:1.6;">'
+        . $h($sender_company)
+        . ($footer_contact_html !== '' ? ' &nbsp;·&nbsp; ' . $footer_contact_html : '')
+      . '</p>'
+    . '</div>'
+
+    . '</div>' // end outer wrapper
+    . '</body></html>';
+
+  // ---- Plain-text fallback ----
+  $text_body = $sender_company . "\r\n";
+  if ($sender_address !== '') {
+    $text_body .= preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ', ', $sender_address)) . "\r\n";
+  }
+  if ($sender_phone !== '') $text_body .= $sender_phone . "\r\n";
+  if ($sender_email !== '') $text_body .= $sender_email . "\r\n";
+  $text_body .= "\r\n";
+  $text_body .= "Quote #{$quote_id}  |  Date: {$quote_date}\r\n";
+  $text_body .= str_repeat('-', 40) . "\r\n\r\n";
+  $text_body .= "Hello" . ($customer_name !== '' ? ", {$customer_name}" : '') . ",\r\n\r\n";
+  $text_body .= "Please find your quote details below.\r\n\r\n";
+  $text_body .= "Line Items:\r\n";
+  $text_body .= implode("\r\n", $rows_text) . "\r\n\r\n";
+  $text_body .= "Subtotal: \${$subtotal}\r\n\r\n";
+  $text_body .= "Thank you for considering our services.\r\n";
+  if ($sender_name !== '') {
+    $text_body .= "\r\nPrepared by: {$sender_name}" . ($sender_company !== 'Our Company' ? " at {$sender_company}" : '') . "\r\n";
   }
 
   try {
@@ -1041,7 +1125,7 @@ render_header('Quotes');
         <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
         <input type="hidden" name="action" value="send_email" />
         <input type="hidden" name="row_id" value="<?= (int)$detail_quote['id'] ?>" />
-        <button type="submit" class="btn">Send Email</button>
+        <button type="submit" class="btn">Email Quote</button>
       </form>
 
       <form method="post" style="margin:0;">
