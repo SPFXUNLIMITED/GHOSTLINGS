@@ -395,7 +395,7 @@ if ($section === 'payroll_export') {
   $pe_from = trim((string)($_GET['pe_from'] ?? $pe_default_from));
   $pe_to   = trim((string)($_GET['pe_to']   ?? $pe_default_to));
 
-  // Sanitise dates
+  // Sanitize dates
   if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $pe_from)) $pe_from = $pe_default_from;
   if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $pe_to))   $pe_to   = $pe_default_to;
 
@@ -1396,7 +1396,8 @@ render_header('Admin Backend');
       <?php elseif ($pe_editing && $payroll_save_errors): ?>
         <?php
           $pe_ci_fmt = str_replace(' ', 'T', substr((string)($_POST['clock_in'] ?? $pe_editing['clock_in']), 0, 16));
-          $pe_co_fmt = trim((string)($_POST['clock_out'] ?? ($pe_editing['clock_out'] ? substr($pe_editing['clock_out'], 0, 16) : '')));
+          $pe_co_raw_val = $_POST['clock_out'] ?? ($pe_editing['clock_out'] ? substr($pe_editing['clock_out'], 0, 16) : '');
+          $pe_co_fmt = str_replace(' ', 'T', trim((string)$pe_co_raw_val));
         ?>
         <div class="card" style="border-color:#93c5fd;">
           <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -1457,7 +1458,7 @@ render_header('Admin Backend');
         <h2 style="margin-top:0;">Detailed Entries
           <span class="muted" style="font-size:14px; font-weight:400; margin-left:8px;"><?= count($pe_entries) ?> entr<?= count($pe_entries) === 1 ? 'y' : 'ies' ?></span>
         </h2>
-        <p class="muted" style="margin-top:0;">Review each entry below. Use <strong>Edit</strong> to correct mistakes such as a missed clock-out for lunch.</p>
+        <p class="muted" style="margin-top:0;">Review each entry below. Use <strong>Edit</strong> to correct mistakes such as incorrect clock-in/out times or manual hours adjustments.</p>
 
         <div class="table-wrap">
           <table class="table-auto">
