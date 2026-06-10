@@ -720,6 +720,7 @@ $updated = isset($_GET['updated']) && $_GET['updated'] === '1';
 $invoice_converted = isset($_GET['invoice_converted']) && $_GET['invoice_converted'] === '1';
 $email_sent = isset($_GET['email_sent']) && $_GET['email_sent'] === '1';
 $deleted = isset($_GET['deleted']) && $_GET['deleted'] === '1';
+$status_updated = isset($_GET['status_updated']) && $_GET['status_updated'] === '1';
 
 $edit_id = null;
 $raw_edit = $_GET['edit'] ?? $_POST['edit_id'] ?? null;
@@ -803,6 +804,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           header('Location: invoice_form.php?id=' . $row_id . '&invoice_converted=1');
           exit;
         }
+      }
+    } elseif ($action === 'change_status') {
+      $row_id     = (int)($_POST['row_id'] ?? 0);
+      $new_status = trim((string)($_POST['new_status'] ?? ''));
+      if ($row_id <= 0) {
+        $errors[] = 'Invalid quote selected for status change.';
+      } elseif (!in_array($new_status, ['draft', 'sent'], true)) {
+        $errors[] = 'Invalid status value.';
+      } else {
+        $stmt = $pdo->prepare("UPDATE quotes SET status = ? WHERE id = ? AND status <> 'converted'");
+        $stmt->execute([$new_status, $row_id]);
+        if ($stmt->rowCount() < 1) {
+          // Either already converted (immutable) or ID not found — treat as no-op
+        }
+        $_SESSION['quotes_csrf'] = bin2hex(random_bytes(24));
+        header('Location: quotes.php?view=all&status_updated=1');
+        exit;
       }
     } elseif ($action === 'send_email') {
       $row_id = (int)($_POST['row_id'] ?? 0);
@@ -1101,6 +1119,9 @@ render_header('Quotes');
 <?php if ($deleted): ?>
   <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Quote deleted successfully.</div>
 <?php endif; ?>
+<?php if ($status_updated): ?>
+  <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Quote status updated.</div>
+<?php endif; ?>
 <?php foreach ($messages as $msg): ?>
   <div class="alert" style="border-color:#bfdbfe; background:#eff6ff; color:#1e3a8a;"><?= h($msg) ?></div>
 <?php endforeach; ?>
@@ -1220,7 +1241,31 @@ render_header('Quotes');
             <td><?= h((string)($quote['company_name'] ?: '—')) ?></td>
             <td><?= (int)$quote['line_count'] ?></td>
             <td><strong>$<?= h(quote_format_money($quote['subtotal_amount'])) ?></strong></td>
-            <td><?= h(ucfirst((string)$quote['status'])) ?><?= !empty($quote['converted_invoice_no']) ? ' (' . h((string)$quote['converted_invoice_no']) . ')' : '' ?></td>
+            <?php
+              $row_status = (string)$quote['status'];
+              $row_status_colors = [
+                'draft'     => ['#fef9c3', '#854d0e'],
+                'sent'      => ['#dbeafe', '#1d4ed8'],
+                'converted' => ['#dcfce7', '#166534'],
+              ];
+              [$row_badge_bg, $row_badge_color] = $row_status_colors[$row_status] ?? ['#f1f5f9', '#334155'];
+            ?>
+            <td style="white-space:nowrap;">
+              <?php if ($row_status === 'converted'): ?>
+                <span style="display:inline-flex;align-items:center;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;background:<?= h($row_badge_bg) ?>;color:<?= h($row_badge_color) ?>;">Converted</span><?= !empty($quote['converted_invoice_no']) ? ' <span style="font-size:12px;color:#64748b;">(' . h((string)$quote['converted_invoice_no']) . ')</span>' : '' ?>
+              <?php else: ?>
+                <form method="post" style="display:inline-flex;align-items:center;gap:4px;">
+                  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
+                  <input type="hidden" name="action" value="change_status" />
+                  <input type="hidden" name="row_id" value="<?= (int)$quote['id'] ?>" />
+                  <select name="new_status" aria-label="Status for quote #<?= (int)$quote['id'] ?>" style="font-size:0.82em;padding:3px 6px;">
+                    <option value="draft" <?= $row_status === 'draft' ? 'selected' : '' ?>>Draft</option>
+                    <option value="sent"  <?= $row_status === 'sent'  ? 'selected' : '' ?>>Sent</option>
+                  </select>
+                  <button type="submit" class="btn" style="font-size:0.78em;padding:3px 8px;">Save</button>
+                </form>
+              <?php endif; ?>
+            </td>
             <td style="white-space:nowrap;">
               <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote['id'] ?>">View</a>
               <a class="btn" href="quotes.php?edit=<?= (int)$quote['id'] ?>">Edit</a>
