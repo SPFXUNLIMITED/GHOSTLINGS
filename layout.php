@@ -464,7 +464,8 @@ function render_header(string $title): void {
       $pv_page = mb_substr(basename((string)($_SERVER['PHP_SELF'] ?? '')), 0, 100);
       $pv_uri  = (string)($_SERVER['REQUEST_URI'] ?? '');
       $pv_url  = mb_substr(strtok($pv_uri, '?'), 0, 512);
-      $pv_stmt = $pdo->prepare("INSERT INTO page_views (user_id, page, url, viewed_at) VALUES (?, ?, ?, CONVERT_TZ(NOW(), @@session.time_zone, 'America/Los_Angeles'))");
+      error_log("Page view logged at server time: " . date('Y-m-d H:i:s'));
+      $pv_stmt = $pdo->prepare("INSERT INTO page_views (user_id, page, url, viewed_at) VALUES (?, ?, ?, NOW())");
       $pv_stmt->execute([$user_id, $pv_page, $pv_url]);
     } catch (Throwable $e) {
       // silently ignore; page view logging must never break page rendering
