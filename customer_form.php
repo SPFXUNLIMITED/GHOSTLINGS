@@ -21,10 +21,15 @@ $fields = [
   'company' => '',
   'phone' => '',
   'email' => '',
+  'address' => '',
+  'city' => '',
+  'state' => '',
+  'zip' => '',
+  'country' => '',
 ];
 
 if ($is_edit) {
-  $row = $pdo->prepare("SELECT id, first_name, last_name, company, phone, email FROM customers WHERE id = ?");
+  $row = $pdo->prepare("SELECT id, first_name, last_name, company, phone, email, address, city, state, zip, country FROM customers WHERE id = ?");
   $row->execute([$id]);
   $customer = $row->fetch(PDO::FETCH_ASSOC);
   if (!$customer) {
@@ -66,12 +71,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($fields['email'] !== '' && !filter_var($fields['email'], FILTER_VALIDATE_EMAIL)) {
       $errors[] = 'Email address is not valid.';
     }
+    if (mb_strlen($fields['address']) > 255) {
+      $errors[] = 'Address must be 255 characters or fewer.';
+    }
+    if (mb_strlen($fields['city']) > 100) {
+      $errors[] = 'City must be 100 characters or fewer.';
+    }
+    if (mb_strlen($fields['state']) > 100) {
+      $errors[] = 'State must be 100 characters or fewer.';
+    }
+    if (mb_strlen($fields['zip']) > 20) {
+      $errors[] = 'ZIP must be 20 characters or fewer.';
+    }
+    if (mb_strlen($fields['country']) > 100) {
+      $errors[] = 'Country must be 100 characters or fewer.';
+    }
 
     if (!$errors) {
       if ($is_edit) {
         $pdo->prepare("
           UPDATE customers
-          SET first_name = ?, last_name = ?, company = ?, phone = ?, email = ?
+          SET first_name = ?, last_name = ?, company = ?, phone = ?, email = ?,
+              address = ?, city = ?, state = ?, zip = ?, country = ?
           WHERE id = ?
         ")->execute([
           $fields['first_name'],
@@ -79,6 +100,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $fields['company'],
           $fields['phone'],
           $fields['email'],
+          $fields['address'],
+          $fields['city'],
+          $fields['state'],
+          $fields['zip'],
+          $fields['country'],
           $id,
         ]);
         $_SESSION['customer_form_csrf'] = bin2hex(random_bytes(24));
@@ -88,8 +114,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       $hubspot_contact_id = 'manual_' . bin2hex(random_bytes(10));
       $pdo->prepare("
-        INSERT INTO customers (hubspot_contact_id, first_name, last_name, company, phone, email, last_updated)
-        VALUES (?, ?, ?, ?, ?, ?, NULL)
+        INSERT INTO customers (hubspot_contact_id, first_name, last_name, company, phone, email, address, city, state, zip, country, last_updated)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
       ")->execute([
         $hubspot_contact_id,
         $fields['first_name'],
@@ -97,6 +123,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fields['company'],
         $fields['phone'],
         $fields['email'],
+        $fields['address'],
+        $fields['city'],
+        $fields['state'],
+        $fields['zip'],
+        $fields['country'],
       ]);
       $_SESSION['customer_form_csrf'] = bin2hex(random_bytes(24));
       header('Location: customers.php?created=1');
@@ -146,6 +177,26 @@ render_header($page_title);
       <div class="full">
         <label>Email</label>
         <input type="email" name="email" maxlength="255" value="<?= h($fields['email']) ?>" />
+      </div>
+      <div class="full">
+        <label>Street Address</label>
+        <input type="text" name="address" maxlength="255" value="<?= h($fields['address']) ?>" />
+      </div>
+      <div>
+        <label>City</label>
+        <input type="text" name="city" maxlength="100" value="<?= h($fields['city']) ?>" />
+      </div>
+      <div>
+        <label>State / Region</label>
+        <input type="text" name="state" maxlength="100" value="<?= h($fields['state']) ?>" />
+      </div>
+      <div>
+        <label>ZIP / Postal Code</label>
+        <input type="text" name="zip" maxlength="20" value="<?= h($fields['zip']) ?>" />
+      </div>
+      <div>
+        <label>Country</label>
+        <input type="text" name="country" maxlength="100" value="<?= h($fields['country']) ?>" />
       </div>
     </div>
 

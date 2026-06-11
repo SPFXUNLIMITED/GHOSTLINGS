@@ -7,7 +7,7 @@ require_admin_or_moderator();
 const HUBSPOT_SYNC_PAGE_LIMIT = 50;
 const HUBSPOT_SYNC_PAGE_SIZE = 100;
 const HUBSPOT_SYNC_TIMEOUT_SECONDS = 20;
-const HUBSPOT_CONTACT_PROPERTIES = 'firstname,lastname,company,phone,email,lastmodifieddate';
+const HUBSPOT_CONTACT_PROPERTIES = 'firstname,lastname,company,phone,email,address,city,state,zip,country,lastmodifieddate';
 const HUBSPOT_CONTACTS_API_BASE = 'https://api.hubapi.com/crm/v3/objects/contacts';
 
 if (empty($_SESSION['customers_sync_csrf'])) {
@@ -210,14 +210,19 @@ function sync_customers_from_hubspot(PDO $pdo): array {
 
   $url = HUBSPOT_CONTACTS_API_BASE . '?limit=' . HUBSPOT_SYNC_PAGE_SIZE . '&properties=' . HUBSPOT_CONTACT_PROPERTIES;
   $upsert = $pdo->prepare(
-    "INSERT INTO customers (hubspot_contact_id, first_name, last_name, company, phone, email, last_updated)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+    "INSERT INTO customers (hubspot_contact_id, first_name, last_name, company, phone, email, address, city, state, zip, country, last_updated)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
        first_name = ?,
        last_name = ?,
        company = ?,
        phone = ?,
        email = ?,
+       address = ?,
+       city = ?,
+       state = ?,
+       zip = ?,
+       country = ?,
        last_updated = ?"
   );
 
@@ -261,6 +266,11 @@ function sync_customers_from_hubspot(PDO $pdo): array {
         $company = trim((string)($props['company'] ?? ''));
         $phone = trim((string)($props['phone'] ?? ''));
         $email = trim((string)($props['email'] ?? ''));
+        $address = trim((string)($props['address'] ?? ''));
+        $city = trim((string)($props['city'] ?? ''));
+        $state = trim((string)($props['state'] ?? ''));
+        $zip = trim((string)($props['zip'] ?? ''));
+        $country = trim((string)($props['country'] ?? ''));
         $last_updated = hubspot_to_datetime($props['lastmodifieddate'] ?? null);
         $upsert->execute([
           $id,
@@ -269,12 +279,22 @@ function sync_customers_from_hubspot(PDO $pdo): array {
           $company,
           $phone,
           $email,
+          $address,
+          $city,
+          $state,
+          $zip,
+          $country,
           $last_updated,
           $first_name,
           $last_name,
           $company,
           $phone,
           $email,
+          $address,
+          $city,
+          $state,
+          $zip,
+          $country,
           $last_updated,
         ]);
         $synced++;

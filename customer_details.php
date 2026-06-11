@@ -67,6 +67,26 @@ render_header('Customer Details');
         <td><?= trim((string)($customer['phone'] ?? '')) !== '' ? h((string)$customer['phone']) : '<span class="muted">—</span>' ?></td>
       </tr>
       <tr>
+        <th>Street Address</th>
+        <td><?= trim((string)($customer['address'] ?? '')) !== '' ? h((string)$customer['address']) : '<span class="muted">—</span>' ?></td>
+      </tr>
+      <tr>
+        <th>City</th>
+        <td><?= trim((string)($customer['city'] ?? '')) !== '' ? h((string)$customer['city']) : '<span class="muted">—</span>' ?></td>
+      </tr>
+      <tr>
+        <th>State / Region</th>
+        <td><?= trim((string)($customer['state'] ?? '')) !== '' ? h((string)$customer['state']) : '<span class="muted">—</span>' ?></td>
+      </tr>
+      <tr>
+        <th>ZIP / Postal Code</th>
+        <td><?= trim((string)($customer['zip'] ?? '')) !== '' ? h((string)$customer['zip']) : '<span class="muted">—</span>' ?></td>
+      </tr>
+      <tr>
+        <th>Country</th>
+        <td><?= trim((string)($customer['country'] ?? '')) !== '' ? h((string)$customer['country']) : '<span class="muted">—</span>' ?></td>
+      </tr>
+      <tr>
         <th>HubSpot Contact ID</th>
         <td><?= trim((string)($customer['hubspot_contact_id'] ?? '')) !== '' ? h((string)$customer['hubspot_contact_id']) : '<span class="muted">—</span>' ?></td>
       </tr>
