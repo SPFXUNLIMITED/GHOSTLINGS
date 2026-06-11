@@ -1466,6 +1466,35 @@ if ($_qi_markup_col === false || $_qi_markup_col->fetch(PDO::FETCH_ASSOC) === fa
 }
 unset($_qi_markup_col);
 
+$_qi_taxable_col = $pdo->query("SHOW COLUMNS FROM quote_items LIKE 'is_taxable'");
+if ($_qi_taxable_col === false || $_qi_taxable_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quote_items ADD COLUMN is_taxable TINYINT(1) NOT NULL DEFAULT 0 AFTER line_total");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quote_items LIKE 'is_taxable'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_qi_taxable_col);
+
+foreach ([
+  'tax_rate'   => "ALTER TABLE quotes ADD COLUMN tax_rate   DECIMAL(6,2)  NOT NULL DEFAULT 0.00 AFTER subtotal_amount",
+  'tax_amount' => "ALTER TABLE quotes ADD COLUMN tax_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER tax_rate",
+] as $_tax_col => $_tax_sql) {
+  $_tax_stmt = $pdo->prepare("SHOW COLUMNS FROM quotes LIKE ?");
+  $_tax_stmt->execute([$_tax_col]);
+  if ($_tax_stmt->fetch(PDO::FETCH_ASSOC) === false) {
+    try {
+      $pdo->exec($_tax_sql);
+    } catch (Throwable $e) {
+      $_tax_rechk = $pdo->prepare("SHOW COLUMNS FROM quotes LIKE ?");
+      $_tax_rechk->execute([$_tax_col]);
+      if ($_tax_rechk->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+    }
+  }
+}
+unset($_tax_col, $_tax_sql, $_tax_stmt, $_tax_rechk);
+
 // Create shipping_rfq_requests table for freight/shipping quote requests
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS shipping_rfq_requests (
