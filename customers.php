@@ -138,7 +138,7 @@ function parse_hubspot_address_components(string $address, string $city, string 
   }
 
   // 3. Extract state (full name or two-letter abbreviation) from the end.
-  $state_abbreviations = [
+  static $state_abbreviations = [
     'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
     'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
     'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
@@ -146,17 +146,20 @@ function parse_hubspot_address_components(string $address, string $city, string 
     'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
     'DC',
   ];
-  $state_names = [
-    'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut','Delaware',
-    'Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa','Kansas','Kentucky',
-    'Louisiana','Maine','Maryland','Massachusetts','Michigan','Minnesota','Mississippi',
-    'Missouri','Montana','Nebraska','Nevada','New Hampshire','New Jersey','New Mexico',
-    'New York','North Carolina','North Dakota','Ohio','Oklahoma','Oregon','Pennsylvania',
-    'Rhode Island','South Carolina','South Dakota','Tennessee','Texas','Utah','Vermont',
-    'Virginia','Washington','West Virginia','Wisconsin','Wyoming','District of Columbia',
-  ];
-  usort($state_names, static fn(string $a, string $b): int => strlen($b) <=> strlen($a));
-  $state_name_pattern = implode('|', array_map(static fn(string $n): string => preg_quote($n, '/'), $state_names));
+  static $state_name_pattern = null;
+  if ($state_name_pattern === null) {
+    $state_names = [
+      'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut','Delaware',
+      'Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa','Kansas','Kentucky',
+      'Louisiana','Maine','Maryland','Massachusetts','Michigan','Minnesota','Mississippi',
+      'Missouri','Montana','Nebraska','Nevada','New Hampshire','New Jersey','New Mexico',
+      'New York','North Carolina','North Dakota','Ohio','Oklahoma','Oregon','Pennsylvania',
+      'Rhode Island','South Carolina','South Dakota','Tennessee','Texas','Utah','Vermont',
+      'Virginia','Washington','West Virginia','Wisconsin','Wyoming','District of Columbia',
+    ];
+    usort($state_names, static fn(string $a, string $b): int => strlen($b) <=> strlen($a));
+    $state_name_pattern = implode('|', array_map(static fn(string $n): string => preg_quote($n, '/'), $state_names));
+  }
 
   $parsed_state = '';
   if (preg_match('/(?:^|,\s*|\s+)(' . $state_name_pattern . ')\s*$/i', $working, $m)) {
