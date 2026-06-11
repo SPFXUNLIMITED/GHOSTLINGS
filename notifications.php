@@ -34,6 +34,25 @@ if ($is_admin) {
   $new_bugs = $bug_stmt->fetchAll();
 }
 
+$approval_alerts = [];
+$approval_stmt = $pdo->prepare("
+  SELECT id, entity_type, entity_id, message, link_url, created_at
+  FROM approval_alerts
+  WHERE recipient_id = ? AND is_read = 0
+  ORDER BY created_at DESC, id DESC
+");
+$approval_stmt->execute([$current_user_id]);
+$approval_alerts = $approval_stmt->fetchAll();
+if ($approval_alerts) {
+  $approval_ids = array_map(static fn(array $row): int => (int)$row['id'], $approval_alerts);
+  $approval_ids = array_values(array_filter($approval_ids, static fn(int $id): bool => $id > 0));
+  if ($approval_ids) {
+    $placeholders = implode(',', array_fill(0, count($approval_ids), '?'));
+    $mark_read_stmt = $pdo->prepare("UPDATE approval_alerts SET is_read = 1 WHERE recipient_id = ? AND id IN ($placeholders)");
+    $mark_read_stmt->execute(array_merge([$current_user_id], $approval_ids));
+  }
+}
+
 render_header('Notifications');
 ?>
 
@@ -41,9 +60,39 @@ render_header('Notifications');
   <h1 style="margin:0;">Notifications</h1>
 </div>
 
-<?php if (empty($unread_messages) && empty($new_bugs)): ?>
+<?php if (empty($unread_messages) && empty($new_bugs) && empty($approval_alerts)): ?>
 <div class="card">
   <p class="muted">You have no new notifications.</p>
+</div>
+<?php endif; ?>
+
+<?php if (!empty($approval_alerts)): ?>
+<div class="card">
+  <h2 style="margin:0 0 12px;">Approval Requests</h2>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Alert</th>
+        <th>Date</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <?php foreach ($approval_alerts as $alert): ?>
+      <?php
+        $entity_type = strtolower(trim((string)($alert['entity_type'] ?? '')));
+        $type_label = $entity_type === 'invoice' ? 'Invoice' : 'Quote';
+      ?>
+      <tr>
+        <td><?= h($type_label) ?></td>
+        <td><?= h((string)$alert['message']) ?></td>
+        <td><?= h((string)$alert['created_at']) ?></td>
+        <td><a class="btn btn-sm" href="<?= h((string)$alert['link_url']) ?>">Open</a></td>
+      </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
 </div>
 <?php endif; ?>
 

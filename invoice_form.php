@@ -20,6 +20,22 @@ if (empty($_SESSION['invoice_form_csrf'])) {
   $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
 }
 
+function invoice_form_approval_label(string $status): string {
+  return match ($status) {
+    'pending_approval' => 'Pending Approval',
+    'approved' => 'Approved',
+    default => 'Not Submitted',
+  };
+}
+
+function invoice_form_approval_colors(string $status): array {
+  return match ($status) {
+    'pending_approval' => ['#fef3c7', '#92400e'],
+    'approved' => ['#dcfce7', '#166534'],
+    default => ['#f1f5f9', '#475569'],
+  };
+}
+
 $view_mode_requested = isset($_GET['mode']) && $_GET['mode'] === 'view';
 
 // ---------- Invoice email helpers ----------
@@ -770,6 +786,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
   }
 
+  if (trim((string)($_POST['action'] ?? '')) === 'approve_invoice') {
+    $row_id = (int)($_POST['row_id'] ?? 0);
+    $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
+    if (!is_admin() || $row_id <= 0) {
+      header('Location: invoice_tracker.php');
+      exit;
+    }
+    $check = $pdo->prepare("SELECT id FROM quotes WHERE id = ? LIMIT 1");
+    $check->execute([$row_id]);
+    if (!$check->fetch()) {
+      header('Location: invoice_tracker.php');
+      exit;
+    }
+    $pdo->prepare("UPDATE quotes SET approval_status = 'approved' WHERE id = ?")->execute([$row_id]);
+    $pdo->prepare("UPDATE approval_alerts SET is_read = 1 WHERE entity_type = 'invoice' AND entity_id = ?")->execute([$row_id]);
+    header('Location: invoice_form.php?id=' . $row_id . '&mode=view&approval_approved=1');
+    exit;
+  }
+
   if ($view_mode_requested) {
     http_response_code(405);
     exit('Viewing mode is read only.');
@@ -1076,6 +1111,10 @@ if (!$line_items) {
 $invoice_converted = isset($_GET['invoice_converted']) && $_GET['invoice_converted'] === '1';
 $invoice_email_sent  = isset($_GET['email_sent'])  && $_GET['email_sent']  === '1';
 $invoice_email_error = isset($_GET['email_error']) && $_GET['email_error'] !== '' ? trim((string)$_GET['email_error']) : '';
+$invoice_approval_approved = isset($_GET['approval_approved']) && $_GET['approval_approved'] === '1';
+$invoice_approval_status = is_array($quote) ? (string)($quote['approval_status'] ?? 'none') : 'none';
+[$invoice_approval_bg, $invoice_approval_color] = invoice_form_approval_colors($invoice_approval_status);
+$invoice_approval_label = invoice_form_approval_label($invoice_approval_status);
 
 render_header($invoice_heading);
 ?>
@@ -1094,6 +1133,9 @@ render_header($invoice_heading);
   <div class="page-header-body">
     <h1><?= h($invoice_heading) ?></h1>
     <p class="muted"><?= h($invoice_subtitle) ?></p>
+    <?php if ($quote): ?>
+      <span style="display:inline-flex;align-items:center;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:600;background:<?= h($invoice_approval_bg) ?>;color:<?= h($invoice_approval_color) ?>;">Approval: <?= h($invoice_approval_label) ?></span>
+    <?php endif; ?>
   </div>
   <div class="actions">
     <?php if ($is_view_mode && $quote): ?>
@@ -1111,6 +1153,14 @@ render_header($invoice_heading);
     <?php if ($quote): ?>
       <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
     <?php endif; ?>
+    <?php if ($is_view_mode && $quote && is_admin() && $invoice_approval_status !== 'approved'): ?>
+      <form method="post" style="margin:0;" action="">
+        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
+        <input type="hidden" name="action" value="approve_invoice" />
+        <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
+        <button type="submit" class="btn primary">Approve</button>
+      </form>
+    <?php endif; ?>
     <a class="btn" href="quotes.php?view=all">All Quotes</a>
   </div>
 </div>
@@ -1124,6 +1174,9 @@ render_header($invoice_heading);
   <?php endif; ?>
   <?php if ($invoice_email_error !== ''): ?>
     <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b; margin-bottom:14px;">Failed to send invoice email: <?= h($invoice_email_error) ?></div>
+  <?php endif; ?>
+  <?php if ($invoice_approval_approved): ?>
+    <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">Invoice approved.</div>
   <?php endif; ?>
 
   <?php if (!$is_view_mode): ?>

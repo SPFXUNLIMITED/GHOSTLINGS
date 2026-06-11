@@ -4,7 +4,7 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_admin_or_moderator();
 
-const INVOICE_TRACKER_TABLE_COLUMN_COUNT = 5;
+const INVOICE_TRACKER_TABLE_COLUMN_COUNT = 6;
 const INVOICE_TRACKER_BASE_FILTER = "((converted_invoice_no IS NOT NULL AND converted_invoice_no <> '') OR status = 'converted')";
 
 // ---------- AJAX: print preview ----------
@@ -284,6 +284,42 @@ function invoice_tracker_effective_date(array $invoice): string {
   return substr(trim((string)($invoice['created_at'] ?? '')), 0, 10);
 }
 
+function invoice_approval_label(string $status): string {
+  return match ($status) {
+    'pending_approval' => 'Pending Approval',
+    'approved' => 'Approved',
+    default => 'Not Submitted',
+  };
+}
+
+function invoice_approval_badge_colors(string $status): array {
+  return match ($status) {
+    'pending_approval' => ['#fef3c7', '#92400e'],
+    'approved' => ['#dcfce7', '#166534'],
+    default => ['#f1f5f9', '#475569'],
+  };
+}
+
+function invoice_create_admin_approval_alerts(PDO $pdo, int $invoice_id, string $message): void {
+  $admin_ids = $pdo->query("SELECT id FROM users WHERE is_admin = 1 OR role = 'admin'")->fetchAll(PDO::FETCH_COLUMN);
+  if (!$admin_ids) {
+    return;
+  }
+
+  $ins = $pdo->prepare("
+    INSERT INTO approval_alerts (recipient_id, entity_type, entity_id, message, link_url)
+    VALUES (?, 'invoice', ?, ?, ?)
+  ");
+  $link_url = 'invoice_form.php?id=' . $invoice_id . '&mode=view';
+  foreach ($admin_ids as $admin_id_raw) {
+    $admin_id = (int)$admin_id_raw;
+    if ($admin_id <= 0) {
+      continue;
+    }
+    $ins->execute([$admin_id, $invoice_id, $message, $link_url]);
+  }
+}
+
 // ---------- POST action handlers ----------
 $tracker_errors = [];
 $tracker_success = '';
@@ -331,6 +367,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: invoice_tracker.php?deleted=1');
         exit;
       }
+    } elseif ($action === 'send_for_approval') {
+      $inv_id = (int)($_POST['invoice_id'] ?? 0);
+      if ($inv_id <= 0) {
+        $tracker_errors[] = 'Invalid invoice.';
+      } else {
+        $check = $pdo->prepare("SELECT id FROM quotes WHERE id = ? LIMIT 1");
+        $check->execute([$inv_id]);
+        if (!$check->fetch()) {
+          $tracker_errors[] = 'Invoice not found.';
+        } else {
+          $pdo->prepare("UPDATE quotes SET approval_status = 'pending_approval' WHERE id = ?")->execute([$inv_id]);
+          $actor = trim((string)($_SESSION['username'] ?? 'A team member'));
+          invoice_create_admin_approval_alerts($pdo, $inv_id, $actor . ' sent Invoice #' . $inv_id . ' for approval.');
+          header('Location: invoice_tracker.php?approval_sent=1');
+          exit;
+        }
+      }
     }
 
     // After POST, redirect to avoid form re-submission
@@ -367,7 +420,7 @@ if ($status_filter !== '' && isset($invoice_statuses[$status_filter])) {
 }
 
 $stmt = $pdo->prepare(
-  "SELECT id, customer_name, company_name, quote_date, subtotal_amount, status, converted_invoice_no,
+  "SELECT id, customer_name, company_name, quote_date, subtotal_amount, status, approval_status, converted_invoice_no,
           enable_online_payment, invoice_emailed, created_at
    FROM quotes
    WHERE " . implode(' AND ', $where_parts) . "
@@ -414,6 +467,9 @@ render_header('Invoice Tracker');
 
 <?php if (($_GET['deleted'] ?? '') === '1'): ?>
   <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b;">Invoice deleted.</div>
+<?php endif; ?>
+<?php if (($_GET['approval_sent'] ?? '') === '1'): ?>
+  <div class="alert" style="border-color:#fde68a; background:#fffbeb; color:#92400e;">Invoice sent for approval.</div>
 <?php endif; ?>
 
 <?php if (($_GET['email_sent'] ?? '') !== ''): ?>
@@ -540,6 +596,7 @@ render_header('Invoice Tracker');
           <th>#</th>
           <th>Invoice</th>
           <th class="col-status">Email Status</th>
+          <th>Approval Status</th>
           <th>Online Payment</th>
           <th class="col-actions">Actions</th>
         </tr>
@@ -558,6 +615,8 @@ render_header('Invoice Tracker');
             $invoice_date   = invoice_tracker_effective_date($invoice);
             $is_emailed     = (int)($invoice['invoice_emailed'] ?? 0) === 1;
             $online_payment = (int)($invoice['enable_online_payment'] ?? 0) === 1;
+            $approval_status = (string)($invoice['approval_status'] ?? 'none');
+            [$approval_bg, $approval_color] = invoice_approval_badge_colors($approval_status);
           ?>
           <tr>
             <td class="muted"><?= $inv_id ?></td>
@@ -585,6 +644,12 @@ render_header('Invoice Tracker');
                 </select>
                 <button type="submit" class="btn">Save</button>
               </form>
+            </td>
+
+            <td>
+              <span style="display:inline-flex;align-items:center;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;background:<?= h($approval_bg) ?>;color:<?= h($approval_color) ?>;">
+                <?= h(invoice_approval_label($approval_status)) ?>
+              </span>
             </td>
 
             <!-- Online Payment toggle -->
@@ -623,6 +688,12 @@ render_header('Invoice Tracker');
                   <input type="hidden" name="row_id" value="<?= $inv_id ?>" />
                   <input type="hidden" name="return_to" value="tracker" />
                   <button type="submit" class="btn">Email Invoice</button>
+                </form>
+                <form method="post" action="invoice_tracker.php" style="display:contents;">
+                  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_tracker_csrf']) ?>" />
+                  <input type="hidden" name="action" value="send_for_approval" />
+                  <input type="hidden" name="invoice_id" value="<?= $inv_id ?>" />
+                  <button type="submit" class="btn">Send for Approval</button>
                 </form>
 
                 <a class="btn" href="quotes.php?view=id&id=<?= $inv_id ?>">Go back to Quote</a>

@@ -1327,6 +1327,17 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+$_quotes_approval_status_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'approval_status'");
+if ($_quotes_approval_status_col === false || $_quotes_approval_status_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN approval_status ENUM('none','pending_approval','approved') NOT NULL DEFAULT 'none' AFTER status");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'approval_status'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_approval_status_col);
+
 $_quotes_online_payment_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'enable_online_payment'");
 if ($_quotes_online_payment_col === false || $_quotes_online_payment_col->fetch(PDO::FETCH_ASSOC) === false) {
   try {
@@ -1560,6 +1571,24 @@ $pdo->exec("
     PRIMARY KEY (id),
     KEY idx_messages_recipient_read (recipient_id, is_read),
     KEY idx_messages_created_at (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// Create approval alerts table for quote/invoice approval requests
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS approval_alerts (
+    id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    recipient_id INT UNSIGNED NOT NULL,
+    entity_type  ENUM('quote','invoice') NOT NULL,
+    entity_id    INT UNSIGNED NOT NULL,
+    message      VARCHAR(500) NOT NULL,
+    link_url     VARCHAR(500) NOT NULL,
+    is_read      TINYINT(1) NOT NULL DEFAULT 0,
+    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_approval_alerts_recipient_unread (recipient_id, is_read, created_at),
+    KEY idx_approval_alerts_entity (entity_type, entity_id),
+    CONSTRAINT fk_approval_alerts_recipient FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 

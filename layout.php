@@ -437,6 +437,10 @@ function render_header(string $title): void {
     $unread_stmt->execute([$user_id]);
     $unread_count = (int)$unread_stmt->fetchColumn();
 
+    $approval_stmt = $pdo->prepare("SELECT COUNT(*) FROM approval_alerts WHERE recipient_id = ? AND is_read = 0");
+    $approval_stmt->execute([$user_id]);
+    $approval_count = (int)$approval_stmt->fetchColumn();
+
     $bug_count = 0;
     if (!empty($_SESSION['is_admin'])) {
       $bug_stmt = $pdo->prepare("SELECT COUNT(*) FROM app_requests WHERE request_type = 'bug' AND status = 'new'");
@@ -444,11 +448,14 @@ function render_header(string $title): void {
       $bug_count = (int)$bug_stmt->fetchColumn();
     }
 
-    $total_notif = $unread_count + $bug_count;
+    $total_notif = $unread_count + $bug_count + $approval_count;
     if ($total_notif > 0) {
       $label_parts = [];
       if ($unread_count > 0) {
         $label_parts[] = $unread_count . ' unread message' . ($unread_count === 1 ? '' : 's');
+      }
+      if ($approval_count > 0) {
+        $label_parts[] = $approval_count . ' approval alert' . ($approval_count === 1 ? '' : 's');
       }
       if ($bug_count > 0) {
         $label_parts[] = $bug_count . ' new bug report' . ($bug_count === 1 ? '' : 's');

@@ -24,6 +24,41 @@ function quote_format_money($value): string {
   return number_format((float)$value, 2);
 }
 
+function quote_approval_label(string $status): string {
+  return match ($status) {
+    'pending_approval' => 'Pending Approval',
+    'approved' => 'Approved',
+    default => 'Not Submitted',
+  };
+}
+
+function quote_approval_badge_colors(string $status): array {
+  return match ($status) {
+    'pending_approval' => ['#fef3c7', '#92400e'],
+    'approved' => ['#dcfce7', '#166534'],
+    default => ['#f1f5f9', '#475569'],
+  };
+}
+
+function quote_create_admin_approval_alerts(PDO $pdo, int $entity_id, string $entity_type, string $link_url, string $message): void {
+  $admin_ids = $pdo->query("SELECT id FROM users WHERE is_admin = 1 OR role = 'admin'")->fetchAll(PDO::FETCH_COLUMN);
+  if (!$admin_ids) {
+    return;
+  }
+
+  $ins = $pdo->prepare("
+    INSERT INTO approval_alerts (recipient_id, entity_type, entity_id, message, link_url)
+    VALUES (?, ?, ?, ?, ?)
+  ");
+  foreach ($admin_ids as $admin_id_raw) {
+    $admin_id = (int)$admin_id_raw;
+    if ($admin_id <= 0) {
+      continue;
+    }
+    $ins->execute([$admin_id, $entity_type, $entity_id, $message, $link_url]);
+  }
+}
+
 function quote_mail_domain(): string {
   $configured = trim((string)getenv('APP_MAIL_FROM_DOMAIN'));
   if ($configured !== '' && preg_match('/^[a-z0-9.-]+$/i', $configured)) {
@@ -1006,6 +1041,8 @@ $invoice_converted = isset($_GET['invoice_converted']) && $_GET['invoice_convert
 $email_sent = isset($_GET['email_sent']) && $_GET['email_sent'] === '1';
 $deleted = isset($_GET['deleted']) && $_GET['deleted'] === '1';
 $status_updated = isset($_GET['status_updated']) && $_GET['status_updated'] === '1';
+$approval_sent = isset($_GET['approval_sent']) && $_GET['approval_sent'] === '1';
+$approval_approved = isset($_GET['approval_approved']) && $_GET['approval_approved'] === '1';
 
 $edit_id = null;
 $raw_edit = $_GET['edit'] ?? $_POST['edit_id'] ?? null;
@@ -1110,6 +1147,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['quotes_csrf'] = bin2hex(random_bytes(24));
         header('Location: quotes.php?view=all&status_updated=1');
         exit;
+      }
+    } elseif ($action === 'send_for_approval') {
+      $row_id = (int)($_POST['row_id'] ?? 0);
+      if ($row_id <= 0) {
+        $errors[] = 'Invalid quote selected for approval.';
+      } else {
+        $check = $pdo->prepare("SELECT id FROM quotes WHERE id = ? LIMIT 1");
+        $check->execute([$row_id]);
+        if (!$check->fetch()) {
+          $errors[] = 'Quote not found.';
+        } else {
+          $pdo->prepare("UPDATE quotes SET approval_status = 'pending_approval' WHERE id = ?")->execute([$row_id]);
+          $actor = trim((string)($_SESSION['username'] ?? 'A team member'));
+          $msg = $actor . ' sent Quote #' . $row_id . ' for approval.';
+          quote_create_admin_approval_alerts($pdo, $row_id, 'quote', 'quotes.php?view=id&id=' . $row_id, $msg);
+          $_SESSION['quotes_csrf'] = bin2hex(random_bytes(24));
+          header('Location: quotes.php?view=all&approval_sent=1');
+          exit;
+        }
+      }
+    } elseif ($action === 'approve_quote') {
+      $row_id = (int)($_POST['row_id'] ?? 0);
+      if (!is_admin()) {
+        $errors[] = 'Only admins can approve quotes.';
+      } elseif ($row_id <= 0) {
+        $errors[] = 'Invalid quote selected for approval.';
+      } else {
+        $check = $pdo->prepare("SELECT id FROM quotes WHERE id = ? LIMIT 1");
+        $check->execute([$row_id]);
+        if (!$check->fetch()) {
+          $errors[] = 'Quote not found.';
+        } else {
+          $pdo->prepare("UPDATE quotes SET approval_status = 'approved' WHERE id = ?")->execute([$row_id]);
+          $pdo->prepare("UPDATE approval_alerts SET is_read = 1 WHERE entity_type = 'quote' AND entity_id = ?")->execute([$row_id]);
+          $_SESSION['quotes_csrf'] = bin2hex(random_bytes(24));
+          header('Location: quotes.php?view=id&id=' . $row_id . '&approval_approved=1');
+          exit;
+        }
       }
     } elseif ($action === 'send_email') {
       $row_id = (int)($_POST['row_id'] ?? 0);
@@ -1339,6 +1414,7 @@ $quotes = [];
 if ($show_all) {
   $stmt = $pdo->query(
     "SELECT q.id, q.customer_name, q.company_name, q.quote_date, q.status, q.subtotal_amount, q.converted_invoice_no, q.created_at,
+            q.approval_status,
             COUNT(qi.id) AS line_count
      FROM quotes q
      LEFT JOIN quote_items qi ON qi.quote_id = q.id
@@ -1423,6 +1499,12 @@ render_header('Quotes');
 <?php if ($status_updated): ?>
   <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Quote status updated.</div>
 <?php endif; ?>
+<?php if ($approval_sent): ?>
+  <div class="alert" style="border-color:#fde68a; background:#fffbeb; color:#92400e;">Quote sent for approval.</div>
+<?php endif; ?>
+<?php if ($approval_approved): ?>
+  <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Quote approved.</div>
+<?php endif; ?>
 <?php foreach ($messages as $msg): ?>
   <div class="alert" style="border-color:#bfdbfe; background:#eff6ff; color:#1e3a8a;"><?= h($msg) ?></div>
 <?php endforeach; ?>
@@ -1430,12 +1512,15 @@ render_header('Quotes');
 <?php if ($show_detail): ?>
   <?php
     $status = (string)$detail_quote['status'];
+    $approval_status = (string)($detail_quote['approval_status'] ?? 'none');
     $status_colors = [
       'draft' => ['#fef9c3', '#854d0e'],
       'sent' => ['#dbeafe', '#1d4ed8'],
       'converted' => ['#dcfce7', '#166534'],
     ];
     [$badge_bg, $badge_color] = $status_colors[$status] ?? ['#f1f5f9', '#334155'];
+    [$approval_bg, $approval_color] = quote_approval_badge_colors($approval_status);
+    $approval_label = quote_approval_label($approval_status);
     $dq_sender = quote_sender_profile($pdo, $detail_quote);
     $dq_sender_company = $dq_sender['company_name'] !== '' ? $dq_sender['company_name'] : ($dq_sender['sender_name'] !== '' ? $dq_sender['sender_name'] : 'Our Company');
     $dq_billing_street = trim((string)($detail_quote['billing_street'] ?? ''));
@@ -1452,7 +1537,10 @@ render_header('Quotes');
         <h2 style="margin:0;">Quote #<?= (int)$detail_quote['id'] ?> — <?= h((string)$detail_quote['customer_name']) ?></h2>
         <p class="muted" style="margin:6px 0 0;">Quote Date: <?= h((string)$detail_quote['quote_date']) ?><?= !empty($detail_quote['created_at']) ? ' • Created ' . h((string)$detail_quote['created_at']) : '' ?></p>
       </div>
-      <span style="display:inline-flex; align-items:center; border-radius:999px; padding:6px 12px; font-weight:600; background:<?= h($badge_bg) ?>; color:<?= h($badge_color) ?>;"><?= h(ucfirst($status)) ?></span>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <span style="display:inline-flex; align-items:center; border-radius:999px; padding:6px 12px; font-weight:600; background:<?= h($badge_bg) ?>; color:<?= h($badge_color) ?>;"><?= h(ucfirst($status)) ?></span>
+        <span style="display:inline-flex; align-items:center; border-radius:999px; padding:6px 12px; font-weight:600; background:<?= h($approval_bg) ?>; color:<?= h($approval_color) ?>;">Approval: <?= h($approval_label) ?></span>
+      </div>
     </div>
   </div>
 
@@ -1556,6 +1644,22 @@ render_header('Quotes');
         <button type="submit" class="btn">Email Quote</button>
       </form>
 
+      <form method="post" style="margin:0;">
+        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
+        <input type="hidden" name="action" value="send_for_approval" />
+        <input type="hidden" name="row_id" value="<?= (int)$detail_quote['id'] ?>" />
+        <button type="submit" class="btn">Send for Approval</button>
+      </form>
+
+      <?php if (is_admin() && (string)($detail_quote['approval_status'] ?? 'none') !== 'approved'): ?>
+        <form method="post" style="margin:0;">
+          <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
+          <input type="hidden" name="action" value="approve_quote" />
+          <input type="hidden" name="row_id" value="<?= (int)$detail_quote['id'] ?>" />
+          <button type="submit" class="btn primary">Approve</button>
+        </form>
+      <?php endif; ?>
+
       <?php if ((string)$detail_quote['status'] !== 'converted'): ?>
         <form method="post" style="margin:0;" onsubmit="return confirm('Convert this quote to invoice?');">
           <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
@@ -1602,6 +1706,8 @@ render_header('Quotes');
                 'sent'      => ['#dbeafe', '#1d4ed8'],
                 'converted' => ['#dcfce7', '#166534'],
               ];
+              $row_approval_status = (string)($quote['approval_status'] ?? 'none');
+              [$row_approval_bg, $row_approval_color] = quote_approval_badge_colors($row_approval_status);
               [$row_badge_bg, $row_badge_color] = $row_status_colors[$row_status] ?? ['#f1f5f9', '#334155'];
             ?>
             <td style="white-space:nowrap;">
@@ -1619,6 +1725,9 @@ render_header('Quotes');
                   <button type="submit" class="btn" style="font-size:0.78em;padding:3px 8px;">Save</button>
                 </form>
               <?php endif; ?>
+              <span style="display:inline-flex;align-items:center;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;background:<?= h($row_approval_bg) ?>;color:<?= h($row_approval_color) ?>;margin-left:6px;">
+                <?= h(quote_approval_label($row_approval_status)) ?>
+              </span>
             </td>
             <td style="white-space:nowrap;">
               <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote['id'] ?>">View</a>
@@ -1629,6 +1738,12 @@ render_header('Quotes');
                 <input type="hidden" name="action" value="send_email" />
                 <input type="hidden" name="row_id" value="<?= (int)$quote['id'] ?>" />
                 <button type="submit" class="btn">Email Quote</button>
+              </form>
+              <form method="post" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
+                <input type="hidden" name="action" value="send_for_approval" />
+                <input type="hidden" name="row_id" value="<?= (int)$quote['id'] ?>" />
+                <button type="submit" class="btn">Send for Approval</button>
               </form>
               <?php if ((string)$quote['status'] !== 'converted'): ?>
                 <form method="post" style="display:inline;" onsubmit="return confirm('Convert this quote to invoice?');">
