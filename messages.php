@@ -203,7 +203,7 @@ render_header('Messages');
 </div>
 
 <!-- Compose New Message -->
-<div class="card" style="margin-top:0; border-top:none; border-top-left-radius:0; border-top-right-radius:0;">
+<div class="card" id="compose-section" style="margin-top:0; border-top:none; border-top-left-radius:0; border-top-right-radius:0;">
   <h2 style="margin:0 0 12px;">Send a Message</h2>
   <form method="post" id="msg-form">
     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['messages_csrf']) ?>" />
@@ -248,6 +248,12 @@ tinymce.init({
   setup: function (editor) {
     editor.on('submit', function () {
       editor.save();
+    });
+
+    editor.on('init', function () {
+      var compose = document.getElementById('compose-section');
+      if (compose) compose.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      editor.focus();
     });
 
     editor.ui.registry.addButton('uploadimage', {
