@@ -114,7 +114,12 @@ $history_stmt = $pdo->prepare("
   ORDER BY m.created_at DESC, m.id DESC
   LIMIT ?
 ");
-$history_stmt->execute([$current_user_id, $other_user_id, $other_user_id, $current_user_id, $show]);
+$history_stmt->bindValue(1, $current_user_id, PDO::PARAM_INT);
+$history_stmt->bindValue(2, $other_user_id,   PDO::PARAM_INT);
+$history_stmt->bindValue(3, $other_user_id,   PDO::PARAM_INT);
+$history_stmt->bindValue(4, $current_user_id, PDO::PARAM_INT);
+$history_stmt->bindValue(5, $show,            PDO::PARAM_INT);
+$history_stmt->execute();
 $messages = array_reverse($history_stmt->fetchAll());
 
 render_header('Messages');
