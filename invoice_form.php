@@ -1147,46 +1147,46 @@ render_header($invoice_heading);
       </div>
     </div>
 
+    <?php if (!$is_view_mode): ?>
     <div style="display:grid; gap:14px; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); margin-top:16px;">
       <div style="position:relative;">
         <label for="customer_name">Customer Name</label>
-        <input id="customer_name" type="text" name="customer_name" maxlength="255" autocomplete="off" value="<?= h($fields['customer_name']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> />
-        <?php if (!$is_view_mode): ?>
-          <div id="customerSuggestions" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:40; background:#fff; border:1px solid #d1d5db; border-radius:10px; box-shadow:0 12px 24px rgba(2,6,23,.12); margin-top:6px; max-height:220px; overflow:auto;"></div>
-        <?php endif; ?>
+        <input id="customer_name" type="text" name="customer_name" maxlength="255" autocomplete="off" value="<?= h($fields['customer_name']) ?>" />
+        <div id="customerSuggestions" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:40; background:#fff; border:1px solid #d1d5db; border-radius:10px; box-shadow:0 12px 24px rgba(2,6,23,.12); margin-top:6px; max-height:220px; overflow:auto;"></div>
       </div>
       <div>
         <label for="company_name">Company</label>
-        <input id="company_name" type="text" name="company_name" maxlength="255" value="<?= h($fields['company_name']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> />
+        <input id="company_name" type="text" name="company_name" maxlength="255" value="<?= h($fields['company_name']) ?>" />
       </div>
       <div>
         <label for="phone_number">Phone</label>
-        <input id="phone_number" type="text" name="phone_number" maxlength="100" value="<?= h($fields['phone_number']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> />
+        <input id="phone_number" type="text" name="phone_number" maxlength="100" value="<?= h($fields['phone_number']) ?>" />
       </div>
       <div>
         <label for="email">Email</label>
-        <input id="email" type="email" name="email" maxlength="255" value="<?= h($fields['email']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> />
+        <input id="email" type="email" name="email" maxlength="255" value="<?= h($fields['email']) ?>" />
       </div>
     </div>
 
     <div style="display:grid; gap:14px; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); margin-top:16px;">
       <div>
         <label for="billing_street">Billing Street Address</label>
-        <input id="billing_street" type="text" name="billing_street" maxlength="255" value="<?= h($fields['billing_street']) ?>" placeholder="Street address"<?= invoice_field_lock_attrs($is_view_mode) ?> />
+        <input id="billing_street" type="text" name="billing_street" maxlength="255" value="<?= h($fields['billing_street']) ?>" placeholder="Street address" />
       </div>
       <div>
         <label for="billing_city">City</label>
-        <input id="billing_city" type="text" name="billing_city" maxlength="100" value="<?= h($fields['billing_city']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> />
+        <input id="billing_city" type="text" name="billing_city" maxlength="100" value="<?= h($fields['billing_city']) ?>" />
       </div>
       <div>
         <label for="billing_state">State</label>
-        <input id="billing_state" type="text" name="billing_state" maxlength="100" value="<?= h($fields['billing_state']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> />
+        <input id="billing_state" type="text" name="billing_state" maxlength="100" value="<?= h($fields['billing_state']) ?>" />
       </div>
       <div>
         <label for="billing_zip">ZIP / Postal Code</label>
-        <input id="billing_zip" type="text" name="billing_zip" maxlength="20" value="<?= h($fields['billing_zip']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> />
+        <input id="billing_zip" type="text" name="billing_zip" maxlength="20" value="<?= h($fields['billing_zip']) ?>" />
       </div>
     </div>
+    <?php endif; ?>
 
     <?php if ($is_view_mode && $quote): ?>
     <?php
