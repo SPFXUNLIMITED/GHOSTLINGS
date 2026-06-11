@@ -341,17 +341,17 @@ function sync_customers_from_hubspot(PDO $pdo): array {
     "INSERT INTO customers (hubspot_contact_id, first_name, last_name, company, phone, email, address, city, state, zip, country, last_updated)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
-       first_name = ?,
-       last_name = ?,
-       company = ?,
-       phone = ?,
-       email = ?,
-       address = ?,
-       city = ?,
-       state = ?,
-       zip = ?,
-       country = ?,
-       last_updated = ?"
+       first_name   = IF(first_name   = '' OR first_name   IS NULL, VALUES(first_name),   first_name),
+       last_name    = IF(last_name    = '' OR last_name    IS NULL, VALUES(last_name),    last_name),
+       company      = IF(company      = '' OR company      IS NULL, VALUES(company),      company),
+       phone        = IF(phone        = '' OR phone        IS NULL, VALUES(phone),        phone),
+       email        = IF(email        = '' OR email        IS NULL, VALUES(email),        email),
+       address      = IF(address      = '' OR address      IS NULL, VALUES(address),      address),
+       city         = IF(city         = '' OR city         IS NULL, VALUES(city),         city),
+       state        = IF(state        = '' OR state        IS NULL, VALUES(state),        state),
+       zip          = IF(zip          = '' OR zip          IS NULL, VALUES(zip),          zip),
+       country      = IF(country      = '' OR country      IS NULL, VALUES(country),      country),
+       last_updated = IF(last_updated IS NULL, VALUES(last_updated), last_updated)"
   );
 
   $synced = 0;
@@ -405,17 +405,6 @@ function sync_customers_from_hubspot(PDO $pdo): array {
         $last_updated = hubspot_to_datetime($props['lastmodifieddate'] ?? null);
         $upsert->execute([
           $id,
-          $first_name,
-          $last_name,
-          $company,
-          $phone,
-          $email,
-          $address,
-          $city,
-          $state,
-          $zip,
-          $country,
-          $last_updated,
           $first_name,
           $last_name,
           $company,
