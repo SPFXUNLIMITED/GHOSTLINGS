@@ -209,7 +209,8 @@ tinymce.init({
   content_css: '/project/tinymce/js/tinymce/skins/content/default/content.min.css',
   menubar: false,
   plugins: 'lists link image',
-  toolbar: 'bold italic underline | bullist numlist | link | uploadimage | removeformat',
+  toolbar: 'bold italic underline blockquote | bullist numlist | link | uploadimage | removeformat',
+  content_style: 'blockquote { border-left: 4px solid #4f46e5; background: #f5f3ff; margin: 8px 0; padding: 8px 12px; color: #374151; font-style: italic; }',
   height: 220,
   branding: false,
   promotion: false,
@@ -282,7 +283,7 @@ document.addEventListener('click', function (e) {
     var srOnlyLabel = escapeHtml('Quoted message from ' + originalLabel);
     var quotedText = escapeHtml(originalText).replace(/\r?\n/g, '<br>');
     var srOnlyHtml = '<span style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">' + srOnlyLabel + '</span>';
-    var quoteHtml = '<blockquote>' + srOnlyHtml + quotedText + '</blockquote><p><br></p>';
+    var quoteHtml = '<blockquote style="border-left:4px solid #4f46e5; background:#f5f3ff; margin:8px 0; padding:8px 12px; color:#374151; font-style:italic;">' + srOnlyHtml + quotedText + '</blockquote><p><br></p>';
     editor.setContent(quoteHtml + editor.getContent({ format: 'html' }));
     editor.focus();
     return;
