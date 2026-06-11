@@ -7,8 +7,8 @@ require_login();
 const MAX_MESSAGE_LENGTH = 200000;
 
 function message_body_to_reply_text(string $html): string {
-  $text = preg_replace('/<(br|\/p|\/div|\/li|\/blockquote)\b[^>]*>/i', "\n", $html) ?? '';
-  $text = preg_replace('/<li\b[^>]*>/i', '- ', $text) ?? $text;
+  $text = preg_replace('~<(br|/p|/div|/li|/blockquote)\b[^>]*>~i', "\n", $html) ?? '';
+  $text = preg_replace('~<li\b[^>]*>~i', '- ', $text) ?? $text;
   $text = strip_tags($text);
   $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
   $text = preg_replace("/\r\n?/", "\n", $text) ?? $text;
@@ -279,7 +279,9 @@ document.addEventListener('click', function (e) {
     var editor = tinymce.get('msg-body');
     if (!originalText || !editor) return;
 
-    var quoteHtml = '<blockquote aria-label="Quoted message from ' + escapeHtml(originalLabel) + '">' + escapeHtml(originalText).replace(/\r?\n/g, '<br>') + '</blockquote><p><br></p>';
+    var ariaLabel = 'Quoted message from ' + escapeHtml(originalLabel);
+    var quotedText = escapeHtml(originalText).replace(/\r?\n/g, '<br>');
+    var quoteHtml = '<blockquote aria-label="' + ariaLabel + '">' + quotedText + '</blockquote><p><br></p>';
     editor.setContent(quoteHtml + editor.getContent({ format: 'html' }));
     editor.focus();
     return;
