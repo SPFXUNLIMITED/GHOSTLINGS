@@ -1213,15 +1213,6 @@ render_header('Quotes');
       'converted' => ['#dcfce7', '#166534'],
     ];
     [$badge_bg, $badge_color] = $status_colors[$status] ?? ['#f1f5f9', '#334155'];
-    $dq_sender = quote_sender_profile($pdo, $detail_quote);
-    $dq_sender_company = $dq_sender['company_name'] !== '' ? $dq_sender['company_name'] : ($dq_sender['sender_name'] !== '' ? $dq_sender['sender_name'] : 'Our Company');
-    $dq_billing_street = trim((string)($detail_quote['billing_street'] ?? ''));
-    $dq_billing_city   = trim((string)($detail_quote['billing_city']   ?? ''));
-    $dq_billing_state  = trim((string)($detail_quote['billing_state']  ?? ''));
-    $dq_billing_zip    = trim((string)($detail_quote['billing_zip']    ?? ''));
-    $dq_addr_parts = array_filter([$dq_billing_city, $dq_billing_state . ($dq_billing_zip !== '' ? ' ' . $dq_billing_zip : '')]);
-    $dq_city_state_zip = implode(', ', $dq_addr_parts);
-    $dq_sender_addr_lines = array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $dq_sender['address'])));
   ?>
   <div class="card">
     <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap;">
@@ -1233,62 +1224,18 @@ render_header('Quotes');
     </div>
   </div>
 
-  <div class="card">
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; flex-wrap:wrap;">
-      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:16px 18px; background:#f8fafc;">
-        <p style="margin:0 0 8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#64748b;">Bill To</p>
-        <?php if (trim((string)($detail_quote['company_name'] ?? '')) !== ''): ?>
-          <p style="margin:0 0 2px; font-weight:700; color:#0f172a;"><?= h((string)$detail_quote['company_name']) ?></p>
-        <?php endif; ?>
-        <p style="margin:0 0 2px; color:#1e293b;"><?= h((string)$detail_quote['customer_name']) ?></p>
-        <?php if ($dq_billing_street !== ''): ?>
-          <p style="margin:0 0 2px; color:#475569;"><?= h($dq_billing_street) ?></p>
-        <?php endif; ?>
-        <?php if ($dq_city_state_zip !== ''): ?>
-          <p style="margin:0 0 2px; color:#475569;"><?= h($dq_city_state_zip) ?></p>
-        <?php endif; ?>
-        <?php if (trim((string)($detail_quote['phone_number'] ?? '')) !== ''): ?>
-          <p style="margin:4px 0 0; color:#64748b; font-size:13px;"><?= h((string)$detail_quote['phone_number']) ?></p>
-        <?php endif; ?>
-        <?php if (trim((string)($detail_quote['email'] ?? '')) !== ''): ?>
-          <p style="margin:0; color:#64748b; font-size:13px;"><?= h((string)$detail_quote['email']) ?></p>
-        <?php endif; ?>
-      </div>
-      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:16px 18px; background:#f8fafc;">
-        <p style="margin:0 0 8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#64748b;">From</p>
-        <p style="margin:0 0 2px; font-weight:700; color:#0f172a;"><?= h($dq_sender_company) ?></p>
-        <?php if ($dq_sender['sender_name'] !== '' && $dq_sender['sender_name'] !== $dq_sender_company): ?>
-          <p style="margin:0 0 2px; color:#1e293b;"><?= h($dq_sender['sender_name']) ?></p>
-        <?php endif; ?>
-        <?php foreach ($dq_sender_addr_lines as $addr_line): ?>
-          <p style="margin:0 0 2px; color:#475569;"><?= h($addr_line) ?></p>
-        <?php endforeach; ?>
-        <?php if ($dq_sender['phone'] !== ''): ?>
-          <p style="margin:4px 0 0; color:#64748b; font-size:13px;"><?= h($dq_sender['phone']) ?></p>
-        <?php endif; ?>
-        <?php if ($dq_sender['email'] !== ''): ?>
-          <p style="margin:0; color:#64748b; font-size:13px;"><?= h($dq_sender['email']) ?></p>
-        <?php endif; ?>
-      </div>
-    </div>
-    <?php if (trim((string)($detail_quote['notes'] ?? '')) !== '' || trim((string)($detail_quote['converted_invoice_no'] ?? '')) !== ''): ?>
-      <div style="margin-top:12px; display:flex; gap:24px; flex-wrap:wrap;">
-        <?php if (trim((string)($detail_quote['converted_invoice_no'] ?? '')) !== ''): ?>
-          <div><span class="muted" style="font-size:13px;">Invoice #</span> <strong><?= h((string)$detail_quote['converted_invoice_no']) ?></strong></div>
-        <?php endif; ?>
-        <div><span class="muted" style="font-size:13px;">Total</span> <strong>$<?= h(quote_format_money($detail_quote['subtotal_amount'])) ?></strong></div>
-      </div>
-    <?php else: ?>
-      <div style="margin-top:12px;">
-        <span class="muted" style="font-size:13px;">Total</span> <strong>$<?= h(quote_format_money($detail_quote['subtotal_amount'])) ?></strong>
-      </div>
-    <?php endif; ?>
-    <?php if (trim((string)($detail_quote['notes'] ?? '')) !== ''): ?>
-      <div style="margin-top:12px; padding-top:12px; border-top:1px solid #e2e8f0;">
-        <p style="margin:0 0 4px; font-size:12px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.06em;">Notes</p>
-        <p style="margin:0; white-space:pre-wrap; color:#374151;"><?= h((string)$detail_quote['notes']) ?></p>
-      </div>
-    <?php endif; ?>
+  <div class="card" style="overflow-x:auto;">
+    <table>
+      <tbody>
+        <tr><th style="width:220px;">Customer</th><td><?= h((string)$detail_quote['customer_name']) ?></td></tr>
+        <tr><th>Company</th><td><?= h((string)($detail_quote['company_name'] ?: '—')) ?></td></tr>
+        <tr><th>Phone</th><td><?= h((string)($detail_quote['phone_number'] ?: '—')) ?></td></tr>
+        <tr><th>Email</th><td><?= h((string)($detail_quote['email'] ?: '—')) ?></td></tr>
+        <tr><th>Subtotal</th><td><strong>$<?= h(quote_format_money($detail_quote['subtotal_amount'])) ?></strong></td></tr>
+        <tr><th>Invoice #</th><td><?= h((string)($detail_quote['converted_invoice_no'] ?: '—')) ?></td></tr>
+        <tr><th>Notes</th><td style="white-space:pre-wrap;"><?= h((string)($detail_quote['notes'] ?: '—')) ?></td></tr>
+      </tbody>
+    </table>
   </div>
 
   <div class="card" style="overflow-x:auto;">

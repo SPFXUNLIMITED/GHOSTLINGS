@@ -1188,59 +1188,6 @@ render_header($invoice_heading);
       </div>
     </div>
 
-    <?php if ($is_view_mode && $quote): ?>
-    <?php
-      $inv_sender = invoice_sender_profile($pdo, isset($quote['created_by']) && $quote['created_by'] !== null ? (int)$quote['created_by'] : null);
-      $inv_sender_company = $inv_sender['company_name'] !== '' ? $inv_sender['company_name'] : ($inv_sender['sender_name'] !== '' ? $inv_sender['sender_name'] : 'Our Company');
-      $inv_bill_street = $fields['billing_street'];
-      $inv_bill_city   = $fields['billing_city'];
-      $inv_bill_state  = $fields['billing_state'];
-      $inv_bill_zip    = $fields['billing_zip'];
-      $inv_addr_csz_parts = array_filter([$inv_bill_city, $inv_bill_state . ($inv_bill_zip !== '' ? ' ' . $inv_bill_zip : '')]);
-      $inv_city_state_zip = implode(', ', $inv_addr_csz_parts);
-      $inv_sender_addr_lines = array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $inv_sender['address'])));
-    ?>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:20px; flex-wrap:wrap;">
-      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:16px 18px; background:#f8fafc;">
-        <p style="margin:0 0 8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#64748b;">Bill To</p>
-        <?php if ($fields['company_name'] !== ''): ?>
-          <p style="margin:0 0 2px; font-weight:700; color:#0f172a;"><?= h($fields['company_name']) ?></p>
-        <?php endif; ?>
-        <?php if ($fields['customer_name'] !== ''): ?>
-          <p style="margin:0 0 2px; color:#1e293b;"><?= h($fields['customer_name']) ?></p>
-        <?php endif; ?>
-        <?php if ($inv_bill_street !== ''): ?>
-          <p style="margin:0 0 2px; color:#475569;"><?= h($inv_bill_street) ?></p>
-        <?php endif; ?>
-        <?php if ($inv_city_state_zip !== ''): ?>
-          <p style="margin:0 0 2px; color:#475569;"><?= h($inv_city_state_zip) ?></p>
-        <?php endif; ?>
-        <?php if ($fields['phone_number'] !== ''): ?>
-          <p style="margin:4px 0 0; color:#64748b; font-size:13px;"><?= h($fields['phone_number']) ?></p>
-        <?php endif; ?>
-        <?php if ($fields['email'] !== ''): ?>
-          <p style="margin:0; color:#64748b; font-size:13px;"><?= h($fields['email']) ?></p>
-        <?php endif; ?>
-      </div>
-      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:16px 18px; background:#f8fafc;">
-        <p style="margin:0 0 8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#64748b;">From</p>
-        <p style="margin:0 0 2px; font-weight:700; color:#0f172a;"><?= h($inv_sender_company) ?></p>
-        <?php if ($inv_sender['sender_name'] !== '' && $inv_sender['sender_name'] !== $inv_sender_company): ?>
-          <p style="margin:0 0 2px; color:#1e293b;"><?= h($inv_sender['sender_name']) ?></p>
-        <?php endif; ?>
-        <?php foreach ($inv_sender_addr_lines as $addr_line): ?>
-          <p style="margin:0 0 2px; color:#475569;"><?= h($addr_line) ?></p>
-        <?php endforeach; ?>
-        <?php if ($inv_sender['phone'] !== ''): ?>
-          <p style="margin:4px 0 0; color:#64748b; font-size:13px;"><?= h($inv_sender['phone']) ?></p>
-        <?php endif; ?>
-        <?php if ($inv_sender['email'] !== ''): ?>
-          <p style="margin:0; color:#64748b; font-size:13px;"><?= h($inv_sender['email']) ?></p>
-        <?php endif; ?>
-      </div>
-    </div>
-    <?php endif; ?>
-
     <!-- ── Labor / Services ── -->
     <div style="margin-top:20px;">
       <h3 style="margin:0 0 10px;">Labor / Services</h3>
