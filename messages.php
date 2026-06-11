@@ -6,6 +6,16 @@ require_login();
 
 const MAX_MESSAGE_LENGTH = 200000;
 
+function message_body_to_reply_text(string $html): string {
+  $text = preg_replace('/<(br|\/p|\/div|\/li|\/blockquote)\b[^>]*>/i', "\n", $html);
+  $text = preg_replace('/<li\b[^>]*>/i', '- ', (string)$text);
+  $text = strip_tags((string)$text);
+  $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+  $text = preg_replace("/\r\n?/", "\n", $text);
+  $text = preg_replace("/\n{3,}/", "\n\n", $text);
+  return trim((string)$text);
+}
+
 $current_user_id = (int)$_SESSION['user_id'];
 
 // Find the other user (the only other user in the system)
@@ -47,9 +57,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       } else {
         $del = $pdo->prepare("DELETE FROM messages WHERE id = ? AND sender_id = ?");
         $del->execute([$message_id, $current_user_id]);
-        $_SESSION['messages_csrf'] = bin2hex(random_bytes(24));
-        header('Location: messages.php?deleted=1');
-        exit;
+        if ($del->rowCount() < 1) {
+          $errors[] = 'Message could not be deleted.';
+        } else {
+          $_SESSION['messages_csrf'] = bin2hex(random_bytes(24));
+          header('Location: messages.php?deleted=1');
+          exit;
+        }
       }
     } else {
       $body = trim((string)($_POST['body'] ?? ''));
@@ -130,7 +144,7 @@ render_header('Messages');
           $label   = $is_mine ? 'You' : h($msg['sender_username']);
           $dt      = new DateTime($msg['created_at'], new DateTimeZone(APP_TZ));
           $fmt_dt  = $dt->format('m/d/Y g:i A');
-          $reply_text = trim(html_entity_decode(strip_tags((string)$msg['body']), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+          $reply_text = message_body_to_reply_text((string)$msg['body']);
         ?>
         <div style="display:flex; flex-direction:column; align-items:<?= $align ?>; max-width:100%;">
           <div style="font-size:11px; color:#6b7280; margin-bottom:3px;">
