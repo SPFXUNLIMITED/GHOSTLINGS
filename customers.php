@@ -94,15 +94,17 @@ function hubspot_contact_names(array $props): array {
  * If the individual city/state/zip values are already populated they are
  * returned unchanged; no parsing is attempted.
  *
- * Recognized US formats (no commas required):
+ * Recognized US formats (commas optional):
  *   "123 Main St Dallas TX 75201"
+ *   "123 Main St Dallas, TX 75201"
+ *   "123 Main St Dallas, Texas 75201"
  *   "123 Main St Dallas TX"
  *   "123 Main St Dallas TX 75201 USA"   (trailing country token ignored)
  *
  * Parsing strategy (right-to-left):
  *   1. Strip a trailing US country token (USA, US, United States, …).
  *   2. Extract the ZIP code (5-digit, optionally plus-4) from the end.
- *   3. Extract the two-letter state abbreviation from the end.
+ *   3. Extract the state (full name or two-letter abbreviation) from the end.
  *   4. Split the remaining text into street and city by finding the first
  *      common street-type suffix word followed by an all-alphabetic city
  *      name.  When no suffix is recognised the last whitespace-delimited
@@ -135,12 +137,41 @@ function parse_hubspot_address_components(string $address, string $city, string 
     return [$address, $city, $state, $zip];
   }
 
-  // 3. Extract two-letter state abbreviation from the end.
-  if (!preg_match('/\b([A-Za-z]{2})\s*$/', $working, $m)) {
+  // 3. Extract state (full name or two-letter abbreviation) from the end.
+  $state_abbreviations = [
+    'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
+    'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
+    'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+    'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
+    'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
+    'DC',
+  ];
+  $state_names = [
+    'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut','Delaware',
+    'Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa','Kansas','Kentucky',
+    'Louisiana','Maine','Maryland','Massachusetts','Michigan','Minnesota','Mississippi',
+    'Missouri','Montana','Nebraska','Nevada','New Hampshire','New Jersey','New Mexico',
+    'New York','North Carolina','North Dakota','Ohio','Oklahoma','Oregon','Pennsylvania',
+    'Rhode Island','South Carolina','South Dakota','Tennessee','Texas','Utah','Vermont',
+    'Virginia','Washington','West Virginia','Wisconsin','Wyoming','District of Columbia',
+  ];
+  usort($state_names, static fn(string $a, string $b): int => strlen($b) <=> strlen($a));
+  $state_name_pattern = implode('|', array_map(static fn(string $n): string => preg_quote($n, '/'), $state_names));
+
+  $parsed_state = '';
+  if (preg_match('/(?:^|,\s*|\s+)(' . $state_name_pattern . ')\s*$/i', $working, $m)) {
+    $parsed_state = trim((string)$m[1]);
+    $working = trim(substr($working, 0, -strlen($m[0])));
+  } elseif (preg_match('/(?:^|,\s*|\s+)([A-Za-z]{2})\s*$/', $working, $m)) {
+    $abbr = strtoupper((string)$m[1]);
+    if (!in_array($abbr, $state_abbreviations, true)) {
+      return [$address, $city, $state, $zip];
+    }
+    $parsed_state = $abbr;
+    $working = trim(substr($working, 0, -strlen($m[0])));
+  } else {
     return [$address, $city, $state, $zip];
   }
-  $parsed_state = strtoupper($m[1]);
-  $working = trim(substr($working, 0, -strlen($m[0])));
 
   if ($working === '') {
     return ['', '', $parsed_state, $parsed_zip];
@@ -169,6 +200,8 @@ function parse_hubspot_address_components(string $address, string $city, string 
       $parsed_city   = $working;
     }
   }
+
+  $parsed_city = trim($parsed_city, " \t\n\r\0\x0B,");
 
   return [$parsed_street, $parsed_city, $parsed_state, $parsed_zip];
 }
