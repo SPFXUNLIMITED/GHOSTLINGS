@@ -94,7 +94,7 @@ function hubspot_contact_names(array $props): array {
  * If the individual city/state/zip values are already populated they are
  * returned unchanged; no parsing is attempted.
  *
- * Recognised US formats (parts are comma-separated):
+ * Recognized US formats (parts are comma-separated):
  *   "123 Main St, Dallas, TX 75201"
  *   "123 Main St, Suite 100, Dallas, TX 75201"
  *   "123 Main St, Dallas, TX 75201, USA"   (trailing country part ignored)
@@ -148,7 +148,7 @@ function parse_hubspot_address_components(string $address, string $city, string 
   $parsed_zip   = isset($m[2]) ? $m[2] : '';
 
   // The part just before the tail is the city.
-  $parsed_city   = array_pop($parts);
+  $parsed_city   = array_pop($parts) ?? '';
 
   // Everything remaining is the street address.
   $parsed_street = count($parts) > 0 ? implode(', ', $parts) : '';
