@@ -146,8 +146,8 @@ function parse_hubspot_address_components(string $address, string $city, string 
     'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
     'DC',
   ];
-  static $state_name_pattern = null;
-  if ($state_name_pattern === null) {
+  static $state_name_regex = null;
+  if ($state_name_regex === null) {
     $state_names = [
       'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut','Delaware',
       'Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa','Kansas','Kentucky',
@@ -157,12 +157,14 @@ function parse_hubspot_address_components(string $address, string $city, string 
       'Rhode Island','South Carolina','South Dakota','Tennessee','Texas','Utah','Vermont',
       'Virginia','Washington','West Virginia','Wisconsin','Wyoming','District of Columbia',
     ];
-    usort($state_names, static fn(string $a, string $b): int => strlen($b) <=> strlen($a));
-    $state_name_pattern = implode('|', array_map(static fn(string $n): string => preg_quote($n, '/'), $state_names));
+    $state_names_sorted = $state_names;
+    usort($state_names_sorted, static fn(string $a, string $b): int => strlen($b) <=> strlen($a));
+    $state_name_pattern = implode('|', array_map(static fn(string $n): string => preg_quote($n, '/'), $state_names_sorted));
+    $state_name_regex = '/(?:^|,\s*|\s+)(' . $state_name_pattern . ')\s*$/i';
   }
 
   $parsed_state = '';
-  if (preg_match('/(?:^|,\s*|\s+)(' . $state_name_pattern . ')\s*$/i', $working, $m)) {
+  if (preg_match($state_name_regex, $working, $m)) {
     $parsed_state = trim((string)$m[1]);
     $working = trim(substr($working, 0, -strlen($m[0])));
   } elseif (preg_match('/(?:^|,\s*|\s+)([A-Za-z]{2})\s*$/', $working, $m)) {
@@ -204,7 +206,7 @@ function parse_hubspot_address_components(string $address, string $city, string 
     }
   }
 
-  $parsed_city = trim($parsed_city, " \t\n\r\0\x0B,");
+  $parsed_city = trim($parsed_city, ', ');
 
   return [$parsed_street, $parsed_city, $parsed_state, $parsed_zip];
 }
