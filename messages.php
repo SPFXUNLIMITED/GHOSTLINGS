@@ -8,11 +8,11 @@ const MAX_MESSAGE_LENGTH = 200000;
 
 function message_body_to_reply_text(string $html): string {
   $text = preg_replace('~<br\b[^>]*>|</?(p|div|blockquote)\b[^>]*>|</li>~i', "\n", $html) ?? '';
-  $text = preg_replace('~<li\b[^>]*>~i', '- ', $text) ?? $text;
+  $text = preg_replace('~<li\b[^>]*>~i', '- ', $text) ?? '';
   $text = strip_tags($text);
   $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-  $text = preg_replace("/\r\n?/", "\n", $text) ?? $text;
-  $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
+  $text = preg_replace("/\r\n?/", "\n", $text) ?? '';
+  $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? '';
   return trim($text);
 }
 
@@ -275,13 +275,14 @@ document.addEventListener('click', function (e) {
   var replyBtn = e.target.closest('.js-reply-btn');
   if (replyBtn) {
     var originalText = (replyBtn.getAttribute('data-reply-text') || '').trim();
-    var originalLabel = (replyBtn.getAttribute('data-reply-label') || 'message').trim();
+    var originalLabel = (replyBtn.getAttribute('data-reply-label') || 'Unknown sender').trim();
     var editor = tinymce.get('msg-body');
     if (!originalText || !editor) return;
 
-    var ariaLabel = 'Quoted message from ' + originalLabel;
+    var srOnlyLabel = escapeHtml('Quoted message from ' + originalLabel);
     var quotedText = escapeHtml(originalText).replace(/\r?\n/g, '<br>');
-    var quoteHtml = '<blockquote aria-label="' + escapeHtml(ariaLabel) + '">' + quotedText + '</blockquote><p><br></p>';
+    var srOnlyHtml = '<span style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">' + srOnlyLabel + '</span>';
+    var quoteHtml = '<blockquote>' + srOnlyHtml + quotedText + '</blockquote><p><br></p>';
     editor.setContent(quoteHtml + editor.getContent({ format: 'html' }));
     editor.focus();
     return;
