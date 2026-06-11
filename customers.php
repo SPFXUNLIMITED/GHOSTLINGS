@@ -351,7 +351,7 @@ function sync_customers_from_hubspot(PDO $pdo): array {
        state        = IF(state        = '' OR state        IS NULL, VALUES(state),        state),
        zip          = IF(zip          = '' OR zip          IS NULL, VALUES(zip),          zip),
        country      = IF(country      = '' OR country      IS NULL, VALUES(country),      country),
-       last_updated = IF(last_updated IS NULL, VALUES(last_updated), last_updated)"
+       last_updated = VALUES(last_updated)"
   );
 
   $synced = 0;
