@@ -88,7 +88,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $pdo->prepare("UPDATE messages SET is_read = 1 WHERE recipient_id = ? AND is_read = 0")
     ->execute([$current_user_id]);
 
-// Load conversation history (all messages between both users), newest first then reverse for display
+// How many messages to show (default 10, increments of 10)
+$show = max(10, (int)($_GET['show'] ?? 10));
+
+// Count total messages between both users
+$count_stmt = $pdo->prepare("
+  SELECT COUNT(*) FROM messages
+  WHERE (sender_id = ? AND recipient_id = ?)
+     OR (sender_id = ? AND recipient_id = ?)
+");
+$count_stmt->execute([$current_user_id, $other_user_id, $other_user_id, $current_user_id]);
+$total_count = (int)$count_stmt->fetchColumn();
+$has_more = $total_count > $show;
+
+// Load the $show most recent messages, then reverse for chronological display
 $history_stmt = $pdo->prepare("
   SELECT m.id, m.sender_id, m.body, m.is_read, m.created_at,
          u.username AS sender_username
@@ -96,10 +109,11 @@ $history_stmt = $pdo->prepare("
   JOIN users u ON u.id = m.sender_id
   WHERE (m.sender_id = ? AND m.recipient_id = ?)
      OR (m.sender_id = ? AND m.recipient_id = ?)
-  ORDER BY m.created_at ASC, m.id ASC
+  ORDER BY m.created_at DESC, m.id DESC
+  LIMIT ?
 ");
-$history_stmt->execute([$current_user_id, $other_user_id, $other_user_id, $current_user_id]);
-$messages = $history_stmt->fetchAll();
+$history_stmt->execute([$current_user_id, $other_user_id, $other_user_id, $current_user_id, $show]);
+$messages = array_reverse($history_stmt->fetchAll());
 
 render_header('Messages');
 ?>
@@ -134,6 +148,11 @@ render_header('Messages');
   <?php if (!$messages): ?>
     <p class="muted" style="padding:20px; text-align:center;">No messages yet. Send the first one below!</p>
   <?php else: ?>
+    <?php if ($has_more): ?>
+      <div style="padding:12px 16px; border-bottom:1px solid #e5e7eb; text-align:center;">
+        <a href="messages.php?show=<?= $show + 10 ?>" class="btn" style="font-size:13px; padding:6px 14px;">Load more</a>
+      </div>
+    <?php endif; ?>
     <div style="max-height:520px; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px;" id="msg-scroll">
       <?php foreach ($messages as $msg): ?>
         <?php
