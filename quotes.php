@@ -744,6 +744,229 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['inventory_search'])) {
   exit;
 }
 
+// ---------- AJAX: print preview ----------
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_preview') {
+  header('Content-Type: application/json; charset=utf-8');
+  $pv_id = (int)($_GET['quote_id'] ?? 0);
+  if ($pv_id <= 0) {
+    echo json_encode(['ok' => false, 'error' => 'Invalid quote ID.']);
+    exit;
+  }
+
+  $pv_stmt = $pdo->prepare(
+    "SELECT id, customer_name, company_name, phone_number, email,
+            billing_street, billing_city, billing_state, billing_zip,
+            quote_date, subtotal_amount, notes, created_by, created_at
+     FROM quotes WHERE id = ? LIMIT 1"
+  );
+  $pv_stmt->execute([$pv_id]);
+  $pv_quote = $pv_stmt->fetch(PDO::FETCH_ASSOC);
+  if (!$pv_quote) {
+    echo json_encode(['ok' => false, 'error' => 'Quote not found.']);
+    exit;
+  }
+
+  $pv_items_stmt = $pdo->prepare(
+    "SELECT description, quantity, unit_price, line_total FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC"
+  );
+  $pv_items_stmt->execute([$pv_id]);
+  $pv_items = $pv_items_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  $pv_sender = quote_sender_profile($pdo, $pv_quote);
+  $pv_sender_name    = $pv_sender['sender_name'];
+  $pv_sender_company = $pv_sender['company_name'] !== '' ? $pv_sender['company_name'] : 'Our Company';
+  $pv_sender_address = $pv_sender['address'];
+  $pv_sender_phone   = $pv_sender['phone'];
+  $pv_sender_email   = $pv_sender['email'];
+
+  $pv_quote_id       = (int)($pv_quote['id'] ?? 0);
+  $pv_customer_name  = trim((string)($pv_quote['customer_name']  ?? ''));
+  $pv_customer_co    = trim((string)($pv_quote['company_name']   ?? ''));
+  $pv_quote_date     = trim((string)($pv_quote['quote_date']     ?? ''));
+  if ($pv_quote_date === '') {
+    $pv_quote_date = substr(trim((string)($pv_quote['created_at'] ?? '')), 0, 10);
+  }
+  $pv_subtotal = quote_format_money($pv_quote['subtotal_amount'] ?? 0);
+  $pv_notes    = trim((string)($pv_quote['notes'] ?? ''));
+
+  $pv_bill_street = trim((string)($pv_quote['billing_street'] ?? ''));
+  $pv_bill_city   = trim((string)($pv_quote['billing_city']   ?? ''));
+  $pv_bill_state  = trim((string)($pv_quote['billing_state']  ?? ''));
+  $pv_bill_zip    = trim((string)($pv_quote['billing_zip']    ?? ''));
+
+  $h = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+
+  // Build item rows
+  $pv_rows_html = [];
+  $pv_row_index = 0;
+  foreach ($pv_items as $pv_item) {
+    $pv_desc       = trim((string)($pv_item['description'] ?? ''));
+    $pv_qty        = quote_format_money($pv_item['quantity']   ?? 0);
+    $pv_unit_price = quote_format_money($pv_item['unit_price'] ?? 0);
+    $pv_line_total = quote_format_money($pv_item['line_total'] ?? 0);
+    $pv_row_bg     = ($pv_row_index % 2 === 0) ? '#ffffff' : '#f9fafb';
+    $pv_rows_html[] = '<tr style="background:' . $pv_row_bg . ';">'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">' . $h($pv_desc) . '</td>'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">' . $h($pv_qty) . '</td>'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . $h($pv_unit_price) . '</td>'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . $h($pv_line_total) . '</td>'
+      . '</tr>';
+    $pv_row_index++;
+  }
+  if (!$pv_rows_html) {
+    $pv_rows_html[] = '<tr><td colspan="4" style="padding:10px 12px;text-align:center;color:#6b7280;">No line items.</td></tr>';
+  }
+
+  // Header contact line
+  $pv_header_parts = [];
+  if ($pv_sender_address !== '') {
+    $pv_addr_oneline = (string)preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ' · ', $pv_sender_address));
+    $pv_header_parts[] = $h($pv_addr_oneline);
+  }
+  if ($pv_sender_phone !== '') $pv_header_parts[] = $h($pv_sender_phone);
+  if ($pv_sender_email !== '') $pv_header_parts[] = '<a href="mailto:' . $h($pv_sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($pv_sender_email) . '</a>';
+  $pv_header_contact_html = implode(' &nbsp;·&nbsp; ', $pv_header_parts);
+
+  // Prepared-by
+  $pv_prepared_by_html = '';
+  if ($pv_sender_name !== '') {
+    $pv_prepared_by_html = 'This quote was prepared by <strong style="color:#1e293b;">' . $h($pv_sender_name) . '</strong>';
+    if ($pv_sender_company !== 'Our Company') {
+      $pv_prepared_by_html .= ' at <strong style="color:#1e293b;">' . $h($pv_sender_company) . '</strong>';
+    }
+    $pv_prepared_by_html .= '.';
+  }
+
+  // Footer contact line
+  $pv_footer_parts = [];
+  if ($pv_sender_address !== '') {
+    $pv_footer_parts[] = $h((string)preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ', ', $pv_sender_address)));
+  }
+  if ($pv_sender_phone !== '') $pv_footer_parts[] = $h($pv_sender_phone);
+  if ($pv_sender_email !== '') $pv_footer_parts[] = '<a href="mailto:' . $h($pv_sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($pv_sender_email) . '</a>';
+  $pv_footer_contact_html = implode(' &nbsp;·&nbsp; ', $pv_footer_parts);
+
+  // Bill To block
+  $pv_bill_to_lines = [];
+  if ($pv_customer_co !== '')  $pv_bill_to_lines[] = '<strong style="color:#0f172a;">' . $h($pv_customer_co) . '</strong>';
+  if ($pv_customer_name !== '') $pv_bill_to_lines[] = $h($pv_customer_name);
+  if ($pv_bill_street !== '')  $pv_bill_to_lines[] = $h($pv_bill_street);
+  $pv_city_state_zip_parts = array_filter([$pv_bill_city, $pv_bill_state . ($pv_bill_zip !== '' ? ' ' . $pv_bill_zip : '')]);
+  $pv_city_state_zip = implode(', ', $pv_city_state_zip_parts);
+  if ($pv_city_state_zip !== '') $pv_bill_to_lines[] = $h($pv_city_state_zip);
+  $pv_quote_phone = trim((string)($pv_quote['phone_number'] ?? ''));
+  if ($pv_quote_phone !== '')  $pv_bill_to_lines[] = $h($pv_quote_phone);
+  $pv_quote_email = trim((string)($pv_quote['email'] ?? ''));
+  if ($pv_quote_email !== '')  $pv_bill_to_lines[] = '<a href="mailto:' . $h($pv_quote_email) . '" style="color:#1d4ed8;text-decoration:none;">' . $h($pv_quote_email) . '</a>';
+  $pv_bill_to_html = implode('<br>', $pv_bill_to_lines) ?: '&mdash;';
+
+  // From block
+  $pv_from_lines = [];
+  $pv_from_lines[] = '<strong style="color:#0f172a;">' . $h($pv_sender_company) . '</strong>';
+  if ($pv_sender_name !== '' && $pv_sender_name !== $pv_sender_company) $pv_from_lines[] = $h($pv_sender_name);
+  foreach (array_filter(array_map('trim', (array)preg_split('/\r\n|\r|\n/', $pv_sender_address))) as $pv_addr_line) {
+    $pv_from_lines[] = $h($pv_addr_line);
+  }
+  if ($pv_sender_phone !== '') $pv_from_lines[] = $h($pv_sender_phone);
+  if ($pv_sender_email !== '') $pv_from_lines[] = '<a href="mailto:' . $h($pv_sender_email) . '" style="color:#1d4ed8;text-decoration:none;">' . $h($pv_sender_email) . '</a>';
+  $pv_from_html = implode('<br>', $pv_from_lines);
+
+  $pv_label = 'Quote #' . $pv_quote_id;
+
+  $pv_preview_html =
+    '<div style="max-width:680px;margin:0 auto;">'
+
+    // ── Header banner ──
+    . '<div style="background:#1e3a5f;border-radius:8px 8px 0 0;padding:28px 32px 24px;">'
+      . '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $h($pv_sender_company) . '</p>'
+      . ($pv_header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $pv_header_contact_html . '</p>' : '')
+    . '</div>'
+
+    // ── Document title strip ──
+    . '<div style="background:#ffffff;padding:20px 32px 0;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
+      . '<table style="width:100%;border-collapse:collapse;">'
+        . '<tr>'
+          . '<td style="padding:0 0 16px;">'
+            . '<p style="margin:0;font-size:18px;font-weight:700;color:#0f172a;">' . $h($pv_label) . '</p>'
+          . '</td>'
+          . '<td style="padding:0 0 16px;text-align:right;">'
+            . '<p style="margin:0;font-size:13px;color:#64748b;">Date: ' . $h($pv_quote_date) . '</p>'
+          . '</td>'
+        . '</tr>'
+      . '</table>'
+      . '<hr style="margin:0;border:none;border-top:2px solid #e2e8f0;">'
+    . '</div>'
+
+    // ── Bill To / From boxes ──
+    . '<div style="background:#ffffff;padding:20px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:0;">'
+      . '<table style="width:100%;border-collapse:collapse;">'
+        . '<tr>'
+          . '<td style="width:50%;padding:0 8px 0 0;vertical-align:top;">'
+            . '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;background:#f8fafc;">'
+              . '<p style="margin:0 0 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;">Bill To</p>'
+              . '<p style="margin:0;font-size:13px;color:#374151;line-height:1.7;">' . $pv_bill_to_html . '</p>'
+            . '</div>'
+          . '</td>'
+          . '<td style="width:50%;padding:0 0 0 8px;vertical-align:top;">'
+            . '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;background:#f8fafc;">'
+              . '<p style="margin:0 0 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;">From</p>'
+              . '<p style="margin:0;font-size:13px;color:#374151;line-height:1.7;">' . $pv_from_html . '</p>'
+            . '</div>'
+          . '</td>'
+        . '</tr>'
+      . '</table>'
+    . '</div>'
+
+    // ── Body ──
+    . '<div style="background:#ffffff;padding:24px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
+      . '<p style="margin:0 0 8px;font-size:15px;color:#1e293b;">Hello' . ($pv_customer_name !== '' ? ', ' . $h($pv_customer_name) : '') . ',</p>'
+      . '<p style="margin:0 0 24px;font-size:14px;color:#475569;">Please find your quote details below. We appreciate the opportunity to earn your business.</p>'
+
+      // Line items table
+      . '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">'
+        . '<thead>'
+          . '<tr style="background:#f8fafc;">'
+            . '<th style="padding:10px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Description</th>'
+            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Qty</th>'
+            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Unit Price</th>'
+            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Total</th>'
+          . '</tr>'
+        . '</thead>'
+        . '<tbody>' . implode('', $pv_rows_html) . '</tbody>'
+        . '<tfoot>'
+          . '<tr>'
+            . '<td colspan="3" style="padding:14px 12px;text-align:right;font-weight:700;font-size:14px;color:#1e293b;border-top:2px solid #e2e8f0;">Subtotal:</td>'
+            . '<td style="padding:14px 12px;text-align:right;font-weight:700;font-size:16px;color:#1e3a5f;border-top:2px solid #e2e8f0;">$' . $h($pv_subtotal) . '</td>'
+          . '</tr>'
+        . '</tfoot>'
+      . '</table>'
+
+      . ($pv_notes !== '' ? '<div style="margin-bottom:20px;padding:14px 16px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;"><p style="margin:0 0 4px;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Notes</p><p style="margin:0;font-size:14px;color:#475569;">' . nl2br($h($pv_notes)) . '</p></div>' : '')
+
+      . '<p style="margin:0;font-size:14px;color:#475569;">Thank you for considering our services. Please do not hesitate to reach out if you have any questions.</p>'
+    . '</div>'
+
+    // ── Prepared-by strip ──
+    . ($pv_prepared_by_html !== ''
+        ? '<div style="background:#f8fafc;padding:14px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:1px solid #e2e8f0;">'
+            . '<p style="margin:0;font-size:13px;color:#64748b;">' . $pv_prepared_by_html . '</p>'
+          . '</div>'
+        : '')
+
+    // ── Footer ──
+    . '<div style="background:#1e3a5f;border-radius:0 0 8px 8px;padding:18px 32px;">'
+      . '<p style="margin:0;font-size:12px;color:#93c5fd;line-height:1.6;">'
+        . $h($pv_sender_company)
+        . ($pv_footer_contact_html !== '' ? ' &nbsp;·&nbsp; ' . $pv_footer_contact_html : '')
+      . '</p>'
+    . '</div>'
+
+    . '</div>';
+
+  echo json_encode(['ok' => true, 'html' => $pv_preview_html, 'quote_label' => $pv_label]);
+  exit;
+}
+
 $errors = [];
 $messages = [];
 $today = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Y-m-d');
@@ -1400,6 +1623,7 @@ render_header('Quotes');
             <td style="white-space:nowrap;">
               <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote['id'] ?>">View</a>
               <a class="btn" href="quotes.php?edit=<?= (int)$quote['id'] ?>">Edit</a>
+              <button type="button" class="btn qt-print-btn" data-quote-id="<?= (int)$quote['id'] ?>">🖨 Print</button>
               <form method="post" style="display:inline;">
                 <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
                 <input type="hidden" name="action" value="send_email" />
@@ -1426,6 +1650,303 @@ render_header('Quotes');
       </tbody>
     </table>
   </div>
+
+<!-- ===== Quote Print Modal ===== -->
+<div id="qt-print-modal" role="dialog" aria-modal="true" aria-labelledby="qt-print-modal-title" style="display:none;">
+  <div class="qt-modal-backdrop"></div>
+  <div class="qt-modal-shell">
+    <!-- Close button -->
+    <button type="button" class="qt-modal-close" aria-label="Close preview">&times;</button>
+
+    <!-- Modal header -->
+    <div class="qt-modal-header">
+      <div class="qt-modal-header-icon" aria-hidden="true">🧾</div>
+      <div>
+        <h2 id="qt-print-modal-title" class="qt-modal-title">Quote Preview</h2>
+        <p class="qt-modal-subtitle">Review your quote before printing</p>
+      </div>
+    </div>
+
+    <!-- Quote content area (populated via JS) -->
+    <div class="qt-modal-body">
+      <div id="qt-print-modal-loading" class="qt-modal-loading" aria-live="polite">
+        <span class="qt-spinner" aria-hidden="true"></span>
+        Loading quote&hellip;
+      </div>
+      <div id="qt-print-modal-content" style="display:none;"></div>
+      <div id="qt-print-modal-error" class="qt-modal-error" style="display:none;" role="alert"></div>
+    </div>
+
+    <!-- Footer actions -->
+    <div class="qt-modal-footer">
+      <button type="button" class="qt-modal-cancel-btn" id="qt-modal-cancel">Cancel</button>
+      <button type="button" class="qt-modal-print-btn" id="qt-modal-print-btn" disabled>
+        <span class="qt-modal-print-icon" aria-hidden="true">🖨</span>
+        Print Quote
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+/* ---- Quote Print Modal ---- */
+#qt-print-modal {
+  position:fixed; inset:0; z-index:9000;
+}
+.qt-modal-backdrop {
+  position:absolute; inset:0;
+  background:rgba(15,23,42,0.72);
+  backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px);
+  animation:qt-fade-in .18s ease;
+}
+@keyframes qt-fade-in { from { opacity:0; } to { opacity:1; } }
+.qt-modal-shell {
+  position:absolute;
+  top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  width:min(760px, calc(100vw - 32px));
+  max-height:calc(100vh - 48px);
+  display:flex;
+  flex-direction:column;
+  background:#fff;
+  border-radius:16px;
+  box-shadow:0 32px 80px rgba(0,0,0,.4), 0 0 0 1px rgba(0,0,0,.08);
+  animation:qt-slide-up .22s cubic-bezier(.34,1.26,.64,1);
+  overflow:hidden;
+}
+@keyframes qt-slide-up {
+  from { opacity:0; transform:translate(-50%,calc(-50% + 24px)); }
+  to   { opacity:1; transform:translate(-50%,-50%); }
+}
+.qt-modal-close {
+  position:absolute; top:14px; right:16px;
+  width:32px; height:32px;
+  border:none; border-radius:50%;
+  background:rgba(255,255,255,.15);
+  color:#fff;
+  font-size:20px; line-height:1;
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .15s;
+  z-index:1;
+}
+.qt-modal-close:hover { background:rgba(255,255,255,.3); }
+.qt-modal-header {
+  display:flex; align-items:center; gap:16px;
+  padding:22px 28px 20px;
+  background:linear-gradient(135deg,#1e3a5f 0%,#1d4ed8 100%);
+  flex-shrink:0;
+}
+.qt-modal-header-icon {
+  font-size:32px; line-height:1;
+  filter:drop-shadow(0 2px 6px rgba(0,0,0,.25));
+}
+.qt-modal-title {
+  margin:0 0 2px;
+  font-size:20px; font-weight:700; color:#fff;
+  letter-spacing:0.2px;
+}
+.qt-modal-subtitle {
+  margin:0;
+  font-size:13px; color:#93c5fd;
+}
+.qt-modal-body {
+  flex:1 1 auto;
+  overflow-y:auto;
+  padding:28px 28px 16px;
+  background:#f1f5f9;
+}
+.qt-modal-loading {
+  display:flex; align-items:center; gap:12px;
+  justify-content:center;
+  padding:48px 0;
+  font-size:15px; color:#64748b;
+}
+.qt-spinner {
+  display:inline-block;
+  width:22px; height:22px;
+  border:3px solid #e2e8f0;
+  border-top-color:#1d4ed8;
+  border-radius:50%;
+  animation:qt-spin .7s linear infinite;
+}
+@keyframes qt-spin { to { transform:rotate(360deg); } }
+.qt-modal-error {
+  padding:14px 18px;
+  background:#fef2f2;
+  border:1px solid #fecaca;
+  border-radius:8px;
+  color:#991b1b;
+  font-size:14px;
+}
+.qt-modal-footer {
+  display:flex; align-items:center; justify-content:flex-end;
+  gap:12px;
+  padding:16px 28px;
+  background:#fff;
+  border-top:1px solid #e2e8f0;
+  flex-shrink:0;
+}
+.qt-modal-cancel-btn {
+  padding:10px 20px;
+  background:#fff;
+  color:#475569;
+  border:1px solid #cbd5e1;
+  border-radius:8px;
+  font-size:14px; font-weight:600;
+  cursor:pointer;
+  transition:background .15s, border-color .15s;
+}
+.qt-modal-cancel-btn:hover { background:#f8fafc; border-color:#94a3b8; }
+.qt-modal-print-btn {
+  display:flex; align-items:center; gap:8px;
+  padding:12px 28px;
+  background:linear-gradient(135deg,#1d4ed8,#1e3a5f);
+  color:#fff;
+  border:none;
+  border-radius:10px;
+  font-size:15px; font-weight:700;
+  cursor:pointer;
+  box-shadow:0 4px 14px rgba(29,78,216,.45);
+  transition:opacity .15s, box-shadow .15s, transform .1s;
+  letter-spacing:0.2px;
+}
+.qt-modal-print-btn:hover:not(:disabled) { opacity:.92; box-shadow:0 6px 20px rgba(29,78,216,.55); transform:translateY(-1px); }
+.qt-modal-print-btn:active:not(:disabled) { transform:translateY(0); }
+.qt-modal-print-btn:disabled { opacity:.5; cursor:not-allowed; box-shadow:none; }
+.qt-modal-print-icon { font-size:18px; }
+
+/* ---- @media print: suppress the main page entirely when printing from popup ---- */
+@media print {
+  body { display:none !important; }
+}
+</style>
+
+<script>
+(function () {
+  'use strict';
+
+  var modal      = document.getElementById('qt-print-modal');
+  var loadingEl  = document.getElementById('qt-print-modal-loading');
+  var contentEl  = document.getElementById('qt-print-modal-content');
+  var errorEl    = document.getElementById('qt-print-modal-error');
+  var printBtn   = document.getElementById('qt-modal-print-btn');
+  var cancelBtns = [
+    document.getElementById('qt-modal-cancel'),
+    modal.querySelector('.qt-modal-close')
+  ];
+
+  function openModal() {
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    modal.querySelector('.qt-modal-close').focus();
+  }
+
+  function closeModal() {
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+    contentEl.innerHTML = '';
+    contentEl.style.display = 'none';
+    loadingEl.style.display = 'flex';
+    errorEl.style.display = 'none';
+    errorEl.textContent = '';
+    printBtn.disabled = true;
+  }
+
+  cancelBtns.forEach(function (btn) {
+    if (btn) btn.addEventListener('click', closeModal);
+  });
+
+  // Close on backdrop click
+  modal.querySelector('.qt-modal-backdrop').addEventListener('click', closeModal);
+
+  // Close on Escape
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && modal.style.display !== 'none') closeModal();
+  });
+
+  // Print button — open a clean popup window containing only the quote HTML
+  printBtn.addEventListener('click', function () {
+    var html = contentEl.innerHTML;
+    if (!html) return;
+
+    var popup = window.open('', '_blank', 'width=800,height=700,scrollbars=yes,resizable=yes');
+    if (!popup) {
+      alert('A pop-up was blocked. Please allow pop-ups for this site in your browser settings and try again.');
+      return;
+    }
+
+    popup.document.open();
+    popup.document.write(
+      '<!DOCTYPE html>' +
+      '<html lang="en">' +
+      '<head>' +
+        '<meta charset="UTF-8">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+        '<title>Quote</title>' +
+        '<style>' +
+          '*, *::before, *::after { box-sizing: border-box; }' +
+          'html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #1e293b; }' +
+          '@media screen { body { padding: 24px; } }' +
+          '@page { margin: 15mm 12mm; }' +
+          '@media print {' +
+            'html, body { margin: 0; padding: 0; background: #fff; }' +
+            'a { color: inherit !important; text-decoration: none !important; }' +
+          '}' +
+        '</style>' +
+      '</head>' +
+      '<body>' + html + '</body>' +
+      '</html>'
+    );
+    popup.document.close();
+
+    // onload may not fire after document.write(); use a short timeout as fallback
+    var printed = false;
+    function doPrint() {
+      if (printed) return;
+      printed = true;
+      popup.focus();
+      popup.print();
+    }
+    popup.onload = doPrint;
+    setTimeout(doPrint, 400);
+  });
+
+  // Print buttons in table rows
+  document.querySelectorAll('.qt-print-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var quoteId = btn.getAttribute('data-quote-id');
+      openModal();
+
+      fetch('quotes.php?action=print_preview&quote_id=' + encodeURIComponent(quoteId), {
+        credentials: 'same-origin'
+      })
+        .then(function (res) {
+          if (!res.ok) throw new Error('Server returned ' + res.status);
+          return res.json();
+        })
+        .then(function (data) {
+          if (!data.ok) {
+            loadingEl.style.display = 'none';
+            errorEl.textContent = data.error || 'Failed to load quote.';
+            errorEl.style.display = 'block';
+            return;
+          }
+          contentEl.innerHTML = data.html;
+          loadingEl.style.display = 'none';
+          contentEl.style.display = 'block';
+          printBtn.disabled = false;
+        })
+        .catch(function (err) {
+          loadingEl.style.display = 'none';
+          errorEl.textContent = 'Could not load quote preview: ' + err.message;
+          errorEl.style.display = 'block';
+        });
+    });
+  });
+}());
+</script>
 
 <?php elseif ($show_form): ?>
   <form method="post" class="card" style="max-width:1100px; position:relative;">
