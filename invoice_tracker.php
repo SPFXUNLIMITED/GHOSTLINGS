@@ -815,7 +815,7 @@ render_header('Invoice Tracker');
 
     var popup = window.open('', '_blank', 'width=800,height=700,scrollbars=yes,resizable=yes');
     if (!popup) {
-      alert('A pop-up was blocked. Please allow pop-ups for this site and try again.');
+      alert('A pop-up was blocked. Please allow pop-ups for this site in your browser settings and try again.');
       return;
     }
 
@@ -843,10 +843,16 @@ render_header('Invoice Tracker');
     );
     popup.document.close();
 
-    popup.onload = function () {
+    // onload may not fire after document.write(); use a short timeout as fallback
+    var printed = false;
+    function doPrint() {
+      if (printed) return;
+      printed = true;
       popup.focus();
       popup.print();
-    };
+    }
+    popup.onload = doPrint;
+    setTimeout(doPrint, 400);
   });
 
   // Print buttons in table rows
