@@ -83,6 +83,79 @@ function hubspot_contact_names(array $props): array {
   ];
 }
 
+/**
+ * Attempts to split a combined address string into its components.
+ *
+ * HubSpot sometimes stores the full address in the `address` field as a single
+ * string (e.g. "123 Main St, Dallas, TX 75201") while leaving city/state/zip
+ * blank.  When that happens this function parses the string and returns the
+ * four components: [street, city, state, zip].
+ *
+ * If the individual city/state/zip values are already populated they are
+ * returned unchanged; no parsing is attempted.
+ *
+ * Recognised US formats (parts are comma-separated):
+ *   "123 Main St, Dallas, TX 75201"
+ *   "123 Main St, Suite 100, Dallas, TX 75201"
+ *   "123 Main St, Dallas, TX 75201, USA"   (trailing country part ignored)
+ *
+ * The state+zip tail is matched with the pattern: two uppercase letters
+ * followed by an optional 5-digit (+ optional -4) ZIP code.
+ */
+function parse_hubspot_address_components(string $address, string $city, string $state, string $zip): array {
+  // If the individual fields are already populated, nothing to do.
+  if ($city !== '' || $state !== '' || $zip !== '') {
+    return [$address, $city, $state, $zip];
+  }
+
+  $raw = trim($address);
+  if ($raw === '') {
+    return [$address, $city, $state, $zip];
+  }
+
+  // Split on commas and clean up whitespace.
+  $parts = array_values(array_filter(array_map('trim', explode(',', $raw)), fn($p) => $p !== ''));
+
+  // Need at least two parts: something before and a "State ZIP" tail.
+  if (count($parts) < 2) {
+    return [$address, $city, $state, $zip];
+  }
+
+  // Check if the last part is a country name / code that should be ignored
+  // (2–3 upper-case letters or a well-known country word), then strip it.
+  $last = end($parts);
+  if (preg_match('/^[A-Za-z]{2,3}$/', $last) && !preg_match('/^\d/', $last)) {
+    // Only drop it if it doesn't look like a state+zip combo.
+    if (!preg_match('/^[A-Za-z]{2}\s+\d{5}/', $last)) {
+      array_pop($parts);
+    }
+  }
+
+  if (count($parts) < 2) {
+    return [$address, $city, $state, $zip];
+  }
+
+  // The last remaining part should be "STATE ZIP" or just "STATE".
+  $tail = array_pop($parts);
+
+  // Match "TX 75201" or "TX 75201-4321" or just "TX".
+  if (!preg_match('/^([A-Za-z]{2})\s*(\d{5}(?:-\d{4})?)?$/', $tail, $m)) {
+    // Does not look like a state/zip tail – treat the whole string as street.
+    return [$address, $city, $state, $zip];
+  }
+
+  $parsed_state = strtoupper($m[1]);
+  $parsed_zip   = isset($m[2]) ? $m[2] : '';
+
+  // The part just before the tail is the city.
+  $parsed_city   = array_pop($parts);
+
+  // Everything remaining is the street address.
+  $parsed_street = count($parts) > 0 ? implode(', ', $parts) : '';
+
+  return [$parsed_street, $parsed_city, $parsed_state, $parsed_zip];
+}
+
 function hubspot_to_datetime(?string $value): ?string {
   $value = trim((string)$value);
   if ($value === '') return null;
@@ -271,6 +344,9 @@ function sync_customers_from_hubspot(PDO $pdo): array {
         $state = trim((string)($props['state'] ?? ''));
         $zip = trim((string)($props['zip'] ?? ''));
         $country = trim((string)($props['country'] ?? ''));
+        // When HubSpot stores the full address in the address field but leaves
+        // city/state/zip blank, parse the components out of the address string.
+        [$address, $city, $state, $zip] = parse_hubspot_address_components($address, $city, $state, $zip);
         $last_updated = hubspot_to_datetime($props['lastmodifieddate'] ?? null);
         $upsert->execute([
           $id,
