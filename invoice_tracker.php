@@ -7,6 +7,196 @@ require_admin_or_moderator();
 const INVOICE_TRACKER_TABLE_COLUMN_COUNT = 5;
 const INVOICE_TRACKER_BASE_FILTER = "((converted_invoice_no IS NOT NULL AND converted_invoice_no <> '') OR status = 'converted')";
 
+// ---------- AJAX: print preview ----------
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_preview') {
+  header('Content-Type: application/json; charset=utf-8');
+  $inv_id = (int)($_GET['invoice_id'] ?? 0);
+  if ($inv_id <= 0) {
+    echo json_encode(['ok' => false, 'error' => 'Invalid invoice ID.']);
+    exit;
+  }
+
+  $quote_stmt = $pdo->prepare(
+    "SELECT id, customer_name, company_name, quote_date, subtotal_amount, status,
+            converted_invoice_no, email, notes, created_by, created_at
+     FROM quotes WHERE id = ? LIMIT 1"
+  );
+  $quote_stmt->execute([$inv_id]);
+  $pq = $quote_stmt->fetch(PDO::FETCH_ASSOC);
+  if (!$pq) {
+    echo json_encode(['ok' => false, 'error' => 'Invoice not found.']);
+    exit;
+  }
+
+  $items_stmt = $pdo->prepare(
+    "SELECT description, quantity, unit_price, line_total FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC"
+  );
+  $items_stmt->execute([$inv_id]);
+  $pitems = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  // Sender profile
+  $sender = ['sender_name' => '', 'company_name' => '', 'address' => '', 'phone' => '', 'email' => ''];
+  $created_by = isset($pq['created_by']) && $pq['created_by'] !== null ? (int)$pq['created_by'] : null;
+  $candidate_ids = [];
+  if ($created_by !== null && $created_by > 0) $candidate_ids[] = $created_by;
+  $session_uid = (int)($_SESSION['user_id'] ?? 0);
+  if ($session_uid > 0 && !in_array($session_uid, $candidate_ids, true)) $candidate_ids[] = $session_uid;
+  if ($candidate_ids) {
+    $sp_stmt = $pdo->prepare("SELECT username, contact_name, company_name, delivery_address, contact_phone, email FROM users WHERE id = ? LIMIT 1");
+    foreach ($candidate_ids as $uid) {
+      $sp_stmt->execute([$uid]);
+      $sp_row = $sp_stmt->fetch();
+      if (!$sp_row) continue;
+      $contact_name = trim((string)($sp_row['contact_name'] ?? ''));
+      $username     = trim((string)($sp_row['username']     ?? ''));
+      $sender['sender_name']  = $contact_name !== '' ? $contact_name : $username;
+      $sender['company_name'] = trim((string)($sp_row['company_name']     ?? ''));
+      $sender['address']      = trim((string)($sp_row['delivery_address'] ?? ''));
+      $sender['phone']        = trim((string)($sp_row['contact_phone']    ?? ''));
+      $sender['email']        = trim((string)($sp_row['email']            ?? ''));
+      break;
+    }
+  }
+
+  $now_stamp = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Ymd');
+  $inv_no        = trim((string)($pq['converted_invoice_no'] ?? ''));
+  $inv_label_raw = $inv_no !== '' ? $inv_no : 'INV-' . $now_stamp . '-' . str_pad((string)$inv_id, 5, '0', STR_PAD_LEFT);
+  $inv_date      = trim((string)($pq['quote_date'] ?? '')) ?: substr(trim((string)($pq['created_at'] ?? '')), 0, 10);
+  $customer_name = trim((string)($pq['customer_name'] ?? ''));
+  $subtotal      = number_format((float)($pq['subtotal_amount'] ?? 0), 2);
+  $notes         = trim((string)($pq['notes'] ?? ''));
+  $sender_company = $sender['company_name'] !== '' ? $sender['company_name'] : 'Our Company';
+  $sender_name    = $sender['sender_name'];
+  $sender_address = $sender['address'];
+  $sender_phone   = $sender['phone'];
+  $sender_email   = $sender['email'];
+
+  $h = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+
+  // Build item rows
+  $rows_html = [];
+  $row_index = 0;
+  foreach ($pitems as $item) {
+    $desc       = trim((string)($item['description'] ?? ''));
+    $qty        = number_format((float)($item['quantity']   ?? 0), 2);
+    $unit_price = number_format((float)($item['unit_price'] ?? 0), 2);
+    $line_total = number_format((float)($item['line_total'] ?? 0), 2);
+    $row_bg     = ($row_index % 2 === 0) ? '#ffffff' : '#f9fafb';
+    $rows_html[] = '<tr style="background:' . $row_bg . ';">'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">' . $h($desc) . '</td>'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">' . $h($qty) . '</td>'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . $h($unit_price) . '</td>'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . $h($line_total) . '</td>'
+      . '</tr>';
+    $row_index++;
+  }
+  if (!$rows_html) {
+    $rows_html[] = '<tr><td colspan="4" style="padding:10px 12px;text-align:center;color:#6b7280;">No line items.</td></tr>';
+  }
+
+  // Header contact line
+  $header_parts = [];
+  if ($sender_address !== '') {
+    $addr_one = preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ' · ', $sender_address));
+    $header_parts[] = $h($addr_one);
+  }
+  if ($sender_phone !== '') $header_parts[] = $h($sender_phone);
+  if ($sender_email !== '') $header_parts[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($sender_email) . '</a>';
+  $header_contact_html = implode(' &nbsp;·&nbsp; ', $header_parts);
+
+  // Prepared-by
+  $prepared_by_html = '';
+  if ($sender_name !== '') {
+    $prepared_by_html = 'This invoice was prepared by <strong style="color:#1e293b;">' . $h($sender_name) . '</strong>';
+    if ($sender_company !== 'Our Company') {
+      $prepared_by_html .= ' at <strong style="color:#1e293b;">' . $h($sender_company) . '</strong>';
+    }
+    $prepared_by_html .= '.';
+  }
+
+  // Footer contact line
+  $footer_parts = [];
+  if ($sender_address !== '') $footer_parts[] = $h(preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ', ', $sender_address)));
+  if ($sender_phone !== '') $footer_parts[] = $h($sender_phone);
+  if ($sender_email !== '') $footer_parts[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($sender_email) . '</a>';
+  $footer_contact_html = implode(' &nbsp;·&nbsp; ', $footer_parts);
+
+  $inv_label = $h($inv_label_raw);
+
+  $preview_html =
+    '<div style="max-width:680px;margin:0 auto;">'
+
+    // ── Header banner ──
+    . '<div style="background:#1e3a5f;border-radius:8px 8px 0 0;padding:28px 32px 24px;">'
+      . '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $h($sender_company) . '</p>'
+      . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '')
+    . '</div>'
+
+    // ── Document title strip ──
+    . '<div style="background:#ffffff;padding:20px 32px 0;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
+      . '<table style="width:100%;border-collapse:collapse;">'
+        . '<tr>'
+          . '<td style="padding:0 0 16px;">'
+            . '<p style="margin:0;font-size:18px;font-weight:700;color:#0f172a;">Invoice ' . $inv_label . '</p>'
+          . '</td>'
+          . '<td style="padding:0 0 16px;text-align:right;">'
+            . '<p style="margin:0;font-size:13px;color:#64748b;">Date: ' . $h($inv_date) . '</p>'
+          . '</td>'
+        . '</tr>'
+      . '</table>'
+      . '<hr style="margin:0;border:none;border-top:2px solid #e2e8f0;">'
+    . '</div>'
+
+    // ── Body ──
+    . '<div style="background:#ffffff;padding:24px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
+      . '<p style="margin:0 0 8px;font-size:15px;color:#1e293b;">Hello' . ($customer_name !== '' ? ', ' . $h($customer_name) : '') . ',</p>'
+      . '<p style="margin:0 0 24px;font-size:14px;color:#475569;">Please find your invoice details below. Thank you for your business.</p>'
+
+      // Line items table
+      . '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">'
+        . '<thead>'
+          . '<tr style="background:#f8fafc;">'
+            . '<th style="padding:10px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Description</th>'
+            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Qty</th>'
+            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Unit Price</th>'
+            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Total</th>'
+          . '</tr>'
+        . '</thead>'
+        . '<tbody>' . implode('', $rows_html) . '</tbody>'
+        . '<tfoot>'
+          . '<tr>'
+            . '<td colspan="3" style="padding:14px 12px;text-align:right;font-weight:700;font-size:14px;color:#1e293b;border-top:2px solid #e2e8f0;">Subtotal:</td>'
+            . '<td style="padding:14px 12px;text-align:right;font-weight:700;font-size:16px;color:#1e3a5f;border-top:2px solid #e2e8f0;">$' . $h($subtotal) . '</td>'
+          . '</tr>'
+        . '</tfoot>'
+      . '</table>'
+
+      . ($notes !== '' ? '<div style="margin-bottom:20px;padding:14px 16px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;"><p style="margin:0 0 4px;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Notes</p><p style="margin:0;font-size:14px;color:#475569;">' . nl2br($h($notes)) . '</p></div>' : '')
+
+      . '<p style="margin:0;font-size:14px;color:#475569;">If you have any questions regarding this invoice, please do not hesitate to contact us.</p>'
+    . '</div>'
+
+    // ── Prepared-by strip ──
+    . ($prepared_by_html !== ''
+        ? '<div style="background:#f8fafc;padding:14px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:1px solid #e2e8f0;">'
+            . '<p style="margin:0;font-size:13px;color:#64748b;">' . $prepared_by_html . '</p>'
+          . '</div>'
+        : '')
+
+    // ── Footer ──
+    . '<div style="background:#1e3a5f;border-radius:0 0 8px 8px;padding:18px 32px;">'
+      . '<p style="margin:0;font-size:12px;color:#93c5fd;line-height:1.6;">'
+        . $h($sender_company)
+        . ($footer_contact_html !== '' ? ' &nbsp;·&nbsp; ' . $footer_contact_html : '')
+      . '</p>'
+    . '</div>'
+
+    . '</div>';
+
+  echo json_encode(['ok' => true, 'html' => $preview_html, 'inv_label' => $inv_label_raw]);
+  exit;
+}
+
 // ---------- CSRF ----------
 if (empty($_SESSION['invoice_tracker_csrf'])) {
   $_SESSION['invoice_tracker_csrf'] = bin2hex(random_bytes(24));
@@ -373,6 +563,7 @@ render_header('Invoice Tracker');
               <div class="it-actions">
                 <a class="btn" href="invoice_form.php?id=<?= $inv_id ?>&mode=view">View</a>
                 <a class="btn" href="invoice_form.php?id=<?= $inv_id ?>">Edit</a>
+                <button type="button" class="btn it-print-btn" data-inv-id="<?= $inv_id ?>">🖨 Print</button>
 
                 <!-- Email Invoice: POST to invoice_form.php using shared CSRF -->
                 <form method="post" action="invoice_form.php" style="display:contents;">
@@ -401,6 +592,280 @@ render_header('Invoice Tracker');
     </table>
   </div>
 </div>
+
+<!-- ===== Invoice Print Modal ===== -->
+<div id="it-print-modal" role="dialog" aria-modal="true" aria-labelledby="it-print-modal-title" style="display:none;">
+  <div class="it-modal-backdrop"></div>
+  <div class="it-modal-shell">
+    <!-- Close button -->
+    <button type="button" class="it-modal-close" aria-label="Close preview">&times;</button>
+
+    <!-- Modal header -->
+    <div class="it-modal-header">
+      <div class="it-modal-header-icon" aria-hidden="true">🧾</div>
+      <div>
+        <h2 id="it-print-modal-title" class="it-modal-title">Invoice Preview</h2>
+        <p class="it-modal-subtitle">Review your invoice before printing</p>
+      </div>
+    </div>
+
+    <!-- Invoice content area (populated via JS) -->
+    <div class="it-modal-body">
+      <div id="it-print-modal-loading" class="it-modal-loading" aria-live="polite">
+        <span class="it-spinner" aria-hidden="true"></span>
+        Loading invoice&hellip;
+      </div>
+      <div id="it-print-modal-content" style="display:none;"></div>
+      <div id="it-print-modal-error" class="it-modal-error" style="display:none;" role="alert"></div>
+    </div>
+
+    <!-- Footer actions -->
+    <div class="it-modal-footer">
+      <button type="button" class="it-modal-cancel-btn" id="it-modal-cancel">Cancel</button>
+      <button type="button" class="it-modal-print-btn" id="it-modal-print-btn" disabled>
+        <span class="it-modal-print-icon" aria-hidden="true">🖨</span>
+        Print Invoice
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+/* ---- Print Modal ---- */
+#it-print-modal {
+  position:fixed; inset:0; z-index:9000;
+}
+.it-modal-backdrop {
+  position:absolute; inset:0;
+  background:rgba(15,23,42,0.72);
+  backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px);
+  animation:it-fade-in .18s ease;
+}
+@keyframes it-fade-in { from { opacity:0; } to { opacity:1; } }
+.it-modal-shell {
+  position:absolute;
+  top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  width:min(760px, calc(100vw - 32px));
+  max-height:calc(100vh - 48px);
+  display:flex;
+  flex-direction:column;
+  background:#fff;
+  border-radius:16px;
+  box-shadow:0 32px 80px rgba(0,0,0,.4), 0 0 0 1px rgba(0,0,0,.08);
+  animation:it-slide-up .22s cubic-bezier(.34,1.26,.64,1);
+  overflow:hidden;
+}
+@keyframes it-slide-up {
+  from { opacity:0; transform:translate(-50%,calc(-50% + 24px)); }
+  to   { opacity:1; transform:translate(-50%,-50%); }
+}
+.it-modal-close {
+  position:absolute; top:14px; right:16px;
+  width:32px; height:32px;
+  border:none; border-radius:50%;
+  background:rgba(255,255,255,.15);
+  color:#fff;
+  font-size:20px; line-height:1;
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .15s;
+  z-index:1;
+}
+.it-modal-close:hover { background:rgba(255,255,255,.3); }
+.it-modal-header {
+  display:flex; align-items:center; gap:16px;
+  padding:22px 28px 20px;
+  background:linear-gradient(135deg,#1e3a5f 0%,#1d4ed8 100%);
+  flex-shrink:0;
+}
+.it-modal-header-icon {
+  font-size:32px; line-height:1;
+  filter:drop-shadow(0 2px 6px rgba(0,0,0,.25));
+}
+.it-modal-title {
+  margin:0 0 2px;
+  font-size:20px; font-weight:700; color:#fff;
+  letter-spacing:0.2px;
+}
+.it-modal-subtitle {
+  margin:0;
+  font-size:13px; color:#93c5fd;
+}
+.it-modal-body {
+  flex:1 1 auto;
+  overflow-y:auto;
+  padding:28px 28px 16px;
+  background:#f1f5f9;
+}
+.it-modal-loading {
+  display:flex; align-items:center; gap:12px;
+  justify-content:center;
+  padding:48px 0;
+  font-size:15px; color:#64748b;
+}
+.it-spinner {
+  display:inline-block;
+  width:22px; height:22px;
+  border:3px solid #e2e8f0;
+  border-top-color:#1d4ed8;
+  border-radius:50%;
+  animation:it-spin .7s linear infinite;
+}
+@keyframes it-spin { to { transform:rotate(360deg); } }
+.it-modal-error {
+  padding:14px 18px;
+  background:#fef2f2;
+  border:1px solid #fecaca;
+  border-radius:8px;
+  color:#991b1b;
+  font-size:14px;
+}
+.it-modal-footer {
+  display:flex; align-items:center; justify-content:flex-end;
+  gap:12px;
+  padding:16px 28px;
+  background:#fff;
+  border-top:1px solid #e2e8f0;
+  flex-shrink:0;
+}
+.it-modal-cancel-btn {
+  padding:10px 20px;
+  background:#fff;
+  color:#475569;
+  border:1px solid #cbd5e1;
+  border-radius:8px;
+  font-size:14px; font-weight:600;
+  cursor:pointer;
+  transition:background .15s, border-color .15s;
+}
+.it-modal-cancel-btn:hover { background:#f8fafc; border-color:#94a3b8; }
+.it-modal-print-btn {
+  display:flex; align-items:center; gap:8px;
+  padding:12px 28px;
+  background:linear-gradient(135deg,#1d4ed8,#1e3a5f);
+  color:#fff;
+  border:none;
+  border-radius:10px;
+  font-size:15px; font-weight:700;
+  cursor:pointer;
+  box-shadow:0 4px 14px rgba(29,78,216,.45);
+  transition:opacity .15s, box-shadow .15s, transform .1s;
+  letter-spacing:0.2px;
+}
+.it-modal-print-btn:hover:not(:disabled) { opacity:.92; box-shadow:0 6px 20px rgba(29,78,216,.55); transform:translateY(-1px); }
+.it-modal-print-btn:active:not(:disabled) { transform:translateY(0); }
+.it-modal-print-btn:disabled { opacity:.5; cursor:not-allowed; box-shadow:none; }
+.it-modal-print-icon { font-size:18px; }
+
+/* ---- @media print ---- */
+@media print {
+  body > *:not(#it-print-modal) { display:none !important; }
+  #it-print-modal { position:static !important; display:block !important; }
+  .it-modal-backdrop,
+  .it-modal-close,
+  .it-modal-header,
+  .it-modal-footer { display:none !important; }
+  .it-modal-shell {
+    position:static !important;
+    transform:none !important;
+    width:100% !important;
+    max-height:none !important;
+    box-shadow:none !important;
+    border-radius:0 !important;
+    overflow:visible !important;
+  }
+  .it-modal-body {
+    padding:0 !important;
+    background:#fff !important;
+    overflow:visible !important;
+  }
+}
+</style>
+
+<script>
+(function () {
+  'use strict';
+
+  var modal         = document.getElementById('it-print-modal');
+  var loadingEl     = document.getElementById('it-print-modal-loading');
+  var contentEl     = document.getElementById('it-print-modal-content');
+  var errorEl       = document.getElementById('it-print-modal-error');
+  var printBtn      = document.getElementById('it-modal-print-btn');
+  var cancelBtns    = [
+    document.getElementById('it-modal-cancel'),
+    modal.querySelector('.it-modal-close')
+  ];
+
+  function openModal() {
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    modal.querySelector('.it-modal-close').focus();
+  }
+
+  function closeModal() {
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+    contentEl.innerHTML = '';
+    contentEl.style.display = 'none';
+    loadingEl.style.display = 'flex';
+    errorEl.style.display = 'none';
+    errorEl.textContent = '';
+    printBtn.disabled = true;
+  }
+
+  cancelBtns.forEach(function (btn) {
+    if (btn) btn.addEventListener('click', closeModal);
+  });
+
+  // Close on backdrop click
+  modal.querySelector('.it-modal-backdrop').addEventListener('click', closeModal);
+
+  // Close on Escape
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && modal.style.display !== 'none') closeModal();
+  });
+
+  // Print button
+  printBtn.addEventListener('click', function () {
+    window.print();
+  });
+
+  // Print buttons in table rows
+  document.querySelectorAll('.it-print-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var invId = btn.getAttribute('data-inv-id');
+      openModal();
+
+      fetch('invoice_tracker.php?action=print_preview&invoice_id=' + encodeURIComponent(invId), {
+        credentials: 'same-origin'
+      })
+        .then(function (res) {
+          if (!res.ok) throw new Error('Server returned ' + res.status);
+          return res.json();
+        })
+        .then(function (data) {
+          if (!data.ok) {
+            loadingEl.style.display = 'none';
+            errorEl.textContent = data.error || 'Failed to load invoice.';
+            errorEl.style.display = 'block';
+            return;
+          }
+          contentEl.innerHTML = data.html;
+          loadingEl.style.display = 'none';
+          contentEl.style.display = 'block';
+          printBtn.disabled = false;
+        })
+        .catch(function (err) {
+          loadingEl.style.display = 'none';
+          errorEl.textContent = 'Could not load invoice preview: ' + err.message;
+          errorEl.style.display = 'block';
+        });
+    });
+  });
+}());
+</script>
 
 <?php render_footer();
 
