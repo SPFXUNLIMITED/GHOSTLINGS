@@ -6,6 +6,16 @@ require_login();
 
 const MAX_MESSAGE_LENGTH = 200000;
 
+function message_body_to_reply_text(string $html): string {
+  $text = preg_replace('~<br\b[^>]*>|</?(p|div|blockquote)\b[^>]*>|</li>~i', "\n", $html) ?? '';
+  $text = preg_replace('~<li\b[^>]*>~i', '- ', $text) ?? '';
+  $text = strip_tags($text);
+  $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+  $text = preg_replace("/\r\n?/", "\n", $text) ?? '';
+  $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? '';
+  return trim($text);
+}
+
 $current_user_id = (int)$_SESSION['user_id'];
 
 // Find the other user (the only other user in the system)
@@ -29,26 +39,47 @@ if (empty($_SESSION['messages_csrf'])) {
 
 $errors = [];
 $sent = isset($_GET['sent']) && $_GET['sent'] === '1';
+$deleted = isset($_GET['deleted']) && $_GET['deleted'] === '1';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $sent = false;
+  $deleted = false;
   $csrf = (string)($_POST['csrf_token'] ?? '');
   if (!hash_equals((string)$_SESSION['messages_csrf'], $csrf)) {
     $errors[] = 'Security token mismatch. Please refresh and try again.';
   } else {
-    $body = trim((string)($_POST['body'] ?? ''));
-    if (trim(strip_tags($body)) === '') {
-      $errors[] = 'Message body cannot be empty.';
-    } elseif (strlen($body) > MAX_MESSAGE_LENGTH) {
-      $errors[] = 'Message is too long.';
+    $action = (string)($_POST['action'] ?? 'send_message');
+
+    if ($action === 'delete_message') {
+      $message_id = (int)($_POST['delete_message_id'] ?? 0);
+      if ($message_id <= 0) {
+        $errors[] = 'Invalid message selected.';
+      } else {
+        $del = $pdo->prepare("DELETE FROM messages WHERE id = ? AND sender_id = ?");
+        $del->execute([$message_id, $current_user_id]);
+        if ($del->rowCount() < 1) {
+          $errors[] = 'Message not found or you do not have permission to delete it.';
+        } else {
+          $_SESSION['messages_csrf'] = bin2hex(random_bytes(24));
+          header('Location: messages.php?deleted=1');
+          exit;
+        }
+      }
     } else {
-      $ins = $pdo->prepare(
-        "INSERT INTO messages (sender_id, recipient_id, body) VALUES (?, ?, ?)"
-      );
-      $ins->execute([$current_user_id, $other_user_id, $body]);
-      $_SESSION['messages_csrf'] = bin2hex(random_bytes(24));
-      header('Location: messages.php?sent=1');
-      exit;
+      $body = trim((string)($_POST['body'] ?? ''));
+      if (trim(strip_tags($body)) === '') {
+        $errors[] = 'Message body cannot be empty.';
+      } elseif (strlen($body) > MAX_MESSAGE_LENGTH) {
+        $errors[] = 'Message is too long.';
+      } else {
+        $ins = $pdo->prepare(
+          "INSERT INTO messages (sender_id, recipient_id, body) VALUES (?, ?, ?)"
+        );
+        $ins->execute([$current_user_id, $other_user_id, $body]);
+        $_SESSION['messages_csrf'] = bin2hex(random_bytes(24));
+        header('Location: messages.php?sent=1');
+        exit;
+      }
     }
   }
 }
@@ -92,6 +123,12 @@ render_header('Messages');
   </div>
 <?php endif; ?>
 
+<?php if ($deleted): ?>
+  <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">
+    Message deleted successfully.
+  </div>
+<?php endif; ?>
+
 <!-- Conversation History -->
 <div class="card" id="message-history" style="padding:0; overflow:hidden;">
   <?php if (!$messages): ?>
@@ -107,6 +144,7 @@ render_header('Messages');
           $label   = $is_mine ? 'You' : h($msg['sender_username']);
           $dt      = new DateTime($msg['created_at'], new DateTimeZone(APP_TZ));
           $fmt_dt  = $dt->format('m/d/Y g:i A');
+          $reply_text = message_body_to_reply_text((string)$msg['body']);
         ?>
         <div style="display:flex; flex-direction:column; align-items:<?= $align ?>; max-width:100%;">
           <div style="font-size:11px; color:#6b7280; margin-bottom:3px;">
@@ -114,6 +152,23 @@ render_header('Messages');
           </div>
           <div style="background:<?= $bg ?>; color:<?= $color ?>; border-radius:10px; padding:10px 14px; max-width:80%; word-break:break-word; line-height:1.6; font-size:14px;">
             <?= $msg['body'] ?>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:6px;">
+            <button
+              type="button"
+              class="btn js-reply-btn"
+              data-reply-text="<?= h($reply_text) ?>"
+              data-reply-label="<?= h($label) ?>"
+              style="font-size:12px; padding:4px 10px;"
+            >Reply</button>
+            <?php if ($is_mine): ?>
+              <button
+                type="button"
+                class="btn js-delete-btn"
+                data-message-id="<?= (int)$msg['id'] ?>"
+                style="font-size:12px; padding:4px 10px; border-color:#fecaca; color:#b91c1c;"
+              >Delete</button>
+            <?php endif; ?>
           </div>
         </div>
       <?php endforeach; ?>
@@ -126,6 +181,7 @@ render_header('Messages');
   <h2 style="margin:0 0 12px;">Send a Message</h2>
   <form method="post" id="msg-form">
     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['messages_csrf']) ?>" />
+    <input type="hidden" name="action" value="send_message" />
     <div style="margin-bottom:12px;">
       <textarea id="msg-body" name="body" rows="8" style="width:100%;"><?php
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors) {
@@ -136,6 +192,12 @@ render_header('Messages');
     <button type="submit" class="btn primary" style="font-size:16px; padding:10px 20px;">Send Message</button>
   </form>
 </div>
+
+<form method="post" id="delete-message-form" style="display:none;">
+  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['messages_csrf']) ?>" />
+  <input type="hidden" name="action" value="delete_message" />
+  <input type="hidden" name="delete_message_id" id="delete_message_id" value="" />
+</form>
 
 <script src="/project/tinymce/js/tinymce/tinymce.min.js"></script>
 <script>
@@ -198,6 +260,44 @@ tinymce.init({
 
 document.getElementById('msg-form').addEventListener('submit', function () {
   tinymce.triggerSave();
+});
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+document.addEventListener('click', function (e) {
+  var replyBtn = e.target.closest('.js-reply-btn');
+  if (replyBtn) {
+    var originalText = (replyBtn.getAttribute('data-reply-text') || '').trim();
+    var originalLabel = (replyBtn.getAttribute('data-reply-label') || 'Unknown sender').trim();
+    var editor = tinymce.get('msg-body');
+    if (!originalText || !editor) return;
+
+    var srOnlyLabel = escapeHtml('Quoted message from ' + originalLabel);
+    var quotedText = escapeHtml(originalText).replace(/\r?\n/g, '<br>');
+    var srOnlyHtml = '<span style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">' + srOnlyLabel + '</span>';
+    var quoteHtml = '<blockquote>' + srOnlyHtml + quotedText + '</blockquote><p><br></p>';
+    editor.setContent(quoteHtml + editor.getContent({ format: 'html' }));
+    editor.focus();
+    return;
+  }
+
+  var deleteBtn = e.target.closest('.js-delete-btn');
+  if (deleteBtn) {
+    var messageId = deleteBtn.getAttribute('data-message-id');
+    var deleteInput = document.getElementById('delete_message_id');
+    var deleteForm = document.getElementById('delete-message-form');
+    if (!messageId || !deleteInput || !deleteForm) return;
+    if (!confirm('Delete this message?')) return;
+    deleteInput.value = messageId;
+    deleteForm.submit();
+  }
 });
 
 // Scroll message history to bottom on page load and after sending (post-redirect reload)
