@@ -981,6 +981,11 @@ $pdo->exec("
     company             VARCHAR(255) NOT NULL DEFAULT '',
     phone               VARCHAR(100) NOT NULL DEFAULT '',
     email               VARCHAR(255) NOT NULL DEFAULT '',
+    address             VARCHAR(255) NOT NULL DEFAULT '',
+    city                VARCHAR(100) NOT NULL DEFAULT '',
+    state               VARCHAR(100) NOT NULL DEFAULT '',
+    zip                 VARCHAR(20)  NOT NULL DEFAULT '',
+    country             VARCHAR(100) NOT NULL DEFAULT '',
     last_updated        DATETIME     NULL,
     created_at          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -1038,6 +1043,26 @@ if ($hasLegacyCustomerName > 0) {
       END
   ");
   $pdo->exec("ALTER TABLE customers DROP COLUMN customer_name");
+}
+
+foreach ([
+  'address' => "ALTER TABLE customers ADD COLUMN address VARCHAR(255) NOT NULL DEFAULT '' AFTER email",
+  'city'    => "ALTER TABLE customers ADD COLUMN city    VARCHAR(100) NOT NULL DEFAULT '' AFTER address",
+  'state'   => "ALTER TABLE customers ADD COLUMN state   VARCHAR(100) NOT NULL DEFAULT '' AFTER city",
+  'zip'     => "ALTER TABLE customers ADD COLUMN zip     VARCHAR(20)  NOT NULL DEFAULT '' AFTER state",
+  'country' => "ALTER TABLE customers ADD COLUMN country VARCHAR(100) NOT NULL DEFAULT '' AFTER zip",
+] as $col => $sql) {
+  $stmt = $pdo->prepare("
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'customers'
+      AND COLUMN_NAME = ?
+  ");
+  $stmt->execute([$col]);
+  if ((int)$stmt->fetchColumn() === 0) {
+    $pdo->exec($sql);
+  }
 }
 
 try {
