@@ -1399,17 +1399,19 @@ foreach ([
   'billing_state'  => "ALTER TABLE quotes ADD COLUMN billing_state  VARCHAR(100) NULL AFTER billing_city",
   'billing_zip'    => "ALTER TABLE quotes ADD COLUMN billing_zip    VARCHAR(20)  NULL AFTER billing_state",
 ] as $_col => $_sql) {
-  $_chk = $pdo->query("SHOW COLUMNS FROM quotes LIKE '" . $_col . "'");
-  if ($_chk === false || $_chk->fetch(PDO::FETCH_ASSOC) === false) {
+  $_stmt = $pdo->prepare("SHOW COLUMNS FROM quotes LIKE ?");
+  $_stmt->execute([$_col]);
+  if ($_stmt->fetch(PDO::FETCH_ASSOC) === false) {
     try {
       $pdo->exec($_sql);
     } catch (Throwable $e) {
-      $_rechk = $pdo->query("SHOW COLUMNS FROM quotes LIKE '" . $_col . "'");
-      if ($_rechk === false || $_rechk->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+      $_rechk = $pdo->prepare("SHOW COLUMNS FROM quotes LIKE ?");
+      $_rechk->execute([$_col]);
+      if ($_rechk->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
     }
   }
 }
-unset($_col, $_sql, $_chk, $_rechk);
+unset($_col, $_sql, $_stmt, $_rechk);
 
 // Create quote_items table for line items on quotes
 $pdo->exec("

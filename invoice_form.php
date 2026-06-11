@@ -441,7 +441,7 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
   if ($customer_name !== '')    $bill_to_lines[] = $h($customer_name);
   if ($bill_street !== '')      $bill_to_lines[] = $h($bill_street);
   $bill_csz_parts = array_filter([$bill_city, $bill_state . ($bill_zip !== '' ? ' ' . $bill_zip : '')]);
-  $bill_csz = implode(', ', array_filter($bill_csz_parts, fn($p) => trim($p) !== ''));
+  $bill_csz = implode(', ', $bill_csz_parts);
   if ($bill_csz !== '')         $bill_to_lines[] = $h($bill_csz);
   if (trim((string)($quote['phone_number'] ?? '')) !== '') $bill_to_lines[] = $h(trim((string)($quote['phone_number'] ?? '')));
   if (trim((string)($quote['email'] ?? '')) !== '') $bill_to_lines[] = '<a href="mailto:' . $h(trim((string)($quote['email'] ?? ''))) . '" style="color:#1d4ed8;text-decoration:none;">' . $h(trim((string)($quote['email'] ?? ''))) . '</a>';
@@ -1197,7 +1197,7 @@ render_header($invoice_heading);
       $inv_bill_state  = $fields['billing_state'];
       $inv_bill_zip    = $fields['billing_zip'];
       $inv_addr_csz_parts = array_filter([$inv_bill_city, $inv_bill_state . ($inv_bill_zip !== '' ? ' ' . $inv_bill_zip : '')]);
-      $inv_city_state_zip = implode(', ', array_filter($inv_addr_csz_parts, fn($p) => trim($p) !== ''));
+      $inv_city_state_zip = implode(', ', $inv_addr_csz_parts);
       $inv_sender_addr_lines = array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $inv_sender['address'])));
     ?>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:20px; flex-wrap:wrap;">

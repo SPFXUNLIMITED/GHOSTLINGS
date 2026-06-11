@@ -457,7 +457,7 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
   if ($customer_name !== '')    $bill_to_lines[] = $h($customer_name);
   if ($bill_street !== '')      $bill_to_lines[] = $h($bill_street);
   $city_state_zip_parts = array_filter([$bill_city, $bill_state . ($bill_zip !== '' ? ' ' . $bill_zip : '')]);
-  $city_state_zip = implode(', ', array_filter($city_state_zip_parts, fn($p) => trim($p) !== ''));
+  $city_state_zip = implode(', ', $city_state_zip_parts);
   if ($city_state_zip !== '')   $bill_to_lines[] = $h($city_state_zip);
   if (trim((string)($quote['phone_number'] ?? '')) !== '') $bill_to_lines[] = $h(trim((string)($quote['phone_number'] ?? '')));
   if (trim((string)($quote['email'] ?? '')) !== '') $bill_to_lines[] = '<a href="mailto:' . $h(trim((string)($quote['email'] ?? ''))) . '" style="color:#1d4ed8;text-decoration:none;">' . $h(trim((string)($quote['email'] ?? ''))) . '</a>';
@@ -1220,7 +1220,7 @@ render_header('Quotes');
     $dq_billing_state  = trim((string)($detail_quote['billing_state']  ?? ''));
     $dq_billing_zip    = trim((string)($detail_quote['billing_zip']    ?? ''));
     $dq_addr_parts = array_filter([$dq_billing_city, $dq_billing_state . ($dq_billing_zip !== '' ? ' ' . $dq_billing_zip : '')]);
-    $dq_city_state_zip = implode(', ', array_filter($dq_addr_parts, fn($p) => trim($p) !== ''));
+    $dq_city_state_zip = implode(', ', $dq_addr_parts);
     $dq_sender_addr_lines = array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $dq_sender['address'])));
   ?>
   <div class="card">
