@@ -281,7 +281,7 @@ document.addEventListener('click', function (e) {
 
     var ariaLabel = 'Quoted message from ' + escapeHtml(originalLabel);
     var quotedText = escapeHtml(originalText).replace(/\r?\n/g, '<br>');
-    var quoteHtml = '<blockquote aria-label="' + ariaLabel + '">' + quotedText + '</blockquote><p><br></p>';
+    var quoteHtml = '<blockquote aria-label=\"' + ariaLabel + '\">' + quotedText + '</blockquote><p><br></p>';
     editor.setContent(quoteHtml + editor.getContent({ format: 'html' }));
     editor.focus();
     return;
