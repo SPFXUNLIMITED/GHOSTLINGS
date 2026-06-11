@@ -1393,6 +1393,26 @@ if ($_quotes_emailed_col === false || $_quotes_emailed_col->fetch(PDO::FETCH_ASS
 }
 unset($_quotes_emailed_col);
 
+foreach ([
+  'billing_street' => "ALTER TABLE quotes ADD COLUMN billing_street VARCHAR(255) NULL AFTER email",
+  'billing_city'   => "ALTER TABLE quotes ADD COLUMN billing_city   VARCHAR(100) NULL AFTER billing_street",
+  'billing_state'  => "ALTER TABLE quotes ADD COLUMN billing_state  VARCHAR(100) NULL AFTER billing_city",
+  'billing_zip'    => "ALTER TABLE quotes ADD COLUMN billing_zip    VARCHAR(20)  NULL AFTER billing_state",
+] as $_col => $_sql) {
+  $_stmt = $pdo->prepare("SHOW COLUMNS FROM quotes LIKE ?");
+  $_stmt->execute([$_col]);
+  if ($_stmt->fetch(PDO::FETCH_ASSOC) === false) {
+    try {
+      $pdo->exec($_sql);
+    } catch (Throwable $e) {
+      $_rechk = $pdo->prepare("SHOW COLUMNS FROM quotes LIKE ?");
+      $_rechk->execute([$_col]);
+      if ($_rechk->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+    }
+  }
+}
+unset($_col, $_sql, $_stmt, $_rechk);
+
 // Create quote_items table for line items on quotes
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS quote_items (

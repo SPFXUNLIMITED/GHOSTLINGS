@@ -373,8 +373,15 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
 
   $quote_id      = (int)($quote['id'] ?? 0);
   $customer_name = trim((string)($quote['customer_name'] ?? ''));
+  $customer_company = trim((string)($quote['company_name'] ?? ''));
   $quote_date    = trim((string)($quote['quote_date'] ?? ''));
   $subtotal      = quote_format_money($quote['subtotal_amount'] ?? 0);
+
+  // Bill To address
+  $bill_street = trim((string)($quote['billing_street'] ?? ''));
+  $bill_city   = trim((string)($quote['billing_city']   ?? ''));
+  $bill_state  = trim((string)($quote['billing_state']  ?? ''));
+  $bill_zip    = trim((string)($quote['billing_zip']    ?? ''));
 
   $subject = $sender_company . ' - Quote #' . $quote_id;
 
@@ -444,6 +451,29 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
   // ---- Assemble HTML email ----
   $h = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 
+  // Build Bill To address block HTML
+  $bill_to_lines = [];
+  if ($customer_company !== '') $bill_to_lines[] = '<strong style="color:#0f172a;">' . $h($customer_company) . '</strong>';
+  if ($customer_name !== '')    $bill_to_lines[] = $h($customer_name);
+  if ($bill_street !== '')      $bill_to_lines[] = $h($bill_street);
+  $city_state_zip_parts = array_filter([$bill_city, $bill_state . ($bill_zip !== '' ? ' ' . $bill_zip : '')]);
+  $city_state_zip = implode(', ', $city_state_zip_parts);
+  if ($city_state_zip !== '')   $bill_to_lines[] = $h($city_state_zip);
+  if (trim((string)($quote['phone_number'] ?? '')) !== '') $bill_to_lines[] = $h(trim((string)($quote['phone_number'] ?? '')));
+  if (trim((string)($quote['email'] ?? '')) !== '') $bill_to_lines[] = '<a href="mailto:' . $h(trim((string)($quote['email'] ?? ''))) . '" style="color:#1d4ed8;text-decoration:none;">' . $h(trim((string)($quote['email'] ?? ''))) . '</a>';
+  $bill_to_html = implode('<br>', $bill_to_lines);
+
+  // Build From address block HTML
+  $from_lines = [];
+  $from_lines[] = '<strong style="color:#0f172a;">' . $h($sender_company) . '</strong>';
+  if ($sender_name !== '' && $sender_name !== $sender_company) $from_lines[] = $h($sender_name);
+  foreach (array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $sender_address))) as $addr_line) {
+    $from_lines[] = $h($addr_line);
+  }
+  if ($sender_phone !== '') $from_lines[] = $h($sender_phone);
+  if ($sender_email !== '') $from_lines[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#1d4ed8;text-decoration:none;">' . $h($sender_email) . '</a>';
+  $from_html = implode('<br>', $from_lines);
+
   $html_body = '<!doctype html>'
     . '<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
     . '<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">'
@@ -470,6 +500,26 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
         . '</tr>'
       . '</table>'
       . '<hr style="margin:0;border:none;border-top:2px solid #e2e8f0;">'
+    . '</div>'
+
+    // ── Bill To / From boxes ──
+    . '<div style="background:#ffffff;padding:20px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:0;">'
+      . '<table style="width:100%;border-collapse:collapse;">'
+        . '<tr>'
+          . '<td style="width:50%;padding:0 8px 0 0;vertical-align:top;">'
+            . '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;background:#f8fafc;">'
+              . '<p style="margin:0 0 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;">Bill To</p>'
+              . '<p style="margin:0;font-size:13px;color:#374151;line-height:1.7;">' . $bill_to_html . '</p>'
+            . '</div>'
+          . '</td>'
+          . '<td style="width:50%;padding:0 0 0 8px;vertical-align:top;">'
+            . '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;background:#f8fafc;">'
+              . '<p style="margin:0 0 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;">From</p>'
+              . '<p style="margin:0;font-size:13px;color:#374151;line-height:1.7;">' . $from_html . '</p>'
+            . '</div>'
+          . '</td>'
+        . '</tr>'
+      . '</table>'
     . '</div>'
 
     // ── Body ──
@@ -530,6 +580,10 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
   if ($sender_email !== '') $text_body .= $sender_email . "\r\n";
   $text_body .= "\r\n";
   $text_body .= "Quote #{$quote_id}  |  Date: {$quote_date}\r\n";
+  $text_body .= str_repeat('-', 40) . "\r\n";
+  $text_body .= "Bill To: " . ($customer_company !== '' ? $customer_company . ' / ' : '') . $customer_name . "\r\n";
+  if ($bill_street !== '') $text_body .= $bill_street . "\r\n";
+  if ($city_state_zip !== '') $text_body .= $city_state_zip . "\r\n";
   $text_body .= str_repeat('-', 40) . "\r\n\r\n";
   $text_body .= "Hello" . ($customer_name !== '' ? ", {$customer_name}" : '') . ",\r\n\r\n";
   $text_body .= "Please find your quote details below.\r\n\r\n";
@@ -614,7 +668,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
       ) AS customer_name,
       company AS company_name,
       phone,
-      email
+      email,
+      address,
+      city,
+      state,
+      zip
      FROM customers
      WHERE first_name LIKE ? ESCAPE '\\\\'
        OR last_name LIKE ? ESCAPE '\\\\'
@@ -626,7 +684,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
      LIMIT 8"
   );
   $stmt->execute([$like, $like, $like, $like, $like, $like]);
-  echo json_encode($stmt->fetchAll(), JSON_UNESCAPED_UNICODE);
+  echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC), JSON_UNESCAPED_UNICODE);
   exit;
 }
 
@@ -695,6 +753,10 @@ $fields = [
   'company_name' => '',
   'phone_number' => '',
   'email' => '',
+  'billing_street' => '',
+  'billing_city' => '',
+  'billing_state' => '',
+  'billing_zip' => '',
   'quote_date' => $today,
   'notes' => '',
 ];
@@ -737,6 +799,10 @@ if ($raw_edit !== null && (int)$raw_edit > 0) {
     $fields['company_name'] = (string)($edit_record['company_name'] ?? '');
     $fields['phone_number'] = (string)($edit_record['phone_number'] ?? '');
     $fields['email'] = (string)($edit_record['email'] ?? '');
+    $fields['billing_street'] = (string)($edit_record['billing_street'] ?? '');
+    $fields['billing_city'] = (string)($edit_record['billing_city'] ?? '');
+    $fields['billing_state'] = (string)($edit_record['billing_state'] ?? '');
+    $fields['billing_zip'] = (string)($edit_record['billing_zip'] ?? '');
     $fields['quote_date'] = (string)($edit_record['quote_date'] ?? $today);
     $fields['notes'] = (string)($edit_record['notes'] ?? '');
 
@@ -954,6 +1020,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                  company_name = ?,
                  phone_number = ?,
                  email = ?,
+                 billing_street = ?,
+                 billing_city = ?,
+                 billing_state = ?,
+                 billing_zip = ?,
                  quote_date = ?,
                  notes = ?,
                  subtotal_amount = ?
@@ -965,6 +1035,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $fields['company_name'] !== '' ? $fields['company_name'] : null,
               $fields['phone_number'] !== '' ? $fields['phone_number'] : null,
               $fields['email'] !== '' ? $fields['email'] : null,
+              $fields['billing_street'] !== '' ? $fields['billing_street'] : null,
+              $fields['billing_city'] !== '' ? $fields['billing_city'] : null,
+              $fields['billing_state'] !== '' ? $fields['billing_state'] : null,
+              $fields['billing_zip'] !== '' ? $fields['billing_zip'] : null,
               $fields['quote_date'] !== '' ? $fields['quote_date'] : $today,
               $fields['notes'] !== '' ? $fields['notes'] : null,
               $subtotal,
@@ -979,8 +1053,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $ins = $pdo->prepare(
               "INSERT INTO quotes
-                 (customer_id, customer_name, company_name, phone_number, email, quote_date, notes, subtotal_amount, created_by)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                 (customer_id, customer_name, company_name, phone_number, email, billing_street, billing_city, billing_state, billing_zip, quote_date, notes, subtotal_amount, created_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             );
             $ins->execute([
               $customer_id,
@@ -988,6 +1062,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $fields['company_name'] !== '' ? $fields['company_name'] : null,
               $fields['phone_number'] !== '' ? $fields['phone_number'] : null,
               $fields['email'] !== '' ? $fields['email'] : null,
+              $fields['billing_street'] !== '' ? $fields['billing_street'] : null,
+              $fields['billing_city'] !== '' ? $fields['billing_city'] : null,
+              $fields['billing_state'] !== '' ? $fields['billing_state'] : null,
+              $fields['billing_zip'] !== '' ? $fields['billing_zip'] : null,
               $fields['quote_date'] !== '' ? $fields['quote_date'] : $today,
               $fields['notes'] !== '' ? $fields['notes'] : null,
               $subtotal,
@@ -1135,6 +1213,15 @@ render_header('Quotes');
       'converted' => ['#dcfce7', '#166534'],
     ];
     [$badge_bg, $badge_color] = $status_colors[$status] ?? ['#f1f5f9', '#334155'];
+    $dq_sender = quote_sender_profile($pdo, $detail_quote);
+    $dq_sender_company = $dq_sender['company_name'] !== '' ? $dq_sender['company_name'] : ($dq_sender['sender_name'] !== '' ? $dq_sender['sender_name'] : 'Our Company');
+    $dq_billing_street = trim((string)($detail_quote['billing_street'] ?? ''));
+    $dq_billing_city   = trim((string)($detail_quote['billing_city']   ?? ''));
+    $dq_billing_state  = trim((string)($detail_quote['billing_state']  ?? ''));
+    $dq_billing_zip    = trim((string)($detail_quote['billing_zip']    ?? ''));
+    $dq_addr_parts = array_filter([$dq_billing_city, $dq_billing_state . ($dq_billing_zip !== '' ? ' ' . $dq_billing_zip : '')]);
+    $dq_city_state_zip = implode(', ', $dq_addr_parts);
+    $dq_sender_addr_lines = array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $dq_sender['address'])));
   ?>
   <div class="card">
     <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap;">
@@ -1146,18 +1233,62 @@ render_header('Quotes');
     </div>
   </div>
 
-  <div class="card" style="overflow-x:auto;">
-    <table>
-      <tbody>
-        <tr><th style="width:220px;">Customer</th><td><?= h((string)$detail_quote['customer_name']) ?></td></tr>
-        <tr><th>Company</th><td><?= h((string)($detail_quote['company_name'] ?: '—')) ?></td></tr>
-        <tr><th>Phone</th><td><?= h((string)($detail_quote['phone_number'] ?: '—')) ?></td></tr>
-        <tr><th>Email</th><td><?= h((string)($detail_quote['email'] ?: '—')) ?></td></tr>
-        <tr><th>Subtotal</th><td><strong>$<?= h(quote_format_money($detail_quote['subtotal_amount'])) ?></strong></td></tr>
-        <tr><th>Invoice #</th><td><?= h((string)($detail_quote['converted_invoice_no'] ?: '—')) ?></td></tr>
-        <tr><th>Notes</th><td style="white-space:pre-wrap;"><?= h((string)($detail_quote['notes'] ?: '—')) ?></td></tr>
-      </tbody>
-    </table>
+  <div class="card">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; flex-wrap:wrap;">
+      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:16px 18px; background:#f8fafc;">
+        <p style="margin:0 0 8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#64748b;">Bill To</p>
+        <?php if (trim((string)($detail_quote['company_name'] ?? '')) !== ''): ?>
+          <p style="margin:0 0 2px; font-weight:700; color:#0f172a;"><?= h((string)$detail_quote['company_name']) ?></p>
+        <?php endif; ?>
+        <p style="margin:0 0 2px; color:#1e293b;"><?= h((string)$detail_quote['customer_name']) ?></p>
+        <?php if ($dq_billing_street !== ''): ?>
+          <p style="margin:0 0 2px; color:#475569;"><?= h($dq_billing_street) ?></p>
+        <?php endif; ?>
+        <?php if ($dq_city_state_zip !== ''): ?>
+          <p style="margin:0 0 2px; color:#475569;"><?= h($dq_city_state_zip) ?></p>
+        <?php endif; ?>
+        <?php if (trim((string)($detail_quote['phone_number'] ?? '')) !== ''): ?>
+          <p style="margin:4px 0 0; color:#64748b; font-size:13px;"><?= h((string)$detail_quote['phone_number']) ?></p>
+        <?php endif; ?>
+        <?php if (trim((string)($detail_quote['email'] ?? '')) !== ''): ?>
+          <p style="margin:0; color:#64748b; font-size:13px;"><?= h((string)$detail_quote['email']) ?></p>
+        <?php endif; ?>
+      </div>
+      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:16px 18px; background:#f8fafc;">
+        <p style="margin:0 0 8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#64748b;">From</p>
+        <p style="margin:0 0 2px; font-weight:700; color:#0f172a;"><?= h($dq_sender_company) ?></p>
+        <?php if ($dq_sender['sender_name'] !== '' && $dq_sender['sender_name'] !== $dq_sender_company): ?>
+          <p style="margin:0 0 2px; color:#1e293b;"><?= h($dq_sender['sender_name']) ?></p>
+        <?php endif; ?>
+        <?php foreach ($dq_sender_addr_lines as $addr_line): ?>
+          <p style="margin:0 0 2px; color:#475569;"><?= h($addr_line) ?></p>
+        <?php endforeach; ?>
+        <?php if ($dq_sender['phone'] !== ''): ?>
+          <p style="margin:4px 0 0; color:#64748b; font-size:13px;"><?= h($dq_sender['phone']) ?></p>
+        <?php endif; ?>
+        <?php if ($dq_sender['email'] !== ''): ?>
+          <p style="margin:0; color:#64748b; font-size:13px;"><?= h($dq_sender['email']) ?></p>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php if (trim((string)($detail_quote['notes'] ?? '')) !== '' || trim((string)($detail_quote['converted_invoice_no'] ?? '')) !== ''): ?>
+      <div style="margin-top:12px; display:flex; gap:24px; flex-wrap:wrap;">
+        <?php if (trim((string)($detail_quote['converted_invoice_no'] ?? '')) !== ''): ?>
+          <div><span class="muted" style="font-size:13px;">Invoice #</span> <strong><?= h((string)$detail_quote['converted_invoice_no']) ?></strong></div>
+        <?php endif; ?>
+        <div><span class="muted" style="font-size:13px;">Total</span> <strong>$<?= h(quote_format_money($detail_quote['subtotal_amount'])) ?></strong></div>
+      </div>
+    <?php else: ?>
+      <div style="margin-top:12px;">
+        <span class="muted" style="font-size:13px;">Total</span> <strong>$<?= h(quote_format_money($detail_quote['subtotal_amount'])) ?></strong>
+      </div>
+    <?php endif; ?>
+    <?php if (trim((string)($detail_quote['notes'] ?? '')) !== ''): ?>
+      <div style="margin-top:12px; padding-top:12px; border-top:1px solid #e2e8f0;">
+        <p style="margin:0 0 4px; font-size:12px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.06em;">Notes</p>
+        <p style="margin:0; white-space:pre-wrap; color:#374151;"><?= h((string)$detail_quote['notes']) ?></p>
+      </div>
+    <?php endif; ?>
   </div>
 
   <div class="card" style="overflow-x:auto;">
@@ -1331,6 +1462,25 @@ render_header('Quotes');
       </div>
     </div>
 
+    <div class="form-grid" style="margin-top:14px;">
+      <div>
+        <label for="billing_street">Billing Street Address</label>
+        <input id="billing_street" type="text" name="billing_street" maxlength="255" value="<?= h($fields['billing_street']) ?>" placeholder="Street address" />
+      </div>
+      <div>
+        <label for="billing_city">City</label>
+        <input id="billing_city" type="text" name="billing_city" maxlength="100" value="<?= h($fields['billing_city']) ?>" />
+      </div>
+      <div>
+        <label for="billing_state">State</label>
+        <input id="billing_state" type="text" name="billing_state" maxlength="100" value="<?= h($fields['billing_state']) ?>" />
+      </div>
+      <div>
+        <label for="billing_zip">ZIP / Postal Code</label>
+        <input id="billing_zip" type="text" name="billing_zip" maxlength="20" value="<?= h($fields['billing_zip']) ?>" />
+      </div>
+    </div>
+
     <!-- ── Labor / Services ── -->
     <div style="margin-top:20px;">
       <h3 style="margin:0 0 10px;">Labor / Services</h3>
@@ -1430,6 +1580,10 @@ render_header('Quotes');
       const companyInput      = document.getElementById('company_name');
       const phoneInput        = document.getElementById('phone_number');
       const emailInput        = document.getElementById('email');
+      const streetInput       = document.getElementById('billing_street');
+      const cityInput         = document.getElementById('billing_city');
+      const stateInput        = document.getElementById('billing_state');
+      const zipInput          = document.getElementById('billing_zip');
       const customerSugg      = document.getElementById('customerSuggestions');
       let customerDebounce    = null;
 
@@ -1460,6 +1614,10 @@ render_header('Quotes');
             companyInput.value      = rowCompany;
             phoneInput.value        = rowPhone;
             emailInput.value        = rowEmail;
+            if (streetInput) streetInput.value = row.address || '';
+            if (cityInput)   cityInput.value   = row.city    || '';
+            if (stateInput)  stateInput.value  = row.state   || '';
+            if (zipInput)    zipInput.value    = row.zip     || '';
             hideCustomerSugg();
           });
           customerSugg.appendChild(btn);
