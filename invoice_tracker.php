@@ -18,7 +18,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_p
 
   $stmt = $pdo->prepare(
     "SELECT id, customer_name, company_name, quote_date, subtotal_amount, status,
-            converted_invoice_no, email, notes, created_by, created_at
+            converted_invoice_no, email, phone_number, notes, created_by, created_at,
+            billing_street, billing_city, billing_state, billing_zip
      FROM quotes WHERE id = ? LIMIT 1"
   );
   $stmt->execute([$inv_id]);
@@ -62,6 +63,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_p
   $inv_label_raw = invoice_tracker_number($invoice, $now_stamp);
   $inv_date      = invoice_tracker_effective_date($invoice);
   $customer_name = trim((string)($invoice['customer_name'] ?? ''));
+  $customer_company = trim((string)($invoice['company_name'] ?? ''));
+  $bill_street   = trim((string)($invoice['billing_street'] ?? ''));
+  $bill_city     = trim((string)($invoice['billing_city'] ?? ''));
+  $bill_state    = trim((string)($invoice['billing_state'] ?? ''));
+  $bill_zip      = trim((string)($invoice['billing_zip'] ?? ''));
   $subtotal      = number_format((float)($invoice['subtotal_amount'] ?? 0), 2);
   $notes         = trim((string)($invoice['notes'] ?? ''));
   $sender_company = $sender['company_name'] !== '' ? $sender['company_name'] : 'Our Company';
@@ -121,6 +127,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_p
   if ($sender_email !== '') $footer_parts[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($sender_email) . '</a>';
   $footer_contact_html = implode(' &nbsp;·&nbsp; ', $footer_parts);
 
+  // Bill To block
+  $bill_to_lines = [];
+  if ($customer_company !== '') $bill_to_lines[] = '<strong style="color:#0f172a;">' . $h($customer_company) . '</strong>';
+  if ($customer_name !== '') $bill_to_lines[] = $h($customer_name);
+  if ($bill_street !== '') $bill_to_lines[] = $h($bill_street);
+  $city_state_zip_parts = array_filter([$bill_city, $bill_state . ($bill_zip !== '' ? ' ' . $bill_zip : '')]);
+  $city_state_zip = implode(', ', $city_state_zip_parts);
+  if ($city_state_zip !== '') $bill_to_lines[] = $h($city_state_zip);
+  $invoice_phone = trim((string)($invoice['phone_number'] ?? ''));
+  if ($invoice_phone !== '') $bill_to_lines[] = $h($invoice_phone);
+  $invoice_email = trim((string)($invoice['email'] ?? ''));
+  if ($invoice_email !== '') $bill_to_lines[] = '<a href="mailto:' . $h($invoice_email) . '" style="color:#1d4ed8;text-decoration:none;">' . $h($invoice_email) . '</a>';
+  $bill_to_html = implode('<br>', $bill_to_lines) ?: '&mdash;';
+
+  // From block
+  $from_lines = [];
+  $from_lines[] = '<strong style="color:#0f172a;">' . $h($sender_company) . '</strong>';
+  if ($sender_name !== '' && $sender_name !== $sender_company) $from_lines[] = $h($sender_name);
+  foreach (array_filter(array_map('trim', (array)preg_split('/\r\n|\r|\n/', $sender_address))) as $addr_line) {
+    $from_lines[] = $h($addr_line);
+  }
+  if ($sender_phone !== '') $from_lines[] = $h($sender_phone);
+  if ($sender_email !== '') $from_lines[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#1d4ed8;text-decoration:none;">' . $h($sender_email) . '</a>';
+  $from_html = implode('<br>', $from_lines) ?: '&mdash;';
+
   $inv_label = $h($inv_label_raw);
 
   $preview_html =
@@ -145,6 +176,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_p
         . '</tr>'
       . '</table>'
       . '<hr style="margin:0;border:none;border-top:2px solid #e2e8f0;">'
+    . '</div>'
+
+    // ── Bill To / From boxes ──
+    . '<div style="background:#ffffff;padding:20px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:0;">'
+      . '<table style="width:100%;border-collapse:collapse;">'
+        . '<tr>'
+          . '<td style="width:50%;padding:0 8px 0 0;vertical-align:top;">'
+            . '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;background:#f8fafc;">'
+              . '<p style="margin:0 0 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;">Bill To</p>'
+              . '<p style="margin:0;font-size:13px;color:#374151;line-height:1.7;">' . $bill_to_html . '</p>'
+            . '</div>'
+          . '</td>'
+          . '<td style="width:50%;padding:0 0 0 8px;vertical-align:top;">'
+            . '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;background:#f8fafc;">'
+              . '<p style="margin:0 0 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;">From</p>'
+              . '<p style="margin:0;font-size:13px;color:#374151;line-height:1.7;">' . $from_html . '</p>'
+            . '</div>'
+          . '</td>'
+        . '</tr>'
+      . '</table>'
     . '</div>'
 
     // ── Body ──
@@ -891,4 +942,3 @@ render_header('Invoice Tracker');
 </script>
 
 <?php render_footer();
-
