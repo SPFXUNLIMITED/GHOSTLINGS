@@ -354,8 +354,15 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
 
   $inv_no        = trim((string)($quote['converted_invoice_no'] ?? ''));
   $customer_name = trim((string)($quote['customer_name'] ?? ''));
+  $customer_company = trim((string)($quote['company_name'] ?? ''));
   $inv_date      = trim((string)($quote['quote_date'] ?? ''));
   $subtotal      = number_format((float)($quote['subtotal_amount'] ?? 0), 2);
+
+  // Bill To address
+  $bill_street = trim((string)($quote['billing_street'] ?? ''));
+  $bill_city   = trim((string)($quote['billing_city']   ?? ''));
+  $bill_state  = trim((string)($quote['billing_state']  ?? ''));
+  $bill_zip    = trim((string)($quote['billing_zip']    ?? ''));
   $payment_link = '';
   if (invoice_online_payment_enabled($quote)) {
     $payment_error = null;
@@ -428,6 +435,28 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
 
   $inv_label = $inv_no !== '' ? $h($inv_no) : '#' . (int)$quote['id'];
 
+  // ---- Build Bill To / From HTML blocks ----
+  $bill_to_lines = [];
+  if ($customer_company !== '') $bill_to_lines[] = '<strong style="color:#0f172a;">' . $h($customer_company) . '</strong>';
+  if ($customer_name !== '')    $bill_to_lines[] = $h($customer_name);
+  if ($bill_street !== '')      $bill_to_lines[] = $h($bill_street);
+  $bill_csz_parts = array_filter([$bill_city, $bill_state . ($bill_zip !== '' ? ' ' . $bill_zip : '')]);
+  $bill_csz = implode(', ', array_filter($bill_csz_parts, fn($p) => trim($p) !== ''));
+  if ($bill_csz !== '')         $bill_to_lines[] = $h($bill_csz);
+  if (trim((string)($quote['phone_number'] ?? '')) !== '') $bill_to_lines[] = $h(trim((string)($quote['phone_number'] ?? '')));
+  if (trim((string)($quote['email'] ?? '')) !== '') $bill_to_lines[] = '<a href="mailto:' . $h(trim((string)($quote['email'] ?? ''))) . '" style="color:#1d4ed8;text-decoration:none;">' . $h(trim((string)($quote['email'] ?? ''))) . '</a>';
+  $bill_to_html = implode('<br>', $bill_to_lines);
+
+  $from_lines = [];
+  $from_lines[] = '<strong style="color:#0f172a;">' . $h($sender_company) . '</strong>';
+  if ($sender_name !== '' && $sender_name !== $sender_company) $from_lines[] = $h($sender_name);
+  foreach (array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $sender_address))) as $addr_line) {
+    $from_lines[] = $h($addr_line);
+  }
+  if ($sender_phone !== '') $from_lines[] = $h($sender_phone);
+  if ($sender_email !== '') $from_lines[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#1d4ed8;text-decoration:none;">' . $h($sender_email) . '</a>';
+  $from_html = implode('<br>', $from_lines);
+
   // ---- Assemble HTML email ----
   $html_body = '<!doctype html>'
     . '<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
@@ -456,6 +485,26 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
       . '<hr style="margin:0;border:none;border-top:2px solid #e2e8f0;">'
     . '</div>'
 
+    // ── Bill To / From boxes ──
+    . '<div style="background:#ffffff;padding:20px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:0;">'
+      . '<table style="width:100%;border-collapse:collapse;">'
+        . '<tr>'
+          . '<td style="width:50%;padding:0 8px 0 0;vertical-align:top;">'
+            . '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;background:#f8fafc;">'
+              . '<p style="margin:0 0 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;">Bill To</p>'
+              . '<p style="margin:0;font-size:13px;color:#374151;line-height:1.7;">' . $bill_to_html . '</p>'
+            . '</div>'
+          . '</td>'
+          . '<td style="width:50%;padding:0 0 0 8px;vertical-align:top;">'
+            . '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;background:#f8fafc;">'
+              . '<p style="margin:0 0 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;">From</p>'
+              . '<p style="margin:0;font-size:13px;color:#374151;line-height:1.7;">' . $from_html . '</p>'
+            . '</div>'
+          . '</td>'
+        . '</tr>'
+      . '</table>'
+    . '</div>'
+
     // ── Body ──
     . '<div style="background:#ffffff;padding:24px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
 
@@ -464,7 +513,7 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
       . ($payment_link !== ''
           ? '<div style="margin:0 0 24px;padding:16px 18px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;">'
               . '<p style="margin:0 0 10px;font-size:14px;font-weight:600;color:#1d4ed8;">Pay this invoice online</p>'
-              . '<p style="margin:0 0 14px;font-size:13px;color:#334155;">Use Stripe’s secure checkout page to pay this invoice online. Card details are entered directly on Stripe and are not collected on our site.</p>'
+              . '<p style="margin:0 0 14px;font-size:13px;color:#334155;">Use Stripe\'s secure checkout page to pay this invoice online. Card details are entered directly on Stripe and are not collected on our site.</p>'
               . '<p style="margin:0;"><a href="' . $h($payment_link) . '" style="display:inline-block;padding:11px 18px;background:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:999px;font-weight:700;">Pay Invoice on Stripe</a></p>'
             . '</div>'
           : '')
@@ -515,6 +564,10 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
   if ($sender_phone !== '')   $text_body .= $sender_phone . "\r\n";
   if ($sender_email !== '')   $text_body .= $sender_email . "\r\n";
   $text_body .= "\r\nInvoice " . ($inv_no !== '' ? $inv_no : '#' . (int)$quote['id']) . "  |  Date: {$inv_date}\r\n";
+  $text_body .= str_repeat('-', 40) . "\r\n";
+  $text_body .= "Bill To: " . ($customer_company !== '' ? $customer_company . ' / ' : '') . $customer_name . "\r\n";
+  if ($bill_street !== '') $text_body .= $bill_street . "\r\n";
+  if ($bill_csz !== '') $text_body .= $bill_csz . "\r\n";
   $text_body .= str_repeat('-', 40) . "\r\n\r\n";
   $text_body .= "Hello" . ($customer_name !== '' ? ", {$customer_name}" : '') . ",\r\n\r\n";
   $text_body .= "Please find your invoice details below.\r\n\r\nLine Items:\r\n";
@@ -592,7 +645,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
        ) AS customer_name,
        company AS company_name,
        phone,
-       email
+       email,
+       address,
+       city,
+       state,
+       zip
      FROM customers
      WHERE first_name LIKE ? ESCAPE '\\\\'
         OR last_name LIKE ? ESCAPE '\\\\'
@@ -726,6 +783,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $post_company_name    = trim((string)($_POST['company_name'] ?? ''));
   $post_phone_number    = trim((string)($_POST['phone_number'] ?? ''));
   $post_email           = trim((string)($_POST['email'] ?? ''));
+  $post_billing_street  = trim((string)($_POST['billing_street'] ?? ''));
+  $post_billing_city    = trim((string)($_POST['billing_city'] ?? ''));
+  $post_billing_state   = trim((string)($_POST['billing_state'] ?? ''));
+  $post_billing_zip     = trim((string)($_POST['billing_zip'] ?? ''));
   $post_enable_online_payment = !empty($_POST['enable_online_payment']);
   $post_notes           = trim((string)($_POST['notes'] ?? ''));
 
@@ -781,6 +842,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 company_name      = ?,
                 phone_number      = ?,
                 email             = ?,
+                billing_street    = ?,
+                billing_city      = ?,
+                billing_state     = ?,
+                billing_zip       = ?,
                 quote_date        = ?,
                 notes             = ?,
                 subtotal_amount   = ?,
@@ -799,6 +864,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $post_company_name !== '' ? $post_company_name : null,
         $post_phone_number  !== '' ? $post_phone_number  : null,
         $post_email         !== '' ? $post_email         : null,
+        $post_billing_street !== '' ? $post_billing_street : null,
+        $post_billing_city   !== '' ? $post_billing_city   : null,
+        $post_billing_state  !== '' ? $post_billing_state  : null,
+        $post_billing_zip    !== '' ? $post_billing_zip    : null,
         $post_invoice_date,
         $post_notes         !== '' ? $post_notes         : null,
         round($subtotal, 2),
@@ -826,15 +895,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       // Insert a new quote row representing the standalone invoice
       $ins_q = $pdo->prepare(
         "INSERT INTO quotes
-           (customer_name, company_name, phone_number, email, quote_date,
+           (customer_name, company_name, phone_number, email, billing_street, billing_city, billing_state, billing_zip, quote_date,
             status, notes, subtotal_amount, enable_online_payment, converted_invoice_no, converted_at, created_by)
-         VALUES (?, ?, ?, ?, ?, 'converted', ?, ?, ?, '', NOW(), ?)"
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'converted', ?, ?, ?, '', NOW(), ?)"
       );
       $ins_q->execute([
         $post_customer_name,
         $post_company_name !== '' ? $post_company_name : null,
         $post_phone_number  !== '' ? $post_phone_number  : null,
         $post_email         !== '' ? $post_email         : null,
+        $post_billing_street !== '' ? $post_billing_street : null,
+        $post_billing_city   !== '' ? $post_billing_city   : null,
+        $post_billing_state  !== '' ? $post_billing_state  : null,
+        $post_billing_zip    !== '' ? $post_billing_zip    : null,
         $post_invoice_date,
         $post_notes         !== '' ? $post_notes         : null,
         round($subtotal, 2),
@@ -969,6 +1042,10 @@ $fields = [
   'company_name' => (string)($quote['company_name'] ?? ''),
   'phone_number' => (string)($quote['phone_number'] ?? ''),
   'email' => (string)($quote['email'] ?? ''),
+  'billing_street' => (string)($quote['billing_street'] ?? ''),
+  'billing_city' => (string)($quote['billing_city'] ?? ''),
+  'billing_state' => (string)($quote['billing_state'] ?? ''),
+  'billing_zip' => (string)($quote['billing_zip'] ?? ''),
   'invoice_date' => invoice_quote_date_value($quote, $today),
   'enable_online_payment' => $quote && invoice_online_payment_enabled($quote) ? '1' : '0',
   'notes' => (string)($quote['notes'] ?? ''),
@@ -1091,6 +1168,78 @@ render_header($invoice_heading);
         <input id="email" type="email" name="email" maxlength="255" value="<?= h($fields['email']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> />
       </div>
     </div>
+
+    <div style="display:grid; gap:14px; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); margin-top:16px;">
+      <div>
+        <label for="billing_street">Billing Street Address</label>
+        <input id="billing_street" type="text" name="billing_street" maxlength="255" value="<?= h($fields['billing_street']) ?>" placeholder="Street address"<?= invoice_field_lock_attrs($is_view_mode) ?> />
+      </div>
+      <div>
+        <label for="billing_city">City</label>
+        <input id="billing_city" type="text" name="billing_city" maxlength="100" value="<?= h($fields['billing_city']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> />
+      </div>
+      <div>
+        <label for="billing_state">State</label>
+        <input id="billing_state" type="text" name="billing_state" maxlength="100" value="<?= h($fields['billing_state']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> />
+      </div>
+      <div>
+        <label for="billing_zip">ZIP / Postal Code</label>
+        <input id="billing_zip" type="text" name="billing_zip" maxlength="20" value="<?= h($fields['billing_zip']) ?>"<?= invoice_field_lock_attrs($is_view_mode) ?> />
+      </div>
+    </div>
+
+    <?php if ($is_view_mode && $quote): ?>
+    <?php
+      $inv_sender = invoice_sender_profile($pdo, isset($quote['created_by']) && $quote['created_by'] !== null ? (int)$quote['created_by'] : null);
+      $inv_sender_company = $inv_sender['company_name'] !== '' ? $inv_sender['company_name'] : ($inv_sender['sender_name'] !== '' ? $inv_sender['sender_name'] : 'Our Company');
+      $inv_bill_street = $fields['billing_street'];
+      $inv_bill_city   = $fields['billing_city'];
+      $inv_bill_state  = $fields['billing_state'];
+      $inv_bill_zip    = $fields['billing_zip'];
+      $inv_addr_csz_parts = array_filter([$inv_bill_city, $inv_bill_state . ($inv_bill_zip !== '' ? ' ' . $inv_bill_zip : '')]);
+      $inv_city_state_zip = implode(', ', array_filter($inv_addr_csz_parts, fn($p) => trim($p) !== ''));
+      $inv_sender_addr_lines = array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $inv_sender['address'])));
+    ?>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:20px; flex-wrap:wrap;">
+      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:16px 18px; background:#f8fafc;">
+        <p style="margin:0 0 8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#64748b;">Bill To</p>
+        <?php if ($fields['company_name'] !== ''): ?>
+          <p style="margin:0 0 2px; font-weight:700; color:#0f172a;"><?= h($fields['company_name']) ?></p>
+        <?php endif; ?>
+        <?php if ($fields['customer_name'] !== ''): ?>
+          <p style="margin:0 0 2px; color:#1e293b;"><?= h($fields['customer_name']) ?></p>
+        <?php endif; ?>
+        <?php if ($inv_bill_street !== ''): ?>
+          <p style="margin:0 0 2px; color:#475569;"><?= h($inv_bill_street) ?></p>
+        <?php endif; ?>
+        <?php if ($inv_city_state_zip !== ''): ?>
+          <p style="margin:0 0 2px; color:#475569;"><?= h($inv_city_state_zip) ?></p>
+        <?php endif; ?>
+        <?php if ($fields['phone_number'] !== ''): ?>
+          <p style="margin:4px 0 0; color:#64748b; font-size:13px;"><?= h($fields['phone_number']) ?></p>
+        <?php endif; ?>
+        <?php if ($fields['email'] !== ''): ?>
+          <p style="margin:0; color:#64748b; font-size:13px;"><?= h($fields['email']) ?></p>
+        <?php endif; ?>
+      </div>
+      <div style="border:1px solid #e2e8f0; border-radius:10px; padding:16px 18px; background:#f8fafc;">
+        <p style="margin:0 0 8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#64748b;">From</p>
+        <p style="margin:0 0 2px; font-weight:700; color:#0f172a;"><?= h($inv_sender_company) ?></p>
+        <?php if ($inv_sender['sender_name'] !== '' && $inv_sender['sender_name'] !== $inv_sender_company): ?>
+          <p style="margin:0 0 2px; color:#1e293b;"><?= h($inv_sender['sender_name']) ?></p>
+        <?php endif; ?>
+        <?php foreach ($inv_sender_addr_lines as $addr_line): ?>
+          <p style="margin:0 0 2px; color:#475569;"><?= h($addr_line) ?></p>
+        <?php endforeach; ?>
+        <?php if ($inv_sender['phone'] !== ''): ?>
+          <p style="margin:4px 0 0; color:#64748b; font-size:13px;"><?= h($inv_sender['phone']) ?></p>
+        <?php endif; ?>
+        <?php if ($inv_sender['email'] !== ''): ?>
+          <p style="margin:0; color:#64748b; font-size:13px;"><?= h($inv_sender['email']) ?></p>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php endif; ?>
 
     <!-- ── Labor / Services ── -->
     <div style="margin-top:20px;">
@@ -1251,6 +1400,10 @@ render_header($invoice_heading);
   const companyInput      = document.getElementById('company_name');
   const phoneInput        = document.getElementById('phone_number');
   const emailInput        = document.getElementById('email');
+  const streetInput       = document.getElementById('billing_street');
+  const cityInput         = document.getElementById('billing_city');
+  const stateInput        = document.getElementById('billing_state');
+  const zipInput          = document.getElementById('billing_zip');
   const customerSugg      = document.getElementById('customerSuggestions');
   if (customerNameInput && customerSugg) {
     let customerDebounce = null;
@@ -1279,6 +1432,10 @@ render_header($invoice_heading);
           companyInput.value = rowCompany;
           phoneInput.value   = rowPhone;
           emailInput.value   = rowEmail;
+          if (streetInput) streetInput.value = row.address || '';
+          if (cityInput)   cityInput.value   = row.city    || '';
+          if (stateInput)  stateInput.value  = row.state   || '';
+          if (zipInput)    zipInput.value    = row.zip     || '';
           hideCustomerSugg();
         });
         customerSugg.appendChild(btn);
