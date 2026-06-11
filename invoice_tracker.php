@@ -759,28 +759,9 @@ render_header('Invoice Tracker');
 .it-modal-print-btn:disabled { opacity:.5; cursor:not-allowed; box-shadow:none; }
 .it-modal-print-icon { font-size:18px; }
 
-/* ---- @media print ---- */
+/* ---- @media print: suppress the main page entirely when printing from popup ---- */
 @media print {
-  body > *:not(#it-print-modal) { display:none !important; }
-  #it-print-modal { position:static !important; display:block !important; }
-  .it-modal-backdrop,
-  .it-modal-close,
-  .it-modal-header,
-  .it-modal-footer { display:none !important; }
-  .it-modal-shell {
-    position:static !important;
-    transform:none !important;
-    width:100% !important;
-    max-height:none !important;
-    box-shadow:none !important;
-    border-radius:0 !important;
-    overflow:visible !important;
-  }
-  .it-modal-body {
-    padding:0 !important;
-    background:#fff !important;
-    overflow:visible !important;
-  }
+  body { display:none !important; }
 }
 </style>
 
@@ -827,9 +808,51 @@ render_header('Invoice Tracker');
     if (e.key === 'Escape' && modal.style.display !== 'none') closeModal();
   });
 
-  // Print button
+  // Print button — open a clean popup window containing only the invoice HTML
   printBtn.addEventListener('click', function () {
-    window.print();
+    var html = contentEl.innerHTML;
+    if (!html) return;
+
+    var popup = window.open('', '_blank', 'width=800,height=700,scrollbars=yes,resizable=yes');
+    if (!popup) {
+      alert('A pop-up was blocked. Please allow pop-ups for this site in your browser settings and try again.');
+      return;
+    }
+
+    popup.document.open();
+    popup.document.write(
+      '<!DOCTYPE html>' +
+      '<html lang="en">' +
+      '<head>' +
+        '<meta charset="UTF-8">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+        '<title>Invoice</title>' +
+        '<style>' +
+          '*, *::before, *::after { box-sizing: border-box; }' +
+          'html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #1e293b; }' +
+          '@media screen { body { padding: 24px; } }' +
+          '@page { margin: 15mm 12mm; }' +
+          '@media print {' +
+            'html, body { margin: 0; padding: 0; background: #fff; }' +
+            'a { color: inherit !important; text-decoration: none !important; }' +
+          '}' +
+        '</style>' +
+      '</head>' +
+      '<body>' + html + '</body>' +
+      '</html>'
+    );
+    popup.document.close();
+
+    // onload may not fire after document.write(); use a short timeout as fallback
+    var printed = false;
+    function doPrint() {
+      if (printed) return;
+      printed = true;
+      popup.focus();
+      popup.print();
+    }
+    popup.onload = doPrint;
+    setTimeout(doPrint, 400);
   });
 
   // Print buttons in table rows
