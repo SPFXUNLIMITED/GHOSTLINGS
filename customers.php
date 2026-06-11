@@ -121,8 +121,8 @@ function parse_hubspot_address_components(string $address, string $city, string 
 
   $working = $raw;
 
-  // 1. Strip trailing US country token (e.g. "USA", "US", "United States").
-  $working = (string) preg_replace('/\s+(?:United\s+States(?:\s+of\s+America)?|U\.?S\.?A?\.?)\s*$/i', '', $working);
+  // 1. Strip trailing US country token (e.g. "USA", "US", "U.S.", "U.S.A.", "United States").
+  $working = (string) preg_replace('/\s+(?:United\s+States(?:\s+of\s+America)?|U\.S\.A\.|U\.S\.|USA|US)\s*$/i', '', $working);
 
   // 2. Extract ZIP code from the end.
   $parsed_zip = '';
