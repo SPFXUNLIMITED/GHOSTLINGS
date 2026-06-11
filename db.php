@@ -1624,16 +1624,18 @@ if (!function_exists('log_admin_activity')) {
 
     $safe_details = trim($details);
     $safe_user_label = trim((string)$fallback_user);
+    $now_pt = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Y-m-d H:i:s');
 
     $stmt = $pdo->prepare("
-      INSERT INTO admin_activity_log (user_id, user_label, action_name, details)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO admin_activity_log (user_id, user_label, action_name, details, created_at)
+      VALUES (?, ?, ?, ?, ?)
     ");
     $stmt->execute([
       $safe_user_id,
       $safe_user_label !== '' ? mb_substr($safe_user_label, 0, 255) : null,
       mb_substr($safe_action, 0, 150),
       $safe_details !== '' ? mb_substr($safe_details, 0, 5000) : null,
+      $now_pt,
     ]);
   }
 }
