@@ -5,6 +5,8 @@ require __DIR__ . '/auth.php';
 require_login();
 
 const MAX_MESSAGE_LENGTH = 200000;
+const MESSAGES_PER_PAGE = 10;
+const MESSAGES_MAX_SHOW = 500;
 
 function message_body_to_reply_text(string $html): string {
   $text = preg_replace('~<br\b[^>]*>|</?(p|div|blockquote)\b[^>]*>|</li>~i', "\n", $html) ?? '';
@@ -88,8 +90,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $pdo->prepare("UPDATE messages SET is_read = 1 WHERE recipient_id = ? AND is_read = 0")
     ->execute([$current_user_id]);
 
-// How many messages to show (default 10, increments of 10)
-$show = max(10, (int)($_GET['show'] ?? 10));
+// How many messages to show (default MESSAGES_PER_PAGE, increments of MESSAGES_PER_PAGE)
+$show = min(MESSAGES_MAX_SHOW, max(MESSAGES_PER_PAGE, (int)($_GET['show'] ?? MESSAGES_PER_PAGE)));
 
 // Count total messages between both users
 $count_stmt = $pdo->prepare("
@@ -150,7 +152,7 @@ render_header('Messages');
   <?php else: ?>
     <?php if ($has_more): ?>
       <div style="padding:12px 16px; border-bottom:1px solid #e5e7eb; text-align:center;">
-        <a href="messages.php?show=<?= $show + 10 ?>" class="btn" style="font-size:13px; padding:6px 14px;">Load more</a>
+        <a href="messages.php?show=<?= h($show + MESSAGES_PER_PAGE) ?>" class="btn" style="font-size:13px; padding:6px 14px;">Load more</a>
       </div>
     <?php endif; ?>
     <div style="max-height:520px; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px;" id="msg-scroll">
