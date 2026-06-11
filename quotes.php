@@ -411,6 +411,9 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
   $customer_company = trim((string)($quote['company_name'] ?? ''));
   $quote_date    = trim((string)($quote['quote_date'] ?? ''));
   $subtotal      = quote_format_money($quote['subtotal_amount'] ?? 0);
+  $tax_rate_val  = (float)($quote['tax_rate'] ?? 0);
+  $tax_amount    = quote_format_money($quote['tax_amount'] ?? 0);
+  $grand_total   = quote_format_money((float)($quote['subtotal_amount'] ?? 0) + (float)($quote['tax_amount'] ?? 0));
 
   // Bill To address
   $bill_street = trim((string)($quote['billing_street'] ?? ''));
@@ -579,8 +582,18 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
         . '</tbody>'
         . '<tfoot>'
           . '<tr>'
-            . '<td colspan="3" style="padding:14px 12px;text-align:right;font-weight:700;font-size:14px;color:#1e293b;border-top:2px solid #e2e8f0;">Subtotal:</td>'
-            . '<td style="padding:14px 12px;text-align:right;font-weight:700;font-size:16px;color:#1e3a5f;border-top:2px solid #e2e8f0;">$' . $h($subtotal) . '</td>'
+            . '<td colspan="3" style="padding:10px 12px;text-align:right;font-weight:600;font-size:13px;color:#1e293b;border-top:2px solid #e2e8f0;">Subtotal:</td>'
+            . '<td style="padding:10px 12px;text-align:right;font-weight:600;font-size:14px;color:#1e3a5f;border-top:2px solid #e2e8f0;">$' . $h($subtotal) . '</td>'
+          . '</tr>'
+          . ($tax_rate_val > 0
+              ? '<tr>'
+                  . '<td colspan="3" style="padding:4px 12px;text-align:right;font-weight:600;font-size:13px;color:#1e293b;">Tax (' . $h(number_format($tax_rate_val, 2)) . '%):</td>'
+                  . '<td style="padding:4px 12px;text-align:right;font-weight:600;font-size:14px;color:#1e3a5f;">$' . $h($tax_amount) . '</td>'
+                . '</tr>'
+              : '')
+          . '<tr>'
+            . '<td colspan="3" style="padding:10px 12px;text-align:right;font-weight:700;font-size:14px;color:#1e293b;">Grand Total:</td>'
+            . '<td style="padding:10px 12px;text-align:right;font-weight:700;font-size:16px;color:#1e3a5f;">$' . $h($grand_total) . '</td>'
           . '</tr>'
         . '</tfoot>'
       . '</table>'
@@ -624,7 +637,11 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
   $text_body .= "Please find your quote details below.\r\n\r\n";
   $text_body .= "Line Items:\r\n";
   $text_body .= implode("\r\n", $rows_text) . "\r\n\r\n";
-  $text_body .= "Subtotal: \${$subtotal}\r\n\r\n";
+  $text_body .= "Subtotal: \${$subtotal}\r\n";
+  if ($tax_rate_val > 0) {
+    $text_body .= "Tax (" . number_format($tax_rate_val, 2) . "%): \${$tax_amount}\r\n";
+  }
+  $text_body .= "Grand Total: \${$grand_total}\r\n\r\n";
   $text_body .= "Thank you for considering our services.\r\n";
   if ($sender_name !== '') {
     $text_body .= "\r\nPrepared by: {$sender_name}" . ($sender_company !== 'Our Company' ? " at {$sender_company}" : '') . "\r\n";
@@ -791,7 +808,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_p
   $pv_stmt = $pdo->prepare(
     "SELECT id, customer_name, company_name, phone_number, email,
             billing_street, billing_city, billing_state, billing_zip,
-            quote_date, subtotal_amount, notes, created_by, created_at
+            quote_date, subtotal_amount, tax_rate, tax_amount, notes, created_by, created_at
      FROM quotes WHERE id = ? LIMIT 1"
   );
   $pv_stmt->execute([$pv_id]);
@@ -802,7 +819,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_p
   }
 
   $pv_items_stmt = $pdo->prepare(
-    "SELECT description, quantity, unit_price, line_total FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC"
+    "SELECT description, quantity, unit_price, line_total, is_taxable FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC"
   );
   $pv_items_stmt->execute([$pv_id]);
   $pv_items = $pv_items_stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -821,7 +838,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_p
   if ($pv_quote_date === '') {
     $pv_quote_date = substr(trim((string)($pv_quote['created_at'] ?? '')), 0, 10);
   }
-  $pv_subtotal = quote_format_money($pv_quote['subtotal_amount'] ?? 0);
+  $pv_subtotal   = quote_format_money($pv_quote['subtotal_amount'] ?? 0);
+  $pv_tax_rate   = (float)($pv_quote['tax_rate'] ?? 0);
+  $pv_tax_amount = quote_format_money($pv_quote['tax_amount'] ?? 0);
+  $pv_grand_total = quote_format_money((float)($pv_quote['subtotal_amount'] ?? 0) + (float)($pv_quote['tax_amount'] ?? 0));
   $pv_notes    = trim((string)($pv_quote['notes'] ?? ''));
 
   $pv_bill_street = trim((string)($pv_quote['billing_street'] ?? ''));
@@ -970,8 +990,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_p
         . '<tbody>' . implode('', $pv_rows_html) . '</tbody>'
         . '<tfoot>'
           . '<tr>'
-            . '<td colspan="3" style="padding:14px 12px;text-align:right;font-weight:700;font-size:14px;color:#1e293b;border-top:2px solid #e2e8f0;">Subtotal:</td>'
-            . '<td style="padding:14px 12px;text-align:right;font-weight:700;font-size:16px;color:#1e3a5f;border-top:2px solid #e2e8f0;">$' . $h($pv_subtotal) . '</td>'
+            . '<td colspan="3" style="padding:10px 12px;text-align:right;font-weight:600;font-size:13px;color:#1e293b;border-top:2px solid #e2e8f0;">Subtotal:</td>'
+            . '<td style="padding:10px 12px;text-align:right;font-weight:600;font-size:14px;color:#1e3a5f;border-top:2px solid #e2e8f0;">$' . $h($pv_subtotal) . '</td>'
+          . '</tr>'
+          . ($pv_tax_rate > 0
+              ? '<tr>'
+                  . '<td colspan="3" style="padding:4px 12px;text-align:right;font-weight:600;font-size:13px;color:#1e293b;">Tax (' . $h(number_format($pv_tax_rate, 2)) . '%):</td>'
+                  . '<td style="padding:4px 12px;text-align:right;font-weight:600;font-size:14px;color:#1e3a5f;">$' . $h($pv_tax_amount) . '</td>'
+                . '</tr>'
+              : '')
+          . '<tr>'
+            . '<td colspan="3" style="padding:10px 12px;text-align:right;font-weight:700;font-size:14px;color:#1e293b;">Grand Total:</td>'
+            . '<td style="padding:10px 12px;text-align:right;font-weight:700;font-size:16px;color:#1e3a5f;">$' . $h($pv_grand_total) . '</td>'
           . '</tr>'
         . '</tfoot>'
       . '</table>'
@@ -1017,9 +1047,10 @@ $fields = [
   'billing_zip' => '',
   'quote_date' => $today,
   'notes' => '',
+  'tax_rate' => '0.00',
 ];
 $line_items = [
-  ['description' => '', 'quantity' => '1', 'cost' => '0.00', 'markup_percent' => '20', 'unit_price' => '0.00'],
+  ['description' => '', 'quantity' => '1', 'cost' => '0.00', 'markup_percent' => '20', 'unit_price' => '0.00', 'is_taxable' => 0],
 ];
 
 $view = (string)($_GET['view'] ?? 'all');
@@ -1065,8 +1096,9 @@ if ($raw_edit !== null && (int)$raw_edit > 0) {
     $fields['billing_zip'] = (string)($edit_record['billing_zip'] ?? '');
     $fields['quote_date'] = (string)($edit_record['quote_date'] ?? $today);
     $fields['notes'] = (string)($edit_record['notes'] ?? '');
+    $fields['tax_rate'] = number_format((float)($edit_record['tax_rate'] ?? 0), 2);
 
-    $item_stmt = $pdo->prepare("SELECT description, quantity, cost, markup_percent, unit_price FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC");
+    $item_stmt = $pdo->prepare("SELECT description, quantity, cost, markup_percent, unit_price, is_taxable FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC");
     $item_stmt->execute([$edit_id]);
     $rows = $item_stmt->fetchAll();
     if ($rows) {
@@ -1078,6 +1110,7 @@ if ($raw_edit !== null && (int)$raw_edit > 0) {
           'cost'           => quote_format_money($row['cost']),
           'markup_percent' => number_format((float)$row['markup_percent'], 2),
           'unit_price'     => quote_format_money($row['unit_price']),
+          'is_taxable'     => (int)($row['is_taxable'] ?? 0),
         ];
       }
     }
@@ -1248,9 +1281,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $posted_cost = $_POST['item_cost'] ?? [];
       $posted_markup = $_POST['item_markup'] ?? [];
       $posted_price = $_POST['item_price'] ?? [];
-      if (!is_array($posted_desc) || !is_array($posted_qty) || !is_array($posted_cost) || !is_array($posted_markup) || !is_array($posted_price)) {
+      $posted_taxable = $_POST['item_taxable'] ?? [];
+      if (!is_array($posted_desc) || !is_array($posted_qty) || !is_array($posted_cost) || !is_array($posted_markup) || !is_array($posted_price) || !is_array($posted_taxable)) {
         $errors[] = 'Line item data is invalid.';
-      } elseif (count($posted_desc) !== count($posted_qty) || count($posted_desc) !== count($posted_cost) || count($posted_desc) !== count($posted_markup) || count($posted_desc) !== count($posted_price)) {
+      } elseif (count($posted_desc) !== count($posted_qty) || count($posted_desc) !== count($posted_cost) || count($posted_desc) !== count($posted_markup) || count($posted_desc) !== count($posted_price) || count($posted_desc) !== count($posted_taxable)) {
         $errors[] = 'Line item data is malformed. Please reload and try again.';
       } else {
         $line_items = [];
@@ -1286,6 +1320,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $cost = round((float)$cost_raw, 2);
           $markup = round((float)$markup_raw, 2);
           $price = round($cost * (1 + $markup / 100), 2);
+          $is_taxable = (int)($posted_taxable[$i] ?? 0) === 1 ? 1 : 0;
           $line_items[] = [
             'description'    => $desc,
             'quantity'       => $qty,
@@ -1293,6 +1328,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'markup_percent' => $markup,
             'unit_price'     => $price,
             'line_total'     => round($qty * $price, 2),
+            'is_taxable'     => $is_taxable,
           ];
         }
 
@@ -1302,11 +1338,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
 
       if (!$errors) {
+        $post_tax_rate = max(0.0, min(100.0, round((float)trim((string)($_POST['tax_rate'] ?? '0')), 2)));
+        $fields['tax_rate'] = number_format($post_tax_rate, 2);
         $subtotal = 0.00;
+        $taxable_subtotal = 0.00;
         foreach ($line_items as $row) {
           $subtotal += (float)$row['line_total'];
+          if ((int)($row['is_taxable'] ?? 0) === 1) {
+            $taxable_subtotal += (float)$row['line_total'];
+          }
         }
         $subtotal = round($subtotal, 2);
+        $tax_amount = round($taxable_subtotal * $post_tax_rate / 100, 2);
 
         $pdo->beginTransaction();
         try {
@@ -1324,7 +1367,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                  billing_zip = ?,
                  quote_date = ?,
                  notes = ?,
-                 subtotal_amount = ?
+                 subtotal_amount = ?,
+                 tax_rate = ?,
+                 tax_amount = ?
                WHERE id = ?"
             );
             $upd->execute([
@@ -1340,6 +1385,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $fields['quote_date'] !== '' ? $fields['quote_date'] : $today,
               $fields['notes'] !== '' ? $fields['notes'] : null,
               $subtotal,
+              $post_tax_rate,
+              $tax_amount,
               $edit_id,
             ]);
             $quote_id = $edit_id;
@@ -1351,8 +1398,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $ins = $pdo->prepare(
               "INSERT INTO quotes
-                 (customer_id, customer_name, company_name, phone_number, email, billing_street, billing_city, billing_state, billing_zip, quote_date, notes, subtotal_amount, created_by)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                 (customer_id, customer_name, company_name, phone_number, email, billing_street, billing_city, billing_state, billing_zip, quote_date, notes, subtotal_amount, tax_rate, tax_amount, created_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             );
             $ins->execute([
               $customer_id,
@@ -1367,6 +1414,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $fields['quote_date'] !== '' ? $fields['quote_date'] : $today,
               $fields['notes'] !== '' ? $fields['notes'] : null,
               $subtotal,
+              $post_tax_rate,
+              $tax_amount,
               $created_by,
             ]);
             $quote_id = (int)$pdo->lastInsertId();
@@ -1374,8 +1423,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           quote_backfill_customer($pdo, $customer_id, $fields);
 
           $item_ins = $pdo->prepare(
-            "INSERT INTO quote_items (quote_id, line_position, description, quantity, cost, markup_percent, unit_price, line_total)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO quote_items (quote_id, line_position, description, quantity, cost, markup_percent, unit_price, line_total, is_taxable)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
           );
           $position = 1;
           foreach ($line_items as $row) {
@@ -1388,6 +1437,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $row['markup_percent'],
               $row['unit_price'],
               $row['line_total'],
+              $row['is_taxable'],
             ]);
             $position++;
           }
@@ -1587,11 +1637,19 @@ render_header('Quotes');
         <?php if (trim((string)($detail_quote['converted_invoice_no'] ?? '')) !== ''): ?>
           <div><span class="muted" style="font-size:13px;">Invoice #</span> <strong><?= h((string)$detail_quote['converted_invoice_no']) ?></strong></div>
         <?php endif; ?>
-        <div><span class="muted" style="font-size:13px;">Total</span> <strong>$<?= h(quote_format_money($detail_quote['subtotal_amount'])) ?></strong></div>
+        <div><span class="muted" style="font-size:13px;">Subtotal</span> <strong>$<?= h(quote_format_money($detail_quote['subtotal_amount'])) ?></strong></div>
+        <?php if ((float)($detail_quote['tax_rate'] ?? 0) > 0): ?>
+          <div><span class="muted" style="font-size:13px;">Tax (<?= h(number_format((float)$detail_quote['tax_rate'], 2)) ?>%)</span> <strong>$<?= h(quote_format_money($detail_quote['tax_amount'] ?? 0)) ?></strong></div>
+        <?php endif; ?>
+        <div><span class="muted" style="font-size:13px;">Total</span> <strong>$<?= h(quote_format_money((float)($detail_quote['subtotal_amount'] ?? 0) + (float)($detail_quote['tax_amount'] ?? 0))) ?></strong></div>
       </div>
     <?php else: ?>
-      <div style="margin-top:12px;">
-        <span class="muted" style="font-size:13px;">Total</span> <strong>$<?= h(quote_format_money($detail_quote['subtotal_amount'])) ?></strong>
+      <div style="margin-top:12px; display:flex; gap:24px; flex-wrap:wrap;">
+        <div><span class="muted" style="font-size:13px;">Subtotal</span> <strong>$<?= h(quote_format_money($detail_quote['subtotal_amount'])) ?></strong></div>
+        <?php if ((float)($detail_quote['tax_rate'] ?? 0) > 0): ?>
+          <div><span class="muted" style="font-size:13px;">Tax (<?= h(number_format((float)$detail_quote['tax_rate'], 2)) ?>%)</span> <strong>$<?= h(quote_format_money($detail_quote['tax_amount'] ?? 0)) ?></strong></div>
+        <?php endif; ?>
+        <div><span class="muted" style="font-size:13px;">Total</span> <strong>$<?= h(quote_format_money((float)($detail_quote['subtotal_amount'] ?? 0) + (float)($detail_quote['tax_amount'] ?? 0))) ?></strong></div>
       </div>
     <?php endif; ?>
     <?php if (trim((string)($detail_quote['notes'] ?? '')) !== ''): ?>
@@ -1614,6 +1672,7 @@ render_header('Quotes');
           <th style="width:110px;">Markup %</th>
           <th style="width:130px;">Price</th>
           <th style="width:150px;">Line Total</th>
+          <th style="width:90px;">Taxable</th>
         </tr>
       </thead>
       <tbody>
@@ -1626,6 +1685,7 @@ render_header('Quotes');
             <td><?= h(number_format((float)($item['markup_percent'] ?? 20), 2)) ?>%</td>
             <td>$<?= h(quote_format_money($item['unit_price'])) ?></td>
             <td><strong>$<?= h(quote_format_money($item['line_total'])) ?></strong></td>
+            <td><?= (int)($item['is_taxable'] ?? 0) === 1 ? '<span style="color:#166534;font-weight:600;">Yes</span>' : '<span class="muted">No</span>' ?></td>
           </tr>
         <?php endforeach; ?>
       </tbody>
@@ -2121,13 +2181,14 @@ render_header('Quotes');
     <div style="margin-top:20px;">
       <h3 style="margin:0 0 10px;">Labor / Services</h3>
       <div style="overflow-x:auto;">
-        <table style="min-width:700px;" id="laborItemsTable">
+        <table style="min-width:780px;" id="laborItemsTable">
           <thead>
             <tr>
               <th>Description</th>
               <th style="width:100px;">Qty</th>
               <th style="width:130px;">Cost</th>
               <th style="width:150px;">Line Total</th>
+              <th style="width:80px; text-align:center;">Taxable</th>
               <th style="width:90px;">Remove</th>
             </tr>
           </thead>
@@ -2142,6 +2203,10 @@ render_header('Quotes');
               <td><input type="number" step="0.01" min="0.01" class="labor-qty" name="item_qty[]" value="1" /></td>
               <td><input type="number" step="0.01" min="0" class="labor-cost" name="item_cost[]" value="0.00" /></td>
               <td class="labor-line-total" style="white-space:nowrap;">$0.00</td>
+              <td style="text-align:center;">
+                <input type="hidden" class="taxable-hidden" name="item_taxable[]" value="0" />
+                <input type="checkbox" class="taxable-check" style="width:18px;height:18px;cursor:pointer;" />
+              </td>
               <td><button type="button" class="btn remove-labor-row">×</button></td>
             </tr>
           </tbody>
@@ -2157,7 +2222,7 @@ render_header('Quotes');
     <div style="margin-top:20px;">
       <h3 style="margin:0 0 10px;">Inventory / Parts</h3>
       <div style="overflow-x:auto;">
-        <table style="min-width:900px;" id="inventoryItemsTable">
+        <table style="min-width:980px;" id="inventoryItemsTable">
           <thead>
             <tr>
               <th>Description</th>
@@ -2166,6 +2231,7 @@ render_header('Quotes');
               <th style="width:110px;">Markup %</th>
               <th style="width:130px;">Price</th>
               <th style="width:150px;">Line Total</th>
+              <th style="width:80px; text-align:center;">Taxable</th>
               <th style="width:90px;">Remove</th>
             </tr>
           </thead>
@@ -2181,6 +2247,10 @@ render_header('Quotes');
                 <td><input type="number" step="0.01" min="0" class="inv-markup" name="item_markup[]" value="<?= h((string)$row['markup_percent']) ?>" /></td>
                 <td><input type="number" step="0.01" min="0" class="inv-price" name="item_price[]" value="<?= h((string)$row['unit_price']) ?>" readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);" /></td>
                 <td class="inv-line-total" style="white-space:nowrap;">$0.00</td>
+                <td style="text-align:center;">
+                  <input type="hidden" class="taxable-hidden" name="item_taxable[]" value="<?= (int)($row['is_taxable'] ?? 0) === 1 ? '1' : '0' ?>" />
+                  <input type="checkbox" class="taxable-check" style="width:18px;height:18px;cursor:pointer;"<?= (int)($row['is_taxable'] ?? 0) === 1 ? ' checked' : '' ?> />
+                </td>
                 <td><button type="button" class="btn remove-inv-row">×</button></td>
               </tr>
             <?php endforeach; ?>
@@ -2193,8 +2263,16 @@ render_header('Quotes');
       </div>
     </div>
 
-    <div style="margin-top:10px; text-align:right; font-size:1.05em;">
-      <strong>Grand Total: $<span id="quoteSubtotal">0.00</span></strong>
+    <div style="margin-top:14px; display:flex; justify-content:flex-end; align-items:flex-start; gap:14px; flex-wrap:wrap;">
+      <div style="text-align:right;">
+        <label for="tax_rate" style="display:block; margin-bottom:4px; font-weight:600;">Tax Rate (%)</label>
+        <input id="tax_rate" type="number" name="tax_rate" step="0.01" min="0" max="100" value="<?= h($fields['tax_rate']) ?>" style="width:120px; text-align:right;" />
+      </div>
+      <div style="font-size:1.05em; padding-top:28px; line-height:1.8;">
+        <div>Subtotal: $<span id="quoteSubtotalDisplay">0.00</span></div>
+        <div id="quoteTaxRow" style="display:none;">Tax (<span id="quoteTaxRateDisplay">0.00</span>%): $<span id="quoteTaxAmount">0.00</span></div>
+        <div><strong>Grand Total: $<span id="quoteSubtotal">0.00</span></strong></div>
+      </div>
     </div>
 
     <div style="margin-top:14px;">
@@ -2285,13 +2363,34 @@ render_header('Quotes');
       // ── Shared helpers ────────────────────────────────────────────────
       function parseNum(v) { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; }
 
-      const laborSubtotalNode = document.getElementById('laborSubtotal');
-      const partsSubtotalNode = document.getElementById('partsSubtotal');
-      const grandTotalNode    = document.getElementById('quoteSubtotal');
+      const laborSubtotalNode      = document.getElementById('laborSubtotal');
+      const partsSubtotalNode      = document.getElementById('partsSubtotal');
+      const grandTotalNode         = document.getElementById('quoteSubtotal');
+      const subtotalDisplayNode    = document.getElementById('quoteSubtotalDisplay');
+      const taxAmountNode          = document.getElementById('quoteTaxAmount');
+      const taxRateDisplayNode     = document.getElementById('quoteTaxRateDisplay');
+      const taxRowNode             = document.getElementById('quoteTaxRow');
+      const taxRateInput           = document.getElementById('tax_rate');
+
+      // taxable subtotals tracked by each section
+      let _laborTaxable = 0;
+      let _invTaxable   = 0;
 
       function updateGrandTotal() {
-        grandTotalNode.textContent = (parseNum(laborSubtotalNode.textContent) + parseNum(partsSubtotalNode.textContent)).toFixed(2);
+        const subtotal     = parseNum(laborSubtotalNode.textContent) + parseNum(partsSubtotalNode.textContent);
+        const taxRate      = parseNum(taxRateInput ? taxRateInput.value : 0);
+        const taxableTotal = _laborTaxable + _invTaxable;
+        const taxAmount    = taxableTotal * taxRate / 100;
+        const grandTotal   = subtotal + taxAmount;
+
+        if (subtotalDisplayNode) subtotalDisplayNode.textContent = subtotal.toFixed(2);
+        if (taxRateDisplayNode)  taxRateDisplayNode.textContent  = taxRate.toFixed(2);
+        if (taxAmountNode)       taxAmountNode.textContent       = taxAmount.toFixed(2);
+        if (taxRowNode)          taxRowNode.style.display        = (taxRate > 0) ? '' : 'none';
+        grandTotalNode.textContent = grandTotal.toFixed(2);
       }
+
+      if (taxRateInput) taxRateInput.addEventListener('input', updateGrandTotal);
 
       function makeSuggestDropdown() {
         return 'display:none; position:absolute; top:100%; left:0; right:0; z-index:50; '
@@ -2321,7 +2420,7 @@ render_header('Quotes');
       const addLaborBtn = document.getElementById('addLaborRow');
 
       function computeLaborTotals() {
-        let total = 0;
+        let total = 0, taxable = 0;
         laborBody.querySelectorAll('tr.labor-row').forEach((row) => {
           const qty  = parseNum(row.querySelector('.labor-qty')?.value);
           const cost = parseNum(row.querySelector('.labor-cost')?.value);
@@ -2331,8 +2430,11 @@ render_header('Quotes');
           const priceHidden = row.querySelector('.labor-price');
           if (priceHidden) priceHidden.value = cost.toFixed(2);
           total += lineTotal;
+          const taxHidden = row.querySelector('.taxable-hidden');
+          if (taxHidden && taxHidden.value === '1') taxable += lineTotal;
         });
         laborSubtotalNode.textContent = total.toFixed(2);
+        _laborTaxable = taxable;
         updateGrandTotal();
       }
 
@@ -2381,6 +2483,14 @@ render_header('Quotes');
         setupLaborSearch(row);
         row.querySelector('.labor-qty')?.addEventListener('input', computeLaborTotals);
         row.querySelector('.labor-cost')?.addEventListener('input', computeLaborTotals);
+        const taxCheck  = row.querySelector('.taxable-check');
+        const taxHidden = row.querySelector('.taxable-hidden');
+        if (taxCheck && taxHidden) {
+          taxCheck.addEventListener('change', () => {
+            taxHidden.value = taxCheck.checked ? '1' : '0';
+            computeLaborTotals();
+          });
+        }
         const removeBtn = row.querySelector('.remove-labor-row');
         if (!removeBtn) return;
         removeBtn.addEventListener('click', () => {
@@ -2388,6 +2498,8 @@ render_header('Quotes');
             row.querySelector('.labor-desc').value = '';
             row.querySelector('.labor-qty').value  = '1';
             row.querySelector('.labor-cost').value = '0.00';
+            if (taxCheck)  taxCheck.checked  = false;
+            if (taxHidden) taxHidden.value   = '0';
           } else {
             row.remove();
           }
@@ -2407,6 +2519,8 @@ render_header('Quotes');
           + '<td><input type="number" step="0.01" min="0.01" class="labor-qty" name="item_qty[]" value="1" /></td>'
           + '<td><input type="number" step="0.01" min="0" class="labor-cost" name="item_cost[]" value="0.00" /></td>'
           + '<td class="labor-line-total" style="white-space:nowrap;">$0.00</td>'
+          + '<td style="text-align:center;"><input type="hidden" class="taxable-hidden" name="item_taxable[]" value="0" />'
+          + '<input type="checkbox" class="taxable-check" style="width:18px;height:18px;cursor:pointer;" /></td>'
           + '<td><button type="button" class="btn remove-labor-row">×</button></td>';
         laborBody.appendChild(tr);
         bindLaborRow(tr);
@@ -2419,7 +2533,7 @@ render_header('Quotes');
       const addInvBtn  = document.getElementById('addInventoryRow');
 
       function computeInvTotals() {
-        let total = 0;
+        let total = 0, taxable = 0;
         invBody.querySelectorAll('tr.inv-row').forEach((row) => {
           const qty    = parseNum(row.querySelector('.inv-qty')?.value);
           const cost   = parseNum(row.querySelector('.inv-cost')?.value);
@@ -2431,8 +2545,11 @@ render_header('Quotes');
           const ltCell = row.querySelector('.inv-line-total');
           if (ltCell) ltCell.textContent = '$' + lineTotal.toFixed(2);
           total += lineTotal;
+          const taxHidden = row.querySelector('.taxable-hidden');
+          if (taxHidden && taxHidden.value === '1') taxable += lineTotal;
         });
         partsSubtotalNode.textContent = total.toFixed(2);
+        _invTaxable = taxable;
         updateGrandTotal();
       }
 
@@ -2483,6 +2600,14 @@ render_header('Quotes');
         row.querySelector('.inv-qty')?.addEventListener('input', computeInvTotals);
         row.querySelector('.inv-cost')?.addEventListener('input', computeInvTotals);
         row.querySelector('.inv-markup')?.addEventListener('input', computeInvTotals);
+        const taxCheck  = row.querySelector('.taxable-check');
+        const taxHidden = row.querySelector('.taxable-hidden');
+        if (taxCheck && taxHidden) {
+          taxCheck.addEventListener('change', () => {
+            taxHidden.value = taxCheck.checked ? '1' : '0';
+            computeInvTotals();
+          });
+        }
         const removeBtn = row.querySelector('.remove-inv-row');
         if (!removeBtn) return;
         removeBtn.addEventListener('click', () => {
@@ -2492,6 +2617,8 @@ render_header('Quotes');
             row.querySelector('.inv-cost').value   = '0.00';
             row.querySelector('.inv-markup').value = '20.00';
             row.querySelector('.inv-price').value  = '0.00';
+            if (taxCheck)  taxCheck.checked  = false;
+            if (taxHidden) taxHidden.value   = '0';
           } else {
             row.remove();
           }
@@ -2511,6 +2638,8 @@ render_header('Quotes');
           + '<td><input type="number" step="0.01" min="0" class="inv-markup" name="item_markup[]" value="20.00" /></td>'
           + '<td><input type="number" step="0.01" min="0" class="inv-price" name="item_price[]" value="0.00" readonly style="background:var(--surface,#f8fafc);color:var(--muted,#64748b);" /></td>'
           + '<td class="inv-line-total" style="white-space:nowrap;">$0.00</td>'
+          + '<td style="text-align:center;"><input type="hidden" class="taxable-hidden" name="item_taxable[]" value="0" />'
+          + '<input type="checkbox" class="taxable-check" style="width:18px;height:18px;cursor:pointer;" /></td>'
           + '<td><button type="button" class="btn remove-inv-row">×</button></td>';
         invBody.appendChild(tr);
         bindInvRow(tr);

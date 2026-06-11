@@ -373,6 +373,9 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
   $customer_company = trim((string)($quote['company_name'] ?? ''));
   $inv_date      = trim((string)($quote['quote_date'] ?? ''));
   $subtotal      = number_format((float)($quote['subtotal_amount'] ?? 0), 2);
+  $inv_tax_rate  = (float)($quote['tax_rate'] ?? 0);
+  $inv_tax_amount = number_format((float)($quote['tax_amount'] ?? 0), 2);
+  $inv_grand_total = number_format((float)($quote['subtotal_amount'] ?? 0) + (float)($quote['tax_amount'] ?? 0), 2);
 
   // Bill To address
   $bill_street = trim((string)($quote['billing_street'] ?? ''));
@@ -547,8 +550,18 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
         . '<tbody>' . implode('', $rows_html) . '</tbody>'
         . '<tfoot>'
           . '<tr>'
-            . '<td colspan="3" style="padding:14px 12px;text-align:right;font-weight:700;font-size:14px;color:#1e293b;border-top:2px solid #e2e8f0;">Subtotal:</td>'
-            . '<td style="padding:14px 12px;text-align:right;font-weight:700;font-size:16px;color:#1e3a5f;border-top:2px solid #e2e8f0;">$' . $h($subtotal) . '</td>'
+            . '<td colspan="3" style="padding:10px 12px;text-align:right;font-weight:600;font-size:13px;color:#1e293b;border-top:2px solid #e2e8f0;">Subtotal:</td>'
+            . '<td style="padding:10px 12px;text-align:right;font-weight:600;font-size:14px;color:#1e3a5f;border-top:2px solid #e2e8f0;">$' . $h($subtotal) . '</td>'
+          . '</tr>'
+          . ($inv_tax_rate > 0
+              ? '<tr>'
+                  . '<td colspan="3" style="padding:4px 12px;text-align:right;font-weight:600;font-size:13px;color:#1e293b;">Tax (' . $h(number_format($inv_tax_rate, 2)) . '%):</td>'
+                  . '<td style="padding:4px 12px;text-align:right;font-weight:600;font-size:14px;color:#1e3a5f;">$' . $h($inv_tax_amount) . '</td>'
+                . '</tr>'
+              : '')
+          . '<tr>'
+            . '<td colspan="3" style="padding:10px 12px;text-align:right;font-weight:700;font-size:14px;color:#1e293b;">Grand Total:</td>'
+            . '<td style="padding:10px 12px;text-align:right;font-weight:700;font-size:16px;color:#1e3a5f;">$' . $h($inv_grand_total) . '</td>'
           . '</tr>'
         . '</tfoot>'
       . '</table>'
@@ -591,7 +604,12 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
     $text_body .= "Pay online with Stripe: {$payment_link}\r\n";
     $text_body .= "Card details are entered directly on Stripe's secure checkout page.\r\n\r\n";
   }
-  $text_body .= implode("\r\n", $rows_text) . "\r\n\r\nSubtotal: \${$subtotal}\r\n\r\n";
+  $text_body .= implode("\r\n", $rows_text) . "\r\n\r\n";
+  $text_body .= "Subtotal: \${$subtotal}\r\n";
+  if ($inv_tax_rate > 0) {
+    $text_body .= "Tax (" . number_format($inv_tax_rate, 2) . "%): \${$inv_tax_amount}\r\n";
+  }
+  $text_body .= "Grand Total: \${$inv_grand_total}\r\n\r\n";
   $text_body .= "Thank you for your business.\r\n";
   if ($sender_name !== '') {
     $text_body .= "\r\nPrepared by: {$sender_name}" . ($sender_company !== 'Our Company' ? " at {$sender_company}" : '') . "\r\n";
@@ -832,31 +850,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $post_invoice_date = (new DateTime('now', $tz))->format('Y-m-d');
   }
 
-  $item_descs   = (array)($_POST['item_desc']   ?? []);
-  $item_qtys    = (array)($_POST['item_qty']    ?? []);
-  $item_costs   = (array)($_POST['item_cost']   ?? []);
-  $item_markups = (array)($_POST['item_markup'] ?? []);
+  $item_descs   = (array)($_POST['item_desc']    ?? []);
+  $item_qtys    = (array)($_POST['item_qty']     ?? []);
+  $item_costs   = (array)($_POST['item_cost']    ?? []);
+  $item_markups = (array)($_POST['item_markup']  ?? []);
+  $item_taxables = (array)($_POST['item_taxable'] ?? []);
+
+  $post_tax_rate = min(100.0, max(0.0, (float)($_POST['tax_rate'] ?? 0)));
 
   $subtotal = 0.0;
+  $taxable_subtotal = 0.0;
   $line_items_to_save = [];
   $count = count($item_descs);
   for ($i = 0; $i < $count; $i++) {
-    $desc      = trim((string)($item_descs[$i]   ?? ''));
-    $qty       = max(INVOICE_MIN_QTY, (float)($item_qtys[$i]    ?? 1));
-    $cost      = max(0.0,  (float)($item_costs[$i]   ?? 0));
-    $markup    = max(0.0,  (float)($item_markups[$i] ?? 0));
+    $desc      = trim((string)($item_descs[$i]    ?? ''));
+    $qty       = max(INVOICE_MIN_QTY, (float)($item_qtys[$i]     ?? 1));
+    $cost      = max(0.0,  (float)($item_costs[$i]    ?? 0));
+    $markup    = max(0.0,  (float)($item_markups[$i]  ?? 0));
+    $is_taxable = (int)($item_taxables[$i] ?? 0) === 1 ? 1 : 0;
     $price     = $cost * (1 + $markup / 100);
     $line_total = $qty * $price;
     $subtotal  += $line_total;
+    if ($is_taxable) $taxable_subtotal += $line_total;
     $line_items_to_save[] = [
-      'description'   => $desc,
-      'quantity'      => $qty,
-      'cost'          => $cost,
-      'markup_percent'=> $markup,
-      'unit_price'    => $price,
-      'line_total'    => $line_total,
+      'description'    => $desc,
+      'quantity'       => $qty,
+      'cost'           => $cost,
+      'markup_percent' => $markup,
+      'unit_price'     => $price,
+      'line_total'     => $line_total,
+      'is_taxable'     => $is_taxable,
     ];
   }
+
+  $tax_amount = round($taxable_subtotal * $post_tax_rate / 100, 2);
 
   $created_by = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
   if ($created_by !== null && $created_by <= 0) {
@@ -884,6 +911,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 quote_date        = ?,
                 notes             = ?,
                 subtotal_amount   = ?,
+                tax_rate          = ?,
+                tax_amount        = ?,
                 enable_online_payment = ?,
                 stripe_checkout_url = NULL,
                 stripe_checkout_session_id = NULL,
@@ -906,6 +935,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $post_invoice_date,
         $post_notes         !== '' ? $post_notes         : null,
         round($subtotal, 2),
+        round($post_tax_rate, 2),
+        $tax_amount,
         $post_enable_online_payment ? 1 : 0,
         $inv_no,
         $post_source_quote_id,
@@ -916,14 +947,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       $ins = $pdo->prepare(
         "INSERT INTO quote_items
-           (quote_id, line_position, description, quantity, cost, markup_percent, unit_price, line_total)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+           (quote_id, line_position, description, quantity, cost, markup_percent, unit_price, line_total, is_taxable)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
       );
       foreach ($line_items_to_save as $pos => $item) {
         $ins->execute([
           $post_source_quote_id, $pos + 1,
           $item['description'], $item['quantity'], $item['cost'],
-          $item['markup_percent'], $item['unit_price'], $item['line_total'],
+          $item['markup_percent'], $item['unit_price'], $item['line_total'], $item['is_taxable'],
         ]);
       }
     } else {
@@ -931,8 +962,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $ins_q = $pdo->prepare(
         "INSERT INTO quotes
            (customer_name, company_name, phone_number, email, billing_street, billing_city, billing_state, billing_zip, quote_date,
-            status, notes, subtotal_amount, enable_online_payment, converted_invoice_no, converted_at, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'converted', ?, ?, ?, '', NOW(), ?)"
+            status, notes, subtotal_amount, tax_rate, tax_amount, enable_online_payment, converted_invoice_no, converted_at, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'converted', ?, ?, ?, ?, ?, '', NOW(), ?)"
       );
       $ins_q->execute([
         $post_customer_name,
@@ -946,6 +977,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $post_invoice_date,
         $post_notes         !== '' ? $post_notes         : null,
         round($subtotal, 2),
+        round($post_tax_rate, 2),
+        $tax_amount,
         $post_enable_online_payment ? 1 : 0,
         $created_by,
       ]);
@@ -958,14 +991,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       // Insert line items
       $ins = $pdo->prepare(
         "INSERT INTO quote_items
-           (quote_id, line_position, description, quantity, cost, markup_percent, unit_price, line_total)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+           (quote_id, line_position, description, quantity, cost, markup_percent, unit_price, line_total, is_taxable)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
       );
       foreach ($line_items_to_save as $pos => $item) {
         $ins->execute([
           $new_id, $pos + 1,
           $item['description'], $item['quantity'], $item['cost'],
-          $item['markup_percent'], $item['unit_price'], $item['line_total'],
+          $item['markup_percent'], $item['unit_price'], $item['line_total'], $item['is_taxable'],
         ]);
       }
     }
@@ -1084,6 +1117,7 @@ $fields = [
   'invoice_date' => invoice_quote_date_value($quote, $today),
   'enable_online_payment' => $quote && invoice_online_payment_enabled($quote) ? '1' : '0',
   'notes' => (string)($quote['notes'] ?? ''),
+  'tax_rate' => number_format((float)($quote['tax_rate'] ?? 0), 2),
 ];
 
 $line_items = [];
@@ -1095,6 +1129,7 @@ foreach ($rows as $row) {
     'markup_percent' => number_format((float)($row['markup_percent'] ?? 0), 2),
     'unit_price' => invoice_format_money($row['unit_price'] ?? 0),
     'line_total' => invoice_format_money($row['line_total'] ?? 0),
+    'is_taxable' => (int)($row['is_taxable'] ?? 0),
   ];
 }
 if (!$line_items) {
@@ -1105,6 +1140,7 @@ if (!$line_items) {
     'markup_percent' => INVOICE_DEFAULT_MARKUP,
     'unit_price' => INVOICE_DEFAULT_PRICE,
     'line_total' => INVOICE_DEFAULT_PRICE,
+    'is_taxable' => 0,
   ];
 }
 
@@ -1298,13 +1334,14 @@ render_header($invoice_heading);
     <div style="margin-top:20px;">
       <h3 style="margin:0 0 10px;">Labor / Services</h3>
       <div style="overflow-x:auto;">
-        <table style="min-width:700px;" id="laborItemsTable">
+        <table style="min-width:780px;" id="laborItemsTable">
           <thead>
             <tr>
               <th>Description</th>
               <th style="width:100px;">Qty</th>
               <th style="width:130px;">Cost</th>
               <th style="width:150px;">Line Total</th>
+              <th style="width:80px; text-align:center;">Taxable</th>
               <th style="width:90px;">Remove</th>
             </tr>
           </thead>
@@ -1323,6 +1360,14 @@ render_header($invoice_heading);
               <td><?php if (!$is_view_mode): ?><input type="number" step="0.01" min="0.01" class="labor-qty" name="item_qty[]" value="1" /><?php else: ?><span class="muted">—</span><?php endif; ?></td>
               <td><?php if (!$is_view_mode): ?><input type="number" step="0.01" min="0" class="labor-cost" name="item_cost[]" value="0.00" /><?php else: ?><span class="muted">—</span><?php endif; ?></td>
               <td class="labor-line-total" style="white-space:nowrap;">$0.00</td>
+              <td style="text-align:center;">
+                <?php if (!$is_view_mode): ?>
+                  <input type="hidden" class="taxable-hidden" name="item_taxable[]" value="0" />
+                  <input type="checkbox" class="taxable-check" style="width:18px;height:18px;cursor:pointer;" />
+                <?php else: ?>
+                  <span class="muted">—</span>
+                <?php endif; ?>
+              </td>
               <td><?php if (!$is_view_mode): ?><button type="button" class="btn remove-labor-row">×</button><?php else: ?><span class="muted">—</span><?php endif; ?></td>
             </tr>
           </tbody>
@@ -1342,7 +1387,7 @@ render_header($invoice_heading);
     <div style="margin-top:20px;">
       <h3 style="margin:0 0 10px;">Inventory / Parts</h3>
       <div style="overflow-x:auto;">
-        <table style="min-width:900px;" id="inventoryItemsTable">
+        <table style="min-width:1000px;" id="inventoryItemsTable">
           <thead>
             <tr>
               <th>Description</th>
@@ -1351,6 +1396,7 @@ render_header($invoice_heading);
               <th style="width:110px;">Markup %</th>
               <th style="width:130px;">Price</th>
               <th style="width:150px;">Line Total</th>
+              <th style="width:80px; text-align:center;">Taxable</th>
               <th style="width:90px;">Remove</th>
             </tr>
           </thead>
@@ -1370,6 +1416,14 @@ render_header($invoice_heading);
                 <td><?php if (!$is_view_mode): ?><input type="number" step="0.01" min="0" class="inv-markup" name="item_markup[]" value="<?= h((string)$row['markup_percent']) ?>" /><?php else: ?><?= h((string)$row['markup_percent']) ?>%<?php endif; ?></td>
                 <td><?php if (!$is_view_mode): ?><input type="number" step="0.01" min="0" class="inv-price" name="item_price[]" value="<?= h((string)$row['unit_price']) ?>" readonly style="background:var(--surface,#f8fafc); color:var(--muted,#64748b);" /><?php else: ?>$<?= h((string)$row['unit_price']) ?><?php endif; ?></td>
                 <td class="inv-line-total" style="white-space:nowrap;">$<?= h((string)$row['line_total']) ?></td>
+                <td style="text-align:center;">
+                  <?php if (!$is_view_mode): ?>
+                    <input type="hidden" class="taxable-hidden" name="item_taxable[]" value="<?= (int)($row['is_taxable'] ?? 0) === 1 ? '1' : '0' ?>" />
+                    <input type="checkbox" class="taxable-check" style="width:18px;height:18px;cursor:pointer;"<?= (int)($row['is_taxable'] ?? 0) === 1 ? ' checked' : '' ?> />
+                  <?php else: ?>
+                    <?= (int)($row['is_taxable'] ?? 0) === 1 ? '<span style="color:#166534;font-weight:600;">Yes</span>' : '<span class="muted">No</span>' ?>
+                  <?php endif; ?>
+                </td>
                 <td>
                   <?php if (!$is_view_mode): ?>
                     <button type="button" class="btn remove-inv-row">×</button>
@@ -1392,8 +1446,18 @@ render_header($invoice_heading);
       </div>
     </div>
 
-    <div style="margin-top:10px; text-align:right; font-size:1.05em;">
-      <strong>Grand Total: $<span id="invoiceSubtotal">0.00</span></strong>
+    <div style="margin-top:14px; display:flex; justify-content:flex-end; align-items:flex-start; gap:14px; flex-wrap:wrap;">
+      <?php if (!$is_view_mode): ?>
+        <div style="text-align:right;">
+          <label for="tax_rate" style="display:block; margin-bottom:4px; font-weight:600;">Tax Rate (%)</label>
+          <input id="tax_rate" type="number" name="tax_rate" step="0.01" min="0" max="100" value="<?= h($fields['tax_rate']) ?>" style="width:120px; text-align:right;" />
+        </div>
+      <?php endif; ?>
+      <div style="font-size:1.05em; padding-top:<?= $is_view_mode ? '0' : '28' ?>px; line-height:1.8;">
+        <div>Subtotal: $<span id="invoiceSubtotalDisplay">0.00</span></div>
+        <div id="invoiceTaxRow" style="display:none;">Tax (<span id="invoiceTaxRateDisplay">0.00</span>%): $<span id="invoiceTaxAmount">0.00</span></div>
+        <div><strong>Grand Total: $<span id="invoiceSubtotal">0.00</span></strong></div>
+      </div>
     </div>
 
     <div style="margin-top:14px;">
