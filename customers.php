@@ -206,7 +206,7 @@ function parse_hubspot_address_components(string $address, string $city, string 
     }
   }
 
-  $parsed_city = trim($parsed_city, ', ');
+  $parsed_city = rtrim($parsed_city, ', ');
 
   return [$parsed_street, $parsed_city, $parsed_state, $parsed_zip];
 }
