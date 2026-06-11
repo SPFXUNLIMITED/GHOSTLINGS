@@ -11,8 +11,8 @@ function message_body_to_reply_text(string $html): string {
   $text = preg_replace('/<li\b[^>]*>/i', '- ', $text) ?? $text;
   $text = strip_tags($text);
   $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-  $text = preg_replace("/\r\n?/", "\n", $text);
-  $text = preg_replace("/\n{3,}/", "\n\n", $text);
+  $text = preg_replace("/\r\n?/", "\n", $text) ?? $text;
+  $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
   return trim($text);
 }
 
@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $del = $pdo->prepare("DELETE FROM messages WHERE id = ? AND sender_id = ?");
         $del->execute([$message_id, $current_user_id]);
         if ($del->rowCount() < 1) {
-          $errors[] = 'Message could not be deleted.';
+          $errors[] = 'Message not found or you do not have permission to delete it.';
         } else {
           $_SESSION['messages_csrf'] = bin2hex(random_bytes(24));
           header('Location: messages.php?deleted=1');
