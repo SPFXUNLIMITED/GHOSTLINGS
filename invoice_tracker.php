@@ -16,14 +16,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_p
     exit;
   }
 
-  $quote_stmt = $pdo->prepare(
+  $stmt = $pdo->prepare(
     "SELECT id, customer_name, company_name, quote_date, subtotal_amount, status,
             converted_invoice_no, email, notes, created_by, created_at
      FROM quotes WHERE id = ? LIMIT 1"
   );
-  $quote_stmt->execute([$inv_id]);
-  $pq = $quote_stmt->fetch(PDO::FETCH_ASSOC);
-  if (!$pq) {
+  $stmt->execute([$inv_id]);
+  $invoice = $stmt->fetch(PDO::FETCH_ASSOC);
+  if (!$invoice) {
     echo json_encode(['ok' => false, 'error' => 'Invoice not found.']);
     exit;
   }
@@ -32,11 +32,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_p
     "SELECT description, quantity, unit_price, line_total FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC"
   );
   $items_stmt->execute([$inv_id]);
-  $pitems = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
+  $invoice_items = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
 
   // Sender profile
   $sender = ['sender_name' => '', 'company_name' => '', 'address' => '', 'phone' => '', 'email' => ''];
-  $created_by = isset($pq['created_by']) && $pq['created_by'] !== null ? (int)$pq['created_by'] : null;
+  $created_by = isset($invoice['created_by']) && $invoice['created_by'] !== null ? (int)$invoice['created_by'] : null;
   $candidate_ids = [];
   if ($created_by !== null && $created_by > 0) $candidate_ids[] = $created_by;
   $session_uid = (int)($_SESSION['user_id'] ?? 0);
@@ -58,13 +58,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_p
     }
   }
 
-  $now_stamp = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Ymd');
-  $inv_no        = trim((string)($pq['converted_invoice_no'] ?? ''));
-  $inv_label_raw = $inv_no !== '' ? $inv_no : 'INV-' . $now_stamp . '-' . str_pad((string)$inv_id, 5, '0', STR_PAD_LEFT);
-  $inv_date      = trim((string)($pq['quote_date'] ?? '')) ?: substr(trim((string)($pq['created_at'] ?? '')), 0, 10);
-  $customer_name = trim((string)($pq['customer_name'] ?? ''));
-  $subtotal      = number_format((float)($pq['subtotal_amount'] ?? 0), 2);
-  $notes         = trim((string)($pq['notes'] ?? ''));
+  $now_stamp     = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Ymd');
+  $inv_label_raw = invoice_tracker_number($invoice, $now_stamp);
+  $inv_date      = invoice_tracker_effective_date($invoice);
+  $customer_name = trim((string)($invoice['customer_name'] ?? ''));
+  $subtotal      = number_format((float)($invoice['subtotal_amount'] ?? 0), 2);
+  $notes         = trim((string)($invoice['notes'] ?? ''));
   $sender_company = $sender['company_name'] !== '' ? $sender['company_name'] : 'Our Company';
   $sender_name    = $sender['sender_name'];
   $sender_address = $sender['address'];
@@ -73,10 +72,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_p
 
   $h = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 
+  // Helper: format address inline with given separator
+  $fmt_addr = static fn(string $addr, string $sep): string =>
+    (string)preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], $sep, $addr));
+
   // Build item rows
   $rows_html = [];
   $row_index = 0;
-  foreach ($pitems as $item) {
+  foreach ($invoice_items as $item) {
     $desc       = trim((string)($item['description'] ?? ''));
     $qty        = number_format((float)($item['quantity']   ?? 0), 2);
     $unit_price = number_format((float)($item['unit_price'] ?? 0), 2);
@@ -96,10 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_p
 
   // Header contact line
   $header_parts = [];
-  if ($sender_address !== '') {
-    $addr_one = preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ' · ', $sender_address));
-    $header_parts[] = $h($addr_one);
-  }
+  if ($sender_address !== '') $header_parts[] = $h($fmt_addr($sender_address, ' · '));
   if ($sender_phone !== '') $header_parts[] = $h($sender_phone);
   if ($sender_email !== '') $header_parts[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($sender_email) . '</a>';
   $header_contact_html = implode(' &nbsp;·&nbsp; ', $header_parts);
@@ -116,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_p
 
   // Footer contact line
   $footer_parts = [];
-  if ($sender_address !== '') $footer_parts[] = $h(preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ', ', $sender_address)));
+  if ($sender_address !== '') $footer_parts[] = $h($fmt_addr($sender_address, ', '));
   if ($sender_phone !== '') $footer_parts[] = $h($sender_phone);
   if ($sender_email !== '') $footer_parts[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($sender_email) . '</a>';
   $footer_contact_html = implode(' &nbsp;·&nbsp; ', $footer_parts);
