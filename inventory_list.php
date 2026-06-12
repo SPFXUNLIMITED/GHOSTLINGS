@@ -4,6 +4,58 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_admin_or_moderator();
 
+// ── AJAX: Quick Stock Adjustment ────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'stock_adjust') {
+  header('Content-Type: application/json; charset=UTF-8');
+  header('X-Content-Type-Options: nosniff');
+
+  $token = (string)($_POST['stock_csrf'] ?? '');
+  if (!hash_equals((string)($_SESSION['inventory_stock_csrf'] ?? ''), $token) || $token === '') {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Invalid security token.']);
+    exit;
+  }
+
+  $item_id    = (int)($_POST['item_id'] ?? 0);
+  $adjustment = (int)($_POST['adjustment'] ?? 0);
+
+  if ($item_id <= 0) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Invalid item.']);
+    exit;
+  }
+  if ($adjustment === 0) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Adjustment cannot be zero.']);
+    exit;
+  }
+
+  $stmt = $pdo->prepare("
+    UPDATE inventory_items
+    SET current_stock = GREATEST(0, current_stock + ?) -- stock is never allowed to go below zero
+    WHERE id = ?
+  ");
+  $stmt->execute([$adjustment, $item_id]);
+
+  if ($stmt->rowCount() === 0) {
+    http_response_code(404);
+    echo json_encode(['ok' => false, 'error' => 'Item not found.']);
+    exit;
+  }
+
+  $updated_stmt = $pdo->prepare("SELECT current_stock, low_stock_alert FROM inventory_items WHERE id = ?");
+  $updated_stmt->execute([$item_id]);
+  $updated = $updated_stmt->fetch();
+
+  echo json_encode([
+    'ok'        => true,
+    'new_stock' => (int)$updated['current_stock'],
+    'low_alert' => (int)$updated['low_stock_alert'],
+  ]);
+  exit;
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS inventory_items (
     id                 INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -171,6 +223,9 @@ if ($success_param === 'created') {
 if (empty($_SESSION['inventory_clone_csrf'])) {
   $_SESSION['inventory_clone_csrf'] = bin2hex(random_bytes(24));
 }
+if (empty($_SESSION['inventory_stock_csrf'])) {
+  $_SESSION['inventory_stock_csrf'] = bin2hex(random_bytes(24));
+}
 
 if ($q !== '') {
   $like = '%' . $q . '%';
@@ -304,6 +359,118 @@ render_header('Inventory List');
     font-size: 1rem;
     font-weight: 700;
   }
+  /* ── Quick Stock Adjustment ── */
+  .inventory-stock-btn {
+    border: 0;
+    background: none;
+    padding: 0;
+    cursor: pointer;
+    display: inline-block;
+  }
+  .inventory-stock-btn:hover .inventory-low-stock,
+  .inventory-stock-btn:hover .inventory-ok-stock {
+    filter: brightness(0.93);
+    outline: 2px solid currentColor;
+    outline-offset: 1px;
+  }
+  .stock-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.72);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 2300;
+  }
+  .stock-modal-overlay.open { display: flex; }
+  .stock-modal {
+    width: min(420px, 96vw);
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid var(--b);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 48px rgba(0,0,0,.25);
+  }
+  .stock-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--b);
+    background: #f8fafc;
+  }
+  .stock-modal-title {
+    font-weight: 700;
+    font-size: 1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .stock-modal-body {
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .stock-current-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: #f1f5f9;
+    border-radius: 8px;
+    border: 1px solid var(--b);
+  }
+  .stock-current-label {
+    font-size: 0.85rem;
+    color: #64748b;
+    font-weight: 500;
+  }
+  .stock-current-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-left: auto;
+  }
+  .stock-modal-field label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: #334155;
+  }
+  .stock-modal-field input[type="number"],
+  .stock-modal-field input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .stock-modal-hint {
+    font-size: 0.78rem;
+    color: #64748b;
+    margin-top: 4px;
+  }
+  .stock-modal-footer {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    padding: 12px 16px;
+    border-top: 1px solid var(--b);
+    background: #f8fafc;
+  }
+  .stock-modal-error {
+    color: #991b1b;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    display: none;
+  }
+  .stock-modal-error.visible { display: block; }
 </style>
 
 <div class="card page-header">
@@ -399,9 +566,17 @@ render_header('Inventory List');
           <td class="inventory-price"><?= h(fmt_money($item['cost_price'])) ?></td>
           <td class="inventory-price"><?= h(fmt_money($item['retail_price'])) ?></td>
           <td>
-            <span class="<?= $is_low_stock ? 'inventory-low-stock' : 'inventory-ok-stock' ?>">
-              <?= $current_stock ?> (alert: <?= $low_stock_alert ?>)
-            </span>
+            <button type="button"
+                    class="inventory-stock-btn js-stock-adjust"
+                    title="Click to adjust stock"
+                    data-id="<?= (int)$item['id'] ?>"
+                    data-name="<?= h((string)$item['item_name']) ?>"
+                    data-stock="<?= $current_stock ?>"
+                    data-alert="<?= $low_stock_alert ?>">
+              <span class="<?= $is_low_stock ? 'inventory-low-stock' : 'inventory-ok-stock' ?>">
+                <?= $current_stock ?> (alert: <?= $low_stock_alert ?>)
+              </span>
+            </button>
           </td>
           <td><?= $item['location'] !== '' ? h((string)$item['location']) : '<span class="muted">—</span>' ?></td>
           <td class="actions">
@@ -467,6 +642,153 @@ render_header('Inventory List');
       modal.classList.add('open');
       modal.setAttribute('aria-hidden', 'false');
     });
+  });
+})();
+</script>
+
+<div id="stockAdjustModal" class="stock-modal-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="stockAdjustModalTitle">
+  <div class="stock-modal">
+    <div class="stock-modal-head">
+      <div class="stock-modal-title" id="stockAdjustModalTitle">Adjust Stock</div>
+      <button type="button" class="btn" id="stockAdjustModalClose">✕</button>
+    </div>
+    <div class="stock-modal-body">
+      <div class="stock-current-display">
+        <span class="stock-current-label">Current Stock</span>
+        <span class="stock-current-value" id="stockCurrentValue">—</span>
+      </div>
+      <div class="stock-modal-field">
+        <label for="stockAdjustAmount">Adjustment <span class="muted" style="font-weight:400;">(use − for removals)</span></label>
+        <input type="number" id="stockAdjustAmount" name="adjustment" placeholder="e.g. +5 or -2" step="1" />
+        <p class="stock-modal-hint">Enter a positive number to add stock, or a negative number to remove stock.</p>
+      </div>
+      <div class="stock-modal-field">
+        <label for="stockAdjustNote">Note <span class="muted" style="font-weight:400;">(optional)</span></label>
+        <input type="text" id="stockAdjustNote" name="note" placeholder="e.g. Received shipment, Sold one unit…" maxlength="255" />
+      </div>
+      <div class="stock-modal-error" id="stockAdjustError"></div>
+    </div>
+    <div class="stock-modal-footer">
+      <button type="button" class="btn" id="stockAdjustCancel">Cancel</button>
+      <button type="button" class="btn primary" id="stockAdjustSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const overlay   = document.getElementById('stockAdjustModal');
+  const titleEl   = document.getElementById('stockAdjustModalTitle');
+  const currentEl = document.getElementById('stockCurrentValue');
+  const amountEl  = document.getElementById('stockAdjustAmount');
+  const noteEl    = document.getElementById('stockAdjustNote');
+  const errorEl   = document.getElementById('stockAdjustError');
+  const saveBtn   = document.getElementById('stockAdjustSave');
+  const cancelBtn = document.getElementById('stockAdjustCancel');
+  const closeBtn  = document.getElementById('stockAdjustModalClose');
+
+  if (!overlay) return;
+
+  const csrfToken = <?= json_encode((string)$_SESSION['inventory_stock_csrf']) ?>;
+
+  let activeItemId   = 0;
+  let activeBtn      = null;
+  let activeLowAlert = 0;
+
+  const openModal = (btn) => {
+    activeItemId   = parseInt(btn.dataset.id, 10) || 0;
+    activeLowAlert = parseInt(btn.dataset.alert, 10) || 0;
+    activeBtn      = btn;
+
+    const name  = btn.dataset.name || 'Item';
+    const stock = parseInt(btn.dataset.stock, 10);
+
+    titleEl.textContent   = 'Adjust Stock — ' + name;
+    currentEl.textContent = stock;
+    amountEl.value        = '';
+    noteEl.value          = '';
+    errorEl.textContent   = '';
+    errorEl.classList.remove('visible');
+
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+    setTimeout(() => amountEl.focus(), 60);
+  };
+
+  const closeModal = () => {
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden', 'true');
+    if (activeBtn) activeBtn.focus();
+    activeBtn = null;
+  };
+
+  const showError = (msg) => {
+    errorEl.textContent = msg;
+    errorEl.classList.add('visible');
+  };
+
+  closeBtn.addEventListener('click', closeModal);
+  cancelBtn.addEventListener('click', closeModal);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const adjustment = parseInt(amountEl.value, 10);
+    if (!amountEl.value.trim() || isNaN(adjustment)) {
+      showError('Please enter a valid number (e.g. 5 or -3).');
+      amountEl.focus();
+      return;
+    }
+    if (adjustment === 0) {
+      showError('Adjustment cannot be zero.');
+      amountEl.focus();
+      return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+    errorEl.classList.remove('visible');
+
+    try {
+      const body = new URLSearchParams({
+        action:      'stock_adjust',
+        stock_csrf:  csrfToken,
+        item_id:     activeItemId,
+        adjustment:  adjustment,
+        note:        noteEl.value.trim(),
+      });
+
+      const res  = await fetch('inventory_list.php', { method: 'POST', body });
+      const data = await res.json();
+
+      if (!data.ok) {
+        showError(data.error || 'An error occurred. Please try again.');
+        return;
+      }
+
+      // Update the badge in the table row
+      const newStock    = data.new_stock;
+      const lowAlert    = data.low_alert;
+      const isLow       = newStock <= lowAlert;
+      const badge       = activeBtn.querySelector('span');
+      const badgeClass  = isLow ? 'inventory-low-stock' : 'inventory-ok-stock';
+      badge.className   = badgeClass;
+      badge.textContent = newStock + ' (alert: ' + lowAlert + ')';
+      activeBtn.dataset.stock = newStock;
+
+      closeModal();
+    } catch (err) {
+      showError('Network error. Please check your connection and try again.');
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    }
+  });
+
+  document.querySelectorAll('.js-stock-adjust').forEach((btn) => {
+    btn.addEventListener('click', () => openModal(btn));
   });
 })();
 </script>
