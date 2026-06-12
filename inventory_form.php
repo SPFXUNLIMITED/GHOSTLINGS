@@ -677,7 +677,7 @@ render_header($page_title);
             <option value="Other Supplier" <?= $purchased_from_selection === 'Other Supplier' ? 'selected' : '' ?>>Other Supplier</option>
           </select>
           <div id="other_supplier_wrap"
-               style="display:none; overflow:hidden; max-height:0; opacity:0; transform:translateY(-4px); transition:max-height .25s ease, opacity .2s ease, transform .2s ease; margin-top:10px;"
+               style="overflow:hidden; max-height:0; opacity:0; transform:translateY(-4px); margin-top:0; transition:max-height .25s ease, opacity .2s ease, transform .2s ease, margin-top .2s ease;"
                aria-hidden="true">
             <label for="other_supplier_name">Other Supplier Name</label>
             <input type="text"
@@ -752,6 +752,19 @@ render_header($page_title);
 </div>
 
 <?php if (!$is_view): ?>
+<style>
+#other_supplier_wrap.is-visible{
+  max-height:120px !important;
+  opacity:1 !important;
+  transform:translateY(0) !important;
+  margin-top:10px !important;
+}
+@media (prefers-reduced-motion: reduce){
+  #other_supplier_wrap{
+    transition:none !important;
+  }
+}
+</style>
 <script>
 (function () {
   var vendorMarkups = {
@@ -766,60 +779,19 @@ render_header($page_title);
   var markupInput = document.getElementById('markup_percent');
   var costInput   = document.getElementById('cost_price');
   var sellingInput = document.getElementById('retail_price');
-  var prefersReducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  var transitionStyle = 'max-height .25s ease, opacity .2s ease, transform .2s ease';
 
   if (!vendorSel) return;
 
-  function toggleOtherSupplier(animated) {
+  function toggleOtherSupplier() {
     if (!otherSupplierWrap || !otherSupplierInput) return;
     var show = vendorSel.value === 'Other Supplier';
-
-    if (show) {
-      otherSupplierWrap.style.display = 'block';
-      if (!animated || prefersReducedMotion) otherSupplierWrap.style.transition = 'none';
-      requestAnimationFrame(function () {
-        otherSupplierWrap.style.maxHeight = otherSupplierWrap.scrollHeight + 'px';
-        otherSupplierWrap.style.opacity = '1';
-        otherSupplierWrap.style.transform = 'translateY(0)';
-      });
-      otherSupplierWrap.setAttribute('aria-hidden', 'false');
-      otherSupplierInput.disabled = false;
-      otherSupplierInput.required = true;
-      if (!animated || prefersReducedMotion) {
-        requestAnimationFrame(function () {
-          otherSupplierWrap.style.transition = prefersReducedMotion ? 'none' : transitionStyle;
-        });
-      }
-      return;
-    }
-
-    if (!animated || prefersReducedMotion) otherSupplierWrap.style.transition = 'none';
-    otherSupplierWrap.style.maxHeight = otherSupplierWrap.scrollHeight + 'px';
-    requestAnimationFrame(function () {
-      otherSupplierWrap.style.maxHeight = '0px';
-      otherSupplierWrap.style.opacity = '0';
-      otherSupplierWrap.style.transform = 'translateY(-4px)';
-    });
-    otherSupplierWrap.setAttribute('aria-hidden', 'true');
-    otherSupplierInput.required = false;
-    otherSupplierInput.disabled = true;
-    if (!animated || prefersReducedMotion) {
-      requestAnimationFrame(function () {
-        otherSupplierWrap.style.transition = prefersReducedMotion ? 'none' : transitionStyle;
-      });
-    }
+    otherSupplierWrap.classList.toggle('is-visible', show);
+    otherSupplierWrap.setAttribute('aria-hidden', show ? 'false' : 'true');
+    otherSupplierInput.disabled = !show;
+    otherSupplierInput.required = show;
   }
 
-  if (otherSupplierWrap) {
-    otherSupplierWrap.addEventListener('transitionend', function (event) {
-      if (event.propertyName === 'max-height' && otherSupplierWrap.style.maxHeight === '0px') {
-        otherSupplierWrap.style.display = 'none';
-      }
-    });
-  }
-
-  toggleOtherSupplier(false);
+  toggleOtherSupplier();
 
   if (!markupInput || !costInput || !sellingInput) return;
 
@@ -835,7 +807,7 @@ render_header($page_title);
   }
 
   vendorSel.addEventListener('change', function () {
-    toggleOtherSupplier(true);
+    toggleOtherSupplier();
     var vendor = vendorSel.value;
     if (vendor in vendorMarkups) {
       markupInput.value = vendorMarkups[vendor];
