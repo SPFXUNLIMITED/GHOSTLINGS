@@ -1255,3 +1255,83 @@ tbody tr:hover td {
   color: #fff;
   border-color: var(--p);
 }
+
+/* ── Mobile responsive overrides ────────────────────────────────────────── */
+@media (max-width: 640px) {
+  /* Topbar: stack brand and right side vertically */
+  .topbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .topbar-brand {
+    flex: 1 1 100%;
+  }
+
+  .topbar-right {
+    flex: 1 1 100%;
+    align-items: flex-start;
+  }
+
+  .topbar-meta {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .topbar-clock-label {
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  /* Menubar: full-width links that stack neatly */
+  .menubar-inner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .menu-link {
+    display: block;
+    text-align: center;
+    padding: 12px 14px;
+    min-height: 44px;
+    line-height: 1.4;
+  }
+
+  .menu-dropdown {
+    width: 100%;
+  }
+
+  .menu-dropdown summary.menu-link {
+    text-align: center;
+  }
+
+  /* Form grid: single column */
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .length-converter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Tables: horizontal scroll to prevent overflow */
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Buttons: larger touch targets */
+  .btn {
+    padding: 10px 14px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Stack pagination on mobile */
+  .pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
