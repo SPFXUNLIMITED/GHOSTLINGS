@@ -20,7 +20,6 @@ if (!$item) {
   exit;
 }
 
-$qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . $id . '&view=1';
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -115,10 +114,13 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . $id . '&view
       }
 
       qrTarget.innerHTML = '';
-      new QRCode(document.getElementById('qrcode'), {
+      new QRCode(qrTarget, {
         text: "https://ghostlaser.com/project/inventory_form.php?id=<?= (int)$id ?>&view=1",
         width: 280,
-        height: 280
+        height: 280,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
       });
     });
   </script>
