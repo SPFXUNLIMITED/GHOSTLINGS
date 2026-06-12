@@ -24,173 +24,102 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . $id . '&view
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QR Label – <?= h((string)$item['part_number']) ?></title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha256-FcVUR0ndoOygJlQ8hRlHocPKzhw6KpQZIky3gGHwH0c=" crossorigin="anonymous"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventory QR Label</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
+    * { box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f1f5f9;
-      color: #0f172a;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 24px 16px;
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      text-align: center;
     }
-
-    .print-btn-bar {
-      width: 100%;
+    .label-container {
       max-width: 420px;
-      margin-bottom: 20px;
-      display: flex;
-      gap: 10px;
-    }
-
-    .btn-print {
-      flex: 1;
-      background: #0f172a;
-      color: #fff;
-      border: none;
+      margin: 0 auto;
+      background: #fff;
+      border: 1px solid #ddd;
       border-radius: 10px;
-      padding: 14px 24px;
-      font-size: 1.1rem;
-      font-weight: 700;
-      cursor: pointer;
-      letter-spacing: 0.02em;
+      padding: 20px;
     }
-
-    .btn-print:hover { background: #1e293b; }
-
-    .btn-back {
-      background: #e2e8f0;
-      color: #0f172a;
-      border: none;
-      border-radius: 10px;
-      padding: 14px 18px;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-    }
-
-    .btn-back:hover { background: #cbd5e1; }
-
-    .label-card {
-      background: #ffffff;
-      border-radius: 16px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
-      padding: 32px 28px 28px;
-      width: 100%;
-      max-width: 420px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 20px;
-    }
-
     #qrcode {
+      width: 280px;
+      height: 280px;
+      margin: 0 auto 20px auto;
       display: flex;
       align-items: center;
       justify-content: center;
     }
-
-    #qrcode canvas,
-    #qrcode img {
-      width: 260px !important;
-      height: 260px !important;
+    #qrcode img,
+    #qrcode canvas {
+      width: 280px !important;
+      height: 280px !important;
       display: block;
+      margin: 0 auto;
     }
-
-    .label-info {
-      text-align: center;
-      width: 100%;
-    }
-
-    .label-part-number {
-      font-size: 1.4rem;
+    .part-number {
+      font-size: 34px;
       font-weight: 800;
-      letter-spacing: 0.04em;
-      color: #0f172a;
-      margin-bottom: 6px;
-      font-family: 'Courier New', Courier, monospace;
+      margin: 0 0 10px 0;
+      line-height: 1.1;
     }
-
-    .label-item-name {
-      font-size: 1.1rem;
-      font-weight: 600;
-      color: #334155;
-      line-height: 1.35;
+    .item-name {
+      font-size: 20px;
+      margin: 0;
+      color: #333;
     }
-
-    .label-url {
-      font-size: 0.72rem;
-      color: #94a3b8;
-      word-break: break-all;
-      margin-top: 8px;
+    .print-btn {
+      margin-top: 20px;
+      background: #000;
+      color: #fff;
+      border: none;
+      padding: 12px 24px;
+      font-size: 18px;
+      cursor: pointer;
+      border-radius: 6px;
+      font-weight: 700;
     }
-
-    /* ── Print styles ─────────────────────────────── */
     @media print {
-      body {
-        background: #fff;
-        padding: 0;
-        display: block;
-      }
-
-      .print-btn-bar { display: none !important; }
-
-      .label-card {
-        box-shadow: none;
+      body { background: #fff; padding: 0; }
+      .print-btn { display: none; }
+      .label-container {
+        border: 0;
         border-radius: 0;
-        padding: 16px;
-        max-width: 100%;
         width: 100%;
-        page-break-inside: avoid;
+        max-width: none;
       }
-
-      #qrcode canvas,
-      #qrcode img {
-        width: 240px !important;
-        height: 240px !important;
-      }
-
-      .label-part-number { font-size: 1.5rem; }
-      .label-item-name   { font-size: 1.15rem; }
-      .label-url         { font-size: 0.7rem; }
     }
   </style>
 </head>
 <body>
-
-  <div class="print-btn-bar">
-    <button class="btn-print" onclick="window.print()">🖨️ Print This Label</button>
-    <a class="btn-back" href="inventory_list.php">← Back</a>
-  </div>
-
-  <div class="label-card">
+  <div class="label-container">
     <div id="qrcode"></div>
-    <div class="label-info">
-      <div class="label-part-number"><?= h((string)$item['part_number']) ?></div>
-      <div class="label-item-name"><?= h((string)$item['item_name']) ?></div>
-      <div class="label-url"><?= h($qr_url) ?></div>
-    </div>
+    <div class="part-number"><?= h((string)$item['part_number']) ?></div>
+    <div class="item-name"><?= h((string)$item['item_name']) ?></div>
+    <button class="print-btn" onclick="window.print()">Print This Label</button>
   </div>
 
   <script>
-    new QRCode(document.getElementById('qrcode'), {
-      text: <?= json_encode($qr_url) ?>,
-      width: 260,
-      height: 260,
-      colorDark: '#000000',
-      colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M
-    });
+    (function () {
+      var qrTarget = document.getElementById('qrcode');
+      if (!qrTarget || typeof QRCode === 'undefined') {
+        qrTarget.textContent = 'Unable to load QR code.';
+        return;
+      }
+
+      qrTarget.innerHTML = '';
+      new QRCode(qrTarget, {
+        text: <?= json_encode($qr_url) ?>,
+        width: 280,
+        height: 280,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H
+      });
+    })();
   </script>
 </body>
 </html>
