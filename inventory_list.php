@@ -164,6 +164,12 @@ if ($success_param === 'created') {
   $success_message = 'Inventory item updated.';
 } elseif ($success_param === 'deleted') {
   $success_message = 'Inventory item deleted.';
+} elseif ($success_param === 'cloned') {
+  $success_message = 'Inventory item cloned.';
+}
+
+if (empty($_SESSION['inventory_clone_csrf'])) {
+  $_SESSION['inventory_clone_csrf'] = bin2hex(random_bytes(24));
 }
 
 if ($q !== '') {
@@ -401,6 +407,11 @@ render_header('Inventory List');
           <td class="actions">
             <a class="btn" href="inventory_form.php?id=<?= (int)$item['id'] ?>&view=1">View</a>
             <a class="btn" href="inventory_form.php?id=<?= (int)$item['id'] ?>">Edit</a>
+            <form method="post" action="inventory_clone.php" style="display:inline;">
+              <input type="hidden" name="id" value="<?= (int)$item['id'] ?>" />
+              <input type="hidden" name="clone_csrf_token" value="<?= h((string)$_SESSION['inventory_clone_csrf']) ?>" />
+              <button type="submit" class="btn">Clone</button>
+            </form>
             <a class="btn" href="inventory_print_qr.php?id=<?= (int)$item['id'] ?>" target="_blank">Print QR Label</a>
           </td>
         </tr>
