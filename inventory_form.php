@@ -584,74 +584,72 @@ render_header($page_title);
   <?php endif; ?>
 
   <?php if ($is_view): ?>
-    <table>
-      <tbody>
-        <tr>
-          <th style="width:220px;">Part Number</th>
-          <td><?= h($part_number) ?></td>
-        </tr>
-        <tr>
-          <th>Name</th>
-          <td><?= h($fields['item_name']) ?></td>
-        </tr>
-        <tr>
-          <th>Description</th>
-          <td><?= $fields['description'] !== '' ? nl2br(h($fields['description'])) : '—' ?></td>
-        </tr>
-        <tr>
-          <th>Category</th>
-          <td><?= h($fields['category']) ?></td>
-        </tr>
-        <tr>
-          <th>Our Cost</th>
-          <td><?= fmt_inventory_money($fields['cost_price']) ?></td>
-        </tr>
-        <tr>
-          <th>Purchased From</th>
-          <td><?= $fields['purchased_from'] !== '' ? h($fields['purchased_from']) : '—' ?></td>
-        </tr>
-        <tr>
-          <th>Purchase Link</th>
-          <td>
-            <?php if ($fields['purchase_link'] !== ''): ?>
-              <a href="<?= h($fields['purchase_link']) ?>" target="_blank" rel="noopener noreferrer"><?= h($fields['purchase_link']) ?></a>
-            <?php else: ?>
-              —
-            <?php endif; ?>
-          </td>
-        </tr>
-        <tr>
-          <th>Markup %</th>
-          <td><?= $fields['markup_percent'] !== '' ? h($fields['markup_percent']) . '%' : '—' ?></td>
-        </tr>
-        <tr>
-          <th>Selling Price</th>
-          <td><?= fmt_inventory_money($fields['retail_price']) ?></td>
-        </tr>
-        <tr>
-          <th>Current Stock</th>
-          <td><?= (int)$fields['current_stock'] ?></td>
-        </tr>
-        <tr>
-          <th>Low Stock Alert</th>
-          <td><?= (int)$fields['low_stock_alert'] ?></td>
-        </tr>
-        <tr>
-          <th>Location</th>
-          <td><?= $fields['location'] !== '' ? h($fields['location']) : '—' ?></td>
-        </tr>
-        <tr>
-          <th>Image</th>
-          <td>
-            <?php if ($image_url !== ''): ?>
-              <img src="<?= h($image_url) ?>" alt="Inventory image for <?= h($fields['item_name']) ?>" style="width:120px; height:120px; object-fit:cover; border-radius:8px; border:1px solid var(--b);" />
-            <?php else: ?>
-              —
-            <?php endif; ?>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="inventory-view-grid">
+      <div class="inventory-view-card">
+        <div class="inventory-view-label">Part Number</div>
+        <div class="inventory-view-value"><?= h($part_number) ?></div>
+      </div>
+      <div class="inventory-view-card">
+        <div class="inventory-view-label">Name</div>
+        <div class="inventory-view-value"><?= h($fields['item_name']) ?></div>
+      </div>
+      <div class="inventory-view-card inventory-view-card-full">
+        <div class="inventory-view-label">Description</div>
+        <div class="inventory-view-value"><?= $fields['description'] !== '' ? nl2br(h($fields['description'])) : '—' ?></div>
+      </div>
+      <div class="inventory-view-card">
+        <div class="inventory-view-label">Category</div>
+        <div class="inventory-view-value"><?= h($fields['category']) ?></div>
+      </div>
+      <div class="inventory-view-card">
+        <div class="inventory-view-label">Our Cost</div>
+        <div class="inventory-view-value"><?= fmt_inventory_money($fields['cost_price']) ?></div>
+      </div>
+      <div class="inventory-view-card">
+        <div class="inventory-view-label">Purchased From</div>
+        <div class="inventory-view-value"><?= $fields['purchased_from'] !== '' ? h($fields['purchased_from']) : '—' ?></div>
+      </div>
+      <div class="inventory-view-card inventory-view-card-full">
+        <div class="inventory-view-label">Purchase Link</div>
+        <div class="inventory-view-value">
+          <?php if ($fields['purchase_link'] !== ''): ?>
+            <a href="<?= h($fields['purchase_link']) ?>" target="_blank" rel="noopener noreferrer"><?= h($fields['purchase_link']) ?></a>
+          <?php else: ?>
+            —
+          <?php endif; ?>
+        </div>
+      </div>
+      <div class="inventory-view-card">
+        <div class="inventory-view-label">Markup %</div>
+        <div class="inventory-view-value"><?= $fields['markup_percent'] !== '' ? h($fields['markup_percent']) . '%' : '—' ?></div>
+      </div>
+      <div class="inventory-view-card">
+        <div class="inventory-view-label">Selling Price</div>
+        <div class="inventory-view-value"><?= fmt_inventory_money($fields['retail_price']) ?></div>
+      </div>
+      <div class="inventory-view-card">
+        <div class="inventory-view-label">Current Stock</div>
+        <div class="inventory-view-value"><?= (int)$fields['current_stock'] ?></div>
+      </div>
+      <div class="inventory-view-card">
+        <div class="inventory-view-label">Low Stock Alert</div>
+        <div class="inventory-view-value"><?= (int)$fields['low_stock_alert'] ?></div>
+      </div>
+      <div class="inventory-view-card">
+        <div class="inventory-view-label">Location</div>
+        <div class="inventory-view-value"><?= $fields['location'] !== '' ? h($fields['location']) : '—' ?></div>
+      </div>
+      <div class="inventory-view-card inventory-view-card-full">
+        <div class="inventory-view-label">Image</div>
+        <div class="inventory-view-value">
+          <?php if ($image_url !== ''): ?>
+            <img src="<?= h($image_url) ?>" alt="Inventory image for <?= h($fields['item_name']) ?>" class="inventory-view-image" />
+          <?php else: ?>
+            —
+          <?php endif; ?>
+        </div>
+      </div>
+    </div>
   <?php else: ?>
     <form method="post" enctype="multipart/form-data" action="inventory_form.php<?= $is_edit ? '?id=' . (int)$id : '' ?>" novalidate>
       <input type="hidden" name="csrf_token" value="<?= h($_SESSION['inventory_form_csrf']) ?>" />
@@ -767,6 +765,68 @@ render_header($page_title);
     </form>
   <?php endif; ?>
 </div>
+
+<?php if ($is_view): ?>
+<style>
+.inventory-view-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));
+  gap:14px;
+}
+.inventory-view-card{
+  border:1px solid var(--b);
+  border-radius:12px;
+  background:#fff;
+  padding:14px 16px;
+}
+.inventory-view-card-full{
+  grid-column:1 / -1;
+}
+.inventory-view-label{
+  font-size:.82rem;
+  font-weight:700;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  color:#64748b;
+  margin-bottom:8px;
+}
+.inventory-view-value{
+  font-size:1rem;
+  line-height:1.65;
+  color:#0f172a;
+  word-break:break-word;
+}
+.inventory-view-value a{
+  color:#0369a1;
+  text-decoration:underline;
+}
+.inventory-view-image{
+  width:100%;
+  max-width:280px;
+  height:auto;
+  object-fit:cover;
+  border-radius:10px;
+  border:1px solid var(--b);
+}
+@media (max-width: 640px){
+  .inventory-view-grid{
+    grid-template-columns:1fr;
+    gap:12px;
+  }
+  .inventory-view-card{
+    padding:16px;
+  }
+  .inventory-view-label{
+    font-size:.85rem;
+    margin-bottom:10px;
+  }
+  .inventory-view-value{
+    font-size:1.08rem;
+    line-height:1.7;
+  }
+}
+</style>
+<?php endif; ?>
 
 <?php if (!$is_view): ?>
 <style>
