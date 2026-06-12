@@ -26,7 +26,7 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . $id . '&view
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Inventory QR Label</title>
+  <title>QR Label – <?= h((string)$item['part_number']) ?></title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha256-FcVUR0ndoOygJlQ8hRlHocPKzhw6KpQZIky3gGHwH0c=" crossorigin="anonymous"></script>
   <style>
     * { box-sizing: border-box; }
@@ -121,7 +121,7 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . $id . '&view
         height: 280,
         colorDark: '#000000',
         colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.H
+        correctLevel: QRCode.CorrectLevel.M
       });
     })();
   </script>
