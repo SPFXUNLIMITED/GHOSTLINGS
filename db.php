@@ -1672,6 +1672,16 @@ if (!$_pv_cleanup_done) {
 }
 unset($_pv_cleanup_done);
 
+// One-time cleanup: delete attendance/payroll entries before June 10, 2026
+$_te_cleanup_done = $pdo->query(
+  "SELECT setting_val FROM integration_settings WHERE setting_key = 'time_entries_pre_20260610_deleted_v1'"
+)->fetchColumn();
+if (!$_te_cleanup_done) {
+  $pdo->exec("DELETE FROM time_entries WHERE DATE(clock_in) < '2026-06-10'");
+  $pdo->exec("INSERT INTO integration_settings (setting_key, setting_val) VALUES ('time_entries_pre_20260610_deleted_v1', '1') ON DUPLICATE KEY UPDATE setting_val = '1'");
+}
+unset($_te_cleanup_done);
+
 if (!function_exists('log_admin_activity')) {
   function log_admin_activity(PDO $pdo, ?int $user_id, string $action_name, string $details = '', ?string $fallback_user = null): void {
     $safe_user_id = $user_id !== null && $user_id > 0 ? $user_id : null;
