@@ -256,6 +256,9 @@ $fields = [
   'low_stock_alert' => '0',
   'location' => '',
 ];
+$vendor_options = ['Alibaba', 'Amazon', 'eBay', 'Other Supplier'];
+$purchased_from_selection = '';
+$other_supplier_name = '';
 
 $errors = [];
 $warnings = [];
@@ -288,6 +291,11 @@ if ($is_edit) {
   foreach ($fields as $key => $_) {
     $fields[$key] = (string)($existing[$key] ?? '');
   }
+  $purchased_from_selection = $fields['purchased_from'];
+  if ($purchased_from_selection !== '' && !in_array($purchased_from_selection, $vendor_options, true)) {
+    $other_supplier_name = $purchased_from_selection;
+    $purchased_from_selection = 'Other Supplier';
+  }
   $image_original_name = $existing['image_original_name'] ?? null;
   $image_stored_name = $existing['image_stored_name'] ?? null;
   $image_mime_type = $existing['image_mime_type'] ?? null;
@@ -305,6 +313,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_view) {
     foreach ($fields as $key => $_) {
       $fields[$key] = trim((string)($_POST[$key] ?? ''));
     }
+    $purchased_from_selection = trim((string)($_POST['purchased_from'] ?? ''));
+    $other_supplier_name = trim((string)($_POST['other_supplier_name'] ?? ''));
+    $fields['purchased_from'] = $purchased_from_selection;
 
     if ($fields['item_name'] === '') {
       $errors[] = 'Name is required.';
@@ -327,9 +338,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_view) {
       $errors[] = 'Markup % must be a non-negative number with up to 2 decimals.';
       $markup_percent = null;
     }
-    $allowed_vendors = ['Alibaba', 'Amazon', 'Other Supplier'];
-    if ($fields['purchased_from'] !== '' && !in_array($fields['purchased_from'], $allowed_vendors, true)) {
+    if ($purchased_from_selection !== '' && !in_array($purchased_from_selection, $vendor_options, true)) {
       $errors[] = 'Purchased From value is invalid.';
+    } elseif ($purchased_from_selection === 'Other Supplier') {
+      if ($other_supplier_name === '') {
+        $errors[] = 'Please enter the supplier name for Other Supplier.';
+      } elseif (mb_strlen($other_supplier_name) > 50) {
+        $errors[] = 'Other Supplier name must be 50 characters or fewer.';
+      } else {
+        $fields['purchased_from'] = $other_supplier_name;
+      }
     }
     $current_stock = parse_int_field($fields['current_stock'], 'Current Stock', $errors);
     $low_stock_alert = parse_int_field($fields['low_stock_alert'], 'Low Stock Alert', $errors);
@@ -514,6 +532,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_view) {
 
 $page_title = $is_view ? 'View Inventory Item' : ($is_edit ? 'Edit Inventory Item' : 'Add Inventory Item');
 $image_url = $image_stored_name ? 'uploads/inventory/' . rawurlencode((string)$image_stored_name) : '';
+$show_other_supplier = $purchased_from_selection === 'Other Supplier';
 render_header($page_title);
 ?>
 
@@ -652,11 +671,23 @@ render_header($page_title);
         <div>
           <label>Purchased From</label>
           <select name="purchased_from" id="purchased_from">
-            <option value="" <?= $fields['purchased_from'] === '' ? 'selected' : '' ?>>— Select —</option>
-            <option value="Alibaba" <?= $fields['purchased_from'] === 'Alibaba' ? 'selected' : '' ?>>Alibaba</option>
-            <option value="Amazon" <?= $fields['purchased_from'] === 'Amazon' ? 'selected' : '' ?>>Amazon</option>
-            <option value="Other Supplier" <?= $fields['purchased_from'] === 'Other Supplier' ? 'selected' : '' ?>>Other Supplier</option>
+            <option value="" <?= $purchased_from_selection === '' ? 'selected' : '' ?>>— Select —</option>
+            <?php foreach ($vendor_options as $vendor_option): ?>
+              <option value="<?= h($vendor_option) ?>" <?= $purchased_from_selection === $vendor_option ? 'selected' : '' ?>><?= h($vendor_option) ?></option>
+            <?php endforeach; ?>
           </select>
+          <div id="other_supplier_wrap"
+               class="<?= $show_other_supplier ? 'is-visible' : '' ?>"
+               <?= $show_other_supplier ? '' : 'aria-hidden="true"' ?>>
+            <label for="other_supplier_name">Other Supplier Name</label>
+            <input type="text"
+                   name="other_supplier_name"
+                   id="other_supplier_name"
+                   maxlength="50"
+                   placeholder="Enter supplier name"
+                   <?= $show_other_supplier ? '' : 'disabled' ?>
+                   value="<?= h($other_supplier_name) ?>" />
+          </div>
         </div>
         <div>
           <label>Purchase Link</label>
@@ -669,11 +700,10 @@ render_header($page_title);
         <div>
           <label>Unit Cost</label>
           <input type="text" name="cost_price" id="cost_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['cost_price']) ?>" />
-          <p style="margin:6px 0 0; padding:8px 10px; border:1px solid #f5c2c7; background:#fff3cd; border-radius:8px; font-size:0.9em; font-weight:700; color:#7a2e00;">
+          <p style="margin:4px 0 0; font-size:0.85em; color:#c2410c; background:#fff7ed; padding:8px 12px; border-radius:8px; border:1px solid #fed7aa;">
             ⚠ Enter the TOTAL landed cost per unit — including shipping, duties, and all fees.<br>
             Do NOT enter just the supplier price.
           </p>
-          <p></p>
         </div>
         <div>
           <label>Selling Price</label>
@@ -722,20 +752,60 @@ render_header($page_title);
 </div>
 
 <?php if (!$is_view): ?>
+<style>
+#other_supplier_wrap{
+  --other-supplier-max-height: 0px;
+  overflow:hidden;
+  max-height:0;
+  opacity:0;
+  transform:translateY(-4px);
+  margin-top:0;
+  transition:max-height .25s ease, opacity .2s ease, transform .2s ease, margin-top .2s ease;
+}
+#other_supplier_wrap.is-visible{
+  max-height:var(--other-supplier-max-height);
+  opacity:1;
+  transform:translateY(0);
+  margin-top:10px;
+}
+@media (prefers-reduced-motion: reduce){
+  #other_supplier_wrap{
+    transition:none !important;
+  }
+}
+</style>
 <script>
 (function () {
   var vendorMarkups = {
     'Alibaba': 90,
     'Amazon': 35,
+    'eBay': 35,
     'Other Supplier': 50
   };
 
   var vendorSel   = document.getElementById('purchased_from');
+  var otherSupplierWrap = document.getElementById('other_supplier_wrap');
+  var otherSupplierInput = document.getElementById('other_supplier_name');
   var markupInput = document.getElementById('markup_percent');
   var costInput   = document.getElementById('cost_price');
   var sellingInput = document.getElementById('retail_price');
 
-  if (!vendorSel || !markupInput || !costInput || !sellingInput) return;
+  if (!vendorSel) return;
+
+  function toggleOtherSupplier() {
+    if (!otherSupplierWrap || !otherSupplierInput) return;
+    var show = vendorSel.value === 'Other Supplier';
+    if (show) {
+      otherSupplierWrap.style.setProperty('--other-supplier-max-height', otherSupplierWrap.scrollHeight + 'px');
+    }
+    otherSupplierWrap.classList.toggle('is-visible', show);
+    otherSupplierWrap.setAttribute('aria-hidden', show ? 'false' : 'true');
+    otherSupplierInput.disabled = !show;
+  }
+
+  toggleOtherSupplier();
+
+  if (!markupInput || !costInput || !sellingInput) return;
 
   function recalcSellingPrice() {
     var cost   = parseFloat(costInput.value);
@@ -749,6 +819,7 @@ render_header($page_title);
   }
 
   vendorSel.addEventListener('change', function () {
+    toggleOtherSupplier();
     var vendor = vendorSel.value;
     if (vendor in vendorMarkups) {
       markupInput.value = vendorMarkups[vendor];
