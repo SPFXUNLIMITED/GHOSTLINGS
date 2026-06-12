@@ -4,6 +4,23 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_admin_or_moderator();
 
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS inventory_log (
+    id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    inventory_id INT UNSIGNED NOT NULL,
+    user_id      INT UNSIGNED NULL,
+    action       VARCHAR(50) NOT NULL,
+    stock_before INT NOT NULL,
+    stock_after  INT NOT NULL,
+    note         TEXT NULL,
+    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_inventory_log_inventory_id (inventory_id),
+    KEY idx_inventory_log_user_id (user_id),
+    KEY idx_inventory_log_action (action)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 // ── AJAX: Quick Stock Adjustment ────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'stock_adjust') {
   header('Content-Type: application/json; charset=UTF-8');
@@ -18,6 +35,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'stock
 
   $item_id    = (int)($_POST['item_id'] ?? 0);
   $adjustment = (int)($_POST['adjustment'] ?? 0);
+  $note       = trim((string)($_POST['note'] ?? ''));
+  $note       = $note === '' ? null : $note;
 
   if ($item_id <= 0) {
     http_response_code(400);
@@ -30,27 +49,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'stock
     exit;
   }
 
-  $stmt = $pdo->prepare("
-    UPDATE inventory_items
-    SET current_stock = GREATEST(0, current_stock + ?) -- stock is never allowed to go below zero
-    WHERE id = ?
-  ");
-  $stmt->execute([$adjustment, $item_id]);
+  try {
+    $pdo->beginTransaction();
 
-  if ($stmt->rowCount() === 0) {
-    http_response_code(404);
-    echo json_encode(['ok' => false, 'error' => 'Item not found.']);
+    $item_stmt = $pdo->prepare("
+      SELECT current_stock, low_stock_alert
+      FROM inventory_items
+      WHERE id = ?
+      FOR UPDATE
+    ");
+    $item_stmt->execute([$item_id]);
+    $item = $item_stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$item) {
+      $pdo->rollBack();
+      http_response_code(404);
+      echo json_encode(['ok' => false, 'error' => 'Item not found.']);
+      exit;
+    }
+
+    $stock_before = (int)$item['current_stock'];
+    $stock_after = max(0, $stock_before + $adjustment);
+
+    $update_stmt = $pdo->prepare("UPDATE inventory_items SET current_stock = ? WHERE id = ?");
+    $update_stmt->execute([$stock_after, $item_id]);
+
+    $log_stmt = $pdo->prepare("
+      INSERT INTO inventory_log (inventory_id, user_id, action, stock_before, stock_after, note)
+      VALUES (?, ?, ?, ?, ?, ?)
+    ");
+    $log_stmt->execute([
+      $item_id,
+      current_user_id(),
+      'stock_adjust',
+      $stock_before,
+      $stock_after,
+      $note,
+    ]);
+
+    $pdo->commit();
+  } catch (Throwable $e) {
+    if ($pdo->inTransaction()) {
+      $pdo->rollBack();
+    }
+
+    error_log('Inventory stock adjustment failed for item ' . $item_id . '.');
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'Unable to save stock adjustment.']);
     exit;
   }
 
-  $updated_stmt = $pdo->prepare("SELECT current_stock, low_stock_alert FROM inventory_items WHERE id = ?");
-  $updated_stmt->execute([$item_id]);
-  $updated = $updated_stmt->fetch();
-
   echo json_encode([
     'ok'        => true,
-    'new_stock' => (int)$updated['current_stock'],
-    'low_alert' => (int)$updated['low_stock_alert'],
+    'new_stock' => $stock_after,
+    'low_alert' => (int)$item['low_stock_alert'],
   ]);
   exit;
 }

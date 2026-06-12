@@ -39,6 +39,23 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS inventory_log (
+    id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    inventory_id INT UNSIGNED NOT NULL,
+    user_id      INT UNSIGNED NULL,
+    action       VARCHAR(50) NOT NULL,
+    stock_before INT NOT NULL,
+    stock_after  INT NOT NULL,
+    note         TEXT NULL,
+    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_inventory_log_inventory_id (inventory_id),
+    KEY idx_inventory_log_user_id (user_id),
+    KEY idx_inventory_log_action (action)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 foreach ([
   "ALTER TABLE inventory_items ADD COLUMN supplier_1_name VARCHAR(255) NOT NULL DEFAULT '' AFTER category",
   "ALTER TABLE inventory_items ADD COLUMN supplier_1_url VARCHAR(1000) NULL AFTER supplier_1_name",
