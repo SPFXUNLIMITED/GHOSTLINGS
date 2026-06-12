@@ -669,7 +669,11 @@ render_header($page_title);
         <div>
           <label>Unit Cost</label>
           <input type="text" name="cost_price" id="cost_price" inputmode="decimal" placeholder="0.00" value="<?= h($fields['cost_price']) ?>" />
-          <p style="margin:4px 0 0;font-size:0.85em;"><strong>⚠ Enter the cost for ONE item only — not the total cost for multiple pieces.</strong></p>
+          <p style="margin:6px 0 0; padding:8px 10px; border:1px solid #f5c2c7; background:#fff3cd; border-radius:8px; font-size:0.9em; font-weight:700; color:#7a2e00;">
+            ⚠ Enter the TOTAL landed cost per unit — including shipping, duties, and all fees.<br>
+            Do NOT enter just the supplier price.
+          </p>
+          <p></p>
         </div>
         <div>
           <label>Selling Price</label>
