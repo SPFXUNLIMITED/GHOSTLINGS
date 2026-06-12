@@ -115,7 +115,7 @@ if (!$item) {
 
       qrTarget.innerHTML = '';
       new QRCode(qrTarget, {
-        text: "https://ghostlaser.com/project/inventory_form.php?id=<?= (int)$id ?>&view=1",
+        text: <?= json_encode('https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '&view=1') ?>,
         width: 280,
         height: 280,
         colorDark: '#000000',
