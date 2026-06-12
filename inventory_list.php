@@ -401,6 +401,7 @@ render_header('Inventory List');
           <td class="actions">
             <a class="btn" href="inventory_form.php?id=<?= (int)$item['id'] ?>&view=1">View</a>
             <a class="btn" href="inventory_form.php?id=<?= (int)$item['id'] ?>">Edit</a>
+            <a class="btn" href="inventory_print_qr.php?id=<?= (int)$item['id'] ?>" target="_blank">Print QR Label</a>
           </td>
         </tr>
       <?php endforeach; ?>
