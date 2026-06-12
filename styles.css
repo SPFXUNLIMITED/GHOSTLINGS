@@ -1320,10 +1320,6 @@ tbody tr:hover td {
     -webkit-overflow-scrolling: touch;
   }
 
-  table {
-    min-width: 480px;
-  }
-
   /* Buttons: larger touch targets */
   .btn {
     padding: 10px 14px;
