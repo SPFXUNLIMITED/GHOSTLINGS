@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'stock
 
   $stmt = $pdo->prepare("
     UPDATE inventory_items
-    SET current_stock = GREATEST(0, current_stock + ?)
+    SET current_stock = GREATEST(0, current_stock + ?) -- stock is never allowed to go below zero
     WHERE id = ?
   ");
   $stmt->execute([$adjustment, $item_id]);
@@ -43,9 +43,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'stock
     exit;
   }
 
-  $row = $pdo->prepare("SELECT current_stock, low_stock_alert FROM inventory_items WHERE id = ?");
-  $row->execute([$item_id]);
-  $updated = $row->fetch();
+  $updated_stmt = $pdo->prepare("SELECT current_stock, low_stock_alert FROM inventory_items WHERE id = ?");
+  $updated_stmt->execute([$item_id]);
+  $updated = $updated_stmt->fetch();
 
   echo json_encode([
     'ok'        => true,
@@ -737,7 +737,7 @@ render_header('Inventory List');
   saveBtn.addEventListener('click', async () => {
     const adjustment = parseInt(amountEl.value, 10);
     if (!amountEl.value.trim() || isNaN(adjustment)) {
-      showError('Please enter a valid number (e.g. 5 or −3).');
+      showError('Please enter a valid number (e.g. 5 or -3).');
       amountEl.focus();
       return;
     }
