@@ -532,6 +532,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_view) {
 
 $page_title = $is_view ? 'View Inventory Item' : ($is_edit ? 'Edit Inventory Item' : 'Add Inventory Item');
 $image_url = $image_stored_name ? 'uploads/inventory/' . rawurlencode((string)$image_stored_name) : '';
+$show_other_supplier = $purchased_from_selection === 'Other Supplier';
 render_header($page_title);
 ?>
 
@@ -671,20 +672,20 @@ render_header($page_title);
           <label>Purchased From</label>
           <select name="purchased_from" id="purchased_from">
             <option value="" <?= $purchased_from_selection === '' ? 'selected' : '' ?>>— Select —</option>
-            <option value="Alibaba" <?= $purchased_from_selection === 'Alibaba' ? 'selected' : '' ?>>Alibaba</option>
-            <option value="Amazon" <?= $purchased_from_selection === 'Amazon' ? 'selected' : '' ?>>Amazon</option>
-            <option value="eBay" <?= $purchased_from_selection === 'eBay' ? 'selected' : '' ?>>eBay</option>
-            <option value="Other Supplier" <?= $purchased_from_selection === 'Other Supplier' ? 'selected' : '' ?>>Other Supplier</option>
+            <?php foreach ($vendor_options as $vendor_option): ?>
+              <option value="<?= h($vendor_option) ?>" <?= $purchased_from_selection === $vendor_option ? 'selected' : '' ?>><?= h($vendor_option) ?></option>
+            <?php endforeach; ?>
           </select>
           <div id="other_supplier_wrap"
-               style="overflow:hidden; max-height:0; opacity:0; transform:translateY(-4px); margin-top:0; transition:max-height .25s ease, opacity .2s ease, transform .2s ease, margin-top .2s ease;"
-               aria-hidden="true">
+               class="<?= $show_other_supplier ? 'is-visible' : '' ?>"
+               <?= $show_other_supplier ? '' : 'aria-hidden="true"' ?>>
             <label for="other_supplier_name">Other Supplier Name</label>
             <input type="text"
                    name="other_supplier_name"
                    id="other_supplier_name"
                    maxlength="50"
                    placeholder="Enter supplier name"
+                   <?= $show_other_supplier ? '' : 'disabled' ?>
                    value="<?= h($other_supplier_name) ?>" />
           </div>
         </div>
@@ -752,11 +753,20 @@ render_header($page_title);
 
 <?php if (!$is_view): ?>
 <style>
+#other_supplier_wrap{
+  --other-supplier-max-height: 0px;
+  overflow:hidden;
+  max-height:0;
+  opacity:0;
+  transform:translateY(-4px);
+  margin-top:0;
+  transition:max-height .25s ease, opacity .2s ease, transform .2s ease, margin-top .2s ease;
+}
 #other_supplier_wrap.is-visible{
-  max-height:120px !important;
-  opacity:1 !important;
-  transform:translateY(0) !important;
-  margin-top:10px !important;
+  max-height:var(--other-supplier-max-height);
+  opacity:1;
+  transform:translateY(0);
+  margin-top:10px;
 }
 @media (prefers-reduced-motion: reduce){
   #other_supplier_wrap{
@@ -769,6 +779,7 @@ render_header($page_title);
   var vendorMarkups = {
     'Alibaba': 90,
     'Amazon': 35,
+    'eBay': 35,
     'Other Supplier': 50
   };
 
@@ -784,10 +795,12 @@ render_header($page_title);
   function toggleOtherSupplier() {
     if (!otherSupplierWrap || !otherSupplierInput) return;
     var show = vendorSel.value === 'Other Supplier';
+    if (show) {
+      otherSupplierWrap.style.setProperty('--other-supplier-max-height', otherSupplierWrap.scrollHeight + 'px');
+    }
     otherSupplierWrap.classList.toggle('is-visible', show);
     otherSupplierWrap.setAttribute('aria-hidden', show ? 'false' : 'true');
     otherSupplierInput.disabled = !show;
-    otherSupplierInput.required = show;
   }
 
   toggleOtherSupplier();
