@@ -27,7 +27,7 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . $id . '&view
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QR Label – <?= h((string)$item['part_number']) ?></title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha256-FcVUR0ndoOygJlQ8hRlHocPKzhw6KpQZIky3gGHwH0c=" crossorigin="anonymous"></script>
+  <script src="js/qrcode.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -103,7 +103,7 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . $id . '&view
   </div>
 
   <script>
-    (function () {
+    window.addEventListener('DOMContentLoaded', function () {
       var qrTarget = document.getElementById('qrcode');
       if (!qrTarget) {
         return;
@@ -115,15 +115,12 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . $id . '&view
       }
 
       qrTarget.innerHTML = '';
-      new QRCode(qrTarget, {
-        text: <?= json_encode($qr_url) ?>,
+      new QRCode(document.getElementById('qrcode'), {
+        text: "https://ghostlaser.com/project/inventory_form.php?id=<?= (int)$id ?>&view=1",
         width: 280,
-        height: 280,
-        colorDark: '#000000',
-        colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.M
+        height: 280
       });
-    })();
+    });
   </script>
 </body>
 </html>
