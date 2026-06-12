@@ -766,6 +766,8 @@ render_header($page_title);
   var markupInput = document.getElementById('markup_percent');
   var costInput   = document.getElementById('cost_price');
   var sellingInput = document.getElementById('retail_price');
+  var prefersReducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var transitionStyle = 'max-height .25s ease, opacity .2s ease, transform .2s ease';
 
   if (!vendorSel) return;
 
@@ -775,7 +777,7 @@ render_header($page_title);
 
     if (show) {
       otherSupplierWrap.style.display = 'block';
-      if (!animated) otherSupplierWrap.style.transition = 'none';
+      if (!animated || prefersReducedMotion) otherSupplierWrap.style.transition = 'none';
       requestAnimationFrame(function () {
         otherSupplierWrap.style.maxHeight = otherSupplierWrap.scrollHeight + 'px';
         otherSupplierWrap.style.opacity = '1';
@@ -784,15 +786,15 @@ render_header($page_title);
       otherSupplierWrap.setAttribute('aria-hidden', 'false');
       otherSupplierInput.disabled = false;
       otherSupplierInput.required = true;
-      if (!animated) {
+      if (!animated || prefersReducedMotion) {
         requestAnimationFrame(function () {
-          otherSupplierWrap.style.transition = 'max-height .25s ease, opacity .2s ease, transform .2s ease';
+          otherSupplierWrap.style.transition = prefersReducedMotion ? 'none' : transitionStyle;
         });
       }
       return;
     }
 
-    if (!animated) otherSupplierWrap.style.transition = 'none';
+    if (!animated || prefersReducedMotion) otherSupplierWrap.style.transition = 'none';
     otherSupplierWrap.style.maxHeight = otherSupplierWrap.scrollHeight + 'px';
     requestAnimationFrame(function () {
       otherSupplierWrap.style.maxHeight = '0px';
@@ -802,9 +804,9 @@ render_header($page_title);
     otherSupplierWrap.setAttribute('aria-hidden', 'true');
     otherSupplierInput.required = false;
     otherSupplierInput.disabled = true;
-    if (!animated) {
+    if (!animated || prefersReducedMotion) {
       requestAnimationFrame(function () {
-        otherSupplierWrap.style.transition = 'max-height .25s ease, opacity .2s ease, transform .2s ease';
+        otherSupplierWrap.style.transition = prefersReducedMotion ? 'none' : transitionStyle;
       });
     }
   }
