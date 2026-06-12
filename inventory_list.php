@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'stock
       $pdo->rollBack();
     }
 
-    error_log('Inventory stock adjustment failed for item ' . $item_id . ': ' . $e->getMessage());
+    error_log('Inventory stock adjustment failed for item ' . $item_id . '.');
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'Unable to save stock adjustment.']);
     exit;
