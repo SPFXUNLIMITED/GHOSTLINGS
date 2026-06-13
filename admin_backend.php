@@ -271,12 +271,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'payroll_export'
             $pe_entry_id,
           ]);
       $_SESSION['payroll_export_csrf'] = bin2hex(random_bytes(24));
-      $qs = http_build_query(array_filter([
-        'section' => 'payroll_export',
-        'pe_from' => $_POST['pe_from'] ?? '',
-        'pe_to'   => $_POST['pe_to']   ?? '',
-      ], fn($v) => $v !== ''));
-      header('Location: admin_backend.php?' . $qs);
+      header('Location: admin_backend.php?section=payroll_export');
       exit;
     }
   }
@@ -292,12 +287,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $section === 'payroll_export'
       $pdo->prepare("DELETE FROM time_entries WHERE id = ?")->execute([$pe_del_id]);
     }
     $_SESSION['payroll_export_csrf'] = bin2hex(random_bytes(24));
-    $qs = http_build_query(array_filter([
-      'section' => 'payroll_export',
-      'pe_from' => $_POST['pe_from'] ?? '',
-      'pe_to'   => $_POST['pe_to']   ?? '',
-    ], fn($v) => $v !== ''));
-    header('Location: admin_backend.php?' . $qs);
+    header('Location: admin_backend.php?section=payroll_export');
     exit;
   }
 }
@@ -432,18 +422,73 @@ $pe_by_employee = [];
 $pe_all_users   = [];
 $pe_editing     = null;
 
-if ($section === 'payroll_export') {
-  $pe_default_to   = (new DateTime('now', $pe_tz_obj))->format('Y-m-d');
-  $pe_default_from = (new DateTime('now', $pe_tz_obj))->modify('-13 days')->format('Y-m-d');
-  $pe_from = trim((string)($_GET['pe_from'] ?? $pe_default_from));
-  $pe_to   = trim((string)($_GET['pe_to']   ?? $pe_default_to));
+// Additional payroll variables for the two-card layout
+$pe_last_from        = '';
+$pe_last_to          = '';
+$pe_curr_from        = '';
+$pe_curr_to          = '';
+$pe_last_by_employee = [];
 
-  // Sanitize dates
-  if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $pe_from)) $pe_from = $pe_default_from;
-  if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $pe_to))   $pe_to   = $pe_default_to;
+if ($section === 'payroll_export') {
+  $pe_now = new DateTime('now', $pe_tz_obj);
+  $pe_dow = (int)$pe_now->format('N'); // 1=Mon .. 7=Sun
+
+  // Last completed pay period: most recently finished Mon–Fri work week.
+  // Days back to reach the last completed Friday (today's Friday counts as "in progress").
+  $pe_days_to_last_fri = ($pe_dow <= 5) ? ($pe_dow + 2) : ($pe_dow - 5);
+  $pe_last_fri_dt = (clone $pe_now)->modify("-{$pe_days_to_last_fri} days");
+  $pe_last_mon_dt = (clone $pe_last_fri_dt)->modify('-4 days');
+  $pe_last_from   = $pe_last_mon_dt->format('Y-m-d');
+  $pe_last_to     = $pe_last_fri_dt->format('Y-m-d');
+
+  // Current pay period: Monday of the current week to today (capped at Friday on weekends).
+  $pe_days_from_mon = $pe_dow - 1;
+  $pe_curr_mon_dt   = (clone $pe_now)->modify("-{$pe_days_from_mon} days");
+  $pe_curr_end_dt   = ($pe_dow >= 6) ? (clone $pe_curr_mon_dt)->modify('+4 days') : $pe_now;
+  $pe_curr_from     = $pe_curr_mon_dt->format('Y-m-d');
+  $pe_curr_to       = $pe_curr_end_dt->format('Y-m-d');
+
+  // Alias used by edit/cancel URL
+  $pe_from = $pe_curr_from;
+  $pe_to   = $pe_curr_to;
 
   $pe_all_users = $pdo->query("SELECT id, username FROM users ORDER BY username ASC")->fetchAll();
 
+  // Last completed pay period: summary by employee (for the top card + ADP export)
+  $pe_last_stmt = $pdo->prepare("
+    SELECT
+      u.username,
+      CASE
+        WHEN te.hours_override IS NOT NULL THEN te.hours_override
+        WHEN te.clock_out IS NOT NULL
+          THEN ROUND((
+            TIMESTAMPDIFF(SECOND, te.clock_in, te.clock_out) -
+            CASE
+              WHEN te.lunch_start IS NOT NULL
+                THEN GREATEST(TIMESTAMPDIFF(SECOND, te.lunch_start, COALESCE(te.lunch_end, te.clock_out)), 0)
+              ELSE 0
+            END
+          ) / 3600, 2)
+        ELSE NULL
+      END AS hours
+    FROM time_entries te
+    JOIN users u ON u.id = te.user_id
+    WHERE DATE(te.clock_in) >= ? AND DATE(te.clock_in) <= ?
+    ORDER BY u.username ASC, te.clock_in DESC
+  ");
+  $pe_last_stmt->execute([$pe_last_from, $pe_last_to]);
+  foreach ($pe_last_stmt->fetchAll() as $r) {
+    $emp = $r['username'];
+    if (!isset($pe_last_by_employee[$emp])) {
+      $pe_last_by_employee[$emp] = ['username' => $emp, 'total_hours' => 0.0, 'entries' => 0];
+    }
+    $pe_last_by_employee[$emp]['entries']++;
+    if ($r['hours'] !== null) {
+      $pe_last_by_employee[$emp]['total_hours'] += (float)$r['hours'];
+    }
+  }
+
+  // Current pay period: detailed entries (for the bottom card)
   $pe_stmt = $pdo->prepare("
     SELECT
       te.id,
@@ -473,7 +518,7 @@ if ($section === 'payroll_export') {
     WHERE DATE(te.clock_in) >= ? AND DATE(te.clock_in) <= ?
     ORDER BY u.username ASC, te.clock_in DESC
   ");
-  $pe_stmt->execute([$pe_from, $pe_to]);
+  $pe_stmt->execute([$pe_curr_from, $pe_curr_to]);
   $pe_entries = $pe_stmt->fetchAll();
 
   foreach ($pe_entries as $r) {
@@ -1334,52 +1379,25 @@ render_header('Admin Backend');
     <?php elseif ($section === 'payroll_export'): ?>
 
       <?php
-        $pe_cancel_url = 'admin_backend.php?' . http_build_query([
-          'section' => 'payroll_export',
-          'pe_from' => $pe_from,
-          'pe_to'   => $pe_to,
-        ]);
+        $pe_cancel_url = 'admin_backend.php?section=payroll_export';
       ?>
 
-      <!-- Date range filter -->
-      <div class="card">
-        <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-          <div>
-            <h2 style="margin:0;">Payroll Export</h2>
-            <p class="muted" style="margin:4px 0 0;">Review hours for the pay period, make corrections, then export for ADP.</p>
-          </div>
-        </div>
-        <form method="get" style="margin-top:16px; display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
-          <input type="hidden" name="section" value="payroll_export" />
-          <div>
-            <label for="pe_from" style="display:block; margin-bottom:4px;">Pay Period Start</label>
-            <input type="date" id="pe_from" name="pe_from" value="<?= h($pe_from) ?>" />
-          </div>
-          <div>
-            <label for="pe_to" style="display:block; margin-bottom:4px;">Pay Period End</label>
-            <input type="date" id="pe_to" name="pe_to" value="<?= h($pe_to) ?>" />
-          </div>
-          <button type="submit" class="btn primary">Apply</button>
-          <a class="btn" href="admin_backend.php?section=payroll_export">Reset (Last 14 Days)</a>
-        </form>
-      </div>
-
-      <!-- Employee summary -->
+      <!-- Last Completed Pay Period -->
       <div class="card">
         <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
           <div>
-            <h2 style="margin:0;">Hours by Employee</h2>
+            <h2 style="margin:0;">Last Completed Pay Period</h2>
             <p class="muted" style="margin:4px 0 0;">
-              <?= h($pe_from) ?> &mdash; <?= h($pe_to) ?>
-              &nbsp;&middot;&nbsp; <?= count($pe_by_employee) ?> employee(s)
+              <?= h($pe_last_from) ?> &mdash; <?= h($pe_last_to) ?>
+              &nbsp;&middot;&nbsp; <?= count($pe_last_by_employee) ?> employee(s)
             </p>
           </div>
           <!-- Export for ADP button -->
           <form method="post" action="admin_backend.php?section=payroll_export">
             <input type="hidden" name="payroll_csrf" value="<?= h($_SESSION['payroll_export_csrf']) ?>" />
             <input type="hidden" name="export_adp"   value="1" />
-            <input type="hidden" name="pe_from"      value="<?= h($pe_from) ?>" />
-            <input type="hidden" name="pe_to"        value="<?= h($pe_to) ?>" />
+            <input type="hidden" name="pe_from"      value="<?= h($pe_last_from) ?>" />
+            <input type="hidden" name="pe_to"        value="<?= h($pe_last_to) ?>" />
             <button type="submit" class="btn primary">⬇ Export for ADP</button>
           </form>
         </div>
@@ -1394,10 +1412,10 @@ render_header('Admin Backend');
               </tr>
             </thead>
             <tbody>
-              <?php if (!$pe_by_employee): ?>
-                <tr><td colspan="3" class="muted">No time entries for this pay period.</td></tr>
+              <?php if (!$pe_last_by_employee): ?>
+                <tr><td colspan="3" class="muted">No time entries for the last completed pay period.</td></tr>
               <?php endif; ?>
-              <?php foreach ($pe_by_employee as $emp): ?>
+              <?php foreach ($pe_last_by_employee as $emp): ?>
                 <tr>
                   <td><strong><?= h($emp['username']) ?></strong></td>
                   <td><?= number_format($emp['total_hours'], 2) ?>h</td>
@@ -1426,8 +1444,6 @@ render_header('Admin Backend');
             <input type="hidden" name="payroll_csrf" value="<?= h($_SESSION['payroll_export_csrf']) ?>" />
             <input type="hidden" name="pe_save_entry" value="1" />
             <input type="hidden" name="entry_id"      value="<?= (int)$pe_editing['id'] ?>" />
-            <input type="hidden" name="pe_from"       value="<?= h($pe_from) ?>" />
-            <input type="hidden" name="pe_to"         value="<?= h($pe_to) ?>" />
             <div class="form-grid">
               <div>
                 <label>Employee</label>
@@ -1484,8 +1500,6 @@ render_header('Admin Backend');
             <input type="hidden" name="payroll_csrf" value="<?= h($_SESSION['payroll_export_csrf']) ?>" />
             <input type="hidden" name="pe_save_entry" value="1" />
             <input type="hidden" name="entry_id"      value="<?= (int)$pe_editing['id'] ?>" />
-            <input type="hidden" name="pe_from"       value="<?= h($pe_from) ?>" />
-            <input type="hidden" name="pe_to"         value="<?= h($pe_to) ?>" />
             <div class="form-grid">
               <div>
                 <label>Employee</label>
@@ -1524,12 +1538,15 @@ render_header('Admin Backend');
         </div>
       <?php endif; ?>
 
-      <!-- Detailed entries for review -->
+      <!-- Current Pay Period: detailed entries -->
       <div class="card">
-        <h2 style="margin-top:0;">Detailed Entries
+        <h2 style="margin-top:0;">Current Pay Period
           <span class="muted" style="font-size:14px; font-weight:400; margin-left:8px;"><?= count($pe_entries) ?> entr<?= count($pe_entries) === 1 ? 'y' : 'ies' ?></span>
         </h2>
-        <p class="muted" style="margin-top:0;">Review each entry below. Use <strong>Edit</strong> to correct mistakes such as incorrect clock-in/out times or manual hours adjustments.</p>
+        <p class="muted" style="margin-top:0;">
+          <?= h($pe_curr_from) ?> &mdash; <?= h($pe_curr_to) ?><br>
+          Review each entry below. Use <strong>Edit</strong> to correct mistakes such as incorrect clock-in/out times or manual hours adjustments.
+        </p>
 
         <div class="table-wrap">
           <table class="table-auto">
@@ -1547,7 +1564,7 @@ render_header('Admin Backend');
             </thead>
             <tbody>
               <?php if (!$pe_entries): ?>
-                <tr><td colspan="8" class="muted">No entries for this pay period.</td></tr>
+                <tr><td colspan="8" class="muted">No entries for the current pay period.</td></tr>
               <?php endif; ?>
               <?php foreach ($pe_entries as $pe_r): ?>
                 <?php
@@ -1567,8 +1584,6 @@ render_header('Admin Backend');
                     'section'    => 'payroll_export',
                     'pe_action'  => 'edit',
                     'pe_id'      => $pe_r['id'],
-                    'pe_from'    => $pe_from,
-                    'pe_to'      => $pe_to,
                   ]);
                 ?>
                 <tr>
@@ -1598,8 +1613,6 @@ render_header('Admin Backend');
                         <input type="hidden" name="payroll_csrf"    value="<?= h($_SESSION['payroll_export_csrf']) ?>" />
                         <input type="hidden" name="pe_delete_entry" value="1" />
                         <input type="hidden" name="entry_id"        value="<?= (int)$pe_r['id'] ?>" />
-                        <input type="hidden" name="pe_from"         value="<?= h($pe_from) ?>" />
-                        <input type="hidden" name="pe_to"           value="<?= h($pe_to) ?>" />
                         <button class="btn danger" type="submit">Delete</button>
                       </form>
                     </div>
