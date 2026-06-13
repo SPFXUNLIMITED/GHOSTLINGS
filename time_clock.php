@@ -230,7 +230,7 @@ render_header('Time Clock');
       <strong>Status:</strong>
       <?php if ($is_on_lunch): ?>
         On Lunch —
-      <?php elseif ($open_entry): ?>
+      <?php else: ?>
         Clocked In —
       <?php endif; ?>
       Shift started at <strong><?= h($clock_in->format('g:i A')) ?></strong>
