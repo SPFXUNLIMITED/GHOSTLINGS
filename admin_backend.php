@@ -448,10 +448,6 @@ if ($section === 'payroll_export') {
   $pe_curr_from     = $pe_curr_mon_dt->format('Y-m-d');
   $pe_curr_to       = $pe_curr_end_dt->format('Y-m-d');
 
-  // Alias used by edit/cancel URL
-  $pe_from = $pe_curr_from;
-  $pe_to   = $pe_curr_to;
-
   $pe_all_users = $pdo->query("SELECT id, username FROM users ORDER BY username ASC")->fetchAll();
 
   // Last completed pay period: summary by employee (for the top card + ADP export)
