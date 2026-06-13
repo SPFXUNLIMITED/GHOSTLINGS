@@ -427,6 +427,7 @@ $pe_last_from        = '';
 $pe_last_to          = '';
 $pe_curr_from        = '';
 $pe_curr_to          = '';
+$pe_last_entries     = [];
 $pe_last_by_employee = [];
 
 if ($section === 'payroll_export') {
@@ -450,9 +451,17 @@ if ($section === 'payroll_export') {
 
   $pe_all_users = $pdo->query("SELECT id, username FROM users ORDER BY username ASC")->fetchAll();
 
-  // Last completed pay period: summary by employee (for the top card + ADP export)
+  // Last completed pay period: full detailed entries (for the top card + ADP export)
   $pe_last_stmt = $pdo->prepare("
     SELECT
+      te.id,
+      te.user_id,
+      te.clock_in,
+      te.clock_out,
+      te.lunch_start,
+      te.lunch_end,
+      te.hours_override,
+      te.description,
       u.username,
       CASE
         WHEN te.hours_override IS NOT NULL THEN te.hours_override
@@ -473,7 +482,8 @@ if ($section === 'payroll_export') {
     ORDER BY u.username ASC, te.clock_in DESC
   ");
   $pe_last_stmt->execute([$pe_last_from, $pe_last_to]);
-  foreach ($pe_last_stmt->fetchAll() as $r) {
+  $pe_last_entries = $pe_last_stmt->fetchAll();
+  foreach ($pe_last_entries as $r) {
     $emp = $r['username'];
     if (!isset($pe_last_by_employee[$emp])) {
       $pe_last_by_employee[$emp] = ['username' => $emp, 'total_hours' => 0.0, 'entries' => 0];
@@ -1398,7 +1408,8 @@ render_header('Admin Backend');
           </form>
         </div>
 
-        <div class="table-wrap">
+        <!-- Summary by employee -->
+        <div class="table-wrap" style="margin-bottom:20px;">
           <table class="table-auto">
             <thead>
               <tr>
@@ -1416,6 +1427,82 @@ render_header('Admin Backend');
                   <td><strong><?= h($emp['username']) ?></strong></td>
                   <td><?= number_format($emp['total_hours'], 2) ?>h</td>
                   <td><?= (int)$emp['entries'] ?></td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Detailed entries -->
+        <div class="table-wrap">
+          <table class="table-auto">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Date</th>
+                <th>Clock In</th>
+                <th>Lunch</th>
+                <th>Clock Out</th>
+                <th>Hours</th>
+                <th>Note</th>
+                <th class="col-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php if (!$pe_last_entries): ?>
+                <tr><td colspan="8" class="muted">No entries for the last completed pay period.</td></tr>
+              <?php endif; ?>
+              <?php foreach ($pe_last_entries as $pe_r): ?>
+                <?php
+                  $pe_ci_dt  = new DateTime($pe_r['clock_in'], $pe_tz_obj);
+                  $pe_co_dt  = !empty($pe_r['clock_out']) ? new DateTime($pe_r['clock_out'], $pe_tz_obj) : null;
+                  $pe_lunch  = '<span class="muted">—</span>';
+                  if (!empty($pe_r['lunch_start'])) {
+                    $pe_ls = new DateTime($pe_r['lunch_start'], $pe_tz_obj);
+                    if (!empty($pe_r['lunch_end'])) {
+                      $pe_le = new DateTime($pe_r['lunch_end'], $pe_tz_obj);
+                      $pe_lunch = h($pe_ls->format('g:i A')) . ' – ' . h($pe_le->format('g:i A'));
+                    } else {
+                      $pe_lunch = 'Started ' . h($pe_ls->format('g:i A'));
+                    }
+                  }
+                  $pe_edit_href = 'admin_backend.php?' . http_build_query([
+                    'section'    => 'payroll_export',
+                    'pe_action'  => 'edit',
+                    'pe_id'      => $pe_r['id'],
+                  ]);
+                ?>
+                <tr>
+                  <td><strong><?= h($pe_r['username']) ?></strong></td>
+                  <td><?= h($pe_ci_dt->format('m-d-Y')) ?></td>
+                  <td><?= h($pe_ci_dt->format('g:i A')) ?></td>
+                  <td><?= $pe_lunch ?></td>
+                  <td>
+                    <?php if ($pe_co_dt): ?>
+                      <?= h($pe_co_dt->format('g:i A')) ?>
+                    <?php else: ?>
+                      <span class="badge clocked-in">Open</span>
+                    <?php endif; ?>
+                  </td>
+                  <td>
+                    <?= $pe_r['hours'] !== null
+                      ? number_format((float)$pe_r['hours'], 2) . 'h'
+                      : '<span class="muted">—</span>' ?>
+                  </td>
+                  <td><?= $pe_r['description'] ? h($pe_r['description']) : '<span class="muted">—</span>' ?></td>
+                  <td class="col-actions">
+                    <div class="actions">
+                      <a class="btn" href="<?= h($pe_edit_href) ?>">Edit</a>
+                      <form method="post" style="margin:0;"
+                            action="admin_backend.php?section=payroll_export"
+                            onsubmit="return confirm('Delete this time entry? This cannot be undone.');">
+                        <input type="hidden" name="payroll_csrf"    value="<?= h($_SESSION['payroll_export_csrf']) ?>" />
+                        <input type="hidden" name="pe_delete_entry" value="1" />
+                        <input type="hidden" name="entry_id"        value="<?= (int)$pe_r['id'] ?>" />
+                        <button class="btn danger" type="submit">Delete</button>
+                      </form>
+                    </div>
+                  </td>
                 </tr>
               <?php endforeach; ?>
             </tbody>
@@ -1534,16 +1621,44 @@ render_header('Admin Backend');
         </div>
       <?php endif; ?>
 
-      <!-- Current Pay Period: detailed entries -->
+      <!-- Current Pay Period: summary + detailed entries -->
       <div class="card">
-        <h2 style="margin-top:0;">Current Pay Period
-          <span class="muted" style="font-size:14px; font-weight:400; margin-left:8px;"><?= count($pe_entries) ?> entr<?= count($pe_entries) === 1 ? 'y' : 'ies' ?></span>
-        </h2>
-        <p class="muted" style="margin-top:0;">
-          <?= h($pe_curr_from) ?> &mdash; <?= h($pe_curr_to) ?><br>
-          Review each entry below. Use <strong>Edit</strong> to correct mistakes such as incorrect clock-in/out times or manual hours adjustments.
-        </p>
+        <div style="margin-bottom:14px;">
+          <h2 style="margin:0;">Current Pay Period
+            <span class="muted" style="font-size:14px; font-weight:400; margin-left:8px;"><?= count($pe_entries) ?> entr<?= count($pe_entries) === 1 ? 'y' : 'ies' ?></span>
+          </h2>
+          <p class="muted" style="margin:4px 0 0;">
+            <?= h($pe_curr_from) ?> &mdash; <?= h($pe_curr_to) ?>
+            &nbsp;&middot;&nbsp; <?= count($pe_by_employee) ?> employee(s)
+          </p>
+        </div>
 
+        <!-- Summary by employee -->
+        <div class="table-wrap" style="margin-bottom:20px;">
+          <table class="table-auto">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Total Hours</th>
+                <th>Entries</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php if (!$pe_by_employee): ?>
+                <tr><td colspan="3" class="muted">No time entries for the current pay period.</td></tr>
+              <?php endif; ?>
+              <?php foreach ($pe_by_employee as $emp): ?>
+                <tr>
+                  <td><strong><?= h($emp['username']) ?></strong></td>
+                  <td><?= number_format($emp['total_hours'], 2) ?>h</td>
+                  <td><?= (int)$emp['entries'] ?></td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Detailed entries -->
         <div class="table-wrap">
           <table class="table-auto">
             <thead>
