@@ -10,6 +10,17 @@ $errors = [];
 $success = '';
 $today = (new DateTime('now', $tz))->format('Y-m-d');
 $week_start = (new DateTime('monday this week', $tz))->format('Y-m-d');
+
+// Bi-weekly pay period: anchor Monday June 15, 2026; 14-day intervals in both directions.
+$pay_anchor = new DateTime('2026-06-15', $tz);
+$now_date   = new DateTime('today', $tz);
+$days_diff  = (int)(($now_date->getTimestamp() - $pay_anchor->getTimestamp()) / 86400);
+$period_offset = (int)floor($days_diff / 14);
+$pay_period_start_obj = clone $pay_anchor;
+if ($period_offset !== 0) {
+  $pay_period_start_obj->modify(($period_offset * 14) . ' days');
+}
+$pay_period_start = $pay_period_start_obj->format('Y-m-d');
 $idle_session_key = defined('ATTENDANCE_IDLE_SESSION_KEY')
   ? ATTENDANCE_IDLE_SESSION_KEY
   : 'attendance_idle_logged';
@@ -123,24 +134,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $open_entry = $load_open_entry();
 }
 
+// Query from pay_period_start (always <= week_start) so one query covers all three totals.
 $summary_stmt = $pdo->prepare("
   SELECT id, clock_in, lunch_start, lunch_end, clock_out, hours_override
   FROM time_entries
   WHERE user_id = ? AND DATE(clock_in) >= ?
   ORDER BY clock_in DESC
 ");
-$summary_stmt->execute([$uid, $week_start]);
+$summary_stmt->execute([$uid, $pay_period_start]);
 $summary_entries = $summary_stmt->fetchAll();
 
-$today_hours = 0.0;
-$week_hours = 0.0;
+$today_hours       = 0.0;
+$week_hours        = 0.0;
+$pay_period_hours  = 0.0;
 foreach ($summary_entries as $entry) {
   $hours = $entry_hours($entry, $tz);
   if ($hours === null) {
     continue;
   }
-  $week_hours += $hours;
-  if (substr((string)$entry['clock_in'], 0, 10) === $today) {
+  $entry_date = substr((string)$entry['clock_in'], 0, 10);
+  $pay_period_hours += $hours;
+  if ($entry_date >= $week_start) {
+    $week_hours += $hours;
+  }
+  if ($entry_date === $today) {
     $today_hours += $hours;
   }
 }
@@ -163,7 +180,12 @@ render_header('Time Clock');
 <div class="card">
   <div class="row" style="justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
     <h1 style="margin:0;">Attendance</h1>
-    <span class="muted">Week starts Monday</span>
+    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+      <span class="muted">Week starts Monday</span>
+      <button type="button" class="btn" onclick="window.print()" style="display:flex; align-items:center; gap:6px;">
+        <span>🖨️</span> Print My Timesheet
+      </button>
+    </div>
   </div>
   <p class="muted">Use the buttons below to manage your shift and lunch break.</p>
   <div style="margin-top:12px; padding:12px 16px; border-radius:6px; background:#f8f9fa; border:1px solid #dee2e6; color:#6c757d; font-size:14px; line-height:1.6;">
@@ -196,22 +218,21 @@ render_header('Time Clock');
       <div style="font-size:32px; font-weight:700; margin-top:6px;"><?= number_format($week_hours, 2) ?>h</div>
     </div>
     <div>
-      <div class="muted" style="font-size:12px; text-transform:uppercase; letter-spacing:.08em;">Current Status</div>
-      <div style="font-size:20px; font-weight:700; margin-top:10px;">
-        <?php if ($is_on_lunch): ?>
-          On Lunch
-        <?php elseif ($open_entry): ?>
-          Clocked In
-        <?php else: ?>
-          Clocked Out
-        <?php endif; ?>
-      </div>
+      <div class="muted" style="font-size:12px; text-transform:uppercase; letter-spacing:.08em;">Current Pay Period</div>
+      <div style="font-size:32px; font-weight:700; margin-top:6px;"><?= number_format($pay_period_hours, 2) ?>h</div>
+      <div class="muted" style="font-size:11px; margin-top:4px;">Since <?= h($pay_period_start_obj->format('M j, Y')) ?></div>
     </div>
   </div>
 
   <?php if ($open_entry): ?>
     <?php $clock_in = new DateTime($open_entry['clock_in'], $tz); ?>
     <p class="muted" style="margin:16px 0 0;">
+      <strong>Status:</strong>
+      <?php if ($is_on_lunch): ?>
+        On Lunch —
+      <?php elseif ($open_entry): ?>
+        Clocked In —
+      <?php endif; ?>
       Shift started at <strong><?= h($clock_in->format('g:i A')) ?></strong>
       on <?= h($clock_in->format('m-d-Y')) ?>.
       <?php if ($is_on_lunch): ?>
@@ -220,6 +241,8 @@ render_header('Time Clock');
         Lunch completed.
       <?php endif; ?>
     </p>
+  <?php else: ?>
+    <p class="muted" style="margin:16px 0 0;"><strong>Status:</strong> Clocked Out</p>
   <?php endif; ?>
 </div>
 
