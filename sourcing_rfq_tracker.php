@@ -1590,12 +1590,20 @@ render_header('Sourcing RFQ Tracker');
                   if ($has_thumb_image) {
                     $thumb_url = 'uploads/' . rawurlencode($r['image_thumb']);
                   } elseif ($has_full_image) {
-                    $thumb_url = 'sourcing_rfq_image.php?rfq_id=' . $rfq_id . '&type=full';
+                    $thumb_url = 'uploads/' . rawurlencode($r['image_path']);
                   } else {
                     $thumb_url = '';
                   }
-                  $full_url = $has_rfq_image ? 'sourcing_rfq_image.php?rfq_id=' . $rfq_id . '&type=full' : '';
-                  $download_url = $has_rfq_image ? 'sourcing_rfq_image.php?rfq_id=' . $rfq_id . '&type=full&download=1' : '';
+                  if ($has_full_image) {
+                    $full_url = 'uploads/' . rawurlencode($r['image_path']);
+                    $download_url = 'uploads/' . rawurlencode($r['image_path']);
+                  } elseif ($has_rfq_image) {
+                    $full_url = 'sourcing_rfq_image.php?rfq_id=' . $rfq_id . '&type=full';
+                    $download_url = 'sourcing_rfq_image.php?rfq_id=' . $rfq_id . '&type=full&download=1';
+                  } else {
+                    $full_url = '';
+                    $download_url = '';
+                  }
                 ?>
                 <?php if ($has_rfq_image): ?>
                   <button type="button"
