@@ -553,7 +553,7 @@ $pdo->exec("
     po_expected_delivery_date DATE NULL,
     po_delivery_address VARCHAR(500) NULL,
     po_payment_terms   TEXT NULL,
-    po_shipping_method ENUM('Sea Freight','Air Freight','Express','Pickup') NULL,
+    po_shipping_method VARCHAR(20) NULL,
     po_shipping_cost   DECIMAL(12,2) NULL,
     po_total_amount    DECIMAL(12,2) NULL,
     request_status     ENUM('draft','sourcing','quotes_received','shortlisted','ordered','closed') NOT NULL DEFAULT 'sourcing',
@@ -1191,6 +1191,13 @@ foreach ([
       throw $e;
     }
   }
+}
+
+// Widen po_shipping_method to VARCHAR(20) to support incoterm codes (DDP, FOB, CIF, EXW, DAP)
+try {
+  $pdo->exec("ALTER TABLE rfq_requests MODIFY COLUMN po_shipping_method VARCHAR(20) NULL");
+} catch (PDOException $e) {
+  // Ignore if already altered
 }
 
 // Create machine_inquiries table for CO2 laser machine purchase inquiries

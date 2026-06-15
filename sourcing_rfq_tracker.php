@@ -217,6 +217,13 @@ function build_rfq_email_text(array $rfq): string {
     $lines[] = trim((string)$rfq['required_features']);
   }
 
+  $incoterm_code  = trim((string)($rfq['po_shipping_method'] ?? ''));
+  $incoterm_label = $incoterm_code !== ''
+    ? (PO_SHIPPING_TERMS[$incoterm_code] ?? $incoterm_code)
+    : 'N/A';
+  $lines[] = '';
+  $lines[] = 'Incoterm:      ' . $incoterm_label;
+
   $additional_notes = trim((string)($rfq['additional_notes'] ?? ''));
   if ($additional_notes !== '') {
     $lines[] = '';
@@ -250,8 +257,6 @@ function build_rfq_email_text(array $rfq): string {
     $lines[] = trim((string)($rfq['po_payment_terms'] ?? 'N/A'));
   }
 
-  $lines[] = '';
-  $lines[] = 'Incoterm:      ' . trim((string)($rfq['po_shipping_method'] ?? 'N/A'));
   $lines[] = '';
   $lines[] = $sep;
   $lines[] = 'Please reply with your best quotation at your earliest convenience.';
