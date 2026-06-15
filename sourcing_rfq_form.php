@@ -9,7 +9,13 @@ const MAX_RFQ_QUANTITY = 1000;
 const PRICE_COMPARISON_TOLERANCE = 0.01;
 const REQUEST_TYPES = ['RFQ', 'Sourcing', 'PO'];
 const REQUEST_CATEGORIES = ['machine', 'parts'];
-const PO_SHIPPING_METHODS = ['Sea Freight', 'Air Freight', 'Express', 'Pickup'];
+const PO_SHIPPING_TERMS = [
+  'DDP' => 'DDP - Delivered Duty Paid (Supplier pays all shipping, duties, and delivers to our door)',
+  'FOB' => 'FOB - Free On Board (Supplier responsible until goods are loaded on the vessel at their port)',
+  'CIF' => 'CIF - Cost, Insurance and Freight (Supplier pays shipping and insurance to destination port)',
+  'EXW' => 'EXW - Ex Works (Buyer arranges and pays for all shipping from supplier\'s factory)',
+  'DAP' => 'DAP - Delivered at Place (Supplier delivers to our location, we handle customs and duties)',
+];
 
 function sourcing_rfq_escape_like(string $value, string $escape = '\\'): string {
   return str_replace(
@@ -145,7 +151,7 @@ $fields = [
   'po_expected_delivery_date' => '',
   'po_delivery_address' => '',
   'po_payment_terms' => '',
-  'po_shipping_method' => '',
+  'po_shipping_method' => 'DDP',
   'po_shipping_cost' => '',
   'po_total_amount' => '',
   'image_path'  => '',
@@ -350,8 +356,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (strlen($fields['po_payment_terms']) > 2000) {
       $errors[] = 'Payment terms must be 2000 characters or fewer.';
     }
-    if (!in_array($fields['po_shipping_method'], PO_SHIPPING_METHODS, true)) {
-      $errors[] = 'Shipping method must be one of: ' . implode(', ', PO_SHIPPING_METHODS) . '.';
+    if (!array_key_exists($fields['po_shipping_method'], PO_SHIPPING_TERMS)) {
+      $errors[] = 'Shipping terms must be one of: ' . implode(', ', array_keys(PO_SHIPPING_TERMS)) . '.';
     }
     $po_shipping_cost_amount = validate_po_money($fields['po_shipping_cost'], 'Shipping cost', $errors);
     $po_total_amount_amount = validate_po_money($fields['po_total_amount'], 'Total amount', $errors);
@@ -734,11 +740,10 @@ render_alibaba_workflow_banner('create_rfq');
              value="<?= h($fields['po_expected_delivery_date']) ?>" />
     </div>
     <div class="po-only">
-      <label>Shipping Method <span style="color:var(--d)">*</span></label>
-      <select name="po_shipping_method" data-required-on-type="PO">
-        <option value="">Select shipping method</option>
-        <?php foreach (PO_SHIPPING_METHODS as $shipping_method): ?>
-          <option value="<?= h($shipping_method) ?>" <?= $fields['po_shipping_method'] === $shipping_method ? 'selected' : '' ?>><?= h($shipping_method) ?></option>
+      <label>Shipping Terms <span style="color:var(--d)">*</span></label>
+      <select name="po_shipping_method" data-required-on-type="PO" required>
+        <?php foreach (PO_SHIPPING_TERMS as $term_code => $term_label): ?>
+          <option value="<?= h($term_code) ?>" <?= $fields['po_shipping_method'] === $term_code ? 'selected' : '' ?>><?= h($term_label) ?></option>
         <?php endforeach; ?>
       </select>
     </div>
