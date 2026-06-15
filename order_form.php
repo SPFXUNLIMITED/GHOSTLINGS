@@ -32,6 +32,16 @@ $order_statuses = [
   'cancelled' => 'Cancelled',
 ];
 $incoterm_options = ['EXW', 'FOB', 'CIF', 'CFR', 'DDP', 'DAP'];
+$shipping_method_options = [
+  'Sea Freight (LCL)',
+  'Sea Freight (FCL)',
+  'Air Freight',
+  'Express Courier (DHL/FedEx/UPS)',
+  'Rail Freight',
+  'Road / Truck Freight',
+  'DDP Door-to-Door',
+  'Other',
+];
 $doc_types = [
   'trade_order'        => ['label' => 'Trade Order',           'icon' => '📝'],
   'trade_assurance'    => ['label' => 'Trade Assurance',       'icon' => '🤝'],
@@ -761,7 +771,12 @@ if (($order['id'] ?? 0) > 0) {
     </div>
     <div>
       <label>Shipping Method</label>
-      <input type="text" name="shipping_method" maxlength="100" placeholder="e.g. Sea freight / DDP door-to-door" value="<?= h((string)order_value($order, 'shipping_method', '')) ?>">
+      <select name="shipping_method">
+        <option value="">— Select —</option>
+        <?php foreach ($shipping_method_options as $opt): ?>
+          <option value="<?= h($opt) ?>"<?= (order_value($order, 'shipping_method', '') === $opt) ? ' selected' : '' ?>><?= h($opt) ?></option>
+        <?php endforeach; ?>
+      </select>
     </div>
     <div>
       <label>Shipping Origin</label>
