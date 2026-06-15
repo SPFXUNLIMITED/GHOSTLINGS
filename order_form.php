@@ -32,15 +32,12 @@ $order_statuses = [
   'cancelled' => 'Cancelled',
 ];
 $incoterm_options = ['EXW', 'FOB', 'CIF', 'CFR', 'DDP', 'DAP'];
-$shipping_method_options = [
-  'Sea Freight (LCL)',
-  'Sea Freight (FCL)',
-  'Air Freight',
-  'Express Courier (DHL/FedEx/UPS)',
-  'Rail Freight',
-  'Road / Truck Freight',
-  'DDP Door-to-Door',
-  'Other',
+const PO_SHIPPING_TERMS = [
+  'DDP' => 'DDP - Delivered Duty Paid (Supplier pays all shipping, duties, and delivers to our door)',
+  'FOB' => 'FOB - Free On Board (Supplier responsible until goods are loaded on the vessel at their port)',
+  'CIF' => 'CIF - Cost, Insurance and Freight (Supplier pays shipping and insurance to destination port)',
+  'EXW' => 'EXW - Ex Works (Buyer arranges and pays for all shipping from supplier\'s factory)',
+  'DAP' => 'DAP - Delivered at Place (Supplier delivers to our location, we handle customs and duties)',
 ];
 $doc_types = [
   'trade_order'        => ['label' => 'Trade Order',           'icon' => '📝'],
@@ -306,6 +303,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if (strlen($incoterm) > 20) {
       $errors[] = 'Incoterm must be 20 characters or fewer.';
+    }
+    if ($shipping_method !== '' && !array_key_exists($shipping_method, PO_SHIPPING_TERMS)) {
+      $errors[] = 'Invalid shipping terms selected.';
     }
 
     $quantity = (int)$quantity_raw;
@@ -770,11 +770,11 @@ if (($order['id'] ?? 0) > 0) {
       </datalist>
     </div>
     <div>
-      <label>Shipping Method</label>
+      <label>Shipping Terms</label>
       <select name="shipping_method">
         <option value="">— Select —</option>
-        <?php foreach ($shipping_method_options as $opt): ?>
-          <option value="<?= h($opt) ?>"<?= (order_value($order, 'shipping_method', '') === $opt) ? ' selected' : '' ?>><?= h($opt) ?></option>
+        <?php foreach (PO_SHIPPING_TERMS as $key => $label): ?>
+          <option value="<?= h($key) ?>"<?= (order_value($order, 'shipping_method', 'DDP') === $key) ? ' selected' : '' ?>><?= h($label) ?></option>
         <?php endforeach; ?>
       </select>
     </div>
