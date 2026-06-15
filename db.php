@@ -1194,11 +1194,7 @@ foreach ([
 }
 
 // Widen po_shipping_method to VARCHAR(20) to support incoterm codes (DDP, FOB, CIF, EXW, DAP)
-try {
-  $pdo->exec("ALTER TABLE rfq_requests MODIFY COLUMN po_shipping_method VARCHAR(20) NULL");
-} catch (PDOException $e) {
-  // Ignore if already altered
-}
+$pdo->exec("ALTER TABLE rfq_requests MODIFY COLUMN po_shipping_method VARCHAR(20) NULL");
 
 // Create machine_inquiries table for CO2 laser machine purchase inquiries
 $pdo->exec("
