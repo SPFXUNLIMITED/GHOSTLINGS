@@ -6,6 +6,7 @@ require_rfq_access();
 
 const MAX_PRODUCTION_LEAD_TIME_DAYS = 730; // Maximum 730 days (2 years) to accommodate long custom manufacturing/import lead times.
 const DEFAULT_DEPOSIT_PERCENT = 30.00;
+const DEFAULT_PO_SHIPPING_METHOD = 'DDP';
 const PENDING_PO_NUMBER_PLACEHOLDER = 'Will be generated on save';
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -524,7 +525,7 @@ if (!$order && $source_quote) {
     'balance_amount' => number_format(round($prefill_total * ((100 - DEFAULT_DEPOSIT_PERCENT) / 100), 2), 2, '.', ''),
     'payment_terms' => format_percentage_label(DEFAULT_DEPOSIT_PERCENT) . '% deposit, ' . format_percentage_label(100 - DEFAULT_DEPOSIT_PERCENT) . '% balance before shipment',
     'incoterm' => '',
-    'shipping_method' => (string)($source_quote['shipping_method'] ?? ''),
+    'shipping_method' => (string)($source_quote['shipping_method'] ?? DEFAULT_PO_SHIPPING_METHOD),
     'shipping_origin' => (string)($source_quote['shipping_origin'] ?? ''),
     'destination_port' => '',
     'destination_address' => '',
@@ -566,7 +567,7 @@ if (!$order && $direct_po_rfq) {
     'balance_amount'           => $prefill_total > 0 ? number_format(round($prefill_total * ((100 - DEFAULT_DEPOSIT_PERCENT) / 100), 2), 2, '.', '') : '',
     'payment_terms'            => (string)($direct_po_rfq['po_payment_terms'] ?? ''),
     'incoterm'                 => '',
-    'shipping_method'          => (string)($direct_po_rfq['po_shipping_method'] ?? ''),
+    'shipping_method'          => (string)($direct_po_rfq['po_shipping_method'] ?? DEFAULT_PO_SHIPPING_METHOD),
     'shipping_origin'          => '',
     'destination_port'         => '',
     'destination_address'      => (string)($direct_po_rfq['po_delivery_address'] ?? ''),
@@ -602,7 +603,7 @@ if (!$order) {
     'balance_amount' => '',
     'payment_terms' => '',
     'incoterm' => '',
-    'shipping_method' => '',
+    'shipping_method' => DEFAULT_PO_SHIPPING_METHOD,
     'shipping_origin' => '',
     'destination_port' => '',
     'destination_address' => '',
@@ -615,6 +616,10 @@ if (!$order) {
   ];
 }
 $current_order_status = (string)order_value($order ?? [], 'order_status', 'create_rfq');
+$current_shipping_method = strtoupper(trim((string)order_value($order ?? [], 'shipping_method', '')));
+if ($current_shipping_method === '' || !array_key_exists($current_shipping_method, PO_SHIPPING_TERMS)) {
+  $current_shipping_method = DEFAULT_PO_SHIPPING_METHOD;
+}
 
 render_header('Purchase Order Form');
 
@@ -774,7 +779,7 @@ if (($order['id'] ?? 0) > 0) {
       <select name="shipping_method">
         <option value="">— Select —</option>
         <?php foreach (PO_SHIPPING_TERMS as $key => $label): ?>
-          <option value="<?= h($key) ?>"<?= (order_value($order, 'shipping_method', 'DDP') === $key) ? ' selected' : '' ?>><?= h($label) ?></option>
+          <option value="<?= h($key) ?>"<?= ($current_shipping_method === $key) ? ' selected' : '' ?>><?= h($label) ?></option>
         <?php endforeach; ?>
       </select>
     </div>
