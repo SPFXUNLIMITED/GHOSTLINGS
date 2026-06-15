@@ -15,6 +15,13 @@ $options = [
 
 $pdo = new PDO($dsn, $db['user'], $db['pass'], $options);
 const APP_ENCRYPTED_MIN_PAYLOAD_BYTES = 29; // 12-byte IV + 16-byte tag + minimum 1-byte ciphertext
+const PO_SHIPPING_TERMS = [
+  'DDP' => 'DDP - Delivered Duty Paid (Supplier pays all shipping, duties, and delivers to our door)',
+  'FOB' => 'FOB - Free On Board (Supplier responsible until goods are loaded on the vessel at their port)',
+  'CIF' => 'CIF - Cost, Insurance and Freight (Supplier pays shipping and insurance to destination port)',
+  'EXW' => 'EXW - Ex Works (Buyer arranges and pays for all shipping from supplier\'s factory)',
+  'DAP' => 'DAP - Delivered at Place (Supplier delivers to our location, we handle customs and duties)',
+];
 
 function app_ensure_integration_settings_table(PDO $pdo): void {
   static $ready = false;

@@ -109,6 +109,13 @@ function build_rfq_email_text_submitted(array $rfq): string {
     $lines[] = trim((string)$rfq['required_features']);
   }
 
+  $incoterm_code  = trim((string)($rfq['po_shipping_method'] ?? ''));
+  $incoterm_label = $incoterm_code !== ''
+    ? (PO_SHIPPING_TERMS[$incoterm_code] ?? $incoterm_code)
+    : 'N/A';
+  $lines[] = '';
+  $lines[] = 'Incoterm:      ' . $incoterm_label;
+
   $additional_notes = trim((string)($rfq['additional_notes'] ?? ''));
   if ($additional_notes !== '') {
     $lines[] = '';

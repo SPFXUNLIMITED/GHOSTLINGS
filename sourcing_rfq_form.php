@@ -9,13 +9,6 @@ const MAX_RFQ_QUANTITY = 1000;
 const PRICE_COMPARISON_TOLERANCE = 0.01;
 const REQUEST_TYPES = ['RFQ', 'Sourcing', 'PO'];
 const REQUEST_CATEGORIES = ['machine', 'parts'];
-const PO_SHIPPING_TERMS = [
-  'DDP' => 'DDP - Delivered Duty Paid (Supplier pays all shipping, duties, and delivers to our door)',
-  'FOB' => 'FOB - Free On Board (Supplier responsible until goods are loaded on the vessel at their port)',
-  'CIF' => 'CIF - Cost, Insurance and Freight (Supplier pays shipping and insurance to destination port)',
-  'EXW' => 'EXW - Ex Works (Buyer arranges and pays for all shipping from supplier\'s factory)',
-  'DAP' => 'DAP - Delivered at Place (Supplier delivers to our location, we handle customs and duties)',
-];
 
 function sourcing_rfq_escape_like(string $value, string $escape = '\\'): string {
   return str_replace(
