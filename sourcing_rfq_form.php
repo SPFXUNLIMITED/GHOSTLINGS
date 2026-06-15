@@ -327,6 +327,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $po_line_total_amount = null;
   $po_shipping_cost_amount = null;
   $po_total_amount_amount = null;
+  if (!isset($fields['po_shipping_method']) || $fields['po_shipping_method'] === '') {
+    $errors[] = 'Shipping terms are required.';
+  } elseif (!array_key_exists($fields['po_shipping_method'], PO_SHIPPING_TERMS)) {
+    $errors[] = 'Shipping terms must be one of: ' . implode(', ', array_keys(PO_SHIPPING_TERMS)) . '.';
+  }
+
   if ($fields['request_type'] === 'PO') {
     if ($fields['po_supplier_info'] === '') {
       $errors[] = 'Supplier information is required for purchase orders.';
@@ -355,9 +361,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $errors[] = 'Payment terms are required for purchase orders.';
     } elseif (strlen($fields['po_payment_terms']) > 2000) {
       $errors[] = 'Payment terms must be 2000 characters or fewer.';
-    }
-    if (!array_key_exists($fields['po_shipping_method'], PO_SHIPPING_TERMS)) {
-      $errors[] = 'Shipping terms must be one of: ' . implode(', ', array_keys(PO_SHIPPING_TERMS)) . '.';
     }
     $po_shipping_cost_amount = validate_po_money($fields['po_shipping_cost'], 'Shipping cost', $errors);
     $po_total_amount_amount = validate_po_money($fields['po_total_amount'], 'Total amount', $errors);
@@ -498,7 +501,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fields['request_type'] === 'PO' ? $fields['po_expected_delivery_date'] : null,
         $fields['request_type'] === 'PO' ? $fields['po_delivery_address'] : null,
         $fields['request_type'] === 'PO' ? $fields['po_payment_terms'] : null,
-        $fields['request_type'] === 'PO' ? $fields['po_shipping_method'] : null,
+        $fields['po_shipping_method'],
         $fields['request_type'] === 'PO' ? $po_shipping_cost_amount : null,
         $fields['request_type'] === 'PO' ? $po_total_amount_amount : null,
         $new_image_path,
@@ -548,7 +551,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fields['request_type'] === 'PO' ? $fields['po_expected_delivery_date'] : null,
         $fields['request_type'] === 'PO' ? $fields['po_delivery_address'] : null,
         $fields['request_type'] === 'PO' ? $fields['po_payment_terms'] : null,
-        $fields['request_type'] === 'PO' ? $fields['po_shipping_method'] : null,
+        $fields['po_shipping_method'],
         $fields['request_type'] === 'PO' ? $po_shipping_cost_amount : null,
         $fields['request_type'] === 'PO' ? $po_total_amount_amount : null,
         $new_image_path,
@@ -739,9 +742,9 @@ render_alibaba_workflow_banner('create_rfq');
       <input type="date" name="po_expected_delivery_date" data-required-on-type="PO"
              value="<?= h($fields['po_expected_delivery_date']) ?>" />
     </div>
-    <div class="po-only">
+    <div>
       <label>Shipping Terms <span style="color:var(--d)">*</span></label>
-      <select name="po_shipping_method" data-required-on-type="PO" required>
+      <select name="po_shipping_method" required>
         <?php foreach (PO_SHIPPING_TERMS as $term_code => $term_label): ?>
           <option value="<?= h($term_code) ?>" <?= $fields['po_shipping_method'] === $term_code ? 'selected' : '' ?>><?= h($term_label) ?></option>
         <?php endforeach; ?>
