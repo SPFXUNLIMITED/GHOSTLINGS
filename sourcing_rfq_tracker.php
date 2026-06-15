@@ -1587,9 +1587,13 @@ render_header('Sourcing RFQ Tracker');
                   $has_thumb_image = (string)($r['image_thumb'] ?? '') !== '';
                   $has_full_image = (string)($r['image_path'] ?? '') !== '';
                   $has_rfq_image = $has_thumb_image || $has_full_image;
-                  $thumb_url = $has_rfq_image
-                    ? 'sourcing_rfq_image.php?rfq_id=' . $rfq_id . '&type=' . ($has_thumb_image ? 'thumb' : 'full')
-                    : '';
+                  if ($has_thumb_image) {
+                    $thumb_url = 'uploads/' . rawurlencode($r['image_thumb']);
+                  } elseif ($has_full_image) {
+                    $thumb_url = 'sourcing_rfq_image.php?rfq_id=' . $rfq_id . '&type=full';
+                  } else {
+                    $thumb_url = '';
+                  }
                   $full_url = $has_rfq_image ? 'sourcing_rfq_image.php?rfq_id=' . $rfq_id . '&type=full' : '';
                   $download_url = $has_rfq_image ? 'sourcing_rfq_image.php?rfq_id=' . $rfq_id . '&type=full&download=1' : '';
                 ?>
