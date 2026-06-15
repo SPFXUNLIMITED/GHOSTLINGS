@@ -182,20 +182,23 @@ function build_rfq_email_text(array $rfq): string {
   ];
 
   if ($company_name !== '') {
-    $lines[] = 'Company:      ' . $company_name;
+    $lines[] = 'Company:          ' . $company_name;
   }
   if ($contact_name !== '') {
-    $lines[] = 'Contact:      ' . $contact_name;
+    $lines[] = 'Contact:          ' . $contact_name;
   } else {
-    $lines[] = 'Requested By: ' . $requested_by;
+    $lines[] = 'Requested By:     ' . $requested_by;
   }
   if ($contact_email !== '') {
-    $lines[] = 'Email:        ' . $contact_email;
+    $lines[] = 'Email:            ' . $contact_email;
   }
   if ($contact_phone !== '') {
-    $lines[] = 'Phone:        ' . $contact_phone;
+    $lines[] = 'Phone:            ' . $contact_phone;
   }
-  $lines[] = 'Delivery Address: ' . ($delivery_address !== '' ? $delivery_address : 'N/A');
+  $addr_display  = $delivery_address !== '' ? $delivery_address : 'N/A';
+  $addr_indent   = str_repeat(' ', 18);
+  $addr_wrapped  = wordwrap($addr_display, strlen($sep) - 18, "\n" . $addr_indent, true);
+  $lines[] = 'Delivery Address: ' . $addr_wrapped;
 
   $request_category = trim((string)($rfq['request_category'] ?? 'machine'));
   $is_parts_request = $request_category === 'parts';
@@ -231,7 +234,7 @@ function build_rfq_email_text(array $rfq): string {
     ? (PO_SHIPPING_TERMS[$incoterm_code] ?? $incoterm_code)
     : 'N/A';
   $lines[] = '';
-  $lines[] = 'Incoterm:      ' . $incoterm_label;
+  $lines[] = 'Incoterm:     ' . $incoterm_label;
 
   $additional_notes = trim((string)($rfq['additional_notes'] ?? ''));
   if ($additional_notes !== '') {
