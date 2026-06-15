@@ -56,6 +56,7 @@ render_header('Vendors');
   <table>
     <thead>
       <tr>
+        <th>Logo</th>
         <th>Company</th>
         <th>Phone</th>
         <th>Alibaba Store</th>
@@ -74,8 +75,37 @@ render_header('Vendors');
           && in_array(strtolower((string)parse_url($alibabaStore, PHP_URL_SCHEME)), ['http', 'https'], true);
         $isValidWebsite = $websiteUrl !== '' && filter_var($websiteUrl, FILTER_VALIDATE_URL)
           && in_array(strtolower((string)parse_url($websiteUrl, PHP_URL_SCHEME)), ['http', 'https'], true);
+        $logo_thumb = (string)($v['logo_thumb'] ?? '');
+        $logo_path  = (string)($v['logo_path']  ?? '');
+        if ($logo_thumb !== '') {
+          $logo_thumb_url = 'uploads/' . rawurlencode($logo_thumb);
+        } elseif ($logo_path !== '') {
+          $logo_thumb_url = 'vendor_logo.php?id=' . (int)$v['id'] . '&type=thumb';
+        } else {
+          $logo_thumb_url = '';
+        }
+        if ($logo_path !== '') {
+          $logo_full_url = 'uploads/' . rawurlencode($logo_path);
+        } elseif ($logo_thumb !== '') {
+          $logo_full_url = 'vendor_logo.php?id=' . (int)$v['id'] . '&type=full';
+        } else {
+          $logo_full_url = '';
+        }
       ?>
       <tr>
+        <td>
+          <?php if ($logo_thumb_url !== ''): ?>
+            <a href="<?= h($logo_full_url) ?>" target="_blank" rel="noopener noreferrer" title="View logo">
+              <img src="<?= h($logo_thumb_url) ?>"
+                   alt="<?= h($v['company_name']) ?> logo"
+                   loading="lazy"
+                   decoding="async"
+                   style="max-width:60px; max-height:40px; object-fit:contain; display:block;" />
+            </a>
+          <?php else: ?>
+            <span class="muted">—</span>
+          <?php endif; ?>
+        </td>
         <td><strong><?= h($v['company_name']) ?></strong></td>
         <td>
           <?php if ($v['phone'] !== ''): ?>

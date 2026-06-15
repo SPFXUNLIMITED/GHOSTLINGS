@@ -1093,6 +1093,28 @@ if ($hasVendorsReview === 0) {
   $pdo->exec("ALTER TABLE vendors ADD COLUMN review TEXT NULL DEFAULT NULL");
 }
 
+$hasVendorsLogoPath = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'vendors'
+    AND COLUMN_NAME = 'logo_path'
+")->fetchColumn();
+if ($hasVendorsLogoPath === 0) {
+  $pdo->exec("ALTER TABLE vendors ADD COLUMN logo_path  VARCHAR(255) NULL DEFAULT NULL");
+}
+
+$hasVendorsLogoThumb = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'vendors'
+    AND COLUMN_NAME = 'logo_thumb'
+")->fetchColumn();
+if ($hasVendorsLogoThumb === 0) {
+  $pdo->exec("ALTER TABLE vendors ADD COLUMN logo_thumb VARCHAR(255) NULL DEFAULT NULL");
+}
+
 // Create freight_forwarders table if it does not exist yet
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS freight_forwarders (
