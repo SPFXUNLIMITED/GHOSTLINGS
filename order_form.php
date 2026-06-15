@@ -251,11 +251,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $deposit_amount_raw = trim((string)($_POST['deposit_amount'] ?? ''));
     $balance_amount_raw = trim((string)($_POST['balance_amount'] ?? ''));
     $payment_terms = trim((string)($_POST['payment_terms'] ?? ''));
-    $incoterm = strtoupper(trim((string)($_POST['incoterm'] ?? '')));
-    if ($incoterm === '' || !array_key_exists($incoterm, PO_SHIPPING_TERMS)) {
-      $incoterm = DEFAULT_PO_SHIPPING_METHOD;
+    $selected_incoterm = strtoupper(trim((string)($_POST['incoterm'] ?? '')));
+    if ($selected_incoterm === '' || !array_key_exists($selected_incoterm, PO_SHIPPING_TERMS)) {
+      $selected_incoterm = DEFAULT_PO_SHIPPING_METHOD;
     }
-    $shipping_method = $incoterm;
+    $incoterm = $selected_incoterm;
+    $shipping_method = $selected_incoterm;
     $shipping_origin = trim((string)($_POST['shipping_origin'] ?? ''));
     $destination_port = trim((string)($_POST['destination_port'] ?? ''));
     $destination_address = trim((string)($_POST['destination_address'] ?? ''));
@@ -304,10 +305,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($production_lead_time_days_raw !== '' && (!ctype_digit($production_lead_time_days_raw) || (int)$production_lead_time_days_raw > MAX_PRODUCTION_LEAD_TIME_DAYS)) {
       $errors[] = 'Production lead time must be a whole number of days up to ' . MAX_PRODUCTION_LEAD_TIME_DAYS . '.';
     }
-    if (!array_key_exists($incoterm, PO_SHIPPING_TERMS)) {
-      $errors[] = 'Invalid incoterm selected.';
-    }
-
     $quantity = (int)$quantity_raw;
     $unit_price = $unit_price_raw === '' ? null : round((float)$unit_price_raw, 2);
     $order_total = $order_total_raw === '' ? null : round((float)$order_total_raw, 2);
@@ -497,6 +494,10 @@ if (!$order && $source_quote) {
   $prefill_quantity = max(1, (int)($source_quote['quantity'] ?? 1));
   $prefill_total = (float)$source_quote['quote_amount'];
   $prefill_unit = $prefill_quantity > 0 ? round($prefill_total / $prefill_quantity, 2) : $prefill_total;
+  $prefill_shipping_term = strtoupper(trim((string)($source_quote['shipping_method'] ?? '')));
+  if (!array_key_exists($prefill_shipping_term, PO_SHIPPING_TERMS)) {
+    $prefill_shipping_term = DEFAULT_PO_SHIPPING_METHOD;
+  }
   $prefill_ready_date = '';
   if (!empty($source_quote['lead_time_days'])) {
     $prefill_ready_date = date('Y-m-d', strtotime($prefill_order_date . ' +' . (int)$source_quote['lead_time_days'] . ' days'));
@@ -523,12 +524,8 @@ if (!$order && $source_quote) {
     'deposit_amount' => number_format(round($prefill_total * (DEFAULT_DEPOSIT_PERCENT / 100), 2), 2, '.', ''),
     'balance_amount' => number_format(round($prefill_total * ((100 - DEFAULT_DEPOSIT_PERCENT) / 100), 2), 2, '.', ''),
     'payment_terms' => format_percentage_label(DEFAULT_DEPOSIT_PERCENT) . '% deposit, ' . format_percentage_label(100 - DEFAULT_DEPOSIT_PERCENT) . '% balance before shipment',
-    'incoterm' => array_key_exists((string)($source_quote['shipping_method'] ?? ''), PO_SHIPPING_TERMS)
-      ? (string)$source_quote['shipping_method']
-      : DEFAULT_PO_SHIPPING_METHOD,
-    'shipping_method' => array_key_exists((string)($source_quote['shipping_method'] ?? ''), PO_SHIPPING_TERMS)
-      ? (string)$source_quote['shipping_method']
-      : DEFAULT_PO_SHIPPING_METHOD,
+    'incoterm' => $prefill_shipping_term,
+    'shipping_method' => $prefill_shipping_term,
     'shipping_origin' => (string)($source_quote['shipping_origin'] ?? ''),
     'destination_port' => '',
     'destination_address' => '',
@@ -547,6 +544,10 @@ if (!$order && $direct_po_rfq) {
   $prefill_unit   = $direct_po_rfq['po_unit_price'] !== null
     ? (float)$direct_po_rfq['po_unit_price']
     : ($prefill_quantity > 0 ? round($prefill_total / $prefill_quantity, 2) : $prefill_total);
+  $prefill_shipping_term = strtoupper(trim((string)($direct_po_rfq['po_shipping_method'] ?? '')));
+  if (!array_key_exists($prefill_shipping_term, PO_SHIPPING_TERMS)) {
+    $prefill_shipping_term = DEFAULT_PO_SHIPPING_METHOD;
+  }
 
   $order = [
     'id'                       => 0,
@@ -569,12 +570,8 @@ if (!$order && $direct_po_rfq) {
     'deposit_amount'           => $prefill_total > 0 ? number_format(round($prefill_total * (DEFAULT_DEPOSIT_PERCENT / 100), 2), 2, '.', '') : '',
     'balance_amount'           => $prefill_total > 0 ? number_format(round($prefill_total * ((100 - DEFAULT_DEPOSIT_PERCENT) / 100), 2), 2, '.', '') : '',
     'payment_terms'            => (string)($direct_po_rfq['po_payment_terms'] ?? ''),
-    'incoterm'                 => array_key_exists((string)($direct_po_rfq['po_shipping_method'] ?? ''), PO_SHIPPING_TERMS)
-      ? (string)$direct_po_rfq['po_shipping_method']
-      : DEFAULT_PO_SHIPPING_METHOD,
-    'shipping_method'          => array_key_exists((string)($direct_po_rfq['po_shipping_method'] ?? ''), PO_SHIPPING_TERMS)
-      ? (string)$direct_po_rfq['po_shipping_method']
-      : DEFAULT_PO_SHIPPING_METHOD,
+    'incoterm'                 => $prefill_shipping_term,
+    'shipping_method'          => $prefill_shipping_term,
     'shipping_origin'          => '',
     'destination_port'         => '',
     'destination_address'      => (string)($direct_po_rfq['po_delivery_address'] ?? ''),
