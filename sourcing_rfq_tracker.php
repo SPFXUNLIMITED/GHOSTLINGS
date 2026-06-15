@@ -197,7 +197,7 @@ function build_rfq_email_text(array $rfq): string {
   }
   $addr_display  = $delivery_address !== '' ? $delivery_address : 'N/A';
   $addr_indent   = str_repeat(' ', 18);
-  $addr_wrapped  = wordwrap($addr_display, 60 - 18, "\n" . $addr_indent, true);
+  $addr_wrapped  = wordwrap($addr_display, strlen($sep) - 18, "\n" . $addr_indent, true);
   $lines[] = 'Delivery Address: ' . $addr_wrapped;
 
   $request_category = trim((string)($rfq['request_category'] ?? 'machine'));
