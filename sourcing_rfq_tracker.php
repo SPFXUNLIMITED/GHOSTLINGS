@@ -203,10 +203,6 @@ function build_rfq_email_text(array $rfq): string {
 
   $request_category = trim((string)($rfq['request_category'] ?? 'machine'));
   $is_parts_request = $request_category === 'parts';
-  $incoterm_code    = trim((string)($rfq['po_shipping_method'] ?? ''));
-  $incoterm_label   = $incoterm_code !== ''
-    ? (PO_SHIPPING_TERMS[$incoterm_code] ?? $incoterm_code)
-    : 'N/A';
   $lines = array_merge($lines, [
     '',
     $sep2,
@@ -215,6 +211,11 @@ function build_rfq_email_text(array $rfq): string {
     sprintf('%-15s%s', 'Title:', $request_title),
     sprintf('%-15s%s', 'Quantity:', (int)$rfq['quantity']),
   ]);
+
+  $incoterm_code  = trim((string)($rfq['po_shipping_method'] ?? ''));
+  $incoterm_label = $incoterm_code !== ''
+    ? (PO_SHIPPING_TERMS[$incoterm_code] ?? $incoterm_code)
+    : 'N/A';
 
   if ($is_parts_request) {
     $lines[] = sprintf('%-15s%s', 'Part Category:', trim((string)($rfq['part_category'] ?? '')));
