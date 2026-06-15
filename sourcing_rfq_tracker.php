@@ -251,6 +251,8 @@ function build_rfq_email_text(array $rfq): string {
   }
 
   $lines[] = '';
+  $lines[] = 'Incoterm:      ' . trim((string)($rfq['po_shipping_method'] ?? 'N/A'));
+  $lines[] = '';
   $lines[] = $sep;
   $lines[] = 'Please reply with your best quotation at your earliest convenience.';
   $lines[] = $sep;
