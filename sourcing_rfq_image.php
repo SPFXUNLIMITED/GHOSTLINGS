@@ -29,104 +29,105 @@ if ($type === 'thumb') {
   $new_thumb_name = '';
   $thumb_path = '';
   $allowed_mimes = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif'];
+  $stored_thumb_exists = $stored_thumb !== '' && preg_match('/^[a-zA-Z0-9._-]+$/', $stored_thumb) && is_file($uploadsDir . '/' . $stored_thumb);
 
-  if ($stored_full !== '' && preg_match('/^[a-zA-Z0-9._-]+$/', $stored_full)) {
-    $src_path = $uploadsDir . '/' . $stored_full;
-    if (is_file($src_path)) {
-      $fi = finfo_open(FILEINFO_MIME_TYPE);
-      $detected_mime = ($fi !== false) ? (finfo_file($fi, $src_path) ?: '') : '';
-      if ($fi !== false) finfo_close($fi);
+  if ($stored_thumb_exists && $stored_thumb !== $stored_full) {
+    $stored = $stored_thumb;
+  } else {
+    if ($stored_full !== '' && preg_match('/^[a-zA-Z0-9._-]+$/', $stored_full)) {
+      $src_path = $uploadsDir . '/' . $stored_full;
+      if (is_file($src_path)) {
+        $fi = finfo_open(FILEINFO_MIME_TYPE);
+        $detected_mime = ($fi !== false) ? (finfo_file($fi, $src_path) ?: '') : '';
+        if ($fi !== false) finfo_close($fi);
 
-      if (!isset($allowed_mimes[$detected_mime])) {
+        if (!isset($allowed_mimes[$detected_mime])) {
+          http_response_code(415);
+          exit('Unsupported image type');
+        }
+
+        $ext = $allowed_mimes[$detected_mime];
+        $base_name = pathinfo(basename($stored_full), PATHINFO_FILENAME);
+        $new_thumb_name = $base_name . '_thumb.' . $ext;
+        $thumb_path = $uploadsDir . '/' . $new_thumb_name;
+      }
+    }
+
+    if ($thumb_path !== '' && is_file($thumb_path)) {
+      $stored = $new_thumb_name;
+      if ($stored_thumb !== $new_thumb_name) {
+        $upd = $pdo->prepare("UPDATE rfq_requests SET image_thumb = ? WHERE id = ?");
+        $upd->execute([$new_thumb_name, $rfq_id]);
+      }
+    } elseif ($stored_thumb_exists) {
+      $stored = $stored_thumb;
+    } else {
+      if ($src_path === '' || !is_file($src_path)) {
+        http_response_code(404);
+        exit('File not found on disk');
+      }
+      if ($thumb_path === '' || $new_thumb_name === '') {
         http_response_code(415);
         exit('Unsupported image type');
       }
 
-      $ext = $allowed_mimes[$detected_mime];
-      $base_name = pathinfo(basename($stored_full), PATHINFO_FILENAME);
-      $new_thumb_name = $base_name . '_thumb.' . $ext;
-      $thumb_path = $uploadsDir . '/' . $new_thumb_name;
-    }
-  }
-
-  if ($thumb_path !== '' && is_file($thumb_path)) {
-    $stored = $new_thumb_name;
-    if ($stored_thumb !== $new_thumb_name) {
-      $upd = $pdo->prepare("UPDATE rfq_requests SET image_thumb = ? WHERE id = ?");
-      $upd->execute([$new_thumb_name, $rfq_id]);
-    }
-  } elseif ($stored_thumb !== '' && preg_match('/^[a-zA-Z0-9._-]+$/', $stored_thumb) && is_file($uploadsDir . '/' . $stored_thumb)) {
-    $stored = $stored_thumb;
-  } else {
-    if ($src_path === '' || !is_file($src_path)) {
-      http_response_code(404);
-      exit('File not found on disk');
-    }
-    if ($thumb_path === '' || $new_thumb_name === '') {
-      http_response_code(415);
-      exit('Unsupported image type');
-    }
-
-    $thumb_ok = false;
-    if ($detected_mime === 'image/jpeg') {
-      $src_img = @imagecreatefromjpeg($src_path);
-    } elseif ($detected_mime === 'image/png') {
-      $src_img = @imagecreatefrompng($src_path);
-    } else {
-      $src_img = @imagecreatefromgif($src_path);
-    }
-    if ($src_img !== false) {
-      $src_w = imagesx($src_img);
-      $src_h = imagesy($src_img);
-      $max_side = 200;
-      if ($src_w > $max_side || $src_h > $max_side) {
-        $ratio = min($max_side / $src_w, $max_side / $src_h);
-        $dst_w = (int)round($src_w * $ratio);
-        $dst_h = (int)round($src_h * $ratio);
+      $thumb_ok = false;
+      if ($detected_mime === 'image/jpeg') {
+        $src_img = @imagecreatefromjpeg($src_path);
+      } elseif ($detected_mime === 'image/png') {
+        $src_img = @imagecreatefrompng($src_path);
       } else {
-        $dst_w = $src_w;
-        $dst_h = $src_h;
+        $src_img = @imagecreatefromgif($src_path);
       }
-      $thumb_img = imagecreatetruecolor($dst_w, $dst_h);
-      if ($thumb_img !== false) {
-        if ($detected_mime === 'image/png') {
-          imagealphablending($thumb_img, false);
-          imagesavealpha($thumb_img, true);
-          $transparent = imagecolorallocatealpha($thumb_img, 255, 255, 255, 127);
-          imagefill($thumb_img, 0, 0, $transparent);
-        } elseif ($detected_mime === 'image/gif') {
-          $trans_idx = imagecolortransparent($src_img);
-          if ($trans_idx >= 0 && $trans_idx < imagecolorstotal($src_img)) {
-            $trans_color = imagecolorsforindex($src_img, $trans_idx);
-            $new_trans = imagecolorallocate($thumb_img, $trans_color['red'], $trans_color['green'], $trans_color['blue']);
-            imagefill($thumb_img, 0, 0, $new_trans);
-            imagecolortransparent($thumb_img, $new_trans);
-          }
-        }
-        imagecopyresampled($thumb_img, $src_img, 0, 0, 0, 0, $dst_w, $dst_h, $src_w, $src_h);
-        if ($detected_mime === 'image/jpeg') {
-          $thumb_ok = (bool)imagejpeg($thumb_img, $thumb_path, 85);
-        } elseif ($detected_mime === 'image/png') {
-          $thumb_ok = (bool)imagepng($thumb_img, $thumb_path);
+      if ($src_img !== false) {
+        $src_w = imagesx($src_img);
+        $src_h = imagesy($src_img);
+        $max_side = 200;
+        if ($src_w > $max_side || $src_h > $max_side) {
+          $ratio = min($max_side / $src_w, $max_side / $src_h);
+          $dst_w = (int)round($src_w * $ratio);
+          $dst_h = (int)round($src_h * $ratio);
         } else {
-          $thumb_ok = (bool)imagegif($thumb_img, $thumb_path);
+          $dst_w = $src_w;
+          $dst_h = $src_h;
         }
-        imagedestroy($thumb_img);
+        $thumb_img = imagecreatetruecolor($dst_w, $dst_h);
+        if ($thumb_img !== false) {
+          if ($detected_mime === 'image/png') {
+            imagealphablending($thumb_img, false);
+            imagesavealpha($thumb_img, true);
+            $transparent = imagecolorallocatealpha($thumb_img, 255, 255, 255, 127);
+            imagefill($thumb_img, 0, 0, $transparent);
+          } elseif ($detected_mime === 'image/gif') {
+            $trans_idx = imagecolortransparent($src_img);
+            if ($trans_idx >= 0 && $trans_idx < imagecolorstotal($src_img)) {
+              $trans_color = imagecolorsforindex($src_img, $trans_idx);
+              $new_trans = imagecolorallocate($thumb_img, $trans_color['red'], $trans_color['green'], $trans_color['blue']);
+              imagefill($thumb_img, 0, 0, $new_trans);
+              imagecolortransparent($thumb_img, $new_trans);
+            }
+          }
+          imagecopyresampled($thumb_img, $src_img, 0, 0, 0, 0, $dst_w, $dst_h, $src_w, $src_h);
+          if ($detected_mime === 'image/jpeg') {
+            $thumb_ok = (bool)imagejpeg($thumb_img, $thumb_path, 85);
+          } elseif ($detected_mime === 'image/png') {
+            $thumb_ok = (bool)imagepng($thumb_img, $thumb_path);
+          } else {
+            $thumb_ok = (bool)imagegif($thumb_img, $thumb_path);
+          }
+          imagedestroy($thumb_img);
+        }
+        imagedestroy($src_img);
       }
-      imagedestroy($src_img);
-    }
 
-    if ($thumb_ok && is_file($thumb_path)) {
-      $upd = $pdo->prepare("UPDATE rfq_requests SET image_thumb = ? WHERE id = ?");
-      $upd->execute([$new_thumb_name, $rfq_id]);
-      $stored = $new_thumb_name;
-    } else {
-      error_log("sourcing_rfq_image: GD thumbnail generation failed for rfq_id={$rfq_id}, falling back to full image");
-      if ($stored_thumb !== $stored_full) {
+      if ($thumb_ok && is_file($thumb_path)) {
         $upd = $pdo->prepare("UPDATE rfq_requests SET image_thumb = ? WHERE id = ?");
-        $upd->execute([$stored_full, $rfq_id]);
+        $upd->execute([$new_thumb_name, $rfq_id]);
+        $stored = $new_thumb_name;
+      } else {
+        error_log("sourcing_rfq_image: GD thumbnail generation failed for rfq_id={$rfq_id}, falling back to full image");
+        $stored = $stored_full;
       }
-      $stored = $stored_full;
     }
   }
 } else {
