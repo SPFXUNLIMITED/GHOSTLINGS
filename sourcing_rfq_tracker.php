@@ -124,6 +124,15 @@ function infer_request_type_from_title(?string $request_title): string {
   return 'RFQ';
 }
 
+function is_purchase_order_request(array $rfq): bool {
+  $request_category = strtolower(trim((string)($rfq['request_category'] ?? '')));
+  if ($request_category === 'po') {
+    return true;
+  }
+  $request_title = trim((string)($rfq['request_title'] ?? ''));
+  return infer_request_type_from_title($request_title) === 'PO';
+}
+
 function format_po_amount($value): string {
   if ($value === null || $value === '') {
     return 'N/A';
@@ -139,7 +148,7 @@ function build_rfq_email_text(array $rfq): string {
   $sep2 = str_repeat('-', 60);
   $date = date('F j, Y', strtotime((string)$rfq['created_at']));
   $request_title = trim((string)($rfq['request_title'] ?? ''));
-  $is_purchase_order = infer_request_type_from_title($request_title) === 'PO';
+  $is_purchase_order = is_purchase_order_request($rfq);
   $email_heading = $is_purchase_order ? 'PURCHASE ORDER (PO)' : 'REQUEST FOR QUOTATION (RFQ)';
   $request_number_label = $is_purchase_order ? 'PO #:         ' : 'RFQ #:        ';
 
@@ -1372,7 +1381,7 @@ if ($rfq_text_id > 0) {
   $txt->execute([$rfq_text_id]);
   $rfq_for_email = $txt->fetch();
   if ($rfq_for_email) {
-    $rfq_email_text_title = infer_request_type_from_title((string)($rfq_for_email['request_title'] ?? '')) === 'PO'
+    $rfq_email_text_title = is_purchase_order_request($rfq_for_email)
       ? 'PO Email Text'
       : 'RFQ Email Text';
     $rfq_email_text = build_rfq_email_text($rfq_for_email);

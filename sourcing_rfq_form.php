@@ -743,7 +743,7 @@ render_alibaba_workflow_banner('create_rfq');
              value="<?= h($fields['po_expected_delivery_date']) ?>" />
     </div>
     <div>
-      <label>Shipping Terms <span style="color:var(--d)">*</span></label>
+      <label>Incoterm <span style="color:var(--d)">*</span></label>
       <select name="po_shipping_method" required>
         <?php foreach (PO_SHIPPING_TERMS as $term_code => $term_label): ?>
           <option value="<?= h($term_code) ?>" <?= $fields['po_shipping_method'] === $term_code ? 'selected' : '' ?>><?= h($term_label) ?></option>
