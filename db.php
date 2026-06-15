@@ -1196,6 +1196,9 @@ foreach ([
 // Widen po_shipping_method to VARCHAR(20) to support incoterm codes (DDP, FOB, CIF, EXW, DAP)
 $pdo->exec("ALTER TABLE rfq_requests MODIFY COLUMN po_shipping_method VARCHAR(20) NULL");
 
+// Expand request_category ENUM to include 'po' for Purchase Order requests
+$pdo->exec("ALTER TABLE rfq_requests MODIFY COLUMN request_category ENUM('machine','parts','po') NOT NULL DEFAULT 'machine'");
+
 // Create machine_inquiries table for CO2 laser machine purchase inquiries
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS machine_inquiries (

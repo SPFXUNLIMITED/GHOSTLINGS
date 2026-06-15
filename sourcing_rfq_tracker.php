@@ -4,6 +4,13 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_rfq_access();
 
+const PO_SHIPPING_TERMS = [
+  'DDP' => 'DDP - Delivered Duty Paid (Supplier pays all shipping, duties, and delivers to our door)',
+  'FOB' => 'FOB - Free On Board (Supplier responsible until goods are loaded on the vessel at their port)',
+  'CIF' => 'CIF - Cost, Insurance and Freight (Supplier pays shipping and insurance to destination port)',
+  'EXW' => 'EXW - Ex Works (Buyer arranges and pays for all shipping from supplier\'s factory)',
+  'DAP' => 'DAP - Delivered at Place (Supplier delivers to our location, we handle customs and duties)',
+];
 const MAX_LEAD_TIME_DAYS = 3650;
 const MAX_QUOTE_UPLOAD_BYTES = 26214400; // 25 MB
 const MAX_QUOTE_NOTES_LENGTH = 5000;
