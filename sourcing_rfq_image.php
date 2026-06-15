@@ -24,36 +24,48 @@ if ($type === 'thumb') {
   $uploadsDir = __DIR__ . '/uploads';
   $stored_thumb = (string)($row['image_thumb'] ?? '');
   $stored_full  = (string)($row['image_path']  ?? '');
+  $src_path = '';
+  $detected_mime = '';
+  $new_thumb_name = '';
+  $thumb_path = '';
+  $allowed_mimes = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif'];
 
-  // Serve the existing thumb file directly if it is on disk
-  if ($stored_thumb !== '' && preg_match('/^[a-zA-Z0-9._-]+$/', $stored_thumb) && is_file($uploadsDir . '/' . $stored_thumb)) {
+  if ($stored_full !== '' && preg_match('/^[a-zA-Z0-9._-]+$/', $stored_full)) {
+    $src_path = $uploadsDir . '/' . $stored_full;
+    if (is_file($src_path)) {
+      $fi = finfo_open(FILEINFO_MIME_TYPE);
+      $detected_mime = ($fi !== false) ? (finfo_file($fi, $src_path) ?: '') : '';
+      if ($fi !== false) finfo_close($fi);
+
+      if (!isset($allowed_mimes[$detected_mime])) {
+        http_response_code(415);
+        exit('Unsupported image type');
+      }
+
+      $ext = $allowed_mimes[$detected_mime];
+      $base_name = pathinfo(basename($stored_full), PATHINFO_FILENAME);
+      $new_thumb_name = $base_name . '_thumb.' . $ext;
+      $thumb_path = $uploadsDir . '/' . $new_thumb_name;
+    }
+  }
+
+  if ($thumb_path !== '' && is_file($thumb_path)) {
+    $stored = $new_thumb_name;
+    if ($stored_thumb !== $new_thumb_name) {
+      $upd = $pdo->prepare("UPDATE rfq_requests SET image_thumb = ? WHERE id = ?");
+      $upd->execute([$new_thumb_name, $rfq_id]);
+    }
+  } elseif ($stored_thumb !== '' && preg_match('/^[a-zA-Z0-9._-]+$/', $stored_thumb) && is_file($uploadsDir . '/' . $stored_thumb)) {
     $stored = $stored_thumb;
   } else {
-    // Thumb missing – regenerate from the full image
-    if ($stored_full === '' || !preg_match('/^[a-zA-Z0-9._-]+$/', $stored_full)) {
-      http_response_code(404);
-      exit('Image not found');
-    }
-    $src_path = $uploadsDir . '/' . $stored_full;
-    if (!is_file($src_path)) {
+    if ($src_path === '' || !is_file($src_path)) {
       http_response_code(404);
       exit('File not found on disk');
     }
-
-    $fi = finfo_open(FILEINFO_MIME_TYPE);
-    $detected_mime = ($fi !== false) ? (finfo_file($fi, $src_path) ?: '') : '';
-    if ($fi !== false) finfo_close($fi);
-
-    $allowed_mimes = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif'];
-    if (!isset($allowed_mimes[$detected_mime])) {
+    if ($thumb_path === '' || $new_thumb_name === '') {
       http_response_code(415);
       exit('Unsupported image type');
     }
-
-    $ext = $allowed_mimes[$detected_mime];
-    $base_name = pathinfo(basename($stored_full), PATHINFO_FILENAME);
-    $new_thumb_name = $base_name . '_thumb.' . $ext;
-    $thumb_path = $uploadsDir . '/' . $new_thumb_name;
 
     $thumb_ok = false;
     if ($detected_mime === 'image/jpeg') {
@@ -104,14 +116,16 @@ if ($type === 'thumb') {
       imagedestroy($src_img);
     }
 
-    if ($thumb_ok) {
-      // Persist the newly generated thumb filename so future requests are served directly
+    if ($thumb_ok && is_file($thumb_path)) {
       $upd = $pdo->prepare("UPDATE rfq_requests SET image_thumb = ? WHERE id = ?");
       $upd->execute([$new_thumb_name, $rfq_id]);
       $stored = $new_thumb_name;
     } else {
-      // GD failed – fall back to full image and log for debugging
       error_log("sourcing_rfq_image: GD thumbnail generation failed for rfq_id={$rfq_id}, falling back to full image");
+      if ($stored_thumb !== $stored_full) {
+        $upd = $pdo->prepare("UPDATE rfq_requests SET image_thumb = ? WHERE id = ?");
+        $upd->execute([$stored_full, $rfq_id]);
+      }
       $stored = $stored_full;
     }
   }
