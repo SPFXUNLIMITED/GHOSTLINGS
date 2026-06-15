@@ -163,6 +163,7 @@ function build_rfq_email_text(array $rfq): string {
   $company_name  = trim((string)($rfq['company_name']  ?? ''));
   $contact_email = trim((string)($rfq['contact_email'] ?? ''));
   $contact_phone = trim((string)($rfq['contact_phone'] ?? ''));
+  $delivery_address = trim((string)($rfq['delivery_address'] ?? ''));
   $requested_by  = trim((string)($rfq['requested_by_username'] ?? 'Unknown'));
 
   $lines = [
@@ -194,6 +195,7 @@ function build_rfq_email_text(array $rfq): string {
   if ($contact_phone !== '') {
     $lines[] = 'Phone:        ' . $contact_phone;
   }
+  $lines[] = 'Delivery Address: ' . ($delivery_address !== '' ? $delivery_address : 'N/A');
 
   $request_category = trim((string)($rfq['request_category'] ?? 'machine'));
   $is_parts_request = $request_category === 'parts';
@@ -1387,7 +1389,7 @@ if ($rfq_text_id > 0) {
             r.required_features, r.additional_notes, r.request_status, r.acquisition_purpose, r.buyer_name, r.created_at,
             r.contact_name, r.company_name, r.contact_email, r.contact_phone, r.po_supplier_info, r.po_unit_price, r.po_line_total,
             r.po_expected_delivery_date, r.po_delivery_address, r.po_payment_terms, r.po_shipping_method, r.po_shipping_cost, r.po_total_amount,
-            u.username AS requested_by_username
+            u.username AS requested_by_username, u.delivery_address AS delivery_address
      FROM rfq_requests r
      LEFT JOIN users u ON u.id = r.requested_by
      WHERE r.id = ? LIMIT 1"
