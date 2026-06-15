@@ -66,18 +66,18 @@ function build_rfq_email_text_submitted(array $rfq): string {
   ];
 
   if ($company_name !== '') {
-    $lines[] = 'Company:      ' . $company_name;
+    $lines[] = 'Company:          ' . $company_name;
   }
   if ($contact_name !== '') {
-    $lines[] = 'Contact:      ' . $contact_name;
+    $lines[] = 'Contact:          ' . $contact_name;
   } else {
-    $lines[] = 'Requested By: ' . $requested_by;
+    $lines[] = 'Requested By:     ' . $requested_by;
   }
   if ($contact_email !== '') {
-    $lines[] = 'Email:        ' . $contact_email;
+    $lines[] = 'Email:            ' . $contact_email;
   }
   if ($contact_phone !== '') {
-    $lines[] = 'Phone:        ' . $contact_phone;
+    $lines[] = 'Phone:            ' . $contact_phone;
   }
 
   $normalized_request_category = $request_category !== '' ? $request_category : 'machine';
