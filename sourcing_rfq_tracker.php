@@ -182,23 +182,24 @@ function build_rfq_email_text(array $rfq): string {
   ];
 
   if ($company_name !== '') {
-    $lines[] = 'Company:          ' . $company_name;
+    $lines[] = sprintf('%-18s%s', 'Company:', $company_name);
   }
   if ($contact_name !== '') {
-    $lines[] = 'Contact:          ' . $contact_name;
+    $lines[] = sprintf('%-18s%s', 'Contact:', $contact_name);
   } else {
-    $lines[] = 'Requested By:     ' . $requested_by;
+    $lines[] = sprintf('%-18s%s', 'Requested By:', $requested_by);
   }
   if ($contact_email !== '') {
-    $lines[] = 'Email:            ' . $contact_email;
+    $lines[] = sprintf('%-18s%s', 'Email:', $contact_email);
   }
   if ($contact_phone !== '') {
-    $lines[] = 'Phone:            ' . $contact_phone;
+    $lines[] = sprintf('%-18s%s', 'Phone:', $contact_phone);
   }
-  $addr_display  = $delivery_address !== '' ? $delivery_address : 'N/A';
-  $addr_indent   = str_repeat(' ', 18);
-  $addr_wrapped  = wordwrap($addr_display, strlen($sep) - 18, "\n" . $addr_indent, true);
-  $lines[] = 'Delivery Address: ' . $addr_wrapped;
+  $addr_display = $delivery_address !== '' ? $delivery_address : 'N/A';
+  $addr_indent  = '  ';
+  $addr_wrapped = wordwrap($addr_display, strlen($sep) - strlen($addr_indent), "\n" . $addr_indent, true);
+  $lines[] = 'Delivery Address:';
+  $lines[] = $addr_indent . $addr_wrapped;
 
   $request_category = trim((string)($rfq['request_category'] ?? 'machine'));
   $is_parts_request = $request_category === 'parts';
@@ -207,34 +208,34 @@ function build_rfq_email_text(array $rfq): string {
     $sep2,
     $is_parts_request ? 'PARTS REQUEST DETAILS:' : 'MACHINE SPECIFICATIONS:',
     $sep2,
-    'Title:        ' . $request_title,
-    'Quantity:     ' . (int)$rfq['quantity'],
+    sprintf('%-15s%s', 'Title:', $request_title),
+    sprintf('%-15s%s', 'Quantity:', (int)$rfq['quantity']),
   ]);
 
+  $incoterm_code  = trim((string)($rfq['po_shipping_method'] ?? ''));
+  $incoterm_label = $incoterm_code !== ''
+    ? (PO_SHIPPING_TERMS[$incoterm_code] ?? $incoterm_code)
+    : 'N/A';
+
   if ($is_parts_request) {
-    $lines[] = 'Part Category: ' . trim((string)($rfq['part_category'] ?? ''));
+    $lines[] = sprintf('%-15s%s', 'Part Category:', trim((string)($rfq['part_category'] ?? '')));
+    $lines[] = sprintf('%-15s%s', 'Incoterm:', $incoterm_label);
     $lines[] = '';
     $lines[] = $sep2;
     $lines[] = 'PART SPECS:';
     $lines[] = $sep2;
     $lines[] = trim((string)($rfq['part_specs'] ?? ''));
   } else {
-    $lines[] = 'Machine Size: ' . trim((string)$rfq['machine_size']);
-    $lines[] = 'Laser Watts:  ' . trim((string)$rfq['laser_watts']);
-    $lines[] = 'Tube Type:    ' . trim((string)$rfq['tube_type']);
+    $lines[] = sprintf('%-15s%s', 'Machine Size:', trim((string)$rfq['machine_size']));
+    $lines[] = sprintf('%-15s%s', 'Laser Watts:', trim((string)$rfq['laser_watts']));
+    $lines[] = sprintf('%-15s%s', 'Tube Type:', trim((string)$rfq['tube_type']));
+    $lines[] = sprintf('%-15s%s', 'Incoterm:', $incoterm_label);
     $lines[] = '';
     $lines[] = $sep2;
     $lines[] = 'REQUIRED FEATURES:';
     $lines[] = $sep2;
     $lines[] = trim((string)$rfq['required_features']);
   }
-
-  $incoterm_code  = trim((string)($rfq['po_shipping_method'] ?? ''));
-  $incoterm_label = $incoterm_code !== ''
-    ? (PO_SHIPPING_TERMS[$incoterm_code] ?? $incoterm_code)
-    : 'N/A';
-  $lines[] = '';
-  $lines[] = 'Incoterm:     ' . $incoterm_label;
 
   $additional_notes = trim((string)($rfq['additional_notes'] ?? ''));
   if ($additional_notes !== '') {
