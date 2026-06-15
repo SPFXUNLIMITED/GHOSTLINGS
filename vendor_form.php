@@ -196,7 +196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             website = ?, alibaba_store = ?, address = ?, notes = ?,
             rating = ?, review = ?,
             logo_path  = COALESCE(?, logo_path),
-            logo_thumb = COALESCE(?, logo_thumb)
+            logo_thumb = COALESCE(?, logo_thumb)  -- preserve existing logo when no new file uploaded
           WHERE id = ?
         ")->execute([
           $fields['company_name'], $fields['contact_name'], $fields['email'],

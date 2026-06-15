@@ -84,9 +84,13 @@ render_header('Vendors');
         } else {
           $logo_thumb_url = '';
         }
-        $logo_full_url = $logo_path !== ''
-          ? 'uploads/' . rawurlencode($logo_path)
-          : ($logo_thumb !== '' ? 'vendor_logo.php?id=' . (int)$v['id'] . '&type=full' : '');
+        if ($logo_path !== '') {
+          $logo_full_url = 'uploads/' . rawurlencode($logo_path);
+        } elseif ($logo_thumb !== '') {
+          $logo_full_url = 'vendor_logo.php?id=' . (int)$v['id'] . '&type=full';
+        } else {
+          $logo_full_url = '';
+        }
       ?>
       <tr>
         <td>
