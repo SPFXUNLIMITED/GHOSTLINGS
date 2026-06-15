@@ -327,8 +327,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $po_line_total_amount = null;
   $po_shipping_cost_amount = null;
   $po_total_amount_amount = null;
-  if (!isset($fields['po_shipping_method']) || $fields['po_shipping_method'] === '' || !array_key_exists($fields['po_shipping_method'], PO_SHIPPING_TERMS)) {
-    $errors[] = 'Shipping terms are required and must be one of: ' . implode(', ', array_keys(PO_SHIPPING_TERMS)) . '.';
+  if (!isset($fields['po_shipping_method']) || $fields['po_shipping_method'] === '') {
+    $errors[] = 'Shipping terms are required.';
+  } elseif (!array_key_exists($fields['po_shipping_method'], PO_SHIPPING_TERMS)) {
+    $errors[] = 'Shipping terms must be one of: ' . implode(', ', array_keys(PO_SHIPPING_TERMS)) . '.';
   }
 
   if ($fields['request_type'] === 'PO') {
