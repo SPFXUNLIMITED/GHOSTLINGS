@@ -541,7 +541,6 @@ function render_email_preview_error(string $message): void {
         . '<strong>Email preview error:</strong><br>'
         . nl2br(htmlspecialchars($message, ENT_QUOTES, 'UTF-8'))
         . '</div></body></html>';
-    exit;
 }
 
 try {
@@ -549,6 +548,7 @@ try {
 
     if ($id === false || $id === null) {
         render_email_preview_error('Unable to generate email preview.');
+        exit;
     }
 
     $stmt = $pdo->prepare('SELECT * FROM quotes WHERE id = ? LIMIT 1');
@@ -571,7 +571,9 @@ try {
     }
 
     render_email_preview_error('Unable to generate email preview.');
+    exit;
 } catch (Throwable $e) {
-    error_log('Email preview failed: ' . $e->getMessage());
-    render_email_preview_error($e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
+    error_log('Email preview failed: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
+    render_email_preview_error('PHP error: ' . $e->getMessage());
+    exit;
 }
