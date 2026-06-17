@@ -677,34 +677,34 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
     }
     return true;
   } catch (Throwable $e) {
-
-  function invoice_email_preview_parts(string $html): array {
-    $html = trim($html);
-    if ($html === '') {
-      return ['body_style' => '', 'content_html' => ''];
-    }
-
-    $body_style = '';
-    if (preg_match('/<body\b[^>]*style=(["\'])(.*?)\1/is', $html, $matches)) {
-      $body_style = trim((string)($matches[2] ?? ''));
-    }
-    if (preg_match('/<body\b[^>]*>(.*)<\/body>/is', $html, $matches)) {
-      $html = (string)($matches[1] ?? '');
-    }
-
-    $html = preg_replace('/<!doctype[^>]*>/i', '', $html);
-    $html = preg_replace('/<head\b.*?<\/head>/is', '', $html);
-    $html = preg_replace('/<\/?(?:html|body)\b[^>]*>/i', '', $html);
-
-    return [
-      'body_style' => $body_style,
-      'content_html' => trim((string)$html),
-    ];
-  } catch (Throwable $e) {
     $error_message = $e->getMessage();
     error_log('Invoice email send failed for quote #' . (int)$quote['id'] . ' to ' . $to . ': ' . $e->getMessage());
     return false;
   }
+}
+
+function invoice_email_preview_parts(string $html): array {
+  $html = trim($html);
+  if ($html === '') {
+    return ['body_style' => '', 'content_html' => ''];
+  }
+
+  $body_style = '';
+  if (preg_match('/<body\b[^>]*style=(["\'])(.*?)\1/is', $html, $matches)) {
+    $body_style = trim((string)($matches[2] ?? ''));
+  }
+  if (preg_match('/<body\b[^>]*>(.*)<\/body>/is', $html, $matches)) {
+    $html = (string)($matches[1] ?? '');
+  }
+
+  $html = preg_replace('/<!doctype[^>]*>/i', '', $html);
+  $html = preg_replace('/<head\b.*?<\/head>/is', '', $html);
+  $html = preg_replace('/<\/?(?:html|body)\b[^>]*>/i', '', $html);
+
+  return [
+    'body_style' => $body_style,
+    'content_html' => trim((string)$html),
+  ];
 }
 
 // ---------- GET: Customer live search ----------
