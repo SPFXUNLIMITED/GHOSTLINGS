@@ -677,6 +677,30 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
     }
     return true;
   } catch (Throwable $e) {
+
+  function invoice_email_preview_parts(string $html): array {
+    $html = trim($html);
+    if ($html === '') {
+      return ['body_style' => '', 'content_html' => ''];
+    }
+
+    $body_style = '';
+    if (preg_match('/<body\b[^>]*style=(["\'])(.*?)\1/is', $html, $matches)) {
+      $body_style = trim((string)($matches[2] ?? ''));
+    }
+    if (preg_match('/<body\b[^>]*>(.*)<\/body>/is', $html, $matches)) {
+      $html = (string)($matches[1] ?? '');
+    }
+
+    $html = preg_replace('/<!doctype[^>]*>/i', '', $html);
+    $html = preg_replace('/<head\b.*?<\/head>/is', '', $html);
+    $html = preg_replace('/<\/?(?:html|body)\b[^>]*>/i', '', $html);
+
+    return [
+      'body_style' => $body_style,
+      'content_html' => trim((string)$html),
+    ];
+  } catch (Throwable $e) {
     $error_message = $e->getMessage();
     error_log('Invoice email send failed for quote #' . (int)$quote['id'] . ' to ' . $to . ': ' . $e->getMessage());
     return false;
@@ -1212,12 +1236,15 @@ $invoice_is_paid = is_array($quote) && invoice_is_paid($quote);
 [$invoice_approval_bg, $invoice_approval_color] = invoice_form_approval_colors($invoice_approval_status);
 $invoice_approval_label = invoice_form_approval_label($invoice_approval_status);
 $invoice_email_preview_html = '';
+$invoice_email_preview_body_style = '';
 $invoice_email_preview_error = '';
 if ($is_view_mode && $quote) {
   $invoice_preview_items = $rows;
   $preview_payload = invoice_build_email_message_data($pdo, $quote, $invoice_preview_items, true, $invoice_email_preview_error);
   if (is_array($preview_payload)) {
-    $invoice_email_preview_html = (string)($preview_payload['html_body'] ?? '');
+    $invoice_email_preview = invoice_email_preview_parts((string)($preview_payload['html_body'] ?? ''));
+    $invoice_email_preview_html = (string)($invoice_email_preview['content_html'] ?? '');
+    $invoice_email_preview_body_style = (string)($invoice_email_preview['body_style'] ?? '');
   }
 }
 
@@ -1235,6 +1262,10 @@ render_header($invoice_heading);
   .invoice-paid-banner{margin:0 0 14px;padding:14px 18px;border:4px solid #dc2626;border-radius:10px;background:#fee2e2;text-align:center;}
   .invoice-paid-banner span{display:inline-block;font-size:56px;line-height:1;font-weight:900;letter-spacing:.16em;color:#b91c1c;text-transform:uppercase;}
   .invoice-mark-paid-btn{background:#dc2626;border-color:#b91c1c;color:#fff;font-weight:700;}
+  .invoice-email-preview-shell{margin-top:14px;padding:18px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;}
+  .invoice-email-preview-shell h2{margin:0 0 6px;font-size:1.15rem;}
+  .invoice-email-preview-shell p{margin:0 0 14px;}
+  .invoice-email-preview-canvas{overflow:auto;border:1px solid #e2e8f0;border-radius:12px;}
 </style>
 
 <div class="card page-header">
@@ -1308,10 +1339,15 @@ render_header($invoice_heading);
       <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b; margin-bottom:14px;">Unable to render invoice email preview: <?= h($invoice_email_preview_error) ?></div>
     <?php endif; ?>
     <?php if ($invoice_email_preview_html !== ''): ?>
-      <iframe
-        title="Invoice Email Preview"
-        style="display:block;width:100%;min-height:980px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;"
-        srcdoc="<?= h($invoice_email_preview_html) ?>"></iframe>
+      <section class="invoice-email-preview-shell" aria-label="Customer Email Preview">
+        <h2>Customer Email Preview</h2>
+        <p class="muted">This is what the customer will see.</p>
+        <div
+          class="invoice-email-preview-canvas"
+          style="<?= h($invoice_email_preview_body_style !== '' ? $invoice_email_preview_body_style : 'margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;') ?>">
+          <?= $invoice_email_preview_html ?>
+        </div>
+      </section>
     <?php else: ?>
       <div class="alert" style="border-color:#fde68a; background:#fffbeb; color:#92400e; margin-bottom:14px;">Invoice email preview is currently unavailable.</div>
     <?php endif; ?>
