@@ -1567,17 +1567,21 @@ render_header($invoice_heading);
           <label for="enable_online_payment" style="display:block; margin:0 0 4px; font-weight:600;">Enable Online Payment</label>
           <p class="muted" style="margin:0; font-size:13px;">When enabled, invoice emails include a secure Stripe checkout link. Save changes before emailing the invoice.</p>
         </div>
-        <label class="invoice-toggle">
-          <input id="enable_online_payment" type="checkbox" name="enable_online_payment" value="1" <?= $fields['enable_online_payment'] === '1' ? 'checked' : '' ?> />
-          <span class="invoice-toggle-slider" aria-hidden="true"></span>
-        </label>
+        <?php if (!$is_view_mode): ?>
+          <label class="invoice-toggle">
+            <input id="enable_online_payment" type="checkbox" name="enable_online_payment" value="1" <?= $fields['enable_online_payment'] === '1' ? 'checked' : '' ?> />
+            <span class="invoice-toggle-slider" aria-hidden="true"></span>
+          </label>
+        <?php endif; ?>
       </div>
       <label for="notes">Notes</label>
       <textarea id="notes" name="notes" rows="5"<?= invoice_field_lock_attrs($is_view_mode) ?>><?= h($fields['notes']) ?></textarea>
     </div>
 
     <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
-      <button type="submit" class="btn primary" style="font-size:18px; padding:14px 22px;">Save Invoice</button>
+      <?php if (!$is_view_mode): ?>
+        <button type="submit" class="btn primary" style="font-size:18px; padding:14px 22px;">Save Invoice</button>
+      <?php endif; ?>
       <a class="btn" href="invoice_tracker.php">Invoice Tracker</a>
       <?php if ($quote): ?>
         <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
