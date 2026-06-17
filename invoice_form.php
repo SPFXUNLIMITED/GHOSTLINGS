@@ -1333,8 +1333,8 @@ render_header($invoice_heading);
   .invoice-toggle input:checked + .invoice-toggle-slider{background:#2563eb;}
   .invoice-toggle input:checked + .invoice-toggle-slider::after{transform:translateX(24px);}
   .invoice-toggle input:focus-visible + .invoice-toggle-slider{outline:3px solid rgba(37,99,235,.25);outline-offset:2px;}
-  .invoice-paid-banner{margin:0 0 14px;padding:14px 18px;border:4px solid #dc2626;border-radius:10px;background:#fee2e2;text-align:center;}
-  .invoice-paid-banner span{display:inline-block;font-size:56px;line-height:1;font-weight:900;letter-spacing:.16em;color:#b91c1c;text-transform:uppercase;}
+  .invoice-paid-banner{margin:0 0 14px;padding:8px 18px;border:4px solid #dc2626;border-radius:10px;background:#fee2e2;text-align:center;}
+  .invoice-paid-banner span{display:inline-block;font-size:28px;line-height:1;font-weight:900;letter-spacing:.16em;color:#b91c1c;text-transform:uppercase;}
   .invoice-mark-paid-btn{background:#dc2626;border-color:#b91c1c;color:#fff;font-weight:700;}
   .invoice-view-content{margin-top:14px;}
 </style>
