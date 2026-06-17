@@ -683,28 +683,54 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
   }
 }
 
-function invoice_email_preview_parts(string $html): array {
+function invoice_email_preview_content(string $html): string {
   $html = trim($html);
   if ($html === '') {
-    return ['body_style' => '', 'content_html' => ''];
+    return '';
   }
 
-  $body_style = '';
-  if (preg_match('/<body\b[^>]*style=(["\'])(.*?)\1/is', $html, $matches)) {
-    $body_style = trim((string)($matches[2] ?? ''));
-  }
-  if (preg_match('/<body\b[^>]*>(.*)<\/body>/is', $html, $matches)) {
-    $html = (string)($matches[1] ?? '');
+  if (class_exists('DOMDocument')) {
+    $dom = new DOMDocument();
+    $libxml_previous = libxml_use_internal_errors(true);
+    $loaded = $dom->loadHTML($html, LIBXML_HTML_NODEFDTD | LIBXML_HTML_NOIMPLIED);
+    libxml_clear_errors();
+    libxml_use_internal_errors($libxml_previous);
+
+    if ($loaded) {
+      foreach (['script', 'iframe', 'object', 'embed'] as $tag_name) {
+        while (($nodes = $dom->getElementsByTagName($tag_name))->length > 0) {
+          $node = $nodes->item(0);
+          if ($node !== null && $node->parentNode !== null) {
+            $node->parentNode->removeChild($node);
+          }
+        }
+      }
+
+      $body = $dom->getElementsByTagName('body')->item(0);
+      $container = $body instanceof DOMNode ? $body : $dom->documentElement;
+      if ($container instanceof DOMNode) {
+        $preview_html = '';
+        foreach ($container->childNodes as $child_node) {
+          $preview_html .= (string)$dom->saveHTML($child_node);
+        }
+        return trim($preview_html);
+      }
+    }
   }
 
-  $html = preg_replace('/<!doctype[^>]*>/i', '', $html);
-  $html = preg_replace('/<head\b.*?<\/head>/is', '', $html);
-  $html = preg_replace('/<\/?(?:html|body)\b[^>]*>/i', '', $html);
+  $body_start = stripos($html, '<body');
+  if ($body_start !== false) {
+    $body_open_end = strpos($html, '>', $body_start);
+    if ($body_open_end !== false) {
+      $body_close = stripos($html, '</body>', $body_open_end);
+      if ($body_close === false) {
+        $body_close = strlen($html);
+      }
+      $html = substr($html, $body_open_end + 1, $body_close - $body_open_end - 1);
+    }
+  }
 
-  return [
-    'body_style' => $body_style,
-    'content_html' => trim((string)$html),
-  ];
+  return trim($html);
 }
 
 // ---------- GET: Customer live search ----------
@@ -1236,15 +1262,12 @@ $invoice_is_paid = is_array($quote) && invoice_is_paid($quote);
 [$invoice_approval_bg, $invoice_approval_color] = invoice_form_approval_colors($invoice_approval_status);
 $invoice_approval_label = invoice_form_approval_label($invoice_approval_status);
 $invoice_email_preview_html = '';
-$invoice_email_preview_body_style = '';
 $invoice_email_preview_error = '';
 if ($is_view_mode && $quote) {
   $invoice_preview_items = $rows;
   $preview_payload = invoice_build_email_message_data($pdo, $quote, $invoice_preview_items, true, $invoice_email_preview_error);
   if (is_array($preview_payload)) {
-    $invoice_email_preview = invoice_email_preview_parts((string)($preview_payload['html_body'] ?? ''));
-    $invoice_email_preview_html = (string)($invoice_email_preview['content_html'] ?? '');
-    $invoice_email_preview_body_style = (string)($invoice_email_preview['body_style'] ?? '');
+    $invoice_email_preview_html = invoice_email_preview_content((string)($preview_payload['html_body'] ?? ''));
   }
 }
 
@@ -1265,7 +1288,7 @@ render_header($invoice_heading);
   .invoice-email-preview-shell{margin-top:14px;padding:18px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;}
   .invoice-email-preview-shell h2{margin:0 0 6px;font-size:1.15rem;}
   .invoice-email-preview-shell p{margin:0 0 14px;}
-  .invoice-email-preview-canvas{overflow:auto;border:1px solid #e2e8f0;border-radius:12px;}
+  .invoice-email-preview-canvas{overflow:auto;border:1px solid #e2e8f0;border-radius:12px;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;}
 </style>
 
 <div class="card page-header">
@@ -1342,9 +1365,7 @@ render_header($invoice_heading);
       <section class="invoice-email-preview-shell" aria-label="Customer Email Preview">
         <h2>Customer Email Preview</h2>
         <p class="muted">This is what the customer will see.</p>
-        <div
-          class="invoice-email-preview-canvas"
-          style="<?= h($invoice_email_preview_body_style !== '' ? $invoice_email_preview_body_style : 'margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;') ?>">
+        <div class="invoice-email-preview-canvas">
           <?= $invoice_email_preview_html ?>
         </div>
       </section>
