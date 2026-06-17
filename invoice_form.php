@@ -7,6 +7,57 @@ require_once __DIR__ . '/lib/PHPMailer/src/PHPMailer.php';
 require_once __DIR__ . '/lib/PHPMailer/src/SMTP.php';
 require_admin_or_moderator();
 
+$quote_id_param = trim((string)($_GET['id'] ?? ''));
+$has_quote_id = $quote_id_param !== '';
+$quote_id = $has_quote_id ? (int)$quote_id_param : 0;
+$quote = null;
+$rows = [];
+
+if ($has_quote_id) {
+  if ($quote_id <= 0) {
+    http_response_code(404);
+    render_header('Invoice Not Found');
+    ?>
+    <div class="card">
+      <h1 style="margin-top:0;">Invoice Not Found</h1>
+      <p class="muted">The requested quote ID is invalid.</p>
+      <a class="btn" href="quotes.php?view=all">Back to Quotes</a>
+    </div>
+    <?php
+    render_footer();
+    exit;
+  }
+
+  $quote_stmt = $pdo->prepare("SELECT * FROM quotes WHERE id = ? LIMIT 1");
+  $quote_stmt->execute([$quote_id]);
+  $quote = $quote_stmt->fetch(PDO::FETCH_ASSOC);
+  if (!$quote) {
+    http_response_code(404);
+    render_header('Invoice Not Found');
+    ?>
+    <div class="card">
+      <h1 style="margin-top:0;">Invoice Not Found</h1>
+      <p class="muted">We couldn't find the quote used to pre-fill this invoice.</p>
+      <a class="btn" href="quotes.php?view=all">Back to Quotes</a>
+    </div>
+    <?php
+    render_footer();
+    exit;
+  }
+
+  $item_stmt = $pdo->prepare("SELECT description, quantity, cost, markup_percent, unit_price, line_total FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC");
+  $item_stmt->execute([$quote_id]);
+  $rows = $item_stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+if (isset($_GET['email_preview']) && $quote !== null) {
+  $ep_error = '';
+  $ep_payload = invoice_build_email_message_data($pdo, $quote, $rows, true, $ep_error);
+  header('Content-Type: text/html; charset=UTF-8');
+  echo is_array($ep_payload) ? (string)($ep_payload['html_body'] ?? '') : '';
+  exit;
+}
+
 const INVOICE_DEFAULT_QTY = '1.00';
 const INVOICE_DEFAULT_COST = '0.00';
 const INVOICE_DEFAULT_MARKUP = '20.00';
@@ -1174,57 +1225,6 @@ function invoice_quote_date_value(?array $quote, string $fallback): string {
   return $quote_date !== '' ? $quote_date : $fallback;
 }
 
-$quote_id_param = trim((string)($_GET['id'] ?? ''));
-$has_quote_id = $quote_id_param !== '';
-$quote_id = $has_quote_id ? (int)$quote_id_param : 0;
-$quote = null;
-$rows = [];
-
-if ($has_quote_id) {
-  if ($quote_id <= 0) {
-    http_response_code(404);
-    render_header('Invoice Not Found');
-    ?>
-    <div class="card">
-      <h1 style="margin-top:0;">Invoice Not Found</h1>
-      <p class="muted">The requested quote ID is invalid.</p>
-      <a class="btn" href="quotes.php?view=all">Back to Quotes</a>
-    </div>
-    <?php
-    render_footer();
-    exit;
-  }
-
-  $quote_stmt = $pdo->prepare("SELECT * FROM quotes WHERE id = ? LIMIT 1");
-  $quote_stmt->execute([$quote_id]);
-  $quote = $quote_stmt->fetch(PDO::FETCH_ASSOC);
-  if (!$quote) {
-    http_response_code(404);
-    render_header('Invoice Not Found');
-    ?>
-    <div class="card">
-      <h1 style="margin-top:0;">Invoice Not Found</h1>
-      <p class="muted">We couldn’t find the quote used to pre-fill this invoice.</p>
-      <a class="btn" href="quotes.php?view=all">Back to Quotes</a>
-    </div>
-    <?php
-    render_footer();
-    exit;
-  }
-
-  $item_stmt = $pdo->prepare("SELECT description, quantity, cost, markup_percent, unit_price, line_total FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC");
-  $item_stmt->execute([$quote_id]);
-  $rows = $item_stmt->fetchAll(PDO::FETCH_ASSOC);
-}
-
-if (isset($_GET['email_preview']) && $quote !== null) {
-  $ep_error = '';
-  $ep_payload = invoice_build_email_message_data($pdo, $quote, $rows, true, $ep_error);
-  header('Content-Type: text/html; charset=UTF-8');
-  echo is_array($ep_payload) ? (string)($ep_payload['html_body'] ?? '') : '';
-  exit;
-}
-
 $today = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Y-m-d');
 $is_view_mode = $view_mode_requested && $quote !== null;
 $invoice_heading = $is_view_mode ? 'View Invoice' : ($quote ? 'Edit Invoice' : 'New Invoice');
@@ -1368,7 +1368,8 @@ render_header($invoice_heading);
     <div class="alert" style="border-color:#fecaca; background:#fff1f2; color:#9f1239; margin-bottom:14px;">Invoice is already marked as paid.</div>
   <?php endif; ?>
   <?php if ($is_view_mode): ?>
-    <iframe src="invoice_form.php?id=<?= (int)$quote_id ?>&email_preview" style="width:100%;border:none;min-height:800px;" title="Invoice Email Preview"></iframe>
+    <p>Customer Email Preview — This is exactly what the customer will receive:</p>
+    <iframe src="invoice_form.php?id=<?= (int)$quote_id ?>&email_preview" style="width:100%;border:none;min-height:1200px;" title="Invoice Email Preview"></iframe>
   <?php endif; ?>
 
   <?php if (!$is_view_mode): ?>
