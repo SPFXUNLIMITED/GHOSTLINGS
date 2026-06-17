@@ -1315,8 +1315,9 @@ render_header($invoice_heading);
     <?php else: ?>
       <div class="alert" style="border-color:#fde68a; background:#fffbeb; color:#92400e; margin-bottom:14px;">Invoice email preview is currently unavailable.</div>
     <?php endif; ?>
-  <?php else: ?>
+  <?php endif; ?>
 
+  <?php if (!$is_view_mode): ?>
   <form method="post" action="">
     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
     <input type="hidden" name="source_quote_id" value="<?= h($fields['source_quote_id']) ?>" />
