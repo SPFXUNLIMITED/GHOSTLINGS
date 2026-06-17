@@ -1300,10 +1300,7 @@ render_header($invoice_heading);
   .invoice-paid-banner{margin:0 0 14px;padding:14px 18px;border:4px solid #dc2626;border-radius:10px;background:#fee2e2;text-align:center;}
   .invoice-paid-banner span{display:inline-block;font-size:56px;line-height:1;font-weight:900;letter-spacing:.16em;color:#b91c1c;text-transform:uppercase;}
   .invoice-mark-paid-btn{background:#dc2626;border-color:#b91c1c;color:#fff;font-weight:700;}
-  .invoice-email-preview-shell{margin-top:14px;padding:18px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;}
-  .invoice-email-preview-shell h2{margin:0 0 6px;font-size:1.15rem;}
-  .invoice-email-preview-shell p{margin:0 0 14px;}
-  .invoice-email-preview-canvas{overflow:auto;border:1px solid #e2e8f0;border-radius:12px;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;}
+  .invoice-view-content{margin-top:14px;}
 </style>
 
 <div class="card page-header">
@@ -1350,7 +1347,7 @@ render_header($invoice_heading);
   </div>
 </div>
 
-<div class="card">
+<div class="<?= $is_view_mode ? 'invoice-view-content' : 'card' ?>">
   <?php if ($invoice_is_paid): ?>
     <div class="invoice-paid-banner"><span>PAID</span></div>
   <?php endif; ?>
@@ -1377,13 +1374,7 @@ render_header($invoice_heading);
       <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b; margin-bottom:14px;">Unable to render invoice email preview: <?= h($invoice_email_preview_error) ?></div>
     <?php endif; ?>
     <?php if ($invoice_email_preview_html !== ''): ?>
-      <section class="invoice-email-preview-shell" aria-label="Customer Email Preview">
-        <h2>Customer Email Preview</h2>
-        <p class="muted">This is what the customer will see.</p>
-        <div class="invoice-email-preview-canvas">
-          <?= $invoice_email_preview_html ?>
-        </div>
-      </section>
+      <?= $invoice_email_preview_html ?>
     <?php else: ?>
       <div class="alert" style="border-color:#fde68a; background:#fffbeb; color:#92400e; margin-bottom:14px;">Invoice email preview is currently unavailable.</div>
     <?php endif; ?>
