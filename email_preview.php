@@ -119,8 +119,8 @@ try {
 
     $document_noun = $is_invoice ? 'invoice' : 'quote';
     $document_heading = $is_invoice
-        ? 'Invoice ' . ($invoice_number !== '' ? $escape_html($invoice_number) : '#' . $quote_id)
-        : 'Quote #' . $escape_html($quote_id);
+        ? 'Invoice ' . ($invoice_number !== '' ? $escape_html($invoice_number) : $escape_html('#' . $quote_id))
+        : 'Quote ' . $escape_html('#' . $quote_id);
     $document_intro = $is_invoice
         ? 'Please find your invoice details below. Thank you for your business.'
         : 'Please find your quote details below. We appreciate the opportunity to earn your business.';
