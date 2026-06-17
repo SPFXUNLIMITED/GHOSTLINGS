@@ -1217,6 +1217,14 @@ if ($has_quote_id) {
   $rows = $item_stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+if (isset($_GET['email_preview']) && $quote !== null) {
+  $ep_error = '';
+  $ep_payload = invoice_build_email_message_data($pdo, $quote, $rows, true, $ep_error);
+  header('Content-Type: text/html; charset=UTF-8');
+  echo is_array($ep_payload) ? (string)($ep_payload['html_body'] ?? '') : '';
+  exit;
+}
+
 $today = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Y-m-d');
 $is_view_mode = $view_mode_requested && $quote !== null;
 $invoice_heading = $is_view_mode ? 'View Invoice' : ($quote ? 'Edit Invoice' : 'New Invoice');
@@ -1276,16 +1284,6 @@ $invoice_approval_status = is_array($quote) ? (string)($quote['approval_status']
 $invoice_is_paid = is_array($quote) && invoice_is_paid($quote);
 [$invoice_approval_bg, $invoice_approval_color] = invoice_form_approval_colors($invoice_approval_status);
 $invoice_approval_label = invoice_form_approval_label($invoice_approval_status);
-$invoice_email_preview_html = '';
-$invoice_email_preview_error = '';
-if ($is_view_mode && $quote) {
-  $invoice_preview_items = $rows;
-  $preview_payload = invoice_build_email_message_data($pdo, $quote, $invoice_preview_items, true, $invoice_email_preview_error);
-  if (is_array($preview_payload)) {
-    $invoice_email_preview_html = invoice_email_preview_content((string)($preview_payload['html_body'] ?? ''));
-  }
-}
-
 render_header($invoice_heading);
 ?>
 
@@ -1370,14 +1368,7 @@ render_header($invoice_heading);
     <div class="alert" style="border-color:#fecaca; background:#fff1f2; color:#9f1239; margin-bottom:14px;">Invoice is already marked as paid.</div>
   <?php endif; ?>
   <?php if ($is_view_mode): ?>
-    <?php if ($invoice_email_preview_error !== ''): ?>
-      <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b; margin-bottom:14px;">Unable to render invoice email preview: <?= h($invoice_email_preview_error) ?></div>
-    <?php endif; ?>
-    <?php if ($invoice_email_preview_html !== ''): ?>
-      <?= $invoice_email_preview_html ?>
-    <?php else: ?>
-      <div class="alert" style="border-color:#fde68a; background:#fffbeb; color:#92400e; margin-bottom:14px;">Invoice email preview is currently unavailable.</div>
-    <?php endif; ?>
+    <iframe src="invoice_form.php?id=<?= (int)$quote_id ?>&email_preview" style="width:100%;border:none;min-height:800px;" title="Invoice Email Preview"></iframe>
   <?php endif; ?>
 
   <?php if (!$is_view_mode): ?>
