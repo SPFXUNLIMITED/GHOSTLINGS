@@ -35,6 +35,283 @@ if (isset($_GET['email_preview']) && isset($_GET['id'])) {
     exit;
 }
 
+function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, bool $require_payment_link = true, ?string &$error_message = null): ?array {
+  $error_message = null;
+  $created_by    = isset($quote['created_by']) && $quote['created_by'] !== null ? (int)$quote['created_by'] : null;
+  $sender        = invoice_sender_profile($pdo, $created_by);
+  $sender_name   = $sender['sender_name'];
+  $smtp_from_name = trim(str_replace(["\r", "\n"], ' ', invoice_env_value('SMTP_FROM_NAME')));
+  $sender_company = $sender['company_name'] !== '' ? $sender['company_name'] : $smtp_from_name;
+  if ($sender_company === '') $sender_company = 'Our Company';
+  $sender_address = $sender['address'];
+  $sender_phone   = $sender['phone'];
+  $sender_email_env = invoice_env_value('SMTP_FROM_EMAIL');
+  $sender_email   = $sender['email'] !== '' ? $sender['email'] : $sender_email_env;
+
+  $inv_no        = trim((string)($quote['converted_invoice_no'] ?? ''));
+  $customer_name = trim((string)($quote['customer_name'] ?? ''));
+  $customer_company = trim((string)($quote['company_name'] ?? ''));
+  $inv_date      = trim((string)($quote['quote_date'] ?? ''));
+  $subtotal      = number_format((float)($quote['subtotal_amount'] ?? 0), 2);
+  $inv_tax_rate  = (float)($quote['tax_rate'] ?? 0);
+  $inv_tax_amount = number_format((float)($quote['tax_amount'] ?? 0), 2);
+  $inv_grand_total = number_format((float)($quote['subtotal_amount'] ?? 0) + (float)($quote['tax_amount'] ?? 0), 2);
+
+  // Bill To address
+  $bill_street = trim((string)($quote['billing_street'] ?? ''));
+  $bill_city   = trim((string)($quote['billing_city']   ?? ''));
+  $bill_state  = trim((string)($quote['billing_state']  ?? ''));
+  $bill_zip    = trim((string)($quote['billing_zip']    ?? ''));
+  $is_paid = invoice_is_paid($quote);
+  $payment_link = '';
+  if (!$is_paid && invoice_online_payment_enabled($quote)) {
+    $payment_error = null;
+    $payment_link = invoice_checkout_session_url($pdo, $quote, $payment_error);
+    if ($payment_link === '' && $require_payment_link) {
+      $error_message = trim((string)$payment_error) !== '' ? trim((string)$payment_error) : 'Unable to create Stripe checkout link for this invoice.';
+      return null;
+    }
+  }
+
+  $subject = $sender_company . ' - Invoice ' . ($inv_no !== '' ? $inv_no : '#' . (int)$quote['id']);
+
+  // ---- Build HTML rows ----
+  $rows_html = [];
+  $rows_text = [];
+  $row_index = 0;
+  foreach ($items as $item) {
+    $desc       = trim((string)($item['description'] ?? ''));
+    $qty        = number_format((float)($item['quantity']   ?? 0), 2);
+    $unit_price = number_format((float)($item['unit_price'] ?? 0), 2);
+    $line_total = number_format((float)($item['line_total'] ?? 0), 2);
+    $row_bg     = ($row_index % 2 === 0) ? '#ffffff' : '#f9fafb';
+    $rows_html[] = '<tr style="background:' . $row_bg . ';">'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">' . htmlspecialchars($desc, ENT_QUOTES, 'UTF-8') . '</td>'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">' . htmlspecialchars($qty, ENT_QUOTES, 'UTF-8') . '</td>'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . htmlspecialchars($unit_price, ENT_QUOTES, 'UTF-8') . '</td>'
+      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . htmlspecialchars($line_total, ENT_QUOTES, 'UTF-8') . '</td>'
+      . '</tr>';
+    $rows_text[] = '- ' . $desc . ' | Qty: ' . $qty . ' | Price: $' . $unit_price . ' | Total: $' . $line_total;
+    $row_index++;
+  }
+  if (!$rows_html) {
+    $rows_html[] = '<tr><td colspan="4" style="padding:10px 12px;text-align:center;color:#6b7280;">No line items.</td></tr>';
+    $rows_text[] = '- No line items.';
+  }
+
+  // ---- Contact / footer parts ----
+  $h = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+
+  $header_parts = [];
+  if ($sender_address !== '') {
+    $addr_oneline = str_replace(["\r\n", "\r", "\n"], ' · ', $sender_address);
+    $addr_oneline = preg_replace('/\s+/', ' ', $addr_oneline);
+    $header_parts[] = $h($addr_oneline);
+  }
+  if ($sender_phone !== '') $header_parts[] = $h($sender_phone);
+  if ($sender_email !== '') {
+    $header_parts[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($sender_email) . '</a>';
+  }
+  $header_contact_html = implode(' &nbsp;·&nbsp; ', $header_parts);
+
+  $prepared_by_html = '';
+  if ($sender_name !== '') {
+    $prepared_by_html = 'This invoice was prepared by <strong style="color:#1e293b;">' . $h($sender_name) . '</strong>';
+    if ($sender_company !== 'Our Company') {
+      $prepared_by_html .= ' at <strong style="color:#1e293b;">' . $h($sender_company) . '</strong>';
+    }
+    $prepared_by_html .= '.';
+  }
+
+  $footer_parts = [];
+  if ($sender_address !== '') {
+    $footer_parts[] = $h(preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ', ', $sender_address)));
+  }
+  if ($sender_phone !== '') $footer_parts[] = $h($sender_phone);
+  if ($sender_email !== '') {
+    $footer_parts[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($sender_email) . '</a>';
+  }
+  $footer_contact_html = implode(' &nbsp;·&nbsp; ', $footer_parts);
+
+  $inv_label = $inv_no !== '' ? $h($inv_no) : '#' . (int)$quote['id'];
+
+  // ---- Build Bill To / From HTML blocks ----
+  $bill_to_lines = [];
+  if ($customer_company !== '') $bill_to_lines[] = '<strong style="color:#0f172a;">' . $h($customer_company) . '</strong>';
+  if ($customer_name !== '')    $bill_to_lines[] = $h($customer_name);
+  if ($bill_street !== '')      $bill_to_lines[] = $h($bill_street);
+  $bill_csz_parts = array_filter([$bill_city, $bill_state . ($bill_zip !== '' ? ' ' . $bill_zip : '')]);
+  $bill_csz = implode(', ', $bill_csz_parts);
+  if ($bill_csz !== '')         $bill_to_lines[] = $h($bill_csz);
+  if (trim((string)($quote['phone_number'] ?? '')) !== '') $bill_to_lines[] = $h(trim((string)($quote['phone_number'] ?? '')));
+  if (trim((string)($quote['email'] ?? '')) !== '') $bill_to_lines[] = '<a href="mailto:' . $h(trim((string)($quote['email'] ?? ''))) . '" style="color:#1d4ed8;text-decoration:none;">' . $h(trim((string)($quote['email'] ?? ''))) . '</a>';
+  $bill_to_html = implode('<br>', $bill_to_lines);
+
+  $from_lines = [];
+  $from_lines[] = '<strong style="color:#0f172a;">' . $h($sender_company) . '</strong>';
+  if ($sender_name !== '' && $sender_name !== $sender_company) $from_lines[] = $h($sender_name);
+  foreach (array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $sender_address))) as $addr_line) {
+    $from_lines[] = $h($addr_line);
+  }
+  if ($sender_phone !== '') $from_lines[] = $h($sender_phone);
+  if ($sender_email !== '') $from_lines[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#1d4ed8;text-decoration:none;">' . $h($sender_email) . '</a>';
+  $from_html = implode('<br>', $from_lines);
+
+  // ---- Assemble HTML email ----
+  $html_body = '<!doctype html>'
+    . '<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
+    . '<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">'
+
+    . '<div style="max-width:680px;margin:32px auto 32px;">'
+
+    // ── Header banner ──
+    . '<div style="background:#1e3a5f;border-radius:8px 8px 0 0;padding:28px 32px 24px;">'
+      . '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $h($sender_company) . '</p>'
+      . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '')
+    . '</div>'
+    . ($is_paid
+        ? '<div style="background:#ffffff;padding:16px 32px 0;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
+            . '<div style="margin:0 0 4px;padding:14px 18px;border:4px solid #dc2626;border-radius:10px;background:#fee2e2;text-align:center;">'
+              . '<span style="display:inline-block;font-size:56px;line-height:1;font-weight:900;letter-spacing:0.16em;color:#b91c1c;text-transform:uppercase;">PAID</span>'
+            . '</div>'
+          . '</div>'
+        : '')
+
+    // ── Document title strip ──
+    . '<div style="background:#ffffff;padding:' . ($is_paid ? '16px' : '20px') . ' 32px 0;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
+      . '<table style="width:100%;border-collapse:collapse;">'
+        . '<tr>'
+          . '<td style="padding:0 0 16px;">'
+            . '<p style="margin:0;font-size:18px;font-weight:700;color:#0f172a;">Invoice ' . $inv_label . '</p>'
+          . '</td>'
+          . '<td style="padding:0 0 16px;text-align:right;">'
+            . '<p style="margin:0;font-size:13px;color:#64748b;">Date: ' . $h($inv_date) . '</p>'
+          . '</td>'
+        . '</tr>'
+      . '</table>'
+      . '<hr style="margin:0;border:none;border-top:2px solid #e2e8f0;">'
+    . '</div>'
+
+    // ── Bill To / From boxes ──
+    . '<div style="background:#ffffff;padding:20px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:0;">'
+      . '<table style="width:100%;border-collapse:collapse;">'
+        . '<tr>'
+          . '<td style="width:50%;padding:0 8px 0 0;vertical-align:top;">'
+            . '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;background:#f8fafc;">'
+              . '<p style="margin:0 0 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;">Bill To</p>'
+              . '<p style="margin:0;font-size:13px;color:#374151;line-height:1.7;">' . $bill_to_html . '</p>'
+            . '</div>'
+          . '</td>'
+          . '<td style="width:50%;padding:0 0 0 8px;vertical-align:top;">'
+            . '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;background:#f8fafc;">'
+              . '<p style="margin:0 0 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;">From</p>'
+              . '<p style="margin:0;font-size:13px;color:#374151;line-height:1.7;">' . $from_html . '</p>'
+            . '</div>'
+          . '</td>'
+        . '</tr>'
+      . '</table>'
+    . '</div>'
+
+    // ── Body ──
+    . '<div style="background:#ffffff;padding:24px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
+
+      . '<p style="margin:0 0 8px;font-size:15px;color:#1e293b;">Hello' . ($customer_name !== '' ? ', ' . $h($customer_name) : '') . ',</p>'
+      . '<p style="margin:0 0 24px;font-size:14px;color:#475569;">Please find your invoice details below. Thank you for your business.</p>'
+      . ($payment_link !== ''
+          ? '<div style="margin:0 0 24px;padding:16px 18px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;">'
+              . '<p style="margin:0 0 10px;font-size:14px;font-weight:600;color:#1d4ed8;">Pay this invoice online</p>'
+              . '<p style="margin:0 0 14px;font-size:13px;color:#334155;">Use Stripe\'s secure checkout page to pay this invoice online. Card details are entered directly on Stripe and are not collected on our site.</p>'
+              . '<p style="margin:0;"><a href="' . $h($payment_link) . '" style="display:inline-block;padding:11px 18px;background:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:999px;font-weight:700;">Pay Invoice on Stripe</a></p>'
+            . '</div>'
+          : '')
+
+      // Line items table
+      . '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">'
+        . '<thead>'
+          . '<tr style="background:#f8fafc;">'
+            . '<th style="padding:10px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Description</th>'
+            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Qty</th>'
+            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Unit Price</th>'
+            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Total</th>'
+          . '</tr>'
+        . '</thead>'
+        . '<tbody>' . implode('', $rows_html) . '</tbody>'
+        . '<tfoot>'
+          . '<tr>'
+            . '<td colspan="3" style="padding:10px 12px;text-align:right;font-weight:600;font-size:13px;color:#1e293b;border-top:2px solid #e2e8f0;">Subtotal:</td>'
+            . '<td style="padding:10px 12px;text-align:right;font-weight:600;font-size:14px;color:#1e3a5f;border-top:2px solid #e2e8f0;">$' . $h($subtotal) . '</td>'
+          . '</tr>'
+          . ($inv_tax_rate > 0
+              ? '<tr>'
+                  . '<td colspan="3" style="padding:4px 12px;text-align:right;font-weight:600;font-size:13px;color:#1e293b;">Tax (' . $h(number_format($inv_tax_rate, 2)) . '%):</td>'
+                  . '<td style="padding:4px 12px;text-align:right;font-weight:600;font-size:14px;color:#1e3a5f;">$' . $h($inv_tax_amount) . '</td>'
+                . '</tr>'
+              : '')
+          . '<tr>'
+            . '<td colspan="3" style="padding:10px 12px;text-align:right;font-weight:700;font-size:14px;color:#1e293b;">Grand Total:</td>'
+            . '<td style="padding:10px 12px;text-align:right;font-weight:700;font-size:16px;color:#1e3a5f;">$' . $h($inv_grand_total) . '</td>'
+          . '</tr>'
+        . '</tfoot>'
+      . '</table>'
+
+      . '<p style="margin:0;font-size:14px;color:#475569;">If you have any questions regarding this invoice, please do not hesitate to contact us.</p>'
+    . '</div>'
+
+    // ── Prepared-by strip ──
+    . ($prepared_by_html !== ''
+        ? '<div style="background:#f8fafc;padding:14px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:1px solid #e2e8f0;">'
+            . '<p style="margin:0;font-size:13px;color:#64748b;">' . $prepared_by_html . '</p>'
+          . '</div>'
+        : '')
+
+    // ── Footer ──
+    . '<div style="background:#1e3a5f;border-radius:0 0 8px 8px;padding:18px 32px;">'
+      . '<p style="margin:0;font-size:12px;color:#93c5fd;line-height:1.6;">'
+        . $h($sender_company)
+        . ($footer_contact_html !== '' ? ' &nbsp;·&nbsp; ' . $footer_contact_html : '')
+      . '</p>'
+    . '</div>'
+
+    . '</div>'
+    . '</body></html>';
+
+  // ---- Plain-text fallback ----
+  $text_body  = $sender_company . "\r\n";
+  if ($sender_address !== '') $text_body .= preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ', ', $sender_address)) . "\r\n";
+  if ($sender_phone !== '')   $text_body .= $sender_phone . "\r\n";
+  if ($sender_email !== '')   $text_body .= $sender_email . "\r\n";
+  $text_body .= "\r\nInvoice " . ($inv_no !== '' ? $inv_no : '#' . (int)$quote['id']) . "  |  Date: {$inv_date}\r\n";
+  $text_body .= str_repeat('-', 40) . "\r\n";
+  $text_body .= "Bill To: " . ($customer_company !== '' ? $customer_company . ' / ' : '') . $customer_name . "\r\n";
+  if ($bill_street !== '') $text_body .= $bill_street . "\r\n";
+  if ($bill_csz !== '') $text_body .= $bill_csz . "\r\n";
+  $text_body .= str_repeat('-', 40) . "\r\n\r\n";
+  if ($is_paid) {
+    $text_body .= "PAID\r\n\r\n";
+  }
+  $text_body .= "Hello" . ($customer_name !== '' ? ", {$customer_name}" : '') . ",\r\n\r\n";
+  $text_body .= "Please find your invoice details below.\r\n\r\nLine Items:\r\n";
+  if ($payment_link !== '') {
+    $text_body .= "Pay online with Stripe: {$payment_link}\r\n";
+    $text_body .= "Card details are entered directly on Stripe's secure checkout page.\r\n\r\n";
+  }
+  $text_body .= implode("\r\n", $rows_text) . "\r\n\r\n";
+  $text_body .= "Subtotal: \${$subtotal}\r\n";
+  if ($inv_tax_rate > 0) {
+    $text_body .= "Tax (" . number_format($inv_tax_rate, 2) . "%): \${$inv_tax_amount}\r\n";
+  }
+  $text_body .= "Grand Total: \${$inv_grand_total}\r\n\r\n";
+  $text_body .= "Thank you for your business.\r\n";
+  if ($sender_name !== '') {
+    $text_body .= "\r\nPrepared by: {$sender_name}" . ($sender_company !== 'Our Company' ? " at {$sender_company}" : '') . "\r\n";
+  }
+
+  return [
+    'subject' => $subject,
+    'html_body' => $html_body,
+    'text_body' => $text_body,
+  ];
+}
 $quote_id_param = trim((string)($_GET['id'] ?? ''));
 $has_quote_id = $quote_id_param !== '';
 $quote_id = $has_quote_id ? (int)$quote_id_param : 0;
@@ -407,284 +684,6 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
   $quote['stripe_checkout_amount'] = $amount;
 
   return $checkout_url;
-}
-
-function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, bool $require_payment_link = true, ?string &$error_message = null): ?array {
-  $error_message = null;
-  $created_by    = isset($quote['created_by']) && $quote['created_by'] !== null ? (int)$quote['created_by'] : null;
-  $sender        = invoice_sender_profile($pdo, $created_by);
-  $sender_name   = $sender['sender_name'];
-  $smtp_from_name = trim(str_replace(["\r", "\n"], ' ', invoice_env_value('SMTP_FROM_NAME')));
-  $sender_company = $sender['company_name'] !== '' ? $sender['company_name'] : $smtp_from_name;
-  if ($sender_company === '') $sender_company = 'Our Company';
-  $sender_address = $sender['address'];
-  $sender_phone   = $sender['phone'];
-  $sender_email_env = invoice_env_value('SMTP_FROM_EMAIL');
-  $sender_email   = $sender['email'] !== '' ? $sender['email'] : $sender_email_env;
-
-  $inv_no        = trim((string)($quote['converted_invoice_no'] ?? ''));
-  $customer_name = trim((string)($quote['customer_name'] ?? ''));
-  $customer_company = trim((string)($quote['company_name'] ?? ''));
-  $inv_date      = trim((string)($quote['quote_date'] ?? ''));
-  $subtotal      = number_format((float)($quote['subtotal_amount'] ?? 0), 2);
-  $inv_tax_rate  = (float)($quote['tax_rate'] ?? 0);
-  $inv_tax_amount = number_format((float)($quote['tax_amount'] ?? 0), 2);
-  $inv_grand_total = number_format((float)($quote['subtotal_amount'] ?? 0) + (float)($quote['tax_amount'] ?? 0), 2);
-
-  // Bill To address
-  $bill_street = trim((string)($quote['billing_street'] ?? ''));
-  $bill_city   = trim((string)($quote['billing_city']   ?? ''));
-  $bill_state  = trim((string)($quote['billing_state']  ?? ''));
-  $bill_zip    = trim((string)($quote['billing_zip']    ?? ''));
-  $is_paid = invoice_is_paid($quote);
-  $payment_link = '';
-  if (!$is_paid && invoice_online_payment_enabled($quote)) {
-    $payment_error = null;
-    $payment_link = invoice_checkout_session_url($pdo, $quote, $payment_error);
-    if ($payment_link === '' && $require_payment_link) {
-      $error_message = trim((string)$payment_error) !== '' ? trim((string)$payment_error) : 'Unable to create Stripe checkout link for this invoice.';
-      return null;
-    }
-  }
-
-  $subject = $sender_company . ' - Invoice ' . ($inv_no !== '' ? $inv_no : '#' . (int)$quote['id']);
-
-  // ---- Build HTML rows ----
-  $rows_html = [];
-  $rows_text = [];
-  $row_index = 0;
-  foreach ($items as $item) {
-    $desc       = trim((string)($item['description'] ?? ''));
-    $qty        = number_format((float)($item['quantity']   ?? 0), 2);
-    $unit_price = number_format((float)($item['unit_price'] ?? 0), 2);
-    $line_total = number_format((float)($item['line_total'] ?? 0), 2);
-    $row_bg     = ($row_index % 2 === 0) ? '#ffffff' : '#f9fafb';
-    $rows_html[] = '<tr style="background:' . $row_bg . ';">'
-      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">' . htmlspecialchars($desc, ENT_QUOTES, 'UTF-8') . '</td>'
-      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">' . htmlspecialchars($qty, ENT_QUOTES, 'UTF-8') . '</td>'
-      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . htmlspecialchars($unit_price, ENT_QUOTES, 'UTF-8') . '</td>'
-      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . htmlspecialchars($line_total, ENT_QUOTES, 'UTF-8') . '</td>'
-      . '</tr>';
-    $rows_text[] = '- ' . $desc . ' | Qty: ' . $qty . ' | Price: $' . $unit_price . ' | Total: $' . $line_total;
-    $row_index++;
-  }
-  if (!$rows_html) {
-    $rows_html[] = '<tr><td colspan="4" style="padding:10px 12px;text-align:center;color:#6b7280;">No line items.</td></tr>';
-    $rows_text[] = '- No line items.';
-  }
-
-  // ---- Contact / footer parts ----
-  $h = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
-
-  $header_parts = [];
-  if ($sender_address !== '') {
-    $addr_oneline = str_replace(["\r\n", "\r", "\n"], ' · ', $sender_address);
-    $addr_oneline = preg_replace('/\s+/', ' ', $addr_oneline);
-    $header_parts[] = $h($addr_oneline);
-  }
-  if ($sender_phone !== '') $header_parts[] = $h($sender_phone);
-  if ($sender_email !== '') {
-    $header_parts[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($sender_email) . '</a>';
-  }
-  $header_contact_html = implode(' &nbsp;·&nbsp; ', $header_parts);
-
-  $prepared_by_html = '';
-  if ($sender_name !== '') {
-    $prepared_by_html = 'This invoice was prepared by <strong style="color:#1e293b;">' . $h($sender_name) . '</strong>';
-    if ($sender_company !== 'Our Company') {
-      $prepared_by_html .= ' at <strong style="color:#1e293b;">' . $h($sender_company) . '</strong>';
-    }
-    $prepared_by_html .= '.';
-  }
-
-  $footer_parts = [];
-  if ($sender_address !== '') {
-    $footer_parts[] = $h(preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ', ', $sender_address)));
-  }
-  if ($sender_phone !== '') $footer_parts[] = $h($sender_phone);
-  if ($sender_email !== '') {
-    $footer_parts[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($sender_email) . '</a>';
-  }
-  $footer_contact_html = implode(' &nbsp;·&nbsp; ', $footer_parts);
-
-  $inv_label = $inv_no !== '' ? $h($inv_no) : '#' . (int)$quote['id'];
-
-  // ---- Build Bill To / From HTML blocks ----
-  $bill_to_lines = [];
-  if ($customer_company !== '') $bill_to_lines[] = '<strong style="color:#0f172a;">' . $h($customer_company) . '</strong>';
-  if ($customer_name !== '')    $bill_to_lines[] = $h($customer_name);
-  if ($bill_street !== '')      $bill_to_lines[] = $h($bill_street);
-  $bill_csz_parts = array_filter([$bill_city, $bill_state . ($bill_zip !== '' ? ' ' . $bill_zip : '')]);
-  $bill_csz = implode(', ', $bill_csz_parts);
-  if ($bill_csz !== '')         $bill_to_lines[] = $h($bill_csz);
-  if (trim((string)($quote['phone_number'] ?? '')) !== '') $bill_to_lines[] = $h(trim((string)($quote['phone_number'] ?? '')));
-  if (trim((string)($quote['email'] ?? '')) !== '') $bill_to_lines[] = '<a href="mailto:' . $h(trim((string)($quote['email'] ?? ''))) . '" style="color:#1d4ed8;text-decoration:none;">' . $h(trim((string)($quote['email'] ?? ''))) . '</a>';
-  $bill_to_html = implode('<br>', $bill_to_lines);
-
-  $from_lines = [];
-  $from_lines[] = '<strong style="color:#0f172a;">' . $h($sender_company) . '</strong>';
-  if ($sender_name !== '' && $sender_name !== $sender_company) $from_lines[] = $h($sender_name);
-  foreach (array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $sender_address))) as $addr_line) {
-    $from_lines[] = $h($addr_line);
-  }
-  if ($sender_phone !== '') $from_lines[] = $h($sender_phone);
-  if ($sender_email !== '') $from_lines[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#1d4ed8;text-decoration:none;">' . $h($sender_email) . '</a>';
-  $from_html = implode('<br>', $from_lines);
-
-  // ---- Assemble HTML email ----
-  $html_body = '<!doctype html>'
-    . '<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
-    . '<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">'
-
-    . '<div style="max-width:680px;margin:32px auto 32px;">'
-
-    // ── Header banner ──
-    . '<div style="background:#1e3a5f;border-radius:8px 8px 0 0;padding:28px 32px 24px;">'
-      . '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $h($sender_company) . '</p>'
-      . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '')
-    . '</div>'
-    . ($is_paid
-        ? '<div style="background:#ffffff;padding:16px 32px 0;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
-            . '<div style="margin:0 0 4px;padding:14px 18px;border:4px solid #dc2626;border-radius:10px;background:#fee2e2;text-align:center;">'
-              . '<span style="display:inline-block;font-size:56px;line-height:1;font-weight:900;letter-spacing:0.16em;color:#b91c1c;text-transform:uppercase;">PAID</span>'
-            . '</div>'
-          . '</div>'
-        : '')
-
-    // ── Document title strip ──
-    . '<div style="background:#ffffff;padding:' . ($is_paid ? '16px' : '20px') . ' 32px 0;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
-      . '<table style="width:100%;border-collapse:collapse;">'
-        . '<tr>'
-          . '<td style="padding:0 0 16px;">'
-            . '<p style="margin:0;font-size:18px;font-weight:700;color:#0f172a;">Invoice ' . $inv_label . '</p>'
-          . '</td>'
-          . '<td style="padding:0 0 16px;text-align:right;">'
-            . '<p style="margin:0;font-size:13px;color:#64748b;">Date: ' . $h($inv_date) . '</p>'
-          . '</td>'
-        . '</tr>'
-      . '</table>'
-      . '<hr style="margin:0;border:none;border-top:2px solid #e2e8f0;">'
-    . '</div>'
-
-    // ── Bill To / From boxes ──
-    . '<div style="background:#ffffff;padding:20px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:0;">'
-      . '<table style="width:100%;border-collapse:collapse;">'
-        . '<tr>'
-          . '<td style="width:50%;padding:0 8px 0 0;vertical-align:top;">'
-            . '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;background:#f8fafc;">'
-              . '<p style="margin:0 0 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;">Bill To</p>'
-              . '<p style="margin:0;font-size:13px;color:#374151;line-height:1.7;">' . $bill_to_html . '</p>'
-            . '</div>'
-          . '</td>'
-          . '<td style="width:50%;padding:0 0 0 8px;vertical-align:top;">'
-            . '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;background:#f8fafc;">'
-              . '<p style="margin:0 0 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;">From</p>'
-              . '<p style="margin:0;font-size:13px;color:#374151;line-height:1.7;">' . $from_html . '</p>'
-            . '</div>'
-          . '</td>'
-        . '</tr>'
-      . '</table>'
-    . '</div>'
-
-    // ── Body ──
-    . '<div style="background:#ffffff;padding:24px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
-
-      . '<p style="margin:0 0 8px;font-size:15px;color:#1e293b;">Hello' . ($customer_name !== '' ? ', ' . $h($customer_name) : '') . ',</p>'
-      . '<p style="margin:0 0 24px;font-size:14px;color:#475569;">Please find your invoice details below. Thank you for your business.</p>'
-      . ($payment_link !== ''
-          ? '<div style="margin:0 0 24px;padding:16px 18px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;">'
-              . '<p style="margin:0 0 10px;font-size:14px;font-weight:600;color:#1d4ed8;">Pay this invoice online</p>'
-              . '<p style="margin:0 0 14px;font-size:13px;color:#334155;">Use Stripe\'s secure checkout page to pay this invoice online. Card details are entered directly on Stripe and are not collected on our site.</p>'
-              . '<p style="margin:0;"><a href="' . $h($payment_link) . '" style="display:inline-block;padding:11px 18px;background:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:999px;font-weight:700;">Pay Invoice on Stripe</a></p>'
-            . '</div>'
-          : '')
-
-      // Line items table
-      . '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">'
-        . '<thead>'
-          . '<tr style="background:#f8fafc;">'
-            . '<th style="padding:10px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Description</th>'
-            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Qty</th>'
-            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Unit Price</th>'
-            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Total</th>'
-          . '</tr>'
-        . '</thead>'
-        . '<tbody>' . implode('', $rows_html) . '</tbody>'
-        . '<tfoot>'
-          . '<tr>'
-            . '<td colspan="3" style="padding:10px 12px;text-align:right;font-weight:600;font-size:13px;color:#1e293b;border-top:2px solid #e2e8f0;">Subtotal:</td>'
-            . '<td style="padding:10px 12px;text-align:right;font-weight:600;font-size:14px;color:#1e3a5f;border-top:2px solid #e2e8f0;">$' . $h($subtotal) . '</td>'
-          . '</tr>'
-          . ($inv_tax_rate > 0
-              ? '<tr>'
-                  . '<td colspan="3" style="padding:4px 12px;text-align:right;font-weight:600;font-size:13px;color:#1e293b;">Tax (' . $h(number_format($inv_tax_rate, 2)) . '%):</td>'
-                  . '<td style="padding:4px 12px;text-align:right;font-weight:600;font-size:14px;color:#1e3a5f;">$' . $h($inv_tax_amount) . '</td>'
-                . '</tr>'
-              : '')
-          . '<tr>'
-            . '<td colspan="3" style="padding:10px 12px;text-align:right;font-weight:700;font-size:14px;color:#1e293b;">Grand Total:</td>'
-            . '<td style="padding:10px 12px;text-align:right;font-weight:700;font-size:16px;color:#1e3a5f;">$' . $h($inv_grand_total) . '</td>'
-          . '</tr>'
-        . '</tfoot>'
-      . '</table>'
-
-      . '<p style="margin:0;font-size:14px;color:#475569;">If you have any questions regarding this invoice, please do not hesitate to contact us.</p>'
-    . '</div>'
-
-    // ── Prepared-by strip ──
-    . ($prepared_by_html !== ''
-        ? '<div style="background:#f8fafc;padding:14px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:1px solid #e2e8f0;">'
-            . '<p style="margin:0;font-size:13px;color:#64748b;">' . $prepared_by_html . '</p>'
-          . '</div>'
-        : '')
-
-    // ── Footer ──
-    . '<div style="background:#1e3a5f;border-radius:0 0 8px 8px;padding:18px 32px;">'
-      . '<p style="margin:0;font-size:12px;color:#93c5fd;line-height:1.6;">'
-        . $h($sender_company)
-        . ($footer_contact_html !== '' ? ' &nbsp;·&nbsp; ' . $footer_contact_html : '')
-      . '</p>'
-    . '</div>'
-
-    . '</div>'
-    . '</body></html>';
-
-  // ---- Plain-text fallback ----
-  $text_body  = $sender_company . "\r\n";
-  if ($sender_address !== '') $text_body .= preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ', ', $sender_address)) . "\r\n";
-  if ($sender_phone !== '')   $text_body .= $sender_phone . "\r\n";
-  if ($sender_email !== '')   $text_body .= $sender_email . "\r\n";
-  $text_body .= "\r\nInvoice " . ($inv_no !== '' ? $inv_no : '#' . (int)$quote['id']) . "  |  Date: {$inv_date}\r\n";
-  $text_body .= str_repeat('-', 40) . "\r\n";
-  $text_body .= "Bill To: " . ($customer_company !== '' ? $customer_company . ' / ' : '') . $customer_name . "\r\n";
-  if ($bill_street !== '') $text_body .= $bill_street . "\r\n";
-  if ($bill_csz !== '') $text_body .= $bill_csz . "\r\n";
-  $text_body .= str_repeat('-', 40) . "\r\n\r\n";
-  if ($is_paid) {
-    $text_body .= "PAID\r\n\r\n";
-  }
-  $text_body .= "Hello" . ($customer_name !== '' ? ", {$customer_name}" : '') . ",\r\n\r\n";
-  $text_body .= "Please find your invoice details below.\r\n\r\nLine Items:\r\n";
-  if ($payment_link !== '') {
-    $text_body .= "Pay online with Stripe: {$payment_link}\r\n";
-    $text_body .= "Card details are entered directly on Stripe's secure checkout page.\r\n\r\n";
-  }
-  $text_body .= implode("\r\n", $rows_text) . "\r\n\r\n";
-  $text_body .= "Subtotal: \${$subtotal}\r\n";
-  if ($inv_tax_rate > 0) {
-    $text_body .= "Tax (" . number_format($inv_tax_rate, 2) . "%): \${$inv_tax_amount}\r\n";
-  }
-  $text_body .= "Grand Total: \${$inv_grand_total}\r\n\r\n";
-  $text_body .= "Thank you for your business.\r\n";
-  if ($sender_name !== '') {
-    $text_body .= "\r\nPrepared by: {$sender_name}" . ($sender_company !== 'Our Company' ? " at {$sender_company}" : '') . "\r\n";
-  }
-
-  return [
-    'subject' => $subject,
-    'html_body' => $html_body,
-    'text_body' => $text_body,
-  ];
 }
 
 function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$error_message = null): bool {
