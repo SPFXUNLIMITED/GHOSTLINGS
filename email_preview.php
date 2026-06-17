@@ -572,15 +572,11 @@ function render_email_preview_error(string $message): void {
     exit;
 } catch (Throwable $e) {
     error_log('Email preview failed: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
-    if (function_exists('render_email_preview_error')) {
-        render_email_preview_error('PHP error: ' . $e->getMessage());
-    } else {
-        header('Content-Type: text/html; charset=utf-8');
-        echo '<!doctype html><html><body style="margin:0;padding:16px;font-family:Arial,sans-serif;background:#fff;">'
-            . '<div style="padding:12px 14px;border:1px solid #fecaca;background:#fef2f2;color:#991b1b;border-radius:6px;">'
-            . '<strong>Email preview error:</strong><br>'
-            . nl2br(htmlspecialchars('PHP error: ' . $e->getMessage(), ENT_QUOTES, 'UTF-8'))
-            . '</div></body></html>';
-    }
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!doctype html><html><body style="margin:0;padding:16px;font-family:Arial,sans-serif;background:#fff;">'
+        . '<div style="padding:12px 14px;border:1px solid #fecaca;background:#fef2f2;color:#991b1b;border-radius:6px;">'
+        . '<strong>Email preview error:</strong><br>'
+        . nl2br(htmlspecialchars('PHP error: ' . $e->getMessage(), ENT_QUOTES, 'UTF-8'))
+        . '</div></body></html>';
     exit;
 }
