@@ -7,6 +7,10 @@ function quote_preview_money($value): string {
     return number_format((float)$value, 2);
 }
 
+function quote_preview_single_line(string $value, string $separator): string {
+    return trim((string)preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], $separator, $value)));
+}
+
 function quote_preview_sender_profile(PDO $pdo, array $quote): array {
     $profile = [
         'sender_name'  => '',
@@ -99,7 +103,7 @@ try {
     $bill_state = trim((string)($quote['billing_state'] ?? ''));
     $bill_zip = trim((string)($quote['billing_zip'] ?? ''));
 
-    $h = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+    $escape_html = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 
     $rows_html = [];
     $row_index = 0;
@@ -110,10 +114,10 @@ try {
         $line_total = quote_preview_money($item['line_total'] ?? 0);
         $row_bg = ($row_index++ % 2 === 0) ? '#ffffff' : '#f9fafb';
         $rows_html[] = '<tr style="background:' . $row_bg . ';">'
-            . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">' . $h($description) . '</td>'
-            . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">' . $h($quantity) . '</td>'
-            . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . $h($unit_price) . '</td>'
-            . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . $h($line_total) . '</td>'
+            . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">' . $escape_html($description) . '</td>'
+            . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">' . $escape_html($quantity) . '</td>'
+            . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . $escape_html($unit_price) . '</td>'
+            . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . $escape_html($line_total) . '</td>'
             . '</tr>';
     }
     if (!$rows_html) {
@@ -122,54 +126,55 @@ try {
 
     $header_contact_parts = [];
     if ($sender_address !== '') {
-        $header_contact_parts[] = $h(trim((string)preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ' · ', $sender_address))));
+        $header_contact_parts[] = $escape_html(quote_preview_single_line($sender_address, ' · '));
     }
     if ($sender_phone !== '') {
-        $header_contact_parts[] = $h($sender_phone);
+        $header_contact_parts[] = $escape_html($sender_phone);
     }
     if ($sender_email !== '') {
-        $header_contact_parts[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($sender_email) . '</a>';
+        $header_contact_parts[] = '<a href="mailto:' . $escape_html($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $escape_html($sender_email) . '</a>';
     }
     $header_contact_html = implode(' &nbsp;·&nbsp; ', $header_contact_parts);
 
     $footer_parts = [];
     if ($sender_address !== '') {
-        $footer_parts[] = $h(trim((string)preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ', ', $sender_address))));
+        $footer_parts[] = $escape_html(quote_preview_single_line($sender_address, ', '));
     }
     if ($sender_phone !== '') {
-        $footer_parts[] = $h($sender_phone);
+        $footer_parts[] = $escape_html($sender_phone);
     }
     if ($sender_email !== '') {
-        $footer_parts[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($sender_email) . '</a>';
+        $footer_parts[] = '<a href="mailto:' . $escape_html($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $escape_html($sender_email) . '</a>';
     }
     $footer_contact_html = implode(' &nbsp;·&nbsp; ', $footer_parts);
 
     $bill_to_lines = [];
-    if ($customer_company !== '') $bill_to_lines[] = '<strong style="color:#0f172a;">' . $h($customer_company) . '</strong>';
-    if ($customer_name !== '') $bill_to_lines[] = $h($customer_name);
-    if ($bill_street !== '') $bill_to_lines[] = $h($bill_street);
-    $city_state_zip = implode(', ', array_filter([$bill_city, $bill_state . ($bill_zip !== '' ? ' ' . $bill_zip : '')]));
-    if ($city_state_zip !== '') $bill_to_lines[] = $h($city_state_zip);
+    if ($customer_company !== '') $bill_to_lines[] = '<strong style="color:#0f172a;">' . $escape_html($customer_company) . '</strong>';
+    if ($customer_name !== '') $bill_to_lines[] = $escape_html($customer_name);
+    if ($bill_street !== '') $bill_to_lines[] = $escape_html($bill_street);
+    $city_state_zip = trim($bill_state . ($bill_zip !== '' ? ' ' . $bill_zip : ''));
+    $city_state_zip = implode(', ', array_filter([$bill_city, $city_state_zip]));
+    if ($city_state_zip !== '') $bill_to_lines[] = $escape_html($city_state_zip);
     $quote_phone = trim((string)($quote['phone_number'] ?? ''));
-    if ($quote_phone !== '') $bill_to_lines[] = $h($quote_phone);
+    if ($quote_phone !== '') $bill_to_lines[] = $escape_html($quote_phone);
     $quote_email = trim((string)($quote['email'] ?? ''));
-    if ($quote_email !== '') $bill_to_lines[] = '<a href="mailto:' . $h($quote_email) . '" style="color:#1d4ed8;text-decoration:none;">' . $h($quote_email) . '</a>';
+    if ($quote_email !== '') $bill_to_lines[] = '<a href="mailto:' . $escape_html($quote_email) . '" style="color:#1d4ed8;text-decoration:none;">' . $escape_html($quote_email) . '</a>';
     $bill_to_html = implode('<br>', $bill_to_lines);
 
-    $from_lines = ['<strong style="color:#0f172a;">' . $h($sender_company) . '</strong>'];
-    if ($sender_name !== '' && $sender_name !== $sender_company) $from_lines[] = $h($sender_name);
+    $from_lines = ['<strong style="color:#0f172a;">' . $escape_html($sender_company) . '</strong>'];
+    if ($sender_name !== '' && $sender_name !== $sender_company) $from_lines[] = $escape_html($sender_name);
     foreach (array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $sender_address))) as $addr_line) {
-        $from_lines[] = $h($addr_line);
+        $from_lines[] = $escape_html($addr_line);
     }
-    if ($sender_phone !== '') $from_lines[] = $h($sender_phone);
-    if ($sender_email !== '') $from_lines[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#1d4ed8;text-decoration:none;">' . $h($sender_email) . '</a>';
+    if ($sender_phone !== '') $from_lines[] = $escape_html($sender_phone);
+    if ($sender_email !== '') $from_lines[] = '<a href="mailto:' . $escape_html($sender_email) . '" style="color:#1d4ed8;text-decoration:none;">' . $escape_html($sender_email) . '</a>';
     $from_html = implode('<br>', $from_lines);
 
     $prepared_by_html = '';
     if ($sender_name !== '') {
-        $prepared_by_html = 'This quote was prepared by <strong style="color:#1e293b;">' . $h($sender_name) . '</strong>';
+        $prepared_by_html = 'This quote was prepared by <strong style="color:#1e293b;">' . $escape_html($sender_name) . '</strong>';
         if ($sender_company !== 'Our Company') {
-            $prepared_by_html .= ' at <strong style="color:#1e293b;">' . $h($sender_company) . '</strong>';
+            $prepared_by_html .= ' at <strong style="color:#1e293b;">' . $escape_html($sender_company) . '</strong>';
         }
         $prepared_by_html .= '.';
     }
@@ -179,11 +184,11 @@ try {
         . '<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">'
         . '<div style="max-width:680px;margin:32px auto 32px;">'
         . '<div style="background:#1e3a5f;border-radius:8px 8px 0 0;padding:28px 32px 24px;">'
-        . '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $h($sender_company) . '</p>'
+        . '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $escape_html($sender_company) . '</p>'
         . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '')
         . '</div>'
         . '<div style="background:#ffffff;padding:20px 32px 0;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
-        . '<table style="width:100%;border-collapse:collapse;"><tr><td style="padding:0 0 16px;"><p style="margin:0;font-size:18px;font-weight:700;color:#0f172a;">Quote #' . $h((string)$quote_id) . '</p></td><td style="padding:0 0 16px;text-align:right;"><p style="margin:0;font-size:13px;color:#64748b;">Date: ' . $h($quote_date) . '</p></td></tr></table>'
+        . '<table style="width:100%;border-collapse:collapse;"><tr><td style="padding:0 0 16px;"><p style="margin:0;font-size:18px;font-weight:700;color:#0f172a;">Quote #' . $escape_html((string)$quote_id) . '</p></td><td style="padding:0 0 16px;text-align:right;"><p style="margin:0;font-size:13px;color:#64748b;">Date: ' . $escape_html($quote_date) . '</p></td></tr></table>'
         . '<hr style="margin:0;border:none;border-top:2px solid #e2e8f0;"></div>'
         . '<div style="background:#ffffff;padding:20px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:0;">'
         . '<table style="width:100%;border-collapse:collapse;"><tr>'
@@ -191,15 +196,15 @@ try {
         . '<td style="width:50%;padding:0 0 0 8px;vertical-align:top;"><div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;background:#f8fafc;"><p style="margin:0 0 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;">From</p><p style="margin:0;font-size:13px;color:#374151;line-height:1.7;">' . $from_html . '</p></div></td>'
         . '</tr></table></div>'
         . '<div style="background:#ffffff;padding:24px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
-        . '<p style="margin:0 0 8px;font-size:15px;color:#1e293b;">Hello' . ($customer_name !== '' ? ', ' . $h($customer_name) : '') . ',</p>'
+        . '<p style="margin:0 0 8px;font-size:15px;color:#1e293b;">Hello' . ($customer_name !== '' ? ', ' . $escape_html($customer_name) : '') . ',</p>'
         . '<p style="margin:0 0 24px;font-size:14px;color:#475569;">Please find your quote details below. We appreciate the opportunity to earn your business.</p>'
-        . '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;"><thead><tr style="background:#f8fafc;"><th style="padding:10px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Description</th><th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Qty</th><th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Unit Price</th><th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Total</th></tr></thead><tbody>' . implode('', $rows_html) . '</tbody><tfoot><tr><td colspan="3" style="padding:10px 12px;text-align:right;font-weight:600;font-size:13px;color:#1e293b;border-top:2px solid #e2e8f0;">Subtotal:</td><td style="padding:10px 12px;text-align:right;font-weight:600;font-size:14px;color:#1e3a5f;border-top:2px solid #e2e8f0;">$' . $h($subtotal) . '</td></tr>'
-        . ($tax_rate > 0 ? '<tr><td colspan="3" style="padding:4px 12px;text-align:right;font-weight:600;font-size:13px;color:#1e293b;">Tax (' . $h(number_format($tax_rate, 2)) . '%):</td><td style="padding:4px 12px;text-align:right;font-weight:600;font-size:14px;color:#1e3a5f;">$' . $h($tax_amount) . '</td></tr>' : '')
-        . '<tr><td colspan="3" style="padding:10px 12px;text-align:right;font-weight:700;font-size:14px;color:#1e293b;">Grand Total:</td><td style="padding:10px 12px;text-align:right;font-weight:700;font-size:16px;color:#1e3a5f;">$' . $h($grand_total) . '</td></tr></tfoot></table>'
+        . '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;"><thead><tr style="background:#f8fafc;"><th style="padding:10px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Description</th><th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Qty</th><th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Unit Price</th><th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Total</th></tr></thead><tbody>' . implode('', $rows_html) . '</tbody><tfoot><tr><td colspan="3" style="padding:10px 12px;text-align:right;font-weight:600;font-size:13px;color:#1e293b;border-top:2px solid #e2e8f0;">Subtotal:</td><td style="padding:10px 12px;text-align:right;font-weight:600;font-size:14px;color:#1e3a5f;border-top:2px solid #e2e8f0;">$' . $escape_html($subtotal) . '</td></tr>'
+        . ($tax_rate > 0 ? '<tr><td colspan="3" style="padding:4px 12px;text-align:right;font-weight:600;font-size:13px;color:#1e293b;">Tax (' . $escape_html(number_format($tax_rate, 2)) . '%):</td><td style="padding:4px 12px;text-align:right;font-weight:600;font-size:14px;color:#1e3a5f;">$' . $escape_html($tax_amount) . '</td></tr>' : '')
+        . '<tr><td colspan="3" style="padding:10px 12px;text-align:right;font-weight:700;font-size:14px;color:#1e293b;">Grand Total:</td><td style="padding:10px 12px;text-align:right;font-weight:700;font-size:16px;color:#1e3a5f;">$' . $escape_html($grand_total) . '</td></tr></tfoot></table>'
         . '<p style="margin:0;font-size:14px;color:#475569;">Thank you for considering our services. Please do not hesitate to reach out if you have any questions.</p>'
         . '</div>'
         . ($prepared_by_html !== '' ? '<div style="background:#f8fafc;padding:14px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:13px;color:#64748b;">' . $prepared_by_html . '</p></div>' : '')
-        . '<div style="background:#1e3a5f;border-radius:0 0 8px 8px;padding:18px 32px;"><p style="margin:0;font-size:12px;color:#93c5fd;line-height:1.6;">' . $h($sender_company) . ($footer_contact_html !== '' ? ' &nbsp;·&nbsp; ' . $footer_contact_html : '') . '</p></div>'
+        . '<div style="background:#1e3a5f;border-radius:0 0 8px 8px;padding:18px 32px;"><p style="margin:0;font-size:12px;color:#93c5fd;line-height:1.6;">' . $escape_html($sender_company) . ($footer_contact_html !== '' ? ' &nbsp;·&nbsp; ' . $footer_contact_html : '') . '</p></div>'
         . '</div></body></html>';
 
     header('Content-Type: text/html; charset=utf-8');
