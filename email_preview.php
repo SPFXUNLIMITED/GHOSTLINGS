@@ -14,6 +14,15 @@ function preview_single_line(string $value, string $separator): string {
     return trim((string)preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], $separator, $value)));
 }
 
+function preview_format_quantity($value): string {
+    $quantity = (float)$value;
+    if (abs($quantity - round($quantity)) < 0.00001) {
+        return number_format($quantity, 0, '.', '');
+    }
+
+    return rtrim(rtrim(number_format($quantity, 2, '.', ''), '0'), '.');
+}
+
 function preview_sender_profile(PDO $pdo, array $quote): array {
     $profile = [
         'sender_name'  => '',
@@ -111,7 +120,7 @@ try {
     $document_noun = $is_invoice ? 'invoice' : 'quote';
     $document_heading = $is_invoice
         ? 'Invoice ' . ($invoice_number !== '' ? $escape_html($invoice_number) : '#' . $quote_id)
-        : 'Quote #' . $escape_html((string)$quote_id);
+        : 'Quote #' . $escape_html($quote_id);
     $document_intro = $is_invoice
         ? 'Please find your invoice details below. Thank you for your business.'
         : 'Please find your quote details below. We appreciate the opportunity to earn your business.';
@@ -140,7 +149,7 @@ try {
     $row_index = 0;
     foreach ($items as $item) {
         $description = trim((string)($item['description'] ?? ''));
-        $quantity = preview_format_money($item['quantity'] ?? 0);
+        $quantity = preview_format_quantity($item['quantity'] ?? 0);
         $unit_price = preview_format_money($item['unit_price'] ?? 0);
         $line_total = preview_format_money($item['line_total'] ?? 0);
         $row_bg = ($row_index++ % 2 === 0) ? '#ffffff' : '#f9fafb';
@@ -189,8 +198,8 @@ try {
     if ($bill_street !== '') {
         $bill_to_lines[] = $escape_html($bill_street);
     }
-    $city_state_zip = trim($bill_state . ($bill_zip !== '' ? ' ' . $bill_zip : ''));
-    $city_state_zip = implode(', ', array_filter([$bill_city, $city_state_zip]));
+    $state_zip = trim($bill_state . ($bill_zip !== '' ? ' ' . $bill_zip : ''));
+    $city_state_zip = implode(', ', array_filter([$bill_city, $state_zip]));
     if ($city_state_zip !== '') {
         $bill_to_lines[] = $escape_html($city_state_zip);
     }
