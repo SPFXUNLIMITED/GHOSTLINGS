@@ -11,11 +11,15 @@ require_admin_or_moderator();
 if (isset($_GET['email_preview']) && isset($_GET['id'])) {
     $id = (int)$_GET['id'];
 
-    $stmt = $pdo->prepare('SELECT * FROM quotes WHERE id = ? LIMIT 1');
-    $stmt->execute([$id]);
-    $quote = $stmt->fetch(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $pdo->prepare('SELECT * FROM quotes WHERE id = ? LIMIT 1');
+        $stmt->execute([$id]);
+        $quote = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($quote) {
+        if (!$quote) {
+            throw new RuntimeException('Quote not found for email preview.');
+        }
+
         $items_stmt = $pdo->prepare('SELECT * FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC');
         $items_stmt->execute([$id]);
         $items = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -23,15 +27,30 @@ if (isset($_GET['email_preview']) && isset($_GET['id'])) {
         $error = null;
         $payload = invoice_build_email_message_data($pdo, $quote, $items, false, $error);
 
-        if (is_array($payload) && !empty($payload['html_body'])) {
-            header('Content-Type: text/html; charset=utf-8');
-            echo $payload['html_body'];
-            exit;
+        if (!is_array($payload) || empty($payload['html_body'])) {
+            $message = trim((string)$error);
+            if ($message === '') {
+                $message = 'Unable to generate email preview.';
+            }
+            throw new RuntimeException($message);
         }
+
+        header('Content-Type: text/html; charset=utf-8');
+        echo $payload['html_body'];
+    } catch (Throwable $e) {
+        http_response_code(500);
+        $message = trim($e->getMessage());
+        $log_message = $message;
+        if ($message === '') {
+            $message = 'Unknown preview error.';
+            $log_message = get_class($e) . ' at ' . $e->getFile() . ':' . $e->getLine();
+        }
+        error_log('Invoice email preview failed for quote #' . $id . ': ' . $log_message);
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<h2>Unable to generate email preview.</h2>';
+        echo '<pre style="white-space:pre-wrap;color:#b91c1c;">' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</pre>';
     }
 
-    header('Content-Type: text/html; charset=utf-8');
-    echo '<h2>Unable to generate email preview.</h2>';
     exit;
 }
 
