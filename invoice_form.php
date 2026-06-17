@@ -1333,8 +1333,6 @@ render_header($invoice_heading);
   .invoice-toggle input:checked + .invoice-toggle-slider{background:#2563eb;}
   .invoice-toggle input:checked + .invoice-toggle-slider::after{transform:translateX(24px);}
   .invoice-toggle input:focus-visible + .invoice-toggle-slider{outline:3px solid rgba(37,99,235,.25);outline-offset:2px;}
-  .invoice-paid-banner{margin:0 0 14px;padding:14px 18px;border:4px solid #dc2626;border-radius:10px;background:#fee2e2;text-align:center;}
-  .invoice-paid-banner span{display:inline-block;font-size:56px;line-height:1;font-weight:900;letter-spacing:.16em;color:#b91c1c;text-transform:uppercase;}
   .invoice-mark-paid-btn{background:#dc2626;border-color:#b91c1c;color:#fff;font-weight:700;}
   .invoice-view-content{margin-top:14px;}
 </style>
@@ -1384,9 +1382,6 @@ render_header($invoice_heading);
 </div>
 
 <div class="<?= $is_view_mode ? 'invoice-view-content' : 'card' ?>">
-  <?php if ($invoice_is_paid && !$is_view_mode): ?>
-    <div class="invoice-paid-banner"><span>PAID</span></div>
-  <?php endif; ?>
   <?php if ($invoice_converted): ?>
     <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">Quote converted to invoice successfully.</div>
   <?php endif; ?>
@@ -1408,8 +1403,7 @@ render_header($invoice_heading);
   <?php if ($is_view_mode): ?>
     <p>Customer Email Preview — This is exactly what the customer will receive:</p>
     <iframe src="email_preview.php?id=<?= (int)$quote_id ?>" 
-        style="width:100%; height:800px; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden;"
-        scrolling="no"
+        style="width:100%; height:1100px; border:1px solid #e2e8f0; border-radius:8px;"
         title="Invoice Email Preview"></iframe>
   <?php endif; ?>
 
