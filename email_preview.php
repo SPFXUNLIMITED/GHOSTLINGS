@@ -103,9 +103,10 @@ try {
     $quote_id = (int)($quote['id'] ?? 0);
     $quote_status = strtolower(trim((string)($quote['status'] ?? '')));
     $invoice_number = trim((string)($quote['converted_invoice_no'] ?? ''));
-    $is_invoice = $quote_status === 'converted'
-        || $invoice_number !== ''
-        || trim((string)($quote['converted_at'] ?? '')) !== '';
+    $converted_at = trim((string)($quote['converted_at'] ?? ''));
+    // Older records may rely on invoice number or converted_at even if status was not backfilled.
+    $has_invoice_markers = $quote_status === 'converted' || $invoice_number !== '' || $converted_at !== '';
+    $is_invoice = $has_invoice_markers;
 
     $document_noun = $is_invoice ? 'invoice' : 'quote';
     $document_heading = $is_invoice
@@ -127,6 +128,7 @@ try {
     $tax_rate = (float)($quote['tax_rate'] ?? 0);
     $tax_amount = preview_format_money($quote['tax_amount'] ?? 0);
     $grand_total = preview_format_money((float)($quote['subtotal_amount'] ?? 0) + (float)($quote['tax_amount'] ?? 0));
+    // Quotes and invoices share the same table, but paid state only applies after invoice conversion.
     $is_paid = $is_invoice && strtolower(trim((string)($quote['payment_status'] ?? ''))) === 'paid';
 
     $bill_street = trim((string)($quote['billing_street'] ?? ''));
