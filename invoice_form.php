@@ -1334,78 +1334,121 @@ render_header($invoice_heading);
   .invoice-toggle input:checked + .invoice-toggle-slider::after{transform:translateX(24px);}
   .invoice-toggle input:focus-visible + .invoice-toggle-slider{outline:3px solid rgba(37,99,235,.25);outline-offset:2px;}
   .invoice-mark-paid-btn{background:#dc2626;border-color:#b91c1c;color:#fff;font-weight:700;}
-  .invoice-view-content{margin-top:14px;}
 </style>
 
 <div class="card page-header">
   <div class="page-header-body">
     <h1><?= h($invoice_heading) ?></h1>
     <p class="muted"><?= h($invoice_subtitle) ?></p>
-    <?php if ($quote): ?>
+    <?php if (!$is_view_mode && $quote): ?>
       <span style="display:inline-flex;align-items:center;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:600;background:<?= h($invoice_approval_bg) ?>;color:<?= h($invoice_approval_color) ?>;">Approval: <?= h($invoice_approval_label) ?></span>
     <?php endif; ?>
   </div>
   <div class="actions">
-    <?php if ($is_view_mode && $quote): ?>
-      <a class="btn primary" href="invoice_form.php?id=<?= (int)$quote_id ?>">Edit Invoice</a>
-    <?php endif; ?>
-    <?php if ($is_view_mode && $quote && !$invoice_is_paid): ?>
-      <form method="post" style="margin:0;" action="">
-        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
-        <input type="hidden" name="action" value="mark_as_paid" />
-        <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
-        <button type="submit" class="btn invoice-mark-paid-btn">Mark as Paid</button>
-      </form>
-    <?php endif; ?>
-    <?php if ($quote && trim((string)($quote['email'] ?? '')) !== ''): ?>
-      <form method="post" style="margin:0;" action="">
-        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
-        <input type="hidden" name="action" value="send_email" />
-        <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
-        <button type="submit" class="btn">Email Invoice</button>
-      </form>
+    <?php if (!$is_view_mode): ?>
+      <?php if ($quote && trim((string)($quote['email'] ?? '')) !== ''): ?>
+        <form method="post" style="margin:0;" action="">
+          <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
+          <input type="hidden" name="action" value="send_email" />
+          <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
+          <button type="submit" class="btn">Email Invoice</button>
+        </form>
+      <?php endif; ?>
     <?php endif; ?>
     <a class="btn" href="invoice_tracker.php">Invoice Tracker</a>
     <?php if ($quote): ?>
       <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
     <?php endif; ?>
-    <?php if ($is_view_mode && $quote && is_admin() && $invoice_approval_status !== 'approved'): ?>
-      <form method="post" style="margin:0;" action="">
-        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
-        <input type="hidden" name="action" value="approve_invoice" />
-        <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
-        <button type="submit" class="btn primary">Approve</button>
-      </form>
-    <?php endif; ?>
     <a class="btn" href="quotes.php?view=all">All Quotes</a>
   </div>
 </div>
 
-<div class="<?= $is_view_mode ? 'invoice-view-content' : 'card' ?>">
-  <?php if ($invoice_converted): ?>
-    <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">Quote converted to invoice successfully.</div>
-  <?php endif; ?>
-  <?php if ($invoice_email_sent): ?>
-    <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">Invoice email sent successfully.</div>
-  <?php endif; ?>
-  <?php if ($invoice_email_error !== ''): ?>
-    <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b; margin-bottom:14px;">Failed to send invoice email: <?= h($invoice_email_error) ?></div>
-  <?php endif; ?>
-  <?php if ($invoice_approval_approved): ?>
-    <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534; margin-bottom:14px;">Invoice approved.</div>
-  <?php endif; ?>
-  <?php if ($invoice_payment_marked): ?>
-    <div class="alert" style="border-color:#fecaca; background:#fff1f2; color:#9f1239; margin-bottom:14px;">Invoice marked as paid.</div>
-  <?php endif; ?>
-  <?php if ($invoice_already_paid): ?>
-    <div class="alert" style="border-color:#fecaca; background:#fff1f2; color:#9f1239; margin-bottom:14px;">Invoice is already marked as paid.</div>
-  <?php endif; ?>
-  <?php if ($is_view_mode): ?>
+<?php if ($invoice_converted): ?>
+  <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Quote converted to invoice successfully.</div>
+<?php endif; ?>
+<?php if ($invoice_email_sent): ?>
+  <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Invoice email sent successfully.</div>
+<?php endif; ?>
+<?php if ($invoice_email_error !== ''): ?>
+  <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b;">Failed to send invoice email: <?= h($invoice_email_error) ?></div>
+<?php endif; ?>
+<?php if ($invoice_approval_approved): ?>
+  <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Invoice approved.</div>
+<?php endif; ?>
+<?php if ($invoice_payment_marked): ?>
+  <div class="alert" style="border-color:#fecaca; background:#fff1f2; color:#9f1239;">Invoice marked as paid.</div>
+<?php endif; ?>
+<?php if ($invoice_already_paid): ?>
+  <div class="alert" style="border-color:#fecaca; background:#fff1f2; color:#9f1239;">Invoice is already marked as paid.</div>
+<?php endif; ?>
+
+<?php if ($is_view_mode && $quote): ?>
+  <?php
+    $inv_paid_bg    = $invoice_is_paid ? '#dcfce7' : '#f1f5f9';
+    $inv_paid_color = $invoice_is_paid ? '#166534' : '#475569';
+    $inv_paid_label = $invoice_is_paid ? 'Paid' : 'Unpaid';
+    $inv_number     = h($fields['invoice_number']);
+    $inv_customer   = h((string)($quote['customer_name'] ?? ''));
+    $inv_date       = h((string)($quote['invoice_date'] ?? ($quote['quote_date'] ?? '')));
+  ?>
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap;">
+      <div>
+        <h2 style="margin:0;">Invoice #<?= $inv_number ?><?= $inv_customer !== '' ? ' — ' . $inv_customer : '' ?></h2>
+        <?php if ($inv_date !== ''): ?>
+          <p class="muted" style="margin:6px 0 0;">Invoice Date: <?= $inv_date ?></p>
+        <?php endif; ?>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <span style="display:inline-flex; align-items:center; border-radius:999px; padding:6px 12px; font-weight:600; background:<?= $inv_paid_bg ?>; color:<?= $inv_paid_color ?>;"><?= $inv_paid_label ?></span>
+        <span style="display:inline-flex; align-items:center; border-radius:999px; padding:6px 12px; font-weight:600; background:<?= h($invoice_approval_bg) ?>; color:<?= h($invoice_approval_color) ?>;">Approval: <?= h($invoice_approval_label) ?></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
     <p>Customer Email Preview — This is exactly what the customer will receive:</p>
-    <iframe src="email_preview.php?id=<?= (int)$quote_id ?>" 
+    <iframe src="email_preview.php?id=<?= (int)$quote_id ?>"
         style="width:100%; height:1100px; border:1px solid #e2e8f0; border-radius:8px;"
         title="Invoice Email Preview"></iframe>
-  <?php endif; ?>
+  </div>
+
+  <div class="card">
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      <a class="btn" href="invoice_tracker.php">Invoice Tracker</a>
+      <?php if ($quote): ?>
+        <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
+      <?php endif; ?>
+      <a class="btn primary" href="invoice_form.php?id=<?= (int)$quote_id ?>">Edit Invoice</a>
+      <?php if (trim((string)($quote['email'] ?? '')) !== ''): ?>
+        <form method="post" style="margin:0;" action="">
+          <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
+          <input type="hidden" name="action" value="send_email" />
+          <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
+          <button type="submit" class="btn">Email Invoice</button>
+        </form>
+      <?php endif; ?>
+      <?php if (!$invoice_is_paid): ?>
+        <form method="post" style="margin:0;" action="">
+          <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
+          <input type="hidden" name="action" value="mark_as_paid" />
+          <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
+          <button type="submit" class="btn invoice-mark-paid-btn">Mark as Paid</button>
+        </form>
+      <?php endif; ?>
+      <?php if (is_admin() && $invoice_approval_status !== 'approved'): ?>
+        <form method="post" style="margin:0;" action="">
+          <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
+          <input type="hidden" name="action" value="approve_invoice" />
+          <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
+          <button type="submit" class="btn primary">Approve</button>
+        </form>
+      <?php endif; ?>
+    </div>
+  </div>
+
+<?php else: ?>
+<div class="card">
 
   <?php if (!$is_view_mode): ?>
   <form method="post" action="">
@@ -1680,6 +1723,7 @@ render_header($invoice_heading);
   </form>
   <?php endif; ?>
 </div>
+<?php endif; ?>
 
 <?php if (!$is_view_mode): ?>
 <script>
