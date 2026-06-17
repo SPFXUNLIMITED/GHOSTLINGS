@@ -1407,7 +1407,7 @@ render_header($invoice_heading);
   <?php endif; ?>
   <?php if ($is_view_mode): ?>
     <p>Customer Email Preview — This is exactly what the customer will receive:</p>
-    <iframe src="invoice_form.php?id=<?= (int)$quote_id ?>&email_preview" style="width:100%;border:none;min-height:1200px;" title="Invoice Email Preview"></iframe>
+    <iframe src="email_preview.php?id=<?= (int)$quote_id ?>" title="Invoice Email Preview"></iframe>
   <?php endif; ?>
 
   <?php if (!$is_view_mode): ?>
