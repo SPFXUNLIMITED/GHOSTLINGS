@@ -1317,11 +1317,9 @@ render_header($invoice_heading);
     <?php endif; ?>
   <?php else: ?>
 
-  <?php if (!$is_view_mode): ?>
   <form method="post" action="">
     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
     <input type="hidden" name="source_quote_id" value="<?= h($fields['source_quote_id']) ?>" />
-  <?php endif; ?>
 
     <div style="display:grid; gap:14px; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));">
       <div>
@@ -1604,9 +1602,7 @@ render_header($invoice_heading);
         <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
       <?php endif; ?>
     </div>
-  <?php if (!$is_view_mode): ?>
   </form>
-  <?php endif; ?>
   <?php endif; ?>
 </div>
 
