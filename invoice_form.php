@@ -40,10 +40,12 @@ if (isset($_GET['email_preview']) && isset($_GET['id'])) {
     } catch (Throwable $e) {
         http_response_code(500);
         $message = trim($e->getMessage());
+        $log_message = $message;
         if ($message === '') {
-            $message = get_class($e) . ' at ' . $e->getFile() . ':' . $e->getLine();
+            $message = 'Unknown preview error.';
+            $log_message = get_class($e) . ' at ' . $e->getFile() . ':' . $e->getLine();
         }
-        error_log('Invoice email preview failed for quote #' . $id . ': ' . $message);
+        error_log('Invoice email preview failed for quote #' . $id . ': ' . $log_message);
         header('Content-Type: text/html; charset=utf-8');
         echo '<h2>Unable to generate email preview.</h2>';
         echo '<pre style="white-space:pre-wrap;color:#b91c1c;">' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</pre>';
