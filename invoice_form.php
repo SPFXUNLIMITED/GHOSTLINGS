@@ -14,6 +14,8 @@ const INVOICE_DEFAULT_PRICE = '0.00';
 const INVOICE_MIN_QTY = 0.01;
 const STRIPE_AMOUNT_TOLERANCE = 0.01;
 const STRIPE_API_TIMEOUT_SECONDS = 20;
+const INVOICE_PAYMENT_STATUS_UNPAID = 'unpaid';
+const INVOICE_PAYMENT_STATUS_PAID = 'paid';
 
 // ---------- CSRF ----------
 if (empty($_SESSION['invoice_form_csrf'])) {
@@ -84,6 +86,10 @@ function invoice_env_value(string $key): string {
 
 function invoice_online_payment_enabled(array $quote): bool {
   return (int)($quote['enable_online_payment'] ?? 0) === 1;
+}
+
+function invoice_is_paid(array $quote): bool {
+  return strtolower(trim((string)($quote['payment_status'] ?? INVOICE_PAYMENT_STATUS_UNPAID))) === INVOICE_PAYMENT_STATUS_PAID;
 }
 
 function invoice_stripe_secret_key(PDO $pdo): string {
@@ -382,7 +388,7 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
   $bill_city   = trim((string)($quote['billing_city']   ?? ''));
   $bill_state  = trim((string)($quote['billing_state']  ?? ''));
   $bill_zip    = trim((string)($quote['billing_zip']    ?? ''));
-  $is_paid = strtolower(trim((string)($quote['payment_status'] ?? ''))) === 'paid';
+  $is_paid = invoice_is_paid($quote);
   $payment_link = '';
   if (!$is_paid && invoice_online_payment_enabled($quote)) {
     $payment_error = null;
@@ -847,8 +853,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       header('Location: invoice_tracker.php');
       exit;
     }
-    $pdo->prepare("UPDATE quotes SET payment_status = 'paid', paid_at = NOW() WHERE id = ?")->execute([$row_id]);
-    header('Location: invoice_form.php?id=' . $row_id . '&mode=view&payment_marked=1');
+    $mark_paid_stmt = $pdo->prepare("UPDATE quotes SET payment_status = ?, paid_at = NOW() WHERE id = ? AND payment_status <> ?");
+    $mark_paid_stmt->execute([
+      INVOICE_PAYMENT_STATUS_PAID,
+      $row_id,
+      INVOICE_PAYMENT_STATUS_PAID,
+    ]);
+    $payment_query_flag = $mark_paid_stmt->rowCount() > 0 ? 'payment_marked=1' : 'already_paid=1';
+    header('Location: invoice_form.php?id=' . $row_id . '&mode=view&' . $payment_query_flag);
     exit;
   }
 
@@ -1178,9 +1190,9 @@ $invoice_email_sent  = isset($_GET['email_sent'])  && $_GET['email_sent']  === '
 $invoice_email_error = isset($_GET['email_error']) && $_GET['email_error'] !== '' ? trim((string)$_GET['email_error']) : '';
 $invoice_approval_approved = isset($_GET['approval_approved']) && $_GET['approval_approved'] === '1';
 $invoice_payment_marked = isset($_GET['payment_marked']) && $_GET['payment_marked'] === '1';
+$invoice_already_paid = isset($_GET['already_paid']) && $_GET['already_paid'] === '1';
 $invoice_approval_status = is_array($quote) ? (string)($quote['approval_status'] ?? 'none') : 'none';
-$invoice_payment_status = is_array($quote) ? strtolower(trim((string)($quote['payment_status'] ?? 'unpaid'))) : 'unpaid';
-$invoice_is_paid = $invoice_payment_status === 'paid';
+$invoice_is_paid = is_array($quote) && invoice_is_paid($quote);
 [$invoice_approval_bg, $invoice_approval_color] = invoice_form_approval_colors($invoice_approval_status);
 $invoice_approval_label = invoice_form_approval_label($invoice_approval_status);
 
@@ -1197,6 +1209,7 @@ render_header($invoice_heading);
   .invoice-toggle input:focus-visible + .invoice-toggle-slider{outline:3px solid rgba(37,99,235,.25);outline-offset:2px;}
   .invoice-paid-banner{margin:0 0 14px;padding:14px 18px;border:4px solid #dc2626;border-radius:10px;background:#fee2e2;text-align:center;}
   .invoice-paid-banner span{display:inline-block;font-size:56px;line-height:1;font-weight:900;letter-spacing:.16em;color:#b91c1c;text-transform:uppercase;}
+  .invoice-mark-paid-btn{background:#dc2626;border-color:#b91c1c;color:#fff;font-weight:700;}
 </style>
 
 <div class="card page-header">
@@ -1216,7 +1229,7 @@ render_header($invoice_heading);
         <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
         <input type="hidden" name="action" value="mark_as_paid" />
         <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
-        <button type="submit" class="btn" style="background:#dc2626;border-color:#b91c1c;color:#fff;font-weight:700;">Mark as Paid</button>
+        <button type="submit" class="btn invoice-mark-paid-btn">Mark as Paid</button>
       </form>
     <?php endif; ?>
     <?php if ($quote && trim((string)($quote['email'] ?? '')) !== ''): ?>
@@ -1261,6 +1274,9 @@ render_header($invoice_heading);
   <?php endif; ?>
   <?php if ($invoice_payment_marked): ?>
     <div class="alert" style="border-color:#fecaca; background:#fff1f2; color:#9f1239; margin-bottom:14px;">Invoice marked as paid.</div>
+  <?php endif; ?>
+  <?php if ($invoice_already_paid): ?>
+    <div class="alert" style="border-color:#fecaca; background:#fff1f2; color:#9f1239; margin-bottom:14px;">Invoice is already marked as paid.</div>
   <?php endif; ?>
 
   <?php if (!$is_view_mode): ?>
