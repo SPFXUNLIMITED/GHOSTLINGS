@@ -354,40 +354,6 @@ if ($has_quote_id) {
   $item_stmt->execute([$quote_id]);
   $rows = $item_stmt->fetchAll(PDO::FETCH_ASSOC);
 }
-
-const INVOICE_DEFAULT_QTY = '1.00';
-const INVOICE_DEFAULT_COST = '0.00';
-const INVOICE_DEFAULT_MARKUP = '20.00';
-const INVOICE_DEFAULT_PRICE = '0.00';
-const INVOICE_MIN_QTY = 0.01;
-const STRIPE_AMOUNT_TOLERANCE = 0.01;
-const STRIPE_API_TIMEOUT_SECONDS = 20;
-const INVOICE_PAYMENT_STATUS_UNPAID = 'unpaid';
-const INVOICE_PAYMENT_STATUS_PAID = 'paid';
-
-// ---------- CSRF ----------
-if (empty($_SESSION['invoice_form_csrf'])) {
-  $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
-}
-
-function invoice_form_approval_label(string $status): string {
-  return match ($status) {
-    'pending_approval' => 'Pending Approval',
-    'approved' => 'Approved',
-    default => 'Not Submitted',
-  };
-}
-
-function invoice_form_approval_colors(string $status): array {
-  return match ($status) {
-    'pending_approval' => ['#fef3c7', '#92400e'],
-    'approved' => ['#dcfce7', '#166534'],
-    default => ['#f1f5f9', '#475569'],
-  };
-}
-
-$view_mode_requested = isset($_GET['mode']) && $_GET['mode'] === 'view';
-
 // ---------- Invoice email helpers ----------
 
 function invoice_env_value(string $key): string {
@@ -685,6 +651,40 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
 
   return $checkout_url;
 }
+
+
+const INVOICE_DEFAULT_QTY = '1.00';
+const INVOICE_DEFAULT_COST = '0.00';
+const INVOICE_DEFAULT_MARKUP = '20.00';
+const INVOICE_DEFAULT_PRICE = '0.00';
+const INVOICE_MIN_QTY = 0.01;
+const STRIPE_AMOUNT_TOLERANCE = 0.01;
+const STRIPE_API_TIMEOUT_SECONDS = 20;
+const INVOICE_PAYMENT_STATUS_UNPAID = 'unpaid';
+const INVOICE_PAYMENT_STATUS_PAID = 'paid';
+
+// ---------- CSRF ----------
+if (empty($_SESSION['invoice_form_csrf'])) {
+  $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
+}
+
+function invoice_form_approval_label(string $status): string {
+  return match ($status) {
+    'pending_approval' => 'Pending Approval',
+    'approved' => 'Approved',
+    default => 'Not Submitted',
+  };
+}
+
+function invoice_form_approval_colors(string $status): array {
+  return match ($status) {
+    'pending_approval' => ['#fef3c7', '#92400e'],
+    'approved' => ['#dcfce7', '#166534'],
+    default => ['#f1f5f9', '#475569'],
+  };
+}
+
+$view_mode_requested = isset($_GET['mode']) && $_GET['mode'] === 'view';
 
 function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$error_message = null): bool {
   $error_message = null;
