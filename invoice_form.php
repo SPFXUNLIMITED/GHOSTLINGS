@@ -7,31 +7,32 @@ require_once __DIR__ . '/lib/PHPMailer/src/PHPMailer.php';
 require_once __DIR__ . '/lib/PHPMailer/src/SMTP.php';
 require_admin_or_moderator();
 
-// Email Preview Handler - must be before any HTML output
+// EMAIL PREVIEW HANDLER - Must be at the very top, right after requires
 if (isset($_GET['email_preview']) && isset($_GET['id'])) {
-  $id = (int)$_GET['id'];
-  $stmt = $pdo->prepare("SELECT * FROM quotes WHERE id = ? LIMIT 1");
-  $stmt->execute([$id]);
-  $quote = $stmt->fetch(PDO::FETCH_ASSOC);
+    $id = (int)$_GET['id'];
 
-  if ($quote) {
-    $items_stmt = $pdo->prepare("SELECT * FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC");
-    $items_stmt->execute([$id]);
-    $items = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmt = $pdo->prepare('SELECT * FROM quotes WHERE id = ? LIMIT 1');
+    $stmt->execute([$id]);
+    $quote = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $error = null;
-    $payload = invoice_build_email_message_data($pdo, $quote, $items, false, $error);
+    if ($quote) {
+        $items_stmt = $pdo->prepare('SELECT * FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC');
+        $items_stmt->execute([$id]);
+        $items = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    if (is_array($payload) && !empty($payload['html_body'])) {
-      header('Content-Type: text/html; charset=utf-8');
-      echo $payload['html_body'];
-      exit;
+        $error = null;
+        $payload = invoice_build_email_message_data($pdo, $quote, $items, false, $error);
+
+        if (is_array($payload) && !empty($payload['html_body'])) {
+            header('Content-Type: text/html; charset=utf-8');
+            echo $payload['html_body'];
+            exit;
+        }
     }
-  }
 
-  header('Content-Type: text/html; charset=utf-8');
-  echo '<h2 style="color:red;padding:40px;text-align:center;">Unable to generate email preview.</h2>';
-  exit;
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<h2>Unable to generate email preview.</h2>';
+    exit;
 }
 
 $quote_id_param = trim((string)($_GET['id'] ?? ''));
