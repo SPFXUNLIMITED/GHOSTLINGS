@@ -1336,6 +1336,8 @@ $pdo->exec("
     email                  VARCHAR(255) NULL,
     quote_date             DATE NOT NULL,
     status                 ENUM('draft','sent','converted') NOT NULL DEFAULT 'draft',
+    payment_status         ENUM('unpaid','paid') NOT NULL DEFAULT 'unpaid',
+    paid_at                DATETIME NULL,
     notes                  TEXT NULL,
     subtotal_amount        DECIMAL(12,2) NOT NULL DEFAULT 0,
     converted_invoice_no   VARCHAR(100) NULL,
@@ -1362,6 +1364,28 @@ if ($_quotes_approval_status_col === false || $_quotes_approval_status_col->fetc
   }
 }
 unset($_quotes_approval_status_col);
+
+$_quotes_payment_status_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'payment_status'");
+if ($_quotes_payment_status_col === false || $_quotes_payment_status_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN payment_status ENUM('unpaid','paid') NOT NULL DEFAULT 'unpaid' AFTER status");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'payment_status'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_payment_status_col);
+
+$_quotes_paid_at_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'paid_at'");
+if ($_quotes_paid_at_col === false || $_quotes_paid_at_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN paid_at DATETIME NULL AFTER payment_status");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'paid_at'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_paid_at_col);
 
 $_quotes_online_payment_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'enable_online_payment'");
 if ($_quotes_online_payment_col === false || $_quotes_online_payment_col->fetch(PDO::FETCH_ASSOC) === false) {
