@@ -717,7 +717,7 @@ function invoice_email_preview_content(string $html): string {
           $attributes_to_remove[] = $attribute->nodeName;
           continue;
         }
-        if (in_array($attribute_name, ['href', 'src', 'xlink:href', 'formaction'], true) && preg_match('/^\s*javascript:/i', $attribute_value)) {
+        if (in_array($attribute_name, ['href', 'src', 'xlink:href', 'formaction'], true) && preg_match('/^\s*(javascript|data|vbscript):/i', $attribute_value)) {
           $attributes_to_remove[] = $attribute->nodeName;
         }
       }
