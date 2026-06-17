@@ -118,6 +118,7 @@ try {
         ? 'If you have any questions regarding this invoice, please do not hesitate to contact us.'
         : 'Thank you for considering our services. Please do not hesitate to reach out if you have any questions.';
     $prepared_by_html = '';
+    $document_noun_html = $escape_html($document_noun);
 
     $document_date = trim((string)($quote['quote_date'] ?? ''));
     $customer_name = trim((string)($quote['customer_name'] ?? ''));
@@ -217,7 +218,7 @@ try {
     $from_html = implode('<br>', $from_lines);
 
     if ($sender_name !== '') {
-        $prepared_by_html = 'This ' . $document_noun . ' was prepared by <strong style="color:#1e293b;">' . $escape_html($sender_name) . '</strong>';
+        $prepared_by_html = 'This ' . $document_noun_html . ' was prepared by <strong style="color:#1e293b;">' . $escape_html($sender_name) . '</strong>';
         if ($sender_company !== 'Our Company') {
             $prepared_by_html .= ' at <strong style="color:#1e293b;">' . $escape_html($sender_company) . '</strong>';
         }
@@ -272,7 +273,7 @@ try {
         . '</div>'
         . '<div style="background:#ffffff;padding:24px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
           . '<p style="margin:0 0 8px;font-size:15px;color:#1e293b;">Hello' . ($customer_name !== '' ? ', ' . $escape_html($customer_name) : '') . ',</p>'
-          . '<p style="margin:0 0 24px;font-size:14px;color:#475569;">' . $escape_html($document_intro) . '</p>'
+          . '<p style="margin:0 0 24px;font-size:14px;color:#475569;">' . $document_intro . '</p>'
           . '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">'
             . '<thead>'
               . '<tr style="background:#f8fafc;">'
@@ -300,7 +301,7 @@ try {
               . '</tr>'
             . '</tfoot>'
           . '</table>'
-          . '<p style="margin:0;font-size:14px;color:#475569;">' . $escape_html($document_closing) . '</p>'
+          . '<p style="margin:0;font-size:14px;color:#475569;">' . $document_closing . '</p>'
         . '</div>'
         . ($prepared_by_html !== ''
             ? '<div style="background:#f8fafc;padding:14px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:1px solid #e2e8f0;">'
