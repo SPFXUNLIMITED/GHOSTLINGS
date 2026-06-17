@@ -1347,7 +1347,7 @@ render_header($invoice_heading);
   <div class="actions">
     <?php if (!$is_view_mode): ?>
       <?php if ($quote && trim((string)($quote['email'] ?? '')) !== ''): ?>
-        <form method="post" style="margin:0;" action="">
+        <form method="post" style="margin:0;" action="" onsubmit="return confirm('Are you sure you want to email this invoice to <?= addslashes(h((string)($quote["customer_name"] ?? ""))) ?>? This cannot be undone.');">
           <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
           <input type="hidden" name="action" value="send_email" />
           <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
@@ -1355,7 +1355,7 @@ render_header($invoice_heading);
         </form>
       <?php endif; ?>
     <?php endif; ?>
-    <a class="btn" href="invoice_tracker.php">Invoice Tracker</a>
+    <a class="btn" href="invoice_tracker.php">Back to Invoices</a>
     <?php if ($quote): ?>
       <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
     <?php endif; ?>
@@ -1415,13 +1415,13 @@ render_header($invoice_heading);
 
   <div class="card">
     <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-      <a class="btn" href="invoice_tracker.php">Invoice Tracker</a>
+      <a class="btn" href="invoice_tracker.php">Back to Invoices</a>
       <?php if ($quote): ?>
         <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
       <?php endif; ?>
       <a class="btn primary" href="invoice_form.php?id=<?= (int)$quote_id ?>">Edit Invoice</a>
       <?php if (trim((string)($quote['email'] ?? '')) !== ''): ?>
-        <form method="post" style="margin:0;" action="">
+        <form method="post" style="margin:0;" action="" onsubmit="return confirm('Are you sure you want to email this invoice to <?= addslashes(h((string)($quote["customer_name"] ?? ""))) ?>? This cannot be undone.');">
           <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
           <input type="hidden" name="action" value="send_email" />
           <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
@@ -1715,7 +1715,7 @@ render_header($invoice_heading);
       <?php if (!$is_view_mode): ?>
         <button type="submit" class="btn primary" style="font-size:18px; padding:14px 22px;">Save Invoice</button>
       <?php endif; ?>
-      <a class="btn" href="invoice_tracker.php">Invoice Tracker</a>
+      <a class="btn" href="invoice_tracker.php">Back to Invoices</a>
       <?php if ($quote): ?>
         <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
       <?php endif; ?>

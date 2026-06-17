@@ -1606,7 +1606,7 @@ render_header('Quotes');
       <a class="btn" href="quotes.php?view=all">Back to Quotes</a>
       <a class="btn" href="quotes.php?edit=<?= (int)$detail_quote['id'] ?>">Edit Quote</a>
 
-      <form method="post" style="margin:0;">
+      <form method="post" style="margin:0;" onsubmit="return confirm('Are you sure you want to email this quote to <?= addslashes(h((string)($detail_quote["customer_name"] ?? ""))) ?>? This cannot be undone.');">
         <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
         <input type="hidden" name="action" value="send_email" />
         <input type="hidden" name="row_id" value="<?= (int)$detail_quote['id'] ?>" />
@@ -1702,7 +1702,7 @@ render_header('Quotes');
               <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote['id'] ?>">View</a>
               <a class="btn" href="quotes.php?edit=<?= (int)$quote['id'] ?>">Edit</a>
               <button type="button" class="btn qt-print-btn" data-quote-id="<?= (int)$quote['id'] ?>">🖨 Print</button>
-              <form method="post" style="display:inline;">
+              <form method="post" style="display:inline;" onsubmit="return confirm('Are you sure you want to email this quote to <?= addslashes(h((string)($quote["customer_name"] ?? ""))) ?>? This cannot be undone.');">
                 <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
                 <input type="hidden" name="action" value="send_email" />
                 <input type="hidden" name="row_id" value="<?= (int)$quote['id'] ?>" />
