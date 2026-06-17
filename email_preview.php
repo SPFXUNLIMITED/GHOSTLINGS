@@ -146,9 +146,9 @@ try {
           . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '')
         . '</div>'
         . ($is_paid
-            ? '<div style="background:#ffffff;padding:16px 32px 0;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
-                . '<div style="margin:0 0 4px;padding:14px 18px;border:4px solid #dc2626;border-radius:10px;background:#fee2e2;text-align:center;">'
-                  . '<span style="display:inline-block;font-size:56px;line-height:1;font-weight:900;letter-spacing:0.16em;color:#b91c1c;text-transform:uppercase;">PAID</span>'
+            ? '<div style="background:#ffffff;padding:12px 32px 0;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
+                . '<div style="margin:0 0 4px;padding:8px 12px;border:3px solid #dc2626;border-radius:10px;background:#fee2e2;text-align:center;">'
+                  . '<span style="display:inline-block;font-size:34px;line-height:1;font-weight:900;letter-spacing:0.12em;color:#b91c1c;text-transform:uppercase;">PAID</span>'
                 . '</div>'
               . '</div>'
             : '')
