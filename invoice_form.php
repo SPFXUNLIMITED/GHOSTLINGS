@@ -9,9 +9,9 @@ require_admin_or_moderator();
 
 // EMAIL PREVIEW HANDLER - Must be at the very top, right after requires
 if (isset($_GET['email_preview']) && isset($_GET['id'])) {
-    try {
-        $id = (int)$_GET['id'];
+    $id = (int)$_GET['id'];
 
+    try {
         $stmt = $pdo->prepare('SELECT * FROM quotes WHERE id = ? LIMIT 1');
         $stmt->execute([$id]);
         $quote = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -43,7 +43,7 @@ if (isset($_GET['email_preview']) && isset($_GET['id'])) {
         if ($message === '') {
             $message = get_class($e) . ' at ' . $e->getFile() . ':' . $e->getLine();
         }
-        error_log('Invoice email preview failed for quote #' . (int)($_GET['id'] ?? 0) . ': ' . $message);
+        error_log('Invoice email preview failed for quote #' . $id . ': ' . $message);
         header('Content-Type: text/html; charset=utf-8');
         echo '<h2>Unable to generate email preview.</h2>';
         echo '<pre style="white-space:pre-wrap;color:#b91c1c;">' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</pre>';
