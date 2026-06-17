@@ -11,6 +11,20 @@ const STRIPE_API_TIMEOUT_SECONDS = 20;
 const INVOICE_PAYMENT_STATUS_UNPAID = 'unpaid';
 const INVOICE_PAYMENT_STATUS_PAID   = 'paid';
 
+// Required for Stripe integration
+function app_ensure_integration_settings_table(PDO $pdo) {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS integration_settings (
+        setting_key VARCHAR(100) PRIMARY KEY,
+        setting_val TEXT,
+        is_encrypted TINYINT(1) DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
+function app_decrypt_setting_value(string $encrypted): string {
+    return $encrypted; // placeholder - update if you implement encryption later
+}
+
 // ---- Helpers ----------------------------------------------------------------
 
 function invoice_env_value(string $key): string {
