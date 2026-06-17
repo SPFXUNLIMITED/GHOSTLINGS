@@ -4,7 +4,6 @@ require __DIR__ . '/auth.php';
 require_once __DIR__ . '/lib/PHPMailer/src/Exception.php';
 require_once __DIR__ . '/lib/PHPMailer/src/PHPMailer.php';
 require_once __DIR__ . '/lib/PHPMailer/src/SMTP.php';
-require_admin_or_moderator();
 
 const STRIPE_AMOUNT_TOLERANCE    = 0.01;
 const STRIPE_API_TIMEOUT_SECONDS = 20;
