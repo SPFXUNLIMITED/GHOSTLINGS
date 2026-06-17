@@ -540,7 +540,7 @@ function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, 
         header('Content-Type: text/html; charset=utf-8');
         echo '<!doctype html><html><body style="margin:0;padding:16px;font-family:Arial,sans-serif;background:#ffffff;">'
             . '<div style="padding:12px 14px;border:1px solid #fecaca;background:#fef2f2;color:#991b1b;border-radius:6px;line-height:1.5;">'
-            . '<strong>Email preview error</strong><br>'
+            . '<strong>Email preview error:</strong><br>'
             . nl2br(htmlspecialchars('Missing or invalid quote ID.', ENT_QUOTES, 'UTF-8'))
             . '</div></body></html>';
         exit;
@@ -575,7 +575,7 @@ function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, 
     header('Content-Type: text/html; charset=utf-8');
     echo '<!doctype html><html><body style="margin:0;padding:16px;font-family:Arial,sans-serif;background:#ffffff;">'
         . '<div style="padding:12px 14px;border:1px solid #fecaca;background:#fef2f2;color:#991b1b;border-radius:6px;line-height:1.5;">'
-        . '<strong>Email preview error</strong><br>'
+        . '<strong>Email preview error:</strong><br>'
         . nl2br(htmlspecialchars($preview_error_message, ENT_QUOTES, 'UTF-8'))
         . '</div></body></html>';
     exit;
@@ -585,7 +585,7 @@ function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, 
     header('Content-Type: text/html; charset=utf-8');
     echo '<!doctype html><html><body style="margin:0;padding:16px;font-family:Arial,sans-serif;background:#ffffff;">'
         . '<div style="padding:12px 14px;border:1px solid #fecaca;background:#fef2f2;color:#991b1b;border-radius:6px;line-height:1.5;">'
-        . '<strong>Email preview error</strong><br>'
+        . '<strong>Email preview error:</strong><br>'
         . nl2br(htmlspecialchars('PHP error: ' . $e->getMessage(), ENT_QUOTES, 'UTF-8'))
         . '</div></body></html>';
     exit;
