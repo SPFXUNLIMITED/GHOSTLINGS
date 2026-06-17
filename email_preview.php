@@ -46,19 +46,24 @@ try {
     if ($sender_company === '') $sender_company = 'Our Company';
     if ($sender_email === '')   $sender_email   = trim((string)(getenv('SMTP_FROM_EMAIL') ?: ''));
 
-    // Quote fields
+    // Determine whether this record is a quote or an invoice
     $h = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 
-    $inv_no          = trim((string)($quote['converted_invoice_no'] ?? ''));
-    $inv_label       = $inv_no !== '' ? $h($inv_no) : '#' . (int)$quote['id'];
-    $inv_date        = $h(trim((string)($quote['quote_date'] ?? '')));
-    $customer_name   = trim((string)($quote['customer_name'] ?? ''));
+    $conv_invoice_no = trim((string)($quote['converted_invoice_no'] ?? ''));
+    $record_status   = strtolower(trim((string)($quote['status'] ?? '')));
+    $is_invoice      = $conv_invoice_no !== '' || $record_status === 'converted';
+
+    $doc_label        = $is_invoice
+        ? 'Invoice ' . ($conv_invoice_no !== '' ? $h($conv_invoice_no) : '#' . (int)$quote['id'])
+        : 'Quote #' . (int)$quote['id'];
+    $doc_date         = $h(trim((string)($quote['quote_date'] ?? '')));
+    $customer_name    = trim((string)($quote['customer_name'] ?? ''));
     $customer_company = trim((string)($quote['company_name']  ?? ''));
-    $subtotal        = number_format((float)($quote['subtotal_amount'] ?? 0), 2);
-    $tax_rate        = (float)($quote['tax_rate']   ?? 0);
-    $tax_amount      = number_format((float)($quote['tax_amount']  ?? 0), 2);
-    $grand_total     = number_format((float)($quote['subtotal_amount'] ?? 0) + (float)($quote['tax_amount'] ?? 0), 2);
-    $is_paid         = strtolower(trim((string)($quote['payment_status'] ?? ''))) === 'paid';
+    $subtotal         = number_format((float)($quote['subtotal_amount'] ?? 0), 2);
+    $tax_rate         = (float)($quote['tax_rate']   ?? 0);
+    $tax_amount       = number_format((float)($quote['tax_amount']  ?? 0), 2);
+    $grand_total      = number_format((float)($quote['subtotal_amount'] ?? 0) + (float)($quote['tax_amount'] ?? 0), 2);
+    $is_paid          = $is_invoice && strtolower(trim((string)($quote['payment_status'] ?? ''))) === 'paid';
 
     $bill_street = trim((string)($quote['billing_street'] ?? ''));
     $bill_city   = trim((string)($quote['billing_city']   ?? ''));
@@ -107,9 +112,10 @@ try {
     $footer_contact_html = implode(' &nbsp;·&nbsp; ', $ftr_parts);
 
     // Prepared-by line
+    $doc_type_label   = $is_invoice ? 'invoice' : 'quote';
     $prepared_by_html = '';
     if ($sender_name !== '') {
-        $prepared_by_html = 'This invoice was prepared by <strong style="color:#1e293b;">' . $h($sender_name) . '</strong>';
+        $prepared_by_html = 'This ' . $doc_type_label . ' was prepared by <strong style="color:#1e293b;">' . $h($sender_name) . '</strong>';
         if ($sender_company !== 'Our Company') {
             $prepared_by_html .= ' at <strong style="color:#1e293b;">' . $h($sender_company) . '</strong>';
         }
@@ -156,10 +162,10 @@ try {
           . '<table style="width:100%;border-collapse:collapse;">'
             . '<tr>'
               . '<td style="padding:0 0 16px;">'
-                . '<p style="margin:0;font-size:18px;font-weight:700;color:#0f172a;">Invoice ' . $inv_label . '</p>'
+                . '<p style="margin:0;font-size:18px;font-weight:700;color:#0f172a;">' . $doc_label . '</p>'
               . '</td>'
               . '<td style="padding:0 0 16px;text-align:right;">'
-                . '<p style="margin:0;font-size:13px;color:#64748b;">Date: ' . $inv_date . '</p>'
+                . '<p style="margin:0;font-size:13px;color:#64748b;">Date: ' . $doc_date . '</p>'
               . '</td>'
             . '</tr>'
           . '</table>'
@@ -185,7 +191,9 @@ try {
         . '</div>'
         . '<div style="background:#ffffff;padding:24px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
           . '<p style="margin:0 0 8px;font-size:15px;color:#1e293b;">Hello' . ($customer_name !== '' ? ', ' . $h($customer_name) : '') . ',</p>'
-          . '<p style="margin:0 0 24px;font-size:14px;color:#475569;">Please find your invoice details below. Thank you for your business.</p>'
+          . ($is_invoice
+              ? '<p style="margin:0 0 24px;font-size:14px;color:#475569;">Please find your invoice details below. Thank you for your business.</p>'
+              : '<p style="margin:0 0 24px;font-size:14px;color:#475569;">Please find your quote details below. We appreciate the opportunity to earn your business.</p>')
           . '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">'
             . '<thead>'
               . '<tr style="background:#f8fafc;">'
@@ -213,7 +221,7 @@ try {
               . '</tr>'
             . '</tfoot>'
           . '</table>'
-          . '<p style="margin:0;font-size:14px;color:#475569;">If you have any questions regarding this invoice, please do not hesitate to contact us.</p>'
+          . '<p style="margin:0;font-size:14px;color:#475569;">If you have any questions regarding this ' . $doc_type_label . ', please do not hesitate to contact us.</p>'
         . '</div>'
         . ($prepared_by_html !== ''
             ? '<div style="background:#f8fafc;padding:14px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:1px solid #e2e8f0;">'
