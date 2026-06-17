@@ -90,9 +90,12 @@ $rows = $pdo->query(
 render_header('Bug Tracker');
 ?>
 
-<div class="card">
-  <h1 style="margin-top:0; margin-bottom:4px;">Bug Tracker</h1>
-  <p class="muted" style="margin:0;">Review and triage user-submitted bug reports.</p>
+<div class="card page-header">
+  <div class="page-header-body">
+    <h1 style="margin-top:0; margin-bottom:4px;">Bug Tracker</h1>
+    <p class="muted" style="margin:0;">Review and triage user-submitted bug reports.</p>
+  </div>
+  <a class="btn primary" href="app_request_form.php">+ New Request</a>
 </div>
 
 <?php if ($errors): ?>
