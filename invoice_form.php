@@ -9,8 +9,6 @@ require_admin_or_moderator();
 
 // EMAIL PREVIEW HANDLER - Must be at the very top, right after requires
 if (isset($_GET['email_preview']) && isset($_GET['id'])) {
-    header('Content-Type: text/html; charset=utf-8');
-
     try {
         $id = (int)$_GET['id'];
 
@@ -37,6 +35,7 @@ if (isset($_GET['email_preview']) && isset($_GET['id'])) {
             throw new RuntimeException($message);
         }
 
+        header('Content-Type: text/html; charset=utf-8');
         echo $payload['html_body'];
     } catch (Throwable $e) {
         http_response_code(500);
@@ -45,6 +44,7 @@ if (isset($_GET['email_preview']) && isset($_GET['id'])) {
             $message = get_class($e) . ' at ' . $e->getFile() . ':' . $e->getLine();
         }
         error_log('Invoice email preview failed for quote #' . (int)($_GET['id'] ?? 0) . ': ' . $message);
+        header('Content-Type: text/html; charset=utf-8');
         echo '<h2>Unable to generate email preview.</h2>';
         echo '<pre style="white-space:pre-wrap;color:#b91c1c;">' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</pre>';
     }
