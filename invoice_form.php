@@ -338,7 +338,7 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
   return $checkout_url;
 }
 
-function invoice_build_email_message_data(PDO $pdo, array &$quote, array $items, bool $require_payment_link = true, ?string &$error_message = null): ?array {
+function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, bool $require_payment_link = true, ?string &$error_message = null): ?array {
   $error_message = null;
   $created_by    = isset($quote['created_by']) && $quote['created_by'] !== null ? (int)$quote['created_by'] : null;
   $sender        = invoice_sender_profile($pdo, $created_by);
@@ -369,7 +369,8 @@ function invoice_build_email_message_data(PDO $pdo, array &$quote, array $items,
   $payment_link = '';
   if (!$is_paid && invoice_online_payment_enabled($quote)) {
     $payment_error = null;
-    $payment_link = invoice_checkout_session_url($pdo, $quote, $payment_error);
+    $quote_for_checkout = $quote;
+    $payment_link = invoice_checkout_session_url($pdo, $quote_for_checkout, $payment_error);
     if ($payment_link === '' && $require_payment_link) {
       $error_message = trim((string)$payment_error) !== '' ? trim((string)$payment_error) : 'Unable to create Stripe checkout link for this invoice.';
       return null;
@@ -1214,8 +1215,7 @@ $invoice_approval_label = invoice_form_approval_label($invoice_approval_status);
 $invoice_email_preview_html = '';
 $invoice_email_preview_error = '';
 if ($is_view_mode && $quote) {
-  $preview_quote = $quote;
-  $preview_payload = invoice_build_email_message_data($pdo, $preview_quote, $rows, true, $invoice_email_preview_error);
+  $preview_payload = invoice_build_email_message_data($pdo, $quote, $rows, true, $invoice_email_preview_error);
   if (is_array($preview_payload)) {
     $invoice_email_preview_html = (string)($preview_payload['html_body'] ?? '');
   }
