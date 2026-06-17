@@ -1,14 +1,13 @@
 <?php
 require __DIR__ . '/db.php';
-require __DIR__ . '/auth.php';
 require_once __DIR__ . '/lib/PHPMailer/src/Exception.php';
 require_once __DIR__ . '/lib/PHPMailer/src/PHPMailer.php';
-require_once __DIR__ . '/lib/PHPMailer/src/SMTP.php';
 
-const STRIPE_AMOUNT_TOLERANCE    = 0.01;
-const STRIPE_API_TIMEOUT_SECONDS = 20;
-const INVOICE_PAYMENT_STATUS_UNPAID = 'unpaid';
-const INVOICE_PAYMENT_STATUS_PAID   = 'paid';
+try {
+    defined('STRIPE_AMOUNT_TOLERANCE') || define('STRIPE_AMOUNT_TOLERANCE', 0.01);
+    defined('STRIPE_API_TIMEOUT_SECONDS') || define('STRIPE_API_TIMEOUT_SECONDS', 20);
+    defined('INVOICE_PAYMENT_STATUS_UNPAID') || define('INVOICE_PAYMENT_STATUS_UNPAID', 'unpaid');
+    defined('INVOICE_PAYMENT_STATUS_PAID') || define('INVOICE_PAYMENT_STATUS_PAID', 'paid');
 
 // Required for Stripe integration
 function app_ensure_integration_settings_table(PDO $pdo) {
@@ -543,7 +542,6 @@ function render_email_preview_error(string $message): void {
         . '</div></body></html>';
 }
 
-try {
     $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
 
     if ($id === false || $id === null) {
@@ -574,6 +572,15 @@ try {
     exit;
 } catch (Throwable $e) {
     error_log('Email preview failed: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
-    render_email_preview_error('PHP error: ' . $e->getMessage());
+    if (function_exists('render_email_preview_error')) {
+        render_email_preview_error('PHP error: ' . $e->getMessage());
+    } else {
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!doctype html><html><body style="margin:0;padding:16px;font-family:Arial,sans-serif;background:#fff;">'
+            . '<div style="padding:12px 14px;border:1px solid #fecaca;background:#fef2f2;color:#991b1b;border-radius:6px;">'
+            . '<strong>Email preview error:</strong><br>'
+            . nl2br(htmlspecialchars('PHP error: ' . $e->getMessage(), ENT_QUOTES, 'UTF-8'))
+            . '</div></body></html>';
+    }
     exit;
 }
