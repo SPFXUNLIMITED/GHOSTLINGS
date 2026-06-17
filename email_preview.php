@@ -1,14 +1,13 @@
 <?php
 require __DIR__ . '/db.php';
-require __DIR__ . '/auth.php';
 require_once __DIR__ . '/lib/PHPMailer/src/Exception.php';
 require_once __DIR__ . '/lib/PHPMailer/src/PHPMailer.php';
-require_once __DIR__ . '/lib/PHPMailer/src/SMTP.php';
 
-const STRIPE_AMOUNT_TOLERANCE    = 0.01;
-const STRIPE_API_TIMEOUT_SECONDS = 20;
-const INVOICE_PAYMENT_STATUS_UNPAID = 'unpaid';
-const INVOICE_PAYMENT_STATUS_PAID   = 'paid';
+try {
+    define('STRIPE_AMOUNT_TOLERANCE', 0.01);
+    define('STRIPE_API_TIMEOUT_SECONDS', 20);
+    define('INVOICE_PAYMENT_STATUS_UNPAID', 'unpaid');
+    define('INVOICE_PAYMENT_STATUS_PAID', 'paid');
 
 // Required for Stripe integration
 function app_ensure_integration_settings_table(PDO $pdo) {
@@ -543,7 +542,6 @@ function render_email_preview_error(string $message): void {
         . '</div></body></html>';
 }
 
-try {
     $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
 
     if ($id === false || $id === null) {
