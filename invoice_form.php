@@ -683,6 +683,71 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
   }
 }
 
+function invoice_email_preview_content(string $html): string {
+  $html = trim($html);
+  if ($html === '' || !class_exists('DOMDocument')) {
+    return '';
+  }
+
+  $dom = new DOMDocument();
+  $libxml_previous = libxml_use_internal_errors(true);
+  $loaded = $dom->loadHTML($html, LIBXML_HTML_NODEFDTD | LIBXML_HTML_NOIMPLIED);
+  libxml_clear_errors();
+  libxml_use_internal_errors($libxml_previous);
+  if (!$loaded) {
+    return '';
+  }
+
+  foreach (['script', 'iframe', 'object', 'embed', 'form', 'link', 'meta', 'base'] as $tag_name) {
+    while (($nodes = $dom->getElementsByTagName($tag_name))->length > 0) {
+      $node = $nodes->item(0);
+      if ($node !== null && $node->parentNode !== null) {
+        $node->parentNode->removeChild($node);
+      }
+    }
+  }
+
+  $sanitize_node = static function (DOMNode $node) use (&$sanitize_node): void {
+    if ($node instanceof DOMElement && $node->hasAttributes()) {
+      $attributes_to_remove = [];
+      foreach ($node->attributes as $attribute) {
+        $attribute_name = strtolower($attribute->nodeName);
+        $attribute_value = trim($attribute->nodeValue);
+        if (str_starts_with($attribute_name, 'on')) {
+          $attributes_to_remove[] = $attribute->nodeName;
+          continue;
+        }
+        if (in_array($attribute_name, ['href', 'src', 'xlink:href', 'formaction'], true) && preg_match('/^\s*(javascript|data|vbscript):/i', $attribute_value)) {
+          $attributes_to_remove[] = $attribute->nodeName;
+        }
+      }
+      foreach ($attributes_to_remove as $attribute_name) {
+        $node->removeAttribute($attribute_name);
+      }
+    }
+    foreach ($node->childNodes as $child_node) {
+      if ($child_node instanceof DOMNode) {
+        $sanitize_node($child_node);
+      }
+    }
+  };
+  $sanitize_node($dom);
+
+  $body = $dom->getElementsByTagName('body')->item(0);
+  $container = $body instanceof DOMElement ? $body : $dom->documentElement;
+  if ($container instanceof DOMNode) {
+    $preview_html = '';
+    foreach ($container->childNodes as $child_node) {
+      if ($child_node instanceof DOMNode) {
+        $preview_html .= (string)$dom->saveHTML($child_node);
+      }
+    }
+    return trim($preview_html);
+  }
+
+  return '';
+}
+
 // ---------- GET: Customer live search ----------
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
   header('Content-Type: application/json; charset=utf-8');
@@ -1217,7 +1282,7 @@ if ($is_view_mode && $quote) {
   $invoice_preview_items = $rows;
   $preview_payload = invoice_build_email_message_data($pdo, $quote, $invoice_preview_items, true, $invoice_email_preview_error);
   if (is_array($preview_payload)) {
-    $invoice_email_preview_html = (string)($preview_payload['html_body'] ?? '');
+    $invoice_email_preview_html = invoice_email_preview_content((string)($preview_payload['html_body'] ?? ''));
   }
 }
 
@@ -1235,6 +1300,10 @@ render_header($invoice_heading);
   .invoice-paid-banner{margin:0 0 14px;padding:14px 18px;border:4px solid #dc2626;border-radius:10px;background:#fee2e2;text-align:center;}
   .invoice-paid-banner span{display:inline-block;font-size:56px;line-height:1;font-weight:900;letter-spacing:.16em;color:#b91c1c;text-transform:uppercase;}
   .invoice-mark-paid-btn{background:#dc2626;border-color:#b91c1c;color:#fff;font-weight:700;}
+  .invoice-email-preview-shell{margin-top:14px;padding:18px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;}
+  .invoice-email-preview-shell h2{margin:0 0 6px;font-size:1.15rem;}
+  .invoice-email-preview-shell p{margin:0 0 14px;}
+  .invoice-email-preview-canvas{overflow:auto;border:1px solid #e2e8f0;border-radius:12px;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;}
 </style>
 
 <div class="card page-header">
@@ -1308,10 +1377,13 @@ render_header($invoice_heading);
       <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b; margin-bottom:14px;">Unable to render invoice email preview: <?= h($invoice_email_preview_error) ?></div>
     <?php endif; ?>
     <?php if ($invoice_email_preview_html !== ''): ?>
-      <iframe
-        title="Invoice Email Preview"
-        style="display:block;width:100%;min-height:980px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;"
-        srcdoc="<?= h($invoice_email_preview_html) ?>"></iframe>
+      <section class="invoice-email-preview-shell" aria-label="Customer Email Preview">
+        <h2>Customer Email Preview</h2>
+        <p class="muted">This is what the customer will see.</p>
+        <div class="invoice-email-preview-canvas">
+          <?= $invoice_email_preview_html ?>
+        </div>
+      </section>
     <?php else: ?>
       <div class="alert" style="border-color:#fde68a; background:#fffbeb; color:#92400e; margin-bottom:14px;">Invoice email preview is currently unavailable.</div>
     <?php endif; ?>
