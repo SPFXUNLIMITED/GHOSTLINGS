@@ -1566,37 +1566,17 @@ render_header($invoice_heading);
           <label for="enable_online_payment" style="display:block; margin:0 0 4px; font-weight:600;">Enable Online Payment</label>
           <p class="muted" style="margin:0; font-size:13px;">When enabled, invoice emails include a secure Stripe checkout link. Save changes before emailing the invoice.</p>
         </div>
-        <?php if (!$is_view_mode): ?>
-          <label class="invoice-toggle">
-            <input id="enable_online_payment" type="checkbox" name="enable_online_payment" value="1" <?= $fields['enable_online_payment'] === '1' ? 'checked' : '' ?> />
-            <span class="invoice-toggle-slider" aria-hidden="true"></span>
-          </label>
-        <?php else: ?>
-          <span style="font-weight:700; color:<?= $fields['enable_online_payment'] === '1' ? '#1d4ed8' : '#64748b' ?>;">
-            <?= $fields['enable_online_payment'] === '1' ? 'Enabled' : 'Disabled' ?>
-          </span>
-        <?php endif; ?>
+        <label class="invoice-toggle">
+          <input id="enable_online_payment" type="checkbox" name="enable_online_payment" value="1" <?= $fields['enable_online_payment'] === '1' ? 'checked' : '' ?> />
+          <span class="invoice-toggle-slider" aria-hidden="true"></span>
+        </label>
       </div>
       <label for="notes">Notes</label>
       <textarea id="notes" name="notes" rows="5"<?= invoice_field_lock_attrs($is_view_mode) ?>><?= h($fields['notes']) ?></textarea>
     </div>
 
     <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
-      <?php if (!$is_view_mode): ?>
-        <button type="submit" class="btn primary" style="font-size:18px; padding:14px 22px;">Save Invoice</button>
-      <?php else: ?>
-        <a class="btn primary" href="invoice_form.php?id=<?= (int)$quote_id ?>">Edit Invoice</a>
-      <?php endif; ?>
-      <?php if ($quote && trim((string)($quote['email'] ?? '')) !== ''): ?>
-        <?php if ($is_view_mode): ?>
-          <form method="post" style="margin:0;" action="">
-            <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
-            <input type="hidden" name="action" value="send_email" />
-            <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
-            <button type="submit" class="btn">Email Invoice</button>
-          </form>
-        <?php endif; ?>
-      <?php endif; ?>
+      <button type="submit" class="btn primary" style="font-size:18px; padding:14px 22px;">Save Invoice</button>
       <a class="btn" href="invoice_tracker.php">Invoice Tracker</a>
       <?php if ($quote): ?>
         <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
