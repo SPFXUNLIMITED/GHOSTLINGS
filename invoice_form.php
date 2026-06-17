@@ -338,41 +338,18 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
   return $checkout_url;
 }
 
-function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$error_message = null): bool {
+function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, bool $require_payment_link = true, ?string &$error_message = null): ?array {
   $error_message = null;
-  $to = trim((string)($quote['email'] ?? ''));
-  if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
-    $error_message = 'Invoice email address is missing or invalid.';
-    return false;
-  }
-
-  $smtp_host     = invoice_env_value('SMTP_HOST');
-  $smtp_port     = (int)invoice_env_value('SMTP_PORT');
-  $smtp_username = invoice_env_value('SMTP_USERNAME');
-  $smtp_password = invoice_env_value('SMTP_PASSWORD');
-  $smtp_from_email = invoice_env_value('SMTP_FROM_EMAIL');
-  $smtp_from_name  = trim(str_replace(["\r", "\n"], ' ', invoice_env_value('SMTP_FROM_NAME')));
-
-  $smtp_errors = [];
-  if ($smtp_host === '') $smtp_errors[] = 'SMTP_HOST';
-  if ($smtp_port <= 0)   $smtp_errors[] = 'SMTP_PORT';
-  if ($smtp_username === '') $smtp_errors[] = 'SMTP_USERNAME';
-  if ($smtp_password === '') $smtp_errors[] = 'SMTP_PASSWORD';
-  if ($smtp_from_email === '' || !filter_var($smtp_from_email, FILTER_VALIDATE_EMAIL)) $smtp_errors[] = 'SMTP_FROM_EMAIL';
-  if ($smtp_errors) {
-    $error_message = 'Missing or invalid SMTP configuration: ' . implode(', ', $smtp_errors);
-    error_log('Invoice email send failed — missing SMTP config: ' . implode(', ', $smtp_errors));
-    return false;
-  }
-
   $created_by    = isset($quote['created_by']) && $quote['created_by'] !== null ? (int)$quote['created_by'] : null;
   $sender        = invoice_sender_profile($pdo, $created_by);
   $sender_name   = $sender['sender_name'];
+  $smtp_from_name = trim(str_replace(["\r", "\n"], ' ', invoice_env_value('SMTP_FROM_NAME')));
   $sender_company = $sender['company_name'] !== '' ? $sender['company_name'] : $smtp_from_name;
   if ($sender_company === '') $sender_company = 'Our Company';
   $sender_address = $sender['address'];
   $sender_phone   = $sender['phone'];
-  $sender_email   = $sender['email'] !== '' ? $sender['email'] : $smtp_from_email;
+  $sender_email_env = invoice_env_value('SMTP_FROM_EMAIL');
+  $sender_email   = $sender['email'] !== '' ? $sender['email'] : $sender_email_env;
 
   $inv_no        = trim((string)($quote['converted_invoice_no'] ?? ''));
   $customer_name = trim((string)($quote['customer_name'] ?? ''));
@@ -393,9 +370,9 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
   if (!$is_paid && invoice_online_payment_enabled($quote)) {
     $payment_error = null;
     $payment_link = invoice_checkout_session_url($pdo, $quote, $payment_error);
-    if ($payment_link === '') {
+    if ($payment_link === '' && $require_payment_link) {
       $error_message = trim((string)$payment_error) !== '' ? trim((string)$payment_error) : 'Unable to create Stripe checkout link for this invoice.';
-      return false;
+      return null;
     }
   }
 
@@ -632,6 +609,45 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
     $text_body .= "\r\nPrepared by: {$sender_name}" . ($sender_company !== 'Our Company' ? " at {$sender_company}" : '') . "\r\n";
   }
 
+  return [
+    'subject' => $subject,
+    'html_body' => $html_body,
+    'text_body' => $text_body,
+  ];
+}
+
+function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$error_message = null): bool {
+  $error_message = null;
+  $to = trim((string)($quote['email'] ?? ''));
+  if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+    $error_message = 'Invoice email address is missing or invalid.';
+    return false;
+  }
+
+  $smtp_host     = invoice_env_value('SMTP_HOST');
+  $smtp_port     = (int)invoice_env_value('SMTP_PORT');
+  $smtp_username = invoice_env_value('SMTP_USERNAME');
+  $smtp_password = invoice_env_value('SMTP_PASSWORD');
+  $smtp_from_email = invoice_env_value('SMTP_FROM_EMAIL');
+  $smtp_from_name  = trim(str_replace(["\r", "\n"], ' ', invoice_env_value('SMTP_FROM_NAME')));
+
+  $smtp_errors = [];
+  if ($smtp_host === '') $smtp_errors[] = 'SMTP_HOST';
+  if ($smtp_port <= 0)   $smtp_errors[] = 'SMTP_PORT';
+  if ($smtp_username === '') $smtp_errors[] = 'SMTP_USERNAME';
+  if ($smtp_password === '') $smtp_errors[] = 'SMTP_PASSWORD';
+  if ($smtp_from_email === '' || !filter_var($smtp_from_email, FILTER_VALIDATE_EMAIL)) $smtp_errors[] = 'SMTP_FROM_EMAIL';
+  if ($smtp_errors) {
+    $error_message = 'Missing or invalid SMTP configuration: ' . implode(', ', $smtp_errors);
+    error_log('Invoice email send failed — missing SMTP config: ' . implode(', ', $smtp_errors));
+    return false;
+  }
+
+  $email_payload = invoice_build_email_message_data($pdo, $quote, $items, true, $error_message);
+  if ($email_payload === null) {
+    return false;
+  }
+
   try {
     $mailer = new \PHPMailer\PHPMailer\PHPMailer(true);
     $mailer->isSMTP();
@@ -651,10 +667,10 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
     $mailer->CharSet = 'UTF-8';
     $mailer->setFrom($smtp_from_email, $smtp_from_name);
     $mailer->addAddress($to);
-    $mailer->Subject  = $subject;
+    $mailer->Subject  = (string)$email_payload['subject'];
     $mailer->isHTML(true);
-    $mailer->Body     = $html_body;
-    $mailer->AltBody  = $text_body;
+    $mailer->Body     = (string)$email_payload['html_body'];
+    $mailer->AltBody  = (string)$email_payload['text_body'];
     if (!$mailer->send()) {
       $error_message = trim((string)$mailer->ErrorInfo);
       return false;
@@ -1195,6 +1211,15 @@ $invoice_approval_status = is_array($quote) ? (string)($quote['approval_status']
 $invoice_is_paid = is_array($quote) && invoice_is_paid($quote);
 [$invoice_approval_bg, $invoice_approval_color] = invoice_form_approval_colors($invoice_approval_status);
 $invoice_approval_label = invoice_form_approval_label($invoice_approval_status);
+$invoice_email_preview_html = '';
+$invoice_email_preview_error = '';
+if ($is_view_mode && $quote) {
+  $invoice_preview_items = $rows;
+  $preview_payload = invoice_build_email_message_data($pdo, $quote, $invoice_preview_items, true, $invoice_email_preview_error);
+  if (is_array($preview_payload)) {
+    $invoice_email_preview_html = (string)($preview_payload['html_body'] ?? '');
+  }
+}
 
 render_header($invoice_heading);
 ?>
@@ -1278,12 +1303,24 @@ render_header($invoice_heading);
   <?php if ($invoice_already_paid): ?>
     <div class="alert" style="border-color:#fecaca; background:#fff1f2; color:#9f1239; margin-bottom:14px;">Invoice is already marked as paid.</div>
   <?php endif; ?>
+  <?php if ($is_view_mode): ?>
+    <?php if ($invoice_email_preview_error !== ''): ?>
+      <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b; margin-bottom:14px;">Unable to render invoice email preview: <?= h($invoice_email_preview_error) ?></div>
+    <?php endif; ?>
+    <?php if ($invoice_email_preview_html !== ''): ?>
+      <iframe
+        title="Invoice Email Preview"
+        style="display:block;width:100%;min-height:980px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;"
+        srcdoc="<?= h($invoice_email_preview_html) ?>"></iframe>
+    <?php else: ?>
+      <div class="alert" style="border-color:#fde68a; background:#fffbeb; color:#92400e; margin-bottom:14px;">Invoice email preview is currently unavailable.</div>
+    <?php endif; ?>
+  <?php endif; ?>
 
   <?php if (!$is_view_mode): ?>
   <form method="post" action="">
     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
     <input type="hidden" name="source_quote_id" value="<?= h($fields['source_quote_id']) ?>" />
-  <?php endif; ?>
 
     <div style="display:grid; gap:14px; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));">
       <div>
@@ -1535,10 +1572,6 @@ render_header($invoice_heading);
             <input id="enable_online_payment" type="checkbox" name="enable_online_payment" value="1" <?= $fields['enable_online_payment'] === '1' ? 'checked' : '' ?> />
             <span class="invoice-toggle-slider" aria-hidden="true"></span>
           </label>
-        <?php else: ?>
-          <span style="font-weight:700; color:<?= $fields['enable_online_payment'] === '1' ? '#1d4ed8' : '#64748b' ?>;">
-            <?= $fields['enable_online_payment'] === '1' ? 'Enabled' : 'Disabled' ?>
-          </span>
         <?php endif; ?>
       </div>
       <label for="notes">Notes</label>
@@ -1548,25 +1581,12 @@ render_header($invoice_heading);
     <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
       <?php if (!$is_view_mode): ?>
         <button type="submit" class="btn primary" style="font-size:18px; padding:14px 22px;">Save Invoice</button>
-      <?php else: ?>
-        <a class="btn primary" href="invoice_form.php?id=<?= (int)$quote_id ?>">Edit Invoice</a>
-      <?php endif; ?>
-      <?php if ($quote && trim((string)($quote['email'] ?? '')) !== ''): ?>
-        <?php if ($is_view_mode): ?>
-          <form method="post" style="margin:0;" action="">
-            <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
-            <input type="hidden" name="action" value="send_email" />
-            <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
-            <button type="submit" class="btn">Email Invoice</button>
-          </form>
-        <?php endif; ?>
       <?php endif; ?>
       <a class="btn" href="invoice_tracker.php">Invoice Tracker</a>
       <?php if ($quote): ?>
         <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
       <?php endif; ?>
     </div>
-  <?php if (!$is_view_mode): ?>
   </form>
   <?php endif; ?>
 </div>
