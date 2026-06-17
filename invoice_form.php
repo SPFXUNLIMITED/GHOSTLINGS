@@ -685,52 +685,67 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
 
 function invoice_email_preview_content(string $html): string {
   $html = trim($html);
-  if ($html === '') {
+  if ($html === '' || !class_exists('DOMDocument')) {
     return '';
   }
 
-  if (class_exists('DOMDocument')) {
-    $dom = new DOMDocument();
-    $libxml_previous = libxml_use_internal_errors(true);
-    $loaded = $dom->loadHTML($html, LIBXML_HTML_NODEFDTD | LIBXML_HTML_NOIMPLIED);
-    libxml_clear_errors();
-    libxml_use_internal_errors($libxml_previous);
+  $dom = new DOMDocument();
+  $libxml_previous = libxml_use_internal_errors(true);
+  $loaded = $dom->loadHTML($html, LIBXML_HTML_NODEFDTD | LIBXML_HTML_NOIMPLIED);
+  libxml_clear_errors();
+  libxml_use_internal_errors($libxml_previous);
+  if (!$loaded) {
+    return '';
+  }
 
-    if ($loaded) {
-      foreach (['script', 'iframe', 'object', 'embed'] as $tag_name) {
-        while (($nodes = $dom->getElementsByTagName($tag_name))->length > 0) {
-          $node = $nodes->item(0);
-          if ($node !== null && $node->parentNode !== null) {
-            $node->parentNode->removeChild($node);
-          }
-        }
-      }
-
-      $body = $dom->getElementsByTagName('body')->item(0);
-      $container = $body instanceof DOMNode ? $body : $dom->documentElement;
-      if ($container instanceof DOMNode) {
-        $preview_html = '';
-        foreach ($container->childNodes as $child_node) {
-          $preview_html .= (string)$dom->saveHTML($child_node);
-        }
-        return trim($preview_html);
+  foreach (['script', 'iframe', 'object', 'embed', 'form', 'link', 'meta', 'base'] as $tag_name) {
+    while (($nodes = $dom->getElementsByTagName($tag_name))->length > 0) {
+      $node = $nodes->item(0);
+      if ($node !== null && $node->parentNode !== null) {
+        $node->parentNode->removeChild($node);
       }
     }
   }
 
-  $body_start = stripos($html, '<body');
-  if ($body_start !== false) {
-    $body_open_end = strpos($html, '>', $body_start);
-    if ($body_open_end !== false) {
-      $body_close = stripos($html, '</body>', $body_open_end);
-      if ($body_close === false) {
-        $body_close = strlen($html);
+  $sanitize_node = static function (DOMNode $node) use (&$sanitize_node): void {
+    if ($node instanceof DOMElement && $node->hasAttributes()) {
+      $attributes_to_remove = [];
+      foreach ($node->attributes as $attribute) {
+        $attribute_name = strtolower($attribute->nodeName);
+        $attribute_value = trim($attribute->nodeValue);
+        if (str_starts_with($attribute_name, 'on')) {
+          $attributes_to_remove[] = $attribute->nodeName;
+          continue;
+        }
+        if (in_array($attribute_name, ['href', 'src', 'xlink:href', 'formaction'], true) && preg_match('/^\s*javascript:/i', $attribute_value)) {
+          $attributes_to_remove[] = $attribute->nodeName;
+        }
       }
-      $html = substr($html, $body_open_end + 1, $body_close - $body_open_end - 1);
+      foreach ($attributes_to_remove as $attribute_name) {
+        $node->removeAttribute($attribute_name);
+      }
     }
+    foreach ($node->childNodes as $child_node) {
+      if ($child_node instanceof DOMNode) {
+        $sanitize_node($child_node);
+      }
+    }
+  };
+  $sanitize_node($dom);
+
+  $body = $dom->getElementsByTagName('body')->item(0);
+  $container = $body instanceof DOMElement ? $body : $dom->documentElement;
+  if ($container instanceof DOMNode) {
+    $preview_html = '';
+    foreach ($container->childNodes as $child_node) {
+      if ($child_node instanceof DOMNode) {
+        $preview_html .= (string)$dom->saveHTML($child_node);
+      }
+    }
+    return trim($preview_html);
   }
 
-  return trim($html);
+  return '';
 }
 
 // ---------- GET: Customer live search ----------
