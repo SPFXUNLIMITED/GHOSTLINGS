@@ -1641,7 +1641,7 @@ render_header($invoice_heading);
 
   <div class="card">
     <p>Customer Email Preview — This is exactly what the customer will receive:</p>
-    <iframe src="email_preview.php?id=<?= (int)$quote_id ?>"
+    <iframe src="email_preview.php?id=<?= (int)$quote_id ?>&context=invoice"
         style="width:100%; height:1100px; border:1px solid #e2e8f0; border-radius:8px;"
         title="Invoice Email Preview"></iframe>
   </div>

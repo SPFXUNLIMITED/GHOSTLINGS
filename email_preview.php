@@ -115,7 +115,17 @@ try {
     $converted_at = trim((string)($quote['converted_at'] ?? ''));
     // Older records may rely on invoice number or converted_at even if status was not backfilled.
     $has_invoice_markers = $quote_status === 'converted' || $invoice_number !== '' || $converted_at !== '';
-    $is_invoice = $has_invoice_markers;
+
+    // Allow callers to explicitly set context via ?context=quote|invoice so that
+    // a converted quote can still be previewed as a quote (e.g. from quotes.php).
+    $context_param = strtolower(trim((string)filter_input(INPUT_GET, 'context', FILTER_SANITIZE_SPECIAL_CHARS)));
+    if ($context_param === 'quote') {
+        $is_invoice = false;
+    } elseif ($context_param === 'invoice') {
+        $is_invoice = true;
+    } else {
+        $is_invoice = $has_invoice_markers;
+    }
 
     $document_noun = $is_invoice ? 'invoice' : 'quote';
     $document_heading = $is_invoice
