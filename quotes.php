@@ -1681,7 +1681,7 @@ render_header('Quotes');
             ?>
             <td style="white-space:nowrap;">
               <?php if ($row_status === 'converted'): ?>
-                <span style="display:inline-flex;align-items:center;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;background:<?= h($row_badge_bg) ?>;color:<?= h($row_badge_color) ?>;">Converted</span><?= !empty($quote['converted_invoice_no']) ? ' <span style="font-size:12px;color:#64748b;">(' . h((string)$quote['converted_invoice_no']) . ')</span>' : '' ?>
+                <span style="display:inline-flex;align-items:center;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;background:<?= h($row_badge_bg) ?>;color:<?= h($row_badge_color) ?>;">Converted</span><?= !empty($quote['converted_invoice_no']) ? ' <span style="font-size:12px;color:#64748b;">(<a href="invoice_form.php?id=' . (int)$quote['id'] . '&mode=view" style="color:inherit;text-decoration:none;">' . h((string)$quote['converted_invoice_no']) . '</a>)</span>' : '' ?>
               <?php else: ?>
                 <form method="post" style="display:inline-flex;align-items:center;gap:4px;">
                   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
