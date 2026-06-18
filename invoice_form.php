@@ -1034,6 +1034,77 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
   }
 
+  if (trim((string)($_POST['action'] ?? '')) === 'apply_credit_to_invoice') {
+    $row_id = (int)($_POST['row_id'] ?? 0);
+    $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
+    if ($row_id <= 0) {
+      header('Location: invoice_tracker.php');
+      exit;
+    }
+    $inv_stmt = $pdo->prepare("SELECT id, customer_id, subtotal_amount, tax_amount, payment_status FROM quotes WHERE id = ? LIMIT 1");
+    $inv_stmt->execute([$row_id]);
+    $inv_row = $inv_stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$inv_row || (int)($inv_row['customer_id'] ?? 0) <= 0) {
+      header('Location: invoice_form.php?id=' . $row_id . '&mode=view&credit_error=' . urlencode('Invoice not found or has no linked customer.'));
+      exit;
+    }
+    $cust_id_for_credit = (int)$inv_row['customer_id'];
+    $inv_total = round((float)$inv_row['subtotal_amount'] + (float)($inv_row['tax_amount'] ?? 0), 2);
+
+    // Outstanding balance = invoice total - sum of already applied credits for this invoice
+    $already_applied_stmt = $pdo->prepare("SELECT COALESCE(SUM(applied_amount), 0) AS total_applied FROM invoice_credit_applications WHERE quote_id = ?");
+    $already_applied_stmt->execute([$row_id]);
+    $already_applied = round((float)$already_applied_stmt->fetchColumn(), 2);
+    $outstanding_balance = round($inv_total - $already_applied, 2);
+
+    // Available credit = total paid - total already applied across all invoices for this customer
+    $total_paid_stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) AS total_paid FROM customer_payments WHERE customer_id = ?");
+    $total_paid_stmt->execute([$cust_id_for_credit]);
+    $total_paid_credit = round((float)$total_paid_stmt->fetchColumn(), 2);
+
+    $total_all_applied_stmt = $pdo->prepare("SELECT COALESCE(SUM(applied_amount), 0) AS total FROM invoice_credit_applications WHERE customer_id = ?");
+    $total_all_applied_stmt->execute([$cust_id_for_credit]);
+    $total_all_applied = round((float)$total_all_applied_stmt->fetchColumn(), 2);
+
+    $available_credit = round($total_paid_credit - $total_all_applied, 2);
+
+    $apply_amount_raw = trim((string)($_POST['apply_amount'] ?? ''));
+    $apply_amount = round((float)str_replace(',', '', $apply_amount_raw), 2);
+    $apply_notes = trim((string)($_POST['apply_notes'] ?? ''));
+    $apply_date = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Y-m-d');
+
+    $credit_errors = [];
+    if ($apply_amount <= 0) {
+      $credit_errors[] = 'Amount must be greater than zero.';
+    }
+    if ($apply_amount > $available_credit + 0.005) {
+      $credit_errors[] = 'Amount exceeds available customer credit ($' . number_format($available_credit, 2) . ').';
+    }
+    if ($apply_amount > $outstanding_balance + 0.005) {
+      $credit_errors[] = 'Amount exceeds the outstanding invoice balance ($' . number_format($outstanding_balance, 2) . ').';
+    }
+
+    if ($credit_errors) {
+      header('Location: invoice_form.php?id=' . $row_id . '&mode=view&credit_error=' . urlencode(implode(' ', $credit_errors)));
+      exit;
+    }
+
+    $apply_by = ((int)($_SESSION['user_id'] ?? 0)) ?: null;
+    $pdo->prepare(
+      "INSERT INTO invoice_credit_applications (quote_id, customer_id, applied_amount, applied_date, notes, applied_by)
+       VALUES (?, ?, ?, ?, ?, ?)"
+    )->execute([$row_id, $cust_id_for_credit, $apply_amount, $apply_date, $apply_notes !== '' ? $apply_notes : null, $apply_by]);
+
+    // If outstanding balance is now fully covered, mark invoice as paid
+    $new_balance = round($outstanding_balance - $apply_amount, 2);
+    if ($new_balance <= 0.005 && strtolower(trim((string)($inv_row['payment_status'] ?? ''))) !== INVOICE_PAYMENT_STATUS_PAID) {
+      $pdo->prepare("UPDATE quotes SET payment_status = ?, paid_at = NOW() WHERE id = ?")->execute([INVOICE_PAYMENT_STATUS_PAID, $row_id]);
+    }
+
+    header('Location: invoice_form.php?id=' . $row_id . '&mode=view&credit_applied=1');
+    exit;
+  }
+
   if ($view_mode_requested) {
     http_response_code(405);
     exit('Viewing mode is read only.');
@@ -1318,6 +1389,8 @@ $invoice_email_error = isset($_GET['email_error']) && $_GET['email_error'] !== '
 $invoice_approval_approved = isset($_GET['approval_approved']) && $_GET['approval_approved'] === '1';
 $invoice_payment_marked = isset($_GET['payment_marked']) && $_GET['payment_marked'] === '1';
 $invoice_already_paid = isset($_GET['already_paid']) && $_GET['already_paid'] === '1';
+$invoice_credit_applied = isset($_GET['credit_applied']) && $_GET['credit_applied'] === '1';
+$invoice_credit_error = isset($_GET['credit_error']) && $_GET['credit_error'] !== '' ? trim((string)$_GET['credit_error']) : '';
 $invoice_approval_status = is_array($quote) ? (string)($quote['approval_status'] ?? 'none') : 'none';
 $invoice_is_paid = is_array($quote) && invoice_is_paid($quote);
 [$invoice_approval_bg, $invoice_approval_color] = invoice_form_approval_colors($invoice_approval_status);
@@ -1381,6 +1454,12 @@ render_header($invoice_heading);
 <?php if ($invoice_already_paid): ?>
   <div class="alert" style="border-color:#fecaca; background:#fff1f2; color:#9f1239;">Invoice is already marked as paid.</div>
 <?php endif; ?>
+<?php if ($invoice_credit_applied): ?>
+  <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Credit applied to invoice successfully.</div>
+<?php endif; ?>
+<?php if ($invoice_credit_error !== ''): ?>
+  <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b;"><?= h($invoice_credit_error) ?></div>
+<?php endif; ?>
 
 <?php if ($is_view_mode && $quote): ?>
   <?php
@@ -1390,6 +1469,38 @@ render_header($invoice_heading);
     $inv_number     = h($fields['invoice_number']);
     $inv_customer   = h((string)($quote['customer_name'] ?? ''));
     $inv_date       = h((string)($quote['invoice_date'] ?? ($quote['quote_date'] ?? '')));
+
+    // ── Credit computation ──────────────────────────────────────────────────
+    $inv_cust_id_for_credit = (int)($quote['customer_id'] ?? 0);
+    $inv_total_for_credit   = round((float)($quote['subtotal_amount'] ?? 0) + (float)($quote['tax_amount'] ?? 0), 2);
+
+    // Credits already applied to this invoice
+    $inv_credit_apps_stmt = $pdo->prepare(
+      "SELECT id, applied_amount, applied_date, notes FROM invoice_credit_applications WHERE quote_id = ? ORDER BY applied_date ASC, id ASC"
+    );
+    $inv_credit_apps_stmt->execute([$quote_id]);
+    $inv_credit_apps = $inv_credit_apps_stmt->fetchAll(PDO::FETCH_ASSOC);
+    $inv_total_applied_here = round(array_sum(array_column($inv_credit_apps, 'applied_amount')), 2);
+    $inv_outstanding_balance = round($inv_total_for_credit - $inv_total_applied_here, 2);
+    if ($inv_outstanding_balance < 0) $inv_outstanding_balance = 0.0;
+
+    // Available credit = total customer payments - total applied across ALL invoices for this customer
+    $inv_available_credit = 0.0;
+    if ($inv_cust_id_for_credit > 0) {
+      $inv_tp_stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) AS total_paid FROM customer_payments WHERE customer_id = ?");
+      $inv_tp_stmt->execute([$inv_cust_id_for_credit]);
+      $inv_total_paid_credit = round((float)$inv_tp_stmt->fetchColumn(), 2);
+
+      $inv_ta_stmt = $pdo->prepare("SELECT COALESCE(SUM(applied_amount), 0) AS total FROM invoice_credit_applications WHERE customer_id = ?");
+      $inv_ta_stmt->execute([$inv_cust_id_for_credit]);
+      $inv_total_all_applied = round((float)$inv_ta_stmt->fetchColumn(), 2);
+
+      $inv_available_credit = round($inv_total_paid_credit - $inv_total_all_applied, 2);
+      if ($inv_available_credit < 0) $inv_available_credit = 0.0;
+    }
+
+    $inv_max_apply = min($inv_available_credit, $inv_outstanding_balance);
+    $inv_can_apply_credit = $inv_cust_id_for_credit > 0 && $inv_available_credit > 0.005 && $inv_outstanding_balance > 0.005 && !$invoice_is_paid;
   ?>
   <div class="card">
     <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap;">
@@ -1405,6 +1516,54 @@ render_header($invoice_heading);
       </div>
     </div>
   </div>
+
+  <?php if ($inv_cust_id_for_credit > 0): ?>
+  <div class="card" id="inv-credit-card">
+    <h3 style="margin:0 0 14px;">Customer Credit &amp; Balance</h3>
+    <div style="display:flex; flex-wrap:wrap; gap:16px; margin-bottom:<?= ($inv_credit_apps || $inv_can_apply_credit) ? '16px' : '0' ?>;">
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px 20px; min-width:180px;">
+        <div style="font-size:0.78em; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px;">Available Customer Credit</div>
+        <div style="font-size:1.35em; font-weight:700; color:<?= $inv_available_credit > 0.005 ? '#166534' : '#64748b' ?>;">$<?= h(number_format($inv_available_credit, 2)) ?></div>
+      </div>
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px 20px; min-width:180px;">
+        <div style="font-size:0.78em; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px;">Outstanding Balance</div>
+        <div style="font-size:1.35em; font-weight:700; color:<?= $inv_outstanding_balance > 0.005 ? '#991b1b' : '#166534' ?>;">$<?= h(number_format($inv_outstanding_balance, 2)) ?></div>
+      </div>
+    </div>
+
+    <?php if ($inv_credit_apps): ?>
+    <div style="margin-bottom:<?= $inv_can_apply_credit ? '16px' : '0' ?>;">
+      <p style="font-size:0.85em; font-weight:600; color:#475569; margin:0 0 8px;">Credit Applied to This Invoice</p>
+      <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:0.88em;">
+          <thead>
+            <tr style="background:#f1f5f9; text-align:left;">
+              <th style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;">Date</th>
+              <th style="padding:6px 10px; border:1px solid #e2e8f0; text-align:right; white-space:nowrap;">Amount</th>
+              <th style="padding:6px 10px; border:1px solid #e2e8f0;">Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($inv_credit_apps as $app): ?>
+            <tr>
+              <td style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;"><?= h((string)($app['applied_date'] ?? '')) ?></td>
+              <td style="padding:6px 10px; border:1px solid #e2e8f0; text-align:right; font-weight:600; white-space:nowrap;">$<?= h(number_format((float)$app['applied_amount'], 2)) ?></td>
+              <td style="padding:6px 10px; border:1px solid #e2e8f0; color:#64748b;"><?= $app['notes'] !== null && $app['notes'] !== '' ? h((string)$app['notes']) : '<span class="muted">—</span>' ?></td>
+            </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($inv_can_apply_credit): ?>
+    <div>
+      <button type="button" class="btn primary" id="inv-open-credit-modal">Apply Credit to this Invoice</button>
+    </div>
+    <?php endif; ?>
+  </div>
+  <?php endif; ?>
 
   <div class="card">
     <p>Customer Email Preview — This is exactly what the customer will receive:</p>
@@ -1446,6 +1605,62 @@ render_header($invoice_heading);
       <?php endif; ?>
     </div>
   </div>
+
+  <?php if ($inv_can_apply_credit): ?>
+  <!-- Apply Credit Modal -->
+  <div id="inv-credit-modal" role="dialog" aria-modal="true" aria-labelledby="inv-credit-modal-title" style="position:fixed;inset:0;z-index:9000;display:none;">
+    <div id="inv-credit-modal-backdrop" style="position:absolute;inset:0;background:rgba(15,23,42,0.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:min(480px,calc(100vw - 32px));background:#fff;border-radius:16px;box-shadow:0 32px 80px rgba(0,0,0,.4),0 0 0 1px rgba(0,0,0,.08);overflow:hidden;">
+      <div style="padding:20px 24px 14px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:12px;">
+        <span aria-hidden="true" style="font-size:1.3em;">💳</span>
+        <h2 id="inv-credit-modal-title" style="font-size:1.1em;font-weight:700;color:#0f172a;margin:0;">Apply Credit to Invoice</h2>
+        <button type="button" id="inv-credit-modal-close" aria-label="Close" style="margin-left:auto;width:30px;height:30px;border:none;border-radius:50%;background:#f1f5f9;color:#64748b;font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;">&times;</button>
+      </div>
+      <form method="post" action="">
+        <div style="padding:20px 24px;">
+          <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
+          <input type="hidden" name="action" value="apply_credit_to_invoice" />
+          <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
+          <div style="display:grid;gap:12px;">
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;font-size:0.88em;color:#166534;">
+              <strong>Available Credit:</strong> $<?= h(number_format($inv_available_credit, 2)) ?> &nbsp;|&nbsp;
+              <strong>Outstanding Balance:</strong> $<?= h(number_format($inv_outstanding_balance, 2)) ?>
+            </div>
+            <div>
+              <label for="inv-credit-amount" style="display:block;font-size:0.88em;font-weight:600;margin-bottom:4px;">Amount to Apply ($)</label>
+              <input id="inv-credit-amount" type="number" name="apply_amount" min="0.01" max="<?= h(number_format($inv_max_apply, 2, '.', '')) ?>" step="0.01" value="<?= h(number_format($inv_max_apply, 2, '.', '')) ?>" style="width:100%;box-sizing:border-box;" required />
+              <p style="font-size:0.8em;color:#64748b;margin:4px 0 0;">Maximum: $<?= h(number_format($inv_max_apply, 2)) ?></p>
+            </div>
+            <div>
+              <label for="inv-credit-notes" style="display:block;font-size:0.88em;font-weight:600;margin-bottom:4px;">Notes <span style="font-weight:400;color:#94a3b8;">(optional)</span></label>
+              <textarea id="inv-credit-notes" name="apply_notes" rows="2" style="width:100%;box-sizing:border-box;resize:vertical;" placeholder="e.g. Credit from overpayment on payment #42"></textarea>
+            </div>
+          </div>
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px;">
+          <button type="button" id="inv-credit-modal-cancel" class="btn">Cancel</button>
+          <button type="submit" class="btn primary">Apply Credit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script>
+  (function() {
+    var modal = document.getElementById('inv-credit-modal');
+    var openBtn = document.getElementById('inv-open-credit-modal');
+    var closeBtn = document.getElementById('inv-credit-modal-close');
+    var cancelBtn = document.getElementById('inv-credit-modal-cancel');
+    var backdrop = document.getElementById('inv-credit-modal-backdrop');
+    function openModal() { modal.style.display = 'block'; document.getElementById('inv-credit-amount').focus(); }
+    function closeModal() { modal.style.display = 'none'; }
+    if (openBtn) openBtn.addEventListener('click', openModal);
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+    if (backdrop) backdrop.addEventListener('click', closeModal);
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && modal.style.display === 'block') closeModal(); });
+  })();
+  </script>
+  <?php endif; ?>
 
 <?php else: ?>
 <div class="card">
