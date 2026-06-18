@@ -573,7 +573,7 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
     $suffix = $details ? ' [' . implode(', ', $details) . ']' : '';
     error_log('invoice_checkout_session_url returning empty for invoice #' . $quote_id . ': ' . $reason . $suffix);
   };
-  $log_failure = static function (string $reason, int $quote_id, ?string &$error_message, array $context = []): string {
+  $log_failure = static function (string $reason, int $quote_id, ?string &$error_message, array $context = []) use ($log_empty_return): string {
     $details = [];
     foreach ($context as $key => $value) {
       if ($value === null || $value === '') continue;
