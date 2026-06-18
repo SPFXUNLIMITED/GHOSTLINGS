@@ -496,7 +496,7 @@ render_header('Invoice Tracker');
         <span class="it-spinner" aria-hidden="true"></span>
         Loading invoice&hellip;
       </div>
-      <iframe id="it-print-modal-iframe" title="Invoice preview" style="display:none;" loading="lazy" sandbox="allow-same-origin allow-scripts allow-modals allow-popups allow-popups-to-escape-sandbox"></iframe>
+      <iframe id="it-print-modal-iframe" title="Invoice preview" style="display:none;" loading="lazy" sandbox="allow-same-origin allow-modals allow-popups allow-popups-to-escape-sandbox"></iframe>
       <div id="it-print-modal-error" class="it-modal-error" style="display:none;" role="alert"></div>
     </div>
 
@@ -725,19 +725,19 @@ render_header('Invoice Tracker');
   document.querySelectorAll('.it-print-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var invId = btn.getAttribute('data-inv-id');
-      if (!invId) {
-        errorEl.textContent = 'Missing invoice ID for preview.';
-        errorEl.style.display = 'block';
-        return;
-      }
       openModal();
       printBtn.disabled = true;
       loadingEl.style.display = 'flex';
       errorEl.style.display = 'none';
       errorEl.textContent = '';
       iframeEl.style.display = 'none';
-      iframeEl.src = 'about:blank';
-      iframeEl.src = 'email_preview.php?id=' + encodeURIComponent(invId);
+      if (!invId) {
+        loadingEl.style.display = 'none';
+        errorEl.textContent = 'Missing invoice ID for preview.';
+        errorEl.style.display = 'block';
+        return;
+      }
+      iframeEl.src = 'email_preview.php?id=' + encodeURIComponent(invId) + '&_ts=' + Date.now();
     });
   });
 }());
