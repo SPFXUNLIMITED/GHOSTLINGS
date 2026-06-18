@@ -1122,13 +1122,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       exit;
     }
 
-    $credit_stmt = $pdo->prepare("SELECT id FROM invoice_credit_applications WHERE id = ? AND quote_id = ? LIMIT 1");
-    $credit_stmt->execute([$credit_app_id, $row_id]);
-    if (!$credit_stmt->fetch(PDO::FETCH_ASSOC)) {
-      header('Location: invoice_form.php?id=' . $row_id . '&mode=view&credit_error=' . urlencode('Credit application not found.'));
-      exit;
-    }
-
     try {
       $pdo->beginTransaction();
 
@@ -1616,14 +1609,13 @@ render_header($invoice_heading);
             <?php foreach ($inv_credit_apps as $app): ?>
             <?php
               $formatted_amount = '$' . number_format((float)($app['applied_amount'] ?? 0), 2);
-              $remove_credit_confirm = 'Remove this credit application for ' . $formatted_amount . '? This will increase the invoice balance and return the amount to available customer credit.';
             ?>
             <tr>
               <td style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;"><?= h((string)($app['applied_date'] ?? '')) ?></td>
               <td style="padding:6px 10px; border:1px solid #e2e8f0; text-align:right; font-weight:600; white-space:nowrap;">$<?= h(number_format((float)$app['applied_amount'], 2)) ?></td>
               <td style="padding:6px 10px; border:1px solid #e2e8f0; color:#64748b;"><?= $app['notes'] !== null && $app['notes'] !== '' ? h((string)$app['notes']) : '<span class="muted">—</span>' ?></td>
               <td style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;">
-                <form method="post" style="margin:0;" action="" onsubmit="return confirm(<?= h(json_encode($remove_credit_confirm, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP)) ?>);">
+                <form method="post" style="margin:0;" action="" onsubmit="return confirm(<?= h(json_encode('Remove this credit application for ' . $formatted_amount . '? This will increase the invoice balance and return the amount to available customer credit.', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP)) ?>);">
                   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
                   <input type="hidden" name="action" value="remove_credit_from_invoice" />
                   <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
