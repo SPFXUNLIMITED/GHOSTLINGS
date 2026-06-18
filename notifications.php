@@ -7,6 +7,17 @@ require_login();
 $current_user_id = (int)$_SESSION['user_id'];
 $is_admin = !empty($_SESSION['is_admin']);
 
+// Handle "Mark as Read" AJAX/POST action for a single approval alert
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_dismissed_id'])) {
+  $dismiss_id = (int)$_POST['mark_dismissed_id'];
+  if ($dismiss_id > 0) {
+    $dismiss_stmt = $pdo->prepare("UPDATE approval_alerts SET dismissed = 1 WHERE id = ? AND recipient_id = ?");
+    $dismiss_stmt->execute([$dismiss_id, $current_user_id]);
+  }
+  header('Location: notifications.php');
+  exit;
+}
+
 // Fetch unread messages for the current user with sender info
 $msg_stmt = $pdo->prepare("
   SELECT m.id, m.body, m.created_at,
@@ -38,20 +49,16 @@ $approval_alerts = [];
 $approval_stmt = $pdo->prepare("
   SELECT id, entity_type, entity_id, message, link_url, created_at
   FROM approval_alerts
-  WHERE recipient_id = ? AND is_read = 0
+  WHERE recipient_id = ? AND dismissed = 0
   ORDER BY created_at DESC, id DESC
 ");
 $approval_stmt->execute([$current_user_id]);
 $approval_alerts = $approval_stmt->fetchAll();
-if ($approval_alerts) {
-  $approval_ids = array_map(static fn(array $row): int => (int)$row['id'], $approval_alerts);
-  $approval_ids = array_values(array_filter($approval_ids, static fn(int $id): bool => $id > 0));
-  if ($approval_ids) {
-    $placeholders = implode(',', array_fill(0, count($approval_ids), '?'));
-    $mark_read_stmt = $pdo->prepare("UPDATE approval_alerts SET is_read = 1 WHERE recipient_id = ? AND id IN ($placeholders)");
-    $mark_read_stmt->execute(array_merge([$current_user_id], $approval_ids));
-  }
-}
+
+// Clear the red badge by marking unread alerts as read (badge uses is_read = 0).
+// This does NOT dismiss items from the list; dismissed = 1 is only set via the "Mark as Read" button.
+$pdo->prepare("UPDATE approval_alerts SET is_read = 1 WHERE recipient_id = ? AND is_read = 0")
+    ->execute([$current_user_id]);
 
 render_header('Notifications');
 ?>
@@ -88,7 +95,13 @@ render_header('Notifications');
         <td><?= h($type_label) ?></td>
         <td><?= h((string)$alert['message']) ?></td>
         <td><?= h((string)$alert['created_at']) ?></td>
-        <td><a class="btn btn-sm" href="<?= h((string)$alert['link_url']) ?>">Open</a></td>
+        <td style="white-space:nowrap;">
+          <a class="btn btn-sm" href="<?= h((string)$alert['link_url']) ?>">Open</a>
+          <form method="post" action="notifications.php" style="display:inline;">
+            <input type="hidden" name="mark_dismissed_id" value="<?= (int)$alert['id'] ?>">
+            <button type="submit" class="btn btn-sm">Mark as Read</button>
+          </form>
+        </td>
       </tr>
       <?php endforeach; ?>
     </tbody>

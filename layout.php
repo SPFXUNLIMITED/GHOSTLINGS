@@ -576,7 +576,10 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
     <?php elseif ($show_mod_menu): ?>
     <?php render_menu_link(['href' => 'index.php', 'file' => 'index.php', 'label' => 'Home'], $current); ?>
     <?php render_menu_link(['href' => 'user_page.php', 'file' => 'user_page.php', 'label' => 'My Profile'], $current); ?>
-    <?php render_menu_link(['href' => 'messages.php', 'file' => 'messages.php', 'label' => 'Messages'], $current); ?>
+    <?php render_menu_dropdown('Messages', [
+      ['href' => 'messages.php', 'file' => 'messages.php', 'label' => 'Messages'],
+      ['href' => 'notifications.php', 'file' => 'notifications.php', 'label' => 'Notifications'],
+    ], $current); ?>
     <?php render_menu_link(['href' => 'time_clock.php', 'files' => ['time_clock.php', 'time_report.php'], 'label' => 'Time Clock'], $current); ?>
     <?php render_menu_dropdown('Inquiries', [
       ['href' => 'machine_inquiry_form.php', 'file' => 'machine_inquiry_form.php', 'label' => 'Machine Inquiry Form'],
