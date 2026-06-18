@@ -1135,7 +1135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $delete_stmt = $pdo->prepare("DELETE FROM invoice_credit_applications WHERE id = ? AND quote_id = ?");
       $delete_stmt->execute([$credit_app_id, $row_id]);
       if ($delete_stmt->rowCount() !== 1) {
-        throw new RuntimeException('Unable to remove the selected credit application.');
+        throw new RuntimeException('Credit application was not found or was already removed.');
       }
 
       $remaining_stmt = $pdo->prepare("SELECT COALESCE(SUM(applied_amount), 0) FROM invoice_credit_applications WHERE quote_id = ?");
@@ -1156,7 +1156,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($pdo->inTransaction()) {
         $pdo->rollBack();
       }
-      header('Location: invoice_form.php?id=' . $row_id . '&mode=view&credit_error=' . urlencode('Unable to remove credit from invoice.'));
+      error_log('Invoice credit removal failed for quote #' . $row_id . ', application #' . $credit_app_id . ': ' . $e->getMessage());
+      $credit_error_message = $e instanceof RuntimeException ? trim((string)$e->getMessage()) : '';
+      if ($credit_error_message === '') {
+        $credit_error_message = 'Unable to remove credit from invoice.';
+      }
+      header('Location: invoice_form.php?id=' . $row_id . '&mode=view&credit_error=' . urlencode($credit_error_message));
       exit;
     }
 
@@ -1609,12 +1614,13 @@ render_header($invoice_heading);
           </thead>
           <tbody>
             <?php foreach ($inv_credit_apps as $app): ?>
+            <?php $remove_credit_amount_label = '$' . number_format((float)($app['applied_amount'] ?? 0), 2); ?>
             <tr>
               <td style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;"><?= h((string)($app['applied_date'] ?? '')) ?></td>
               <td style="padding:6px 10px; border:1px solid #e2e8f0; text-align:right; font-weight:600; white-space:nowrap;">$<?= h(number_format((float)$app['applied_amount'], 2)) ?></td>
               <td style="padding:6px 10px; border:1px solid #e2e8f0; color:#64748b;"><?= $app['notes'] !== null && $app['notes'] !== '' ? h((string)$app['notes']) : '<span class="muted">—</span>' ?></td>
               <td style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;">
-                <form method="post" style="margin:0;" action="" onsubmit="return confirm(<?= h(json_encode('Remove this credit application for $' . number_format((float)$app['applied_amount'], 2) . '? This will increase the invoice balance and return the amount to available customer credit.', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP)) ?>);">
+                <form method="post" style="margin:0;" action="" onsubmit="return confirm(<?= h(json_encode('Remove this credit application for ' . $remove_credit_amount_label . '? This will increase the invoice balance and return the amount to available customer credit.', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP)) ?>);">
                   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
                   <input type="hidden" name="action" value="remove_credit_from_invoice" />
                   <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
