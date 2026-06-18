@@ -679,6 +679,7 @@ const INVOICE_DEFAULT_PRICE = '0.00';
 const INVOICE_MIN_QTY = 0.01;
 const STRIPE_AMOUNT_TOLERANCE = 0.01;
 const STRIPE_API_TIMEOUT_SECONDS = 20;
+const INVOICE_BALANCE_EPSILON = 0.005;
 const INVOICE_PAYMENT_STATUS_UNPAID = 'unpaid';
 const INVOICE_PAYMENT_STATUS_PAID = 'paid';
 
@@ -1097,11 +1098,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // If outstanding balance is now fully covered, mark invoice as paid
     $new_balance = round($outstanding_balance - $apply_amount, 2);
-    if ($new_balance <= 0.005 && strtolower(trim((string)($inv_row['payment_status'] ?? ''))) !== INVOICE_PAYMENT_STATUS_PAID) {
+    if ($new_balance <= INVOICE_BALANCE_EPSILON && strtolower(trim((string)($inv_row['payment_status'] ?? ''))) !== INVOICE_PAYMENT_STATUS_PAID) {
       $pdo->prepare("UPDATE quotes SET payment_status = ?, paid_at = NOW() WHERE id = ?")->execute([INVOICE_PAYMENT_STATUS_PAID, $row_id]);
     }
 
     header('Location: invoice_form.php?id=' . $row_id . '&mode=view&credit_applied=1');
+    exit;
+  }
+
+  if (trim((string)($_POST['action'] ?? '')) === 'remove_credit_from_invoice') {
+    $row_id = (int)($_POST['row_id'] ?? 0);
+    $credit_app_id = (int)($_POST['credit_app_id'] ?? 0);
+    if ($row_id <= 0 || $credit_app_id <= 0) {
+      header('Location: invoice_tracker.php');
+      exit;
+    }
+
+    $inv_stmt = $pdo->prepare("SELECT id, subtotal_amount, tax_amount FROM quotes WHERE id = ? LIMIT 1");
+    $inv_stmt->execute([$row_id]);
+    $inv_row = $inv_stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$inv_row) {
+      header('Location: invoice_tracker.php');
+      exit;
+    }
+
+    try {
+      $pdo->beginTransaction();
+
+      $delete_stmt = $pdo->prepare("DELETE FROM invoice_credit_applications WHERE id = ? AND quote_id = ?");
+      $delete_stmt->execute([$credit_app_id, $row_id]);
+      if ($delete_stmt->rowCount() !== 1) {
+        throw new RuntimeException('Credit application was not found or was already removed.');
+      }
+
+      $remaining_stmt = $pdo->prepare("SELECT COALESCE(SUM(applied_amount), 0) FROM invoice_credit_applications WHERE quote_id = ?");
+      $remaining_stmt->execute([$row_id]);
+      $remaining_applied = round((float)$remaining_stmt->fetchColumn(), 2);
+      $invoice_total = round((float)$inv_row['subtotal_amount'] + (float)($inv_row['tax_amount'] ?? 0), 2);
+      $outstanding_balance = round($invoice_total - $remaining_applied, 2);
+
+      if ($outstanding_balance > INVOICE_BALANCE_EPSILON) {
+        $pdo->prepare("UPDATE quotes SET payment_status = ?, paid_at = NULL WHERE id = ?")->execute([
+          INVOICE_PAYMENT_STATUS_UNPAID,
+          $row_id,
+        ]);
+      }
+
+      $pdo->commit();
+    } catch (Throwable $e) {
+      if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+      }
+      error_log('Invoice credit removal failed for quote #' . $row_id . ', application #' . $credit_app_id . ': ' . $e->getMessage());
+      $credit_error_message = $e instanceof RuntimeException ? trim((string)$e->getMessage()) : '';
+      if ($credit_error_message === '') {
+        $credit_error_message = 'Unable to remove credit from invoice. Please try again or contact support if the issue persists.';
+      }
+      header('Location: invoice_form.php?id=' . $row_id . '&mode=view&credit_error=' . urlencode($credit_error_message));
+      exit;
+    }
+
+    header('Location: invoice_form.php?id=' . $row_id . '&mode=view&credit_removed=1');
     exit;
   }
 
@@ -1390,6 +1447,7 @@ $invoice_approval_approved = isset($_GET['approval_approved']) && $_GET['approva
 $invoice_payment_marked = isset($_GET['payment_marked']) && $_GET['payment_marked'] === '1';
 $invoice_already_paid = isset($_GET['already_paid']) && $_GET['already_paid'] === '1';
 $invoice_credit_applied = isset($_GET['credit_applied']) && $_GET['credit_applied'] === '1';
+$invoice_credit_removed = isset($_GET['credit_removed']) && $_GET['credit_removed'] === '1';
 $invoice_credit_error = isset($_GET['credit_error']) && $_GET['credit_error'] !== '' ? trim((string)$_GET['credit_error']) : '';
 $invoice_approval_status = is_array($quote) ? (string)($quote['approval_status'] ?? 'none') : 'none';
 $invoice_is_paid = is_array($quote) && invoice_is_paid($quote);
@@ -1457,6 +1515,9 @@ render_header($invoice_heading);
 <?php if ($invoice_credit_applied): ?>
   <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Credit applied to invoice successfully.</div>
 <?php endif; ?>
+<?php if ($invoice_credit_removed): ?>
+  <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Credit removed from invoice successfully.</div>
+<?php endif; ?>
 <?php if ($invoice_credit_error !== ''): ?>
   <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b;"><?= h($invoice_credit_error) ?></div>
 <?php endif; ?>
@@ -1500,7 +1561,7 @@ render_header($invoice_heading);
     }
 
     $inv_max_apply = min($inv_available_credit, $inv_outstanding_balance);
-    $inv_can_apply_credit = $inv_cust_id_for_credit > 0 && $inv_available_credit > 0.005 && $inv_outstanding_balance > 0.005 && !$invoice_is_paid;
+    $inv_can_apply_credit = $inv_cust_id_for_credit > 0 && $inv_available_credit > INVOICE_BALANCE_EPSILON && $inv_outstanding_balance > INVOICE_BALANCE_EPSILON && !$invoice_is_paid;
   ?>
   <div class="card">
     <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap;">
@@ -1523,11 +1584,11 @@ render_header($invoice_heading);
     <div style="display:flex; flex-wrap:wrap; gap:16px; margin-bottom:<?= ($inv_credit_apps || $inv_can_apply_credit) ? '16px' : '0' ?>;">
       <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px 20px; min-width:180px;">
         <div style="font-size:0.78em; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px;">Available Customer Credit</div>
-        <div style="font-size:1.35em; font-weight:700; color:<?= $inv_available_credit > 0.005 ? '#166534' : '#64748b' ?>;">$<?= h(number_format($inv_available_credit, 2)) ?></div>
+        <div style="font-size:1.35em; font-weight:700; color:<?= $inv_available_credit > INVOICE_BALANCE_EPSILON ? '#166534' : '#64748b' ?>;">$<?= h(number_format($inv_available_credit, 2)) ?></div>
       </div>
       <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px 20px; min-width:180px;">
         <div style="font-size:0.78em; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px;">Outstanding Balance</div>
-        <div style="font-size:1.35em; font-weight:700; color:<?= $inv_outstanding_balance > 0.005 ? '#991b1b' : '#166534' ?>;">$<?= h(number_format($inv_outstanding_balance, 2)) ?></div>
+        <div style="font-size:1.35em; font-weight:700; color:<?= $inv_outstanding_balance > INVOICE_BALANCE_EPSILON ? '#991b1b' : '#166534' ?>;">$<?= h(number_format($inv_outstanding_balance, 2)) ?></div>
       </div>
     </div>
 
@@ -1541,14 +1602,27 @@ render_header($invoice_heading);
               <th style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;">Date</th>
               <th style="padding:6px 10px; border:1px solid #e2e8f0; text-align:right; white-space:nowrap;">Amount</th>
               <th style="padding:6px 10px; border:1px solid #e2e8f0;">Notes</th>
+              <th style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;">Action</th>
             </tr>
           </thead>
           <tbody>
             <?php foreach ($inv_credit_apps as $app): ?>
+            <?php
+              $formatted_amount = '$' . number_format((float)($app['applied_amount'] ?? 0), 2);
+            ?>
             <tr>
               <td style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;"><?= h((string)($app['applied_date'] ?? '')) ?></td>
               <td style="padding:6px 10px; border:1px solid #e2e8f0; text-align:right; font-weight:600; white-space:nowrap;">$<?= h(number_format((float)$app['applied_amount'], 2)) ?></td>
               <td style="padding:6px 10px; border:1px solid #e2e8f0; color:#64748b;"><?= $app['notes'] !== null && $app['notes'] !== '' ? h((string)$app['notes']) : '<span class="muted">—</span>' ?></td>
+              <td style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;">
+                <form method="post" style="margin:0;" action="" onsubmit="return confirm(<?= h(json_encode('Remove this credit application for ' . $formatted_amount . '? This will increase the invoice balance and return the amount to available customer credit.', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP)) ?>);">
+                  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
+                  <input type="hidden" name="action" value="remove_credit_from_invoice" />
+                  <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
+                  <input type="hidden" name="credit_app_id" value="<?= (int)($app['id'] ?? 0) ?>" />
+                  <button type="submit" class="btn" style="padding:4px 8px; font-size:0.8em;">Remove</button>
+                </form>
+              </td>
             </tr>
             <?php endforeach; ?>
           </tbody>
