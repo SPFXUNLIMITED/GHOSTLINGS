@@ -1152,7 +1152,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       error_log('Invoice credit removal failed for quote #' . $row_id . ', application #' . $credit_app_id . ': ' . $e->getMessage());
       $credit_error_message = $e instanceof RuntimeException ? trim((string)$e->getMessage()) : '';
       if ($credit_error_message === '') {
-        $credit_error_message = 'Unable to remove credit from invoice.';
+        $credit_error_message = 'Unable to remove credit from invoice. Please try again or contact support if the issue persists.';
       }
       header('Location: invoice_form.php?id=' . $row_id . '&mode=view&credit_error=' . urlencode($credit_error_message));
       exit;
