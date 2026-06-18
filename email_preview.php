@@ -118,7 +118,8 @@ try {
 
     // Allow callers to explicitly set context via ?context=quote|invoice so that
     // a converted quote can still be previewed as a quote (e.g. from quotes.php).
-    $context_param = strtolower(trim((string)filter_input(INPUT_GET, 'context', FILTER_SANITIZE_SPECIAL_CHARS)));
+    $context_raw = strtolower(trim((string)filter_input(INPUT_GET, 'context', FILTER_DEFAULT)));
+    $context_param = in_array($context_raw, ['quote', 'invoice'], true) ? $context_raw : '';
     if ($context_param === 'quote') {
         $is_invoice = false;
     } elseif ($context_param === 'invoice') {
