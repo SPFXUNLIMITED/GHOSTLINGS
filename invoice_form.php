@@ -95,6 +95,11 @@ function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, 
   $bill_zip    = trim((string)($quote['billing_zip']    ?? ''));
   $is_paid = invoice_is_paid($quote);
   $payment_link = '';
+  error_log(
+    'DEBUG: enable_online_payment = ' . (int)($quote['enable_online_payment'] ?? 0)
+    . ' | is_paid = ' . ($is_paid ? 'true' : 'false')
+    . ' | invoice #' . (int)($quote['id'] ?? 0)
+  );
   if (!$is_paid && invoice_online_payment_enabled($quote)) {
     $payment_error = null;
     $payment_link = invoice_checkout_session_url($pdo, $quote, $payment_error);
@@ -553,7 +558,7 @@ function invoice_has_valid_checkout_session(array $quote, float $amount): bool {
 
 function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_message = null): string {
   $error_message = null;
-  $log_failure = static function (string $reason, int $quote_id, ?string &$error_message, array $context = []): string {
+  $log_empty_result = static function (string $reason, int $quote_id, array $context = [], bool $failed = false): void {
     $details = [];
     foreach ($context as $key => $value) {
       if ($value === null || $value === '') continue;
@@ -566,12 +571,21 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
       $details[] = $key . '=' . (string)$value;
     }
     $suffix = $details ? ' [' . implode(', ', $details) . ']' : '';
-    error_log('invoice_checkout_session_url failed for invoice #' . $quote_id . ': ' . $reason . $suffix);
+    $prefix = $failed
+      ? 'invoice_checkout_session_url failed and returned empty for invoice #'
+      : 'invoice_checkout_session_url returning empty for invoice #';
+    error_log($prefix . $quote_id . ': ' . $reason . $suffix);
+  };
+  $log_failure = static function (string $reason, int $quote_id, ?string &$error_message, array $context = []) use ($log_empty_result): string {
+    $log_empty_result($reason, $quote_id, $context, true);
     $error_message = $reason;
     return '';
   };
 
   if (!invoice_online_payment_enabled($quote)) {
+    $log_empty_result('Online payment is disabled for this invoice.', (int)($quote['id'] ?? 0), [
+      'enable_online_payment' => (int)($quote['enable_online_payment'] ?? 0),
+    ]);
     return '';
   }
 
