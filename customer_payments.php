@@ -207,44 +207,41 @@ foreach ($payments as $p) {
 }
 $all_customer_ids = array_values($all_customer_ids);
 
-// Compute per-customer balance: total invoiced (converted invoices) − total payments
+// Compute per-customer balance in a single query:
+// total invoiced (converted invoices) − total payments for each customer.
+// The converted-invoice condition matches INVOICE_TRACKER_BASE_FILTER in invoice_tracker.php.
 $customer_balances = [];
 if ($all_customer_ids) {
   $ph = implode(',', array_fill(0, count($all_customer_ids), '?'));
 
-  $inv_stmt = $pdo->prepare(
-    "SELECT customer_id, COALESCE(SUM(subtotal_amount), 0) AS total_invoiced
-     FROM quotes
-     WHERE customer_id IN ($ph)
-       AND (converted_invoice_no IS NOT NULL AND converted_invoice_no <> '' OR status = 'converted')
-     GROUP BY customer_id"
+  $balance_stmt = $pdo->prepare(
+    "SELECT cp.customer_id,
+            COALESCE(SUM(cp.amount), 0) AS total_paid,
+            COALESCE(inv.total_invoiced, 0) AS total_invoiced
+     FROM customer_payments cp
+     LEFT JOIN (
+       SELECT customer_id, SUM(subtotal_amount) AS total_invoiced
+       FROM quotes
+       WHERE customer_id IN ($ph)
+         AND (converted_invoice_no IS NOT NULL AND converted_invoice_no <> ''
+              OR status = 'converted')
+       GROUP BY customer_id
+     ) inv ON inv.customer_id = cp.customer_id
+     WHERE cp.customer_id IN ($ph)
+     GROUP BY cp.customer_id"
   );
-  $inv_stmt->execute($all_customer_ids);
-  $invoiced_map = [];
-  foreach ($inv_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-    $invoiced_map[(int)$row['customer_id']] = (float)$row['total_invoiced'];
-  }
-
-  $paid_stmt = $pdo->prepare(
-    "SELECT customer_id, COALESCE(SUM(amount), 0) AS total_paid
-     FROM customer_payments
-     WHERE customer_id IN ($ph)
-     GROUP BY customer_id"
-  );
-  $paid_stmt->execute($all_customer_ids);
-  $paid_map = [];
-  foreach ($paid_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-    $paid_map[(int)$row['customer_id']] = (float)$row['total_paid'];
-  }
-
-  foreach ($all_customer_ids as $cid) {
-    $customer_balances[$cid] = ($invoiced_map[$cid] ?? 0.0) - ($paid_map[$cid] ?? 0.0);
+  // Bind the customer ID list twice (once for the subquery, once for the outer WHERE)
+  $balance_stmt->execute(array_merge($all_customer_ids, $all_customer_ids));
+  foreach ($balance_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    $cid = (int)$row['customer_id'];
+    $customer_balances[$cid] = (float)$row['total_invoiced'] - (float)$row['total_paid'];
   }
 }
 
 // Hero stats
 $now_dt        = new DateTime('now', new DateTimeZone(APP_TZ));
 $current_month = $now_dt->format('Y-m');
+$today_ymd     = $now_dt->format('Y-m-d'); // Server-side today for new payment default
 $hero_total    = count($payments);
 $hero_total_amt = array_sum(array_column($payments, 'amount'));
 $hero_this_month = 0;
@@ -637,6 +634,8 @@ render_header('Customer Payments');
   var notesInput   = document.getElementById('cp-notes');
   var submitBtn    = document.getElementById('cp-submit-btn');
 
+  var todayYmd  = <?= json_encode($today_ymd) ?>;
+
   // ── Modal open / close ──────────────────────────────────────────────────
   function openModal(isEdit) {
     modal.classList.add('open');
@@ -644,9 +643,9 @@ render_header('Customer Payments');
     titleEl.textContent = isEdit ? 'Edit Payment' : 'Add Payment';
     submitBtn.textContent = isEdit ? 'Update Payment' : 'Save Payment';
     actionIn.value = isEdit ? 'edit_payment' : 'add_payment';
-    // Set today as default date for new payments
+    // Set server-side today as default date for new payments
     if (!isEdit && dateInput.value === '') {
-      dateInput.value = new Date().toISOString().slice(0, 10);
+      dateInput.value = todayYmd;
     }
     customerInput.focus();
   }
