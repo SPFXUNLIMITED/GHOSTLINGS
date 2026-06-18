@@ -74,6 +74,215 @@ function preview_sender_profile(PDO $pdo, array $quote): array {
     return $profile;
 }
 
+function preview_env_value(string $key): string {
+    static $dotenv_values = null;
+    if ($dotenv_values === null) {
+        $dotenv_values = [];
+        $dotenv_path = __DIR__ . '/.env';
+        if (is_file($dotenv_path) && is_readable($dotenv_path)) {
+            $lines = file($dotenv_path, FILE_IGNORE_NEW_LINES);
+            if (is_array($lines)) {
+                foreach ($lines as $line) {
+                    $line = trim((string)$line);
+                    if ($line === '' || str_starts_with($line, '#')) continue;
+                    $separator_pos = strpos($line, '=');
+                    if ($separator_pos === false) continue;
+                    $name = trim(substr($line, 0, $separator_pos));
+                    if ($name === '' || !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $name)) continue;
+                    $value = trim(substr($line, $separator_pos + 1));
+                    if (strlen($value) >= 2) {
+                        $first = $value[0]; $last = $value[strlen($value) - 1];
+                        if ($first === '"' && $last === '"') {
+                            $value = substr($value, 1, -1);
+                            $value = strtr($value, ['\\\\' => '\\', '\\"' => '"', '\\n' => "\n", '\\r' => "\r", '\\t' => "\t"]);
+                        } elseif ($first === "'" && $last === "'") {
+                            $value = substr($value, 1, -1);
+                            $value = strtr($value, ['\\\\' => '\\', "\\'" => "'"]);
+                        }
+                    } else {
+                        $value = rtrim(preg_replace('/\s+#.*$/', '', $value) ?? $value);
+                    }
+                    $dotenv_values[$name] = $value;
+                }
+            }
+        }
+    }
+    foreach ([getenv($key), $_ENV[$key] ?? null, $_SERVER[$key] ?? null, $dotenv_values[$key] ?? null] as $candidate) {
+        $v = trim((string)$candidate);
+        if ($v !== '') return $v;
+    }
+    return '';
+}
+
+function preview_stripe_secret_key(PDO $pdo): string {
+    $secret_key = preview_env_value('STRIPE_SECRET_KEY');
+    if ($secret_key !== '') {
+        return $secret_key;
+    }
+    try {
+        app_ensure_integration_settings_table($pdo);
+        $stmt = $pdo->prepare(
+            "SELECT setting_val, is_encrypted FROM integration_settings WHERE setting_key = 'stripe_secret_key' LIMIT 1"
+        );
+        $stmt->execute();
+        $row = $stmt->fetch();
+        if (is_array($row)) {
+            $stored = trim((string)($row['setting_val'] ?? ''));
+            if ($stored !== '') {
+                $is_encrypted = (int)($row['is_encrypted'] ?? 0) === 1;
+                $resolved = $is_encrypted ? app_decrypt_setting_value($stored) : $stored;
+                $resolved = trim((string)$resolved);
+                if ($resolved !== '') {
+                    return $resolved;
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('Invoice preview: Stripe secret key lookup failed: ' . $e->getMessage());
+    }
+    return '';
+}
+
+function preview_has_valid_checkout_session(array $quote, float $amount): bool {
+    $existing_url = trim((string)($quote['stripe_checkout_url'] ?? ''));
+    $existing_session_id = trim((string)($quote['stripe_checkout_session_id'] ?? ''));
+    $existing_amount = isset($quote['stripe_checkout_amount'])
+        ? round((float)$quote['stripe_checkout_amount'], 2)
+        : null;
+    return $existing_url !== ''
+        && $existing_session_id !== ''
+        && $existing_amount !== null
+        && abs($existing_amount - $amount) < 0.01;
+}
+
+function preview_checkout_session_url(PDO $pdo, array &$quote): string {
+    if ((int)($quote['enable_online_payment'] ?? 0) !== 1) {
+        return '';
+    }
+    $quote_id = (int)($quote['id'] ?? 0);
+    if ($quote_id <= 0) {
+        return '';
+    }
+    $amount = round((float)($quote['subtotal_amount'] ?? 0), 2);
+    if ($amount <= 0) {
+        return '';
+    }
+    if (preview_has_valid_checkout_session($quote, $amount)) {
+        return trim((string)($quote['stripe_checkout_url'] ?? ''));
+    }
+    if (!function_exists('curl_init')) {
+        error_log('Invoice preview: Stripe checkout could not be created — cURL not available.');
+        return '';
+    }
+    $secret_key = preview_stripe_secret_key($pdo);
+    if ($secret_key === '') {
+        return '';
+    }
+    $invoice_number = trim((string)($quote['converted_invoice_no'] ?? ''));
+    if ($invoice_number === '') {
+        $invoice_number = '#' . $quote_id;
+    }
+    $customer_name  = trim((string)($quote['customer_name'] ?? ''));
+    $company_name   = trim((string)($quote['company_name'] ?? ''));
+    $customer_email = trim((string)($quote['email'] ?? ''));
+    $description_parts = array_filter([
+        $company_name !== '' ? $company_name : null,
+        $customer_name !== '' ? $customer_name : null,
+    ]);
+    $product_description = implode(' • ', $description_parts);
+    $amount_cents = (int)round($amount * 100);
+
+    $configured_base = rtrim(preview_env_value('APP_URL'), '/');
+    if ($configured_base === '') {
+        $forwarded_proto = strtolower(trim((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')));
+        $https_on = !empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off';
+        $scheme = $forwarded_proto !== '' ? $forwarded_proto : ($https_on ? 'https' : 'http');
+        $host = trim((string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost'));
+        $script_dir = str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? '/')));
+        if ($script_dir === '.' || $script_dir === '/') {
+            $script_dir = '';
+        }
+        $configured_base = $scheme . '://' . $host . rtrim($script_dir, '/');
+    }
+    $success_url = $configured_base . '/invoice_payment_status.php?' . http_build_query(['status' => 'success'], '', '&', PHP_QUERY_RFC3986);
+    $cancel_url  = $configured_base . '/invoice_payment_status.php?' . http_build_query(['status' => 'cancel'],  '', '&', PHP_QUERY_RFC3986);
+
+    $payload = [
+        'mode' => 'payment',
+        'success_url' => $success_url,
+        'cancel_url'  => $cancel_url,
+        'payment_method_types' => ['card'],
+        'line_items' => [[
+            'price_data' => [
+                'currency' => 'usd',
+                'product_data' => array_filter([
+                    'name'        => 'Invoice ' . $invoice_number,
+                    'description' => $product_description !== '' ? $product_description : null,
+                ], static fn($v) => $v !== null && $v !== ''),
+                'unit_amount' => $amount_cents,
+            ],
+            'quantity' => 1,
+        ]],
+        'metadata' => array_filter([
+            'invoice_id'     => (string)$quote_id,
+            'invoice_number' => $invoice_number,
+            'customer_name'  => $customer_name,
+            'company_name'   => $company_name,
+        ], static fn($v) => $v !== ''),
+        'submit_type' => 'pay',
+    ];
+    if ($customer_email !== '' && filter_var($customer_email, FILTER_VALIDATE_EMAIL)) {
+        $payload['customer_email'] = $customer_email;
+    }
+
+    $ch = curl_init('https://api.stripe.com/v1/checkout/sessions');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => http_build_query($payload, '', '&', PHP_QUERY_RFC3986),
+        CURLOPT_TIMEOUT        => 20,
+        CURLOPT_HTTPHEADER     => [
+            'Authorization: Bearer ' . $secret_key,
+            'Content-Type: application/x-www-form-urlencoded',
+        ],
+    ]);
+    $response_body = curl_exec($ch);
+    $curl_error    = curl_error($ch);
+    $http_code     = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    curl_close($ch);
+
+    if ($response_body === false) {
+        error_log('Invoice preview: Stripe checkout failed for #' . $quote_id . ': ' . ($curl_error !== '' ? $curl_error : 'cURL request failed'));
+        return '';
+    }
+    $response = json_decode($response_body, true);
+    if (!is_array($response)) {
+        error_log('Invoice preview: Stripe checkout failed for #' . $quote_id . ': invalid JSON response');
+        return '';
+    }
+    if ($http_code >= 400) {
+        $stripe_err = trim((string)($response['error']['message'] ?? ''));
+        error_log('Invoice preview: Stripe checkout failed for #' . $quote_id . ': ' . ($stripe_err !== '' ? $stripe_err : 'HTTP ' . $http_code));
+        return '';
+    }
+    $checkout_url = trim((string)($response['url'] ?? ''));
+    $session_id   = trim((string)($response['id']  ?? ''));
+    if ($checkout_url === '' || $session_id === '') {
+        error_log('Invoice preview: Stripe checkout failed for #' . $quote_id . ': no URL or session ID in response');
+        return '';
+    }
+
+    $pdo->prepare(
+        "UPDATE quotes SET stripe_checkout_url = ?, stripe_checkout_session_id = ?, stripe_checkout_created_at = NOW(), stripe_checkout_amount = ? WHERE id = ?"
+    )->execute([$checkout_url, $session_id, $amount, $quote_id]);
+
+    $quote['stripe_checkout_url']        = $checkout_url;
+    $quote['stripe_checkout_session_id'] = $session_id;
+    $quote['stripe_checkout_amount']     = $amount;
+
+    return $checkout_url;
+}
+
 try {
     $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
     if (!$id) {
@@ -152,6 +361,12 @@ try {
     $is_paid = $is_invoice && strtolower(trim((string)($quote['payment_status'] ?? ''))) === 'paid';
     $enable_online_payment = (int)($quote['enable_online_payment'] ?? 0) === 1;
     $stripe_checkout_url = trim((string)($quote['stripe_checkout_url'] ?? ''));
+    if ($is_invoice && !$is_paid && $enable_online_payment) {
+        $generated_url = preview_checkout_session_url($pdo, $quote);
+        if ($generated_url !== '') {
+            $stripe_checkout_url = $generated_url;
+        }
+    }
 
     $bill_street = trim((string)($quote['billing_street'] ?? ''));
     $bill_city = trim((string)($quote['billing_city'] ?? ''));
