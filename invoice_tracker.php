@@ -725,19 +725,20 @@ render_header('Invoice Tracker');
   document.querySelectorAll('.it-print-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var invId = btn.getAttribute('data-inv-id');
+      var invIdNum = Number(invId);
       openModal();
       printBtn.disabled = true;
       loadingEl.style.display = 'flex';
       errorEl.style.display = 'none';
       errorEl.textContent = '';
       iframeEl.style.display = 'none';
-      if (!invId) {
+      if (!Number.isInteger(invIdNum) || invIdNum <= 0) {
         loadingEl.style.display = 'none';
-        errorEl.textContent = 'Missing invoice ID for preview.';
+        errorEl.textContent = 'Invalid invoice ID for preview.';
         errorEl.style.display = 'block';
         return;
       }
-      iframeEl.src = 'email_preview.php?id=' + encodeURIComponent(invId) + '&_ts=' + Date.now();
+      iframeEl.src = 'email_preview.php?id=' + encodeURIComponent(String(invIdNum)) + '&_ts=' + Date.now();
     });
   });
 }());
