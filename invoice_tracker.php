@@ -7,247 +7,6 @@ require_admin_or_moderator();
 const INVOICE_TRACKER_TABLE_COLUMN_COUNT = 6;
 const INVOICE_TRACKER_BASE_FILTER = "((converted_invoice_no IS NOT NULL AND converted_invoice_no <> '') OR status = 'converted')";
 
-// ---------- AJAX: print preview ----------
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_preview') {
-  header('Content-Type: application/json; charset=utf-8');
-  $inv_id = (int)($_GET['invoice_id'] ?? 0);
-  if ($inv_id <= 0) {
-    echo json_encode(['ok' => false, 'error' => 'Invalid invoice ID.']);
-    exit;
-  }
-
-  $stmt = $pdo->prepare(
-    "SELECT id, customer_name, company_name, quote_date, subtotal_amount, status,
-            converted_invoice_no, email, phone_number, notes, created_by, created_at,
-            billing_street, billing_city, billing_state, billing_zip
-     FROM quotes WHERE id = ? LIMIT 1"
-  );
-  $stmt->execute([$inv_id]);
-  $invoice = $stmt->fetch(PDO::FETCH_ASSOC);
-  if (!$invoice) {
-    echo json_encode(['ok' => false, 'error' => 'Invoice not found.']);
-    exit;
-  }
-
-  $items_stmt = $pdo->prepare(
-    "SELECT description, quantity, unit_price, line_total FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC"
-  );
-  $items_stmt->execute([$inv_id]);
-  $invoice_items = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
-
-  // Sender profile
-  $sender = ['sender_name' => '', 'company_name' => '', 'address' => '', 'phone' => '', 'email' => ''];
-  $created_by = isset($invoice['created_by']) && $invoice['created_by'] !== null ? (int)$invoice['created_by'] : null;
-  $candidate_ids = [];
-  if ($created_by !== null && $created_by > 0) $candidate_ids[] = $created_by;
-  $session_uid = (int)($_SESSION['user_id'] ?? 0);
-  if ($session_uid > 0 && !in_array($session_uid, $candidate_ids, true)) $candidate_ids[] = $session_uid;
-  if ($candidate_ids) {
-    $sp_stmt = $pdo->prepare("SELECT username, contact_name, company_name, delivery_address, contact_phone, email FROM users WHERE id = ? LIMIT 1");
-    foreach ($candidate_ids as $uid) {
-      $sp_stmt->execute([$uid]);
-      $sp_row = $sp_stmt->fetch();
-      if (!$sp_row) continue;
-      $contact_name = trim((string)($sp_row['contact_name'] ?? ''));
-      $username     = trim((string)($sp_row['username']     ?? ''));
-      $sender['sender_name']  = $contact_name !== '' ? $contact_name : $username;
-      $sender['company_name'] = trim((string)($sp_row['company_name']     ?? ''));
-      $sender['address']      = trim((string)($sp_row['delivery_address'] ?? ''));
-      $sender['phone']        = trim((string)($sp_row['contact_phone']    ?? ''));
-      $sender['email']        = trim((string)($sp_row['email']            ?? ''));
-      break;
-    }
-  }
-
-  $now_stamp     = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Ymd');
-  $inv_label_raw = invoice_tracker_number($invoice, $now_stamp);
-  $inv_date      = invoice_tracker_effective_date($invoice);
-  $customer_name = trim((string)($invoice['customer_name'] ?? ''));
-  $customer_company = trim((string)($invoice['company_name'] ?? ''));
-  $bill_street   = trim((string)($invoice['billing_street'] ?? ''));
-  $bill_city     = trim((string)($invoice['billing_city'] ?? ''));
-  $bill_state    = trim((string)($invoice['billing_state'] ?? ''));
-  $bill_zip      = trim((string)($invoice['billing_zip'] ?? ''));
-  $subtotal      = number_format((float)($invoice['subtotal_amount'] ?? 0), 2);
-  $notes         = trim((string)($invoice['notes'] ?? ''));
-  $sender_company = $sender['company_name'] !== '' ? $sender['company_name'] : 'Our Company';
-  $sender_name    = $sender['sender_name'];
-  $sender_address = $sender['address'];
-  $sender_phone   = $sender['phone'];
-  $sender_email   = $sender['email'];
-
-  $h = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
-
-  // Helper: format address inline with given separator
-  $fmt_addr = static fn(string $addr, string $sep): string =>
-    (string)preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], $sep, $addr));
-
-  // Build item rows
-  $rows_html = [];
-  $row_index = 0;
-  foreach ($invoice_items as $item) {
-    $desc       = trim((string)($item['description'] ?? ''));
-    $qty        = number_format((float)($item['quantity']   ?? 0), 2);
-    $unit_price = number_format((float)($item['unit_price'] ?? 0), 2);
-    $line_total = number_format((float)($item['line_total'] ?? 0), 2);
-    $row_bg     = ($row_index % 2 === 0) ? '#ffffff' : '#f9fafb';
-    $rows_html[] = '<tr style="background:' . $row_bg . ';">'
-      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">' . $h($desc) . '</td>'
-      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">' . $h($qty) . '</td>'
-      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . $h($unit_price) . '</td>'
-      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . $h($line_total) . '</td>'
-      . '</tr>';
-    $row_index++;
-  }
-  if (!$rows_html) {
-    $rows_html[] = '<tr><td colspan="4" style="padding:10px 12px;text-align:center;color:#6b7280;">No line items.</td></tr>';
-  }
-
-  // Header contact line
-  $header_parts = [];
-  if ($sender_address !== '') $header_parts[] = $h($fmt_addr($sender_address, ' · '));
-  if ($sender_phone !== '') $header_parts[] = $h($sender_phone);
-  if ($sender_email !== '') $header_parts[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($sender_email) . '</a>';
-  $header_contact_html = implode(' &nbsp;·&nbsp; ', $header_parts);
-
-  // Prepared-by
-  $prepared_by_html = '';
-  if ($sender_name !== '') {
-    $prepared_by_html = 'This invoice was prepared by <strong style="color:#1e293b;">' . $h($sender_name) . '</strong>';
-    if ($sender_company !== 'Our Company') {
-      $prepared_by_html .= ' at <strong style="color:#1e293b;">' . $h($sender_company) . '</strong>';
-    }
-    $prepared_by_html .= '.';
-  }
-
-  // Footer contact line
-  $footer_parts = [];
-  if ($sender_address !== '') $footer_parts[] = $h($fmt_addr($sender_address, ', '));
-  if ($sender_phone !== '') $footer_parts[] = $h($sender_phone);
-  if ($sender_email !== '') $footer_parts[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($sender_email) . '</a>';
-  $footer_contact_html = implode(' &nbsp;·&nbsp; ', $footer_parts);
-
-  // Bill To block
-  $bill_to_lines = [];
-  if ($customer_company !== '') $bill_to_lines[] = '<strong style="color:#0f172a;">' . $h($customer_company) . '</strong>';
-  if ($customer_name !== '') $bill_to_lines[] = $h($customer_name);
-  if ($bill_street !== '') $bill_to_lines[] = $h($bill_street);
-  $city_state_zip_parts = array_filter([$bill_city, $bill_state . ($bill_zip !== '' ? ' ' . $bill_zip : '')]);
-  $city_state_zip = implode(', ', $city_state_zip_parts);
-  if ($city_state_zip !== '') $bill_to_lines[] = $h($city_state_zip);
-  $invoice_phone = trim((string)($invoice['phone_number'] ?? ''));
-  if ($invoice_phone !== '') $bill_to_lines[] = $h($invoice_phone);
-  $invoice_email = trim((string)($invoice['email'] ?? ''));
-  if ($invoice_email !== '') $bill_to_lines[] = '<a href="mailto:' . $h($invoice_email) . '" style="color:#1d4ed8;text-decoration:none;">' . $h($invoice_email) . '</a>';
-  $bill_to_html = implode('<br>', $bill_to_lines) ?: '&mdash;';
-
-  // From block
-  $from_lines = [];
-  $from_lines[] = '<strong style="color:#0f172a;">' . $h($sender_company) . '</strong>';
-  if ($sender_name !== '' && $sender_name !== $sender_company) $from_lines[] = $h($sender_name);
-  foreach (array_filter(array_map('trim', (array)preg_split('/\r\n|\r|\n/', $sender_address))) as $addr_line) {
-    $from_lines[] = $h($addr_line);
-  }
-  if ($sender_phone !== '') $from_lines[] = $h($sender_phone);
-  if ($sender_email !== '') $from_lines[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#1d4ed8;text-decoration:none;">' . $h($sender_email) . '</a>';
-  $from_html = implode('<br>', $from_lines) ?: '&mdash;';
-
-  $inv_label = $h($inv_label_raw);
-
-  $preview_html =
-    '<div style="max-width:680px;margin:0 auto;">'
-
-    // ── Header banner ──
-    . '<div style="background:#1e3a5f;border-radius:8px 8px 0 0;padding:28px 32px 24px;">'
-      . '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $h($sender_company) . '</p>'
-      . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '')
-    . '</div>'
-
-    // ── Document title strip ──
-    . '<div style="background:#ffffff;padding:20px 32px 0;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
-      . '<table style="width:100%;border-collapse:collapse;">'
-        . '<tr>'
-          . '<td style="padding:0 0 16px;">'
-            . '<p style="margin:0;font-size:18px;font-weight:700;color:#0f172a;">Invoice ' . $inv_label . '</p>'
-          . '</td>'
-          . '<td style="padding:0 0 16px;text-align:right;">'
-            . '<p style="margin:0;font-size:13px;color:#64748b;">Date: ' . $h($inv_date) . '</p>'
-          . '</td>'
-        . '</tr>'
-      . '</table>'
-      . '<hr style="margin:0;border:none;border-top:2px solid #e2e8f0;">'
-    . '</div>'
-
-    // ── Bill To / From boxes ──
-    . '<div style="background:#ffffff;padding:20px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:0;">'
-      . '<table style="width:100%;border-collapse:collapse;">'
-        . '<tr>'
-          . '<td style="width:50%;padding:0 8px 0 0;vertical-align:top;">'
-            . '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;background:#f8fafc;">'
-              . '<p style="margin:0 0 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;">Bill To</p>'
-              . '<p style="margin:0;font-size:13px;color:#374151;line-height:1.7;">' . $bill_to_html . '</p>'
-            . '</div>'
-          . '</td>'
-          . '<td style="width:50%;padding:0 0 0 8px;vertical-align:top;">'
-            . '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;background:#f8fafc;">'
-              . '<p style="margin:0 0 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;">From</p>'
-              . '<p style="margin:0;font-size:13px;color:#374151;line-height:1.7;">' . $from_html . '</p>'
-            . '</div>'
-          . '</td>'
-        . '</tr>'
-      . '</table>'
-    . '</div>'
-
-    // ── Body ──
-    . '<div style="background:#ffffff;padding:24px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
-      . '<p style="margin:0 0 8px;font-size:15px;color:#1e293b;">Hello' . ($customer_name !== '' ? ', ' . $h($customer_name) : '') . ',</p>'
-      . '<p style="margin:0 0 24px;font-size:14px;color:#475569;">Please find your invoice details below. Thank you for your business.</p>'
-
-      // Line items table
-      . '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">'
-        . '<thead>'
-          . '<tr style="background:#f8fafc;">'
-            . '<th style="padding:10px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Description</th>'
-            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Qty</th>'
-            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Unit Price</th>'
-            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Total</th>'
-          . '</tr>'
-        . '</thead>'
-        . '<tbody>' . implode('', $rows_html) . '</tbody>'
-        . '<tfoot>'
-          . '<tr>'
-            . '<td colspan="3" style="padding:14px 12px;text-align:right;font-weight:700;font-size:14px;color:#1e293b;border-top:2px solid #e2e8f0;">Subtotal:</td>'
-            . '<td style="padding:14px 12px;text-align:right;font-weight:700;font-size:16px;color:#1e3a5f;border-top:2px solid #e2e8f0;">$' . $h($subtotal) . '</td>'
-          . '</tr>'
-        . '</tfoot>'
-      . '</table>'
-
-      . ($notes !== '' ? '<div style="margin-bottom:20px;padding:14px 16px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;"><p style="margin:0 0 4px;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Notes</p><p style="margin:0;font-size:14px;color:#475569;">' . nl2br($h($notes)) . '</p></div>' : '')
-
-      . '<p style="margin:0;font-size:14px;color:#475569;">If you have any questions regarding this invoice, please do not hesitate to contact us.</p>'
-    . '</div>'
-
-    // ── Prepared-by strip ──
-    . ($prepared_by_html !== ''
-        ? '<div style="background:#f8fafc;padding:14px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:1px solid #e2e8f0;">'
-            . '<p style="margin:0;font-size:13px;color:#64748b;">' . $prepared_by_html . '</p>'
-          . '</div>'
-        : '')
-
-    // ── Footer ──
-    . '<div style="background:#1e3a5f;border-radius:0 0 8px 8px;padding:18px 32px;">'
-      . '<p style="margin:0;font-size:12px;color:#93c5fd;line-height:1.6;">'
-        . $h($sender_company)
-        . ($footer_contact_html !== '' ? ' &nbsp;·&nbsp; ' . $footer_contact_html : '')
-      . '</p>'
-    . '</div>'
-
-    . '</div>';
-
-  echo json_encode(['ok' => true, 'html' => $preview_html, 'inv_label' => $inv_label_raw]);
-  exit;
-}
-
 // ---------- CSRF ----------
 if (empty($_SESSION['invoice_tracker_csrf'])) {
   $_SESSION['invoice_tracker_csrf'] = bin2hex(random_bytes(24));
@@ -757,7 +516,7 @@ render_header('Invoice Tracker');
         <span class="it-spinner" aria-hidden="true"></span>
         Loading invoice&hellip;
       </div>
-      <div id="it-print-modal-content" style="display:none;"></div>
+      <iframe id="it-print-modal-iframe" title="Invoice preview" style="display:none;" loading="lazy" sandbox="allow-same-origin allow-modals allow-popups allow-popups-to-escape-sandbox"></iframe>
       <div id="it-print-modal-error" class="it-modal-error" style="display:none;" role="alert"></div>
     </div>
 
@@ -838,7 +597,7 @@ render_header('Invoice Tracker');
 .it-modal-body {
   flex:1 1 auto;
   overflow-y:auto;
-  padding:28px 28px 16px;
+  padding:20px;
   background:#f1f5f9;
 }
 .it-modal-loading {
@@ -863,6 +622,13 @@ render_header('Invoice Tracker');
   border-radius:8px;
   color:#991b1b;
   font-size:14px;
+}
+#it-print-modal-iframe {
+  width:100%;
+  min-height:1100px;
+  border:0;
+  border-radius:8px;
+  background:#fff;
 }
 .it-modal-footer {
   display:flex; align-items:center; justify-content:flex-end;
@@ -900,11 +666,6 @@ render_header('Invoice Tracker');
 .it-modal-print-btn:active:not(:disabled) { transform:translateY(0); }
 .it-modal-print-btn:disabled { opacity:.5; cursor:not-allowed; box-shadow:none; }
 .it-modal-print-icon { font-size:18px; }
-
-/* ---- @media print: suppress the main page entirely when printing from popup ---- */
-@media print {
-  body { display:none !important; }
-}
 </style>
 
 <script>
@@ -913,7 +674,7 @@ render_header('Invoice Tracker');
 
   var modal         = document.getElementById('it-print-modal');
   var loadingEl     = document.getElementById('it-print-modal-loading');
-  var contentEl     = document.getElementById('it-print-modal-content');
+  var iframeEl      = document.getElementById('it-print-modal-iframe');
   var errorEl       = document.getElementById('it-print-modal-error');
   var printBtn      = document.getElementById('it-modal-print-btn');
   var cancelBtns    = [
@@ -930,8 +691,8 @@ render_header('Invoice Tracker');
   function closeModal() {
     modal.style.display = 'none';
     document.body.style.overflow = '';
-    contentEl.innerHTML = '';
-    contentEl.style.display = 'none';
+    iframeEl.src = 'about:blank';
+    iframeEl.style.display = 'none';
     loadingEl.style.display = 'flex';
     errorEl.style.display = 'none';
     errorEl.textContent = '';
@@ -950,83 +711,54 @@ render_header('Invoice Tracker');
     if (e.key === 'Escape' && modal.style.display !== 'none') closeModal();
   });
 
-  // Print button — open a clean popup window containing only the invoice HTML
-  printBtn.addEventListener('click', function () {
-    var html = contentEl.innerHTML;
-    if (!html) return;
-
-    var popup = window.open('', '_blank', 'width=800,height=700,scrollbars=yes,resizable=yes');
-    if (!popup) {
-      alert('A pop-up was blocked. Please allow pop-ups for this site in your browser settings and try again.');
+  iframeEl.addEventListener('load', function () {
+    if (!iframeEl.src || iframeEl.src === 'about:blank') {
       return;
     }
+    loadingEl.style.display = 'none';
+    errorEl.style.display = 'none';
+    iframeEl.style.display = 'block';
+    printBtn.disabled = false;
+  });
 
-    popup.document.open();
-    popup.document.write(
-      '<!DOCTYPE html>' +
-      '<html lang="en">' +
-      '<head>' +
-        '<meta charset="UTF-8">' +
-        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-        '<title>Invoice</title>' +
-        '<style>' +
-          '*, *::before, *::after { box-sizing: border-box; }' +
-          'html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #1e293b; }' +
-          '@media screen { body { padding: 24px; } }' +
-          '@page { margin: 15mm 12mm; }' +
-          '@media print {' +
-            'html, body { margin: 0; padding: 0; background: #fff; }' +
-            'a { color: inherit !important; text-decoration: none !important; }' +
-          '}' +
-        '</style>' +
-      '</head>' +
-      '<body>' + html + '</body>' +
-      '</html>'
-    );
-    popup.document.close();
+  iframeEl.addEventListener('error', function () {
+    loadingEl.style.display = 'none';
+    iframeEl.style.display = 'none';
+    errorEl.textContent = 'Could not load invoice preview.';
+    errorEl.style.display = 'block';
+    printBtn.disabled = true;
+  });
 
-    // onload may not fire after document.write(); use a short timeout as fallback
-    var printed = false;
-    function doPrint() {
-      if (printed) return;
-      printed = true;
-      popup.focus();
-      popup.print();
+  printBtn.addEventListener('click', function () {
+    if (!iframeEl.src || iframeEl.src === 'about:blank') return;
+    var iframeWindow = iframeEl.contentWindow;
+    if (!iframeWindow) {
+      errorEl.textContent = 'Invoice preview is not ready yet.';
+      errorEl.style.display = 'block';
+      return;
     }
-    popup.onload = doPrint;
-    setTimeout(doPrint, 400);
+    iframeWindow.focus();
+    iframeWindow.print();
   });
 
   // Print buttons in table rows
   document.querySelectorAll('.it-print-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var invId = btn.getAttribute('data-inv-id');
+      var invIdNum = Number(invId);
       openModal();
-
-      fetch('invoice_tracker.php?action=print_preview&invoice_id=' + encodeURIComponent(invId), {
-        credentials: 'same-origin'
-      })
-        .then(function (res) {
-          if (!res.ok) throw new Error('Server returned ' + res.status);
-          return res.json();
-        })
-        .then(function (data) {
-          if (!data.ok) {
-            loadingEl.style.display = 'none';
-            errorEl.textContent = data.error || 'Failed to load invoice.';
-            errorEl.style.display = 'block';
-            return;
-          }
-          contentEl.innerHTML = data.html;
-          loadingEl.style.display = 'none';
-          contentEl.style.display = 'block';
-          printBtn.disabled = false;
-        })
-        .catch(function (err) {
-          loadingEl.style.display = 'none';
-          errorEl.textContent = 'Could not load invoice preview: ' + err.message;
-          errorEl.style.display = 'block';
-        });
+      printBtn.disabled = true;
+      loadingEl.style.display = 'flex';
+      errorEl.style.display = 'none';
+      errorEl.textContent = '';
+      iframeEl.style.display = 'none';
+      if (!Number.isInteger(invIdNum) || invIdNum <= 0) {
+        loadingEl.style.display = 'none';
+        errorEl.textContent = 'Invalid invoice ID for preview.';
+        errorEl.style.display = 'block';
+        return;
+      }
+      iframeEl.src = 'email_preview.php?id=' + encodeURIComponent(String(invIdNum)) + '&_ts=' + Date.now();
     });
   });
 }());
