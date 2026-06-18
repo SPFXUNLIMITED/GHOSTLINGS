@@ -21,6 +21,26 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// ── Delete Inventory Item ────────────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_inventory') {
+  $token = (string)($_POST['delete_csrf'] ?? '');
+  if (!hash_equals((string)($_SESSION['inventory_delete_csrf'] ?? ''), $token) || $token === '') {
+    http_response_code(403);
+    die('Invalid security token.');
+  }
+
+  $item_id = (int)($_POST['item_id'] ?? 0);
+  if ($item_id > 0) {
+    $stmt = $pdo->prepare("DELETE FROM inventory_items WHERE id = ?");
+    $stmt->execute([$item_id]);
+  }
+
+  $_SESSION['inventory_delete_csrf'] = bin2hex(random_bytes(24));
+  header('Location: inventory_list.php?success=deleted' . ($item_id > 0 ? '' : ''));
+  exit;
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 // ── AJAX: Quick Stock Adjustment ────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'stock_adjust') {
   header('Content-Type: application/json; charset=UTF-8');
@@ -277,6 +297,9 @@ if (empty($_SESSION['inventory_clone_csrf'])) {
 }
 if (empty($_SESSION['inventory_stock_csrf'])) {
   $_SESSION['inventory_stock_csrf'] = bin2hex(random_bytes(24));
+}
+if (empty($_SESSION['inventory_delete_csrf'])) {
+  $_SESSION['inventory_delete_csrf'] = bin2hex(random_bytes(24));
 }
 
 if ($q !== '') {
@@ -640,6 +663,12 @@ render_header('Inventory List');
               <button type="submit" class="btn">Clone</button>
             </form>
             <a class="btn" href="inventory_print_qr.php?id=<?= (int)$item['id'] ?>" target="_blank">Print QR Label</a>
+            <form method="post" action="inventory_list.php" style="display:inline;" onsubmit="return confirm('Delete this inventory item permanently? This cannot be undone.');">
+              <input type="hidden" name="action" value="delete_inventory" />
+              <input type="hidden" name="item_id" value="<?= (int)$item['id'] ?>" />
+              <input type="hidden" name="delete_csrf" value="<?= h((string)$_SESSION['inventory_delete_csrf']) ?>" />
+              <button type="submit" class="btn danger">Delete</button>
+            </form>
           </td>
         </tr>
       <?php endforeach; ?>
