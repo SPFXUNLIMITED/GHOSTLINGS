@@ -541,8 +541,7 @@ function invoice_has_valid_checkout_session(array $quote, float $amount): bool {
 
 function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_message = null): string {
   $error_message = null;
-  $quote_id = (int)($quote['id'] ?? 0);
-  $log_failure = static function (string $reason, ?string &$error_message_ref, int $quote_id_for_log, array $context = []): string {
+  $log_failure = static function (string $reason, ?string &$error_message, int $quote_id, array $context = []): string {
     $details = [];
     foreach ($context as $key => $value) {
       if ($value === null || $value === '') continue;
@@ -555,8 +554,8 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
       $details[] = $key . '=' . (string)$value;
     }
     $suffix = $details ? ' [' . implode(', ', $details) . ']' : '';
-    error_log('invoice_checkout_session_url failed for invoice #' . $quote_id_for_log . ': ' . $reason . $suffix);
-    $error_message_ref = $reason;
+    error_log('invoice_checkout_session_url failed for invoice #' . $quote_id . ': ' . $reason . $suffix);
+    $error_message = $reason;
     return '';
   };
 
@@ -564,6 +563,7 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
     return '';
   }
 
+  $quote_id = (int)($quote['id'] ?? 0);
   if ($quote_id <= 0) {
     return $log_failure('Invoice must be saved before generating an online payment link.', $error_message, $quote_id);
   }
@@ -639,7 +639,7 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
 
   $ch = curl_init('https://api.stripe.com/v1/checkout/sessions');
   if ($ch === false) {
-    return $log_failure('Stripe checkout could not be created because cURL initialization failed.', $error_message, $quote_id);
+    return $log_failure('Failed to initialize cURL session for Stripe checkout.', $error_message, $quote_id);
   }
 
   curl_setopt_array($ch, [
