@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
   }
 
   $_SESSION['inventory_delete_csrf'] = bin2hex(random_bytes(24));
-  header('Location: inventory_list.php?success=deleted' . ($item_id > 0 ? '' : ''));
+  header('Location: inventory_list.php?success=deleted');
   exit;
 }
 // ────────────────────────────────────────────────────────────────────────────
