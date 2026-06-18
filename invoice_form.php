@@ -558,7 +558,7 @@ function invoice_has_valid_checkout_session(array $quote, float $amount): bool {
 
 function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_message = null): string {
   $error_message = null;
-  $log_empty_return = static function (string $reason, int $quote_id, array $context = []): void {
+  $format_log_suffix = static function (array $context = []): string {
     $details = [];
     foreach ($context as $key => $value) {
       if ($value === null || $value === '') continue;
@@ -570,24 +570,15 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
       }
       $details[] = $key . '=' . (string)$value;
     }
-    $suffix = $details ? ' [' . implode(', ', $details) . ']' : '';
+    return $details ? ' [' . implode(', ', $details) . ']' : '';
+  };
+  $log_empty_return = static function (string $reason, int $quote_id, array $context = []) use ($format_log_suffix): void {
+    $suffix = $format_log_suffix($context);
     error_log('invoice_checkout_session_url returning empty for invoice #' . $quote_id . ': ' . $reason . $suffix);
   };
-  $log_failure = static function (string $reason, int $quote_id, ?string &$error_message, array $context = []) use ($log_empty_return): string {
-    $details = [];
-    foreach ($context as $key => $value) {
-      if ($value === null || $value === '') continue;
-      if (is_bool($value)) {
-        $value = $value ? 'true' : 'false';
-      } elseif (!is_scalar($value)) {
-        $encoded = json_encode($value);
-        $value = $encoded !== false ? $encoded : '[unserializable]';
-      }
-      $details[] = $key . '=' . (string)$value;
-    }
-    $suffix = $details ? ' [' . implode(', ', $details) . ']' : '';
-    error_log('invoice_checkout_session_url failed for invoice #' . $quote_id . ': ' . $reason . $suffix);
-    $log_empty_return($reason, $quote_id, $context);
+  $log_failure = static function (string $reason, int $quote_id, ?string &$error_message, array $context = []) use ($format_log_suffix): string {
+    $suffix = $format_log_suffix($context);
+    error_log('invoice_checkout_session_url failed and returned empty for invoice #' . $quote_id . ': ' . $reason . $suffix);
     $error_message = $reason;
     return '';
   };
