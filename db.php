@@ -1670,6 +1670,19 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Add dismissed column to approval_alerts if it does not exist yet
+$has_dismissed = $pdo->query("SHOW COLUMNS FROM approval_alerts LIKE 'dismissed'");
+if ($has_dismissed === false || $has_dismissed->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE approval_alerts ADD COLUMN dismissed TINYINT(1) NOT NULL DEFAULT 0");
+  } catch (Throwable $e) {
+    $recheck_dismissed = $pdo->query("SHOW COLUMNS FROM approval_alerts LIKE 'dismissed'");
+    if ($recheck_dismissed === false || $recheck_dismissed->fetch(PDO::FETCH_ASSOC) === false) {
+      throw $e;
+    }
+  }
+}
+
 // Create admin activity log table for key backend audit events
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS admin_activity_log (
