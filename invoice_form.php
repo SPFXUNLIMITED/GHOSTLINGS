@@ -542,7 +542,7 @@ function invoice_has_valid_checkout_session(array $quote, float $amount): bool {
 function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_message = null): string {
   $error_message = null;
   $quote_id = (int)($quote['id'] ?? 0);
-  $log_failure = static function (string $reason, ?string &$error_message_ref, int $quote_id_ref, array $context = []): string {
+  $log_failure = static function (string $reason, ?string &$error_message_ref, int $quote_id_for_log, array $context = []): string {
     $details = [];
     foreach ($context as $key => $value) {
       if ($value === null || $value === '') continue;
@@ -555,7 +555,7 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
       $details[] = $key . '=' . (string)$value;
     }
     $suffix = $details ? ' [' . implode(', ', $details) . ']' : '';
-    error_log('invoice_checkout_session_url failed for invoice #' . $quote_id_ref . ': ' . $reason . $suffix);
+    error_log('invoice_checkout_session_url failed for invoice #' . $quote_id_for_log . ': ' . $reason . $suffix);
     $error_message_ref = $reason;
     return '';
   };
@@ -674,7 +674,7 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
       $quote_id,
       [
         'http_code' => $http_code,
-        'response_excerpt' => substr(trim($response_body), 0, 500),
+        'response_body_length' => strlen($response_body),
       ]
     );
   }
