@@ -433,6 +433,18 @@ foreach ($params as $key => $value) {
 $stmt->execute();
 $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Build a set of invoice IDs that already have payments applied in invoice_credit_applications
+$applied_invoice_ids = [];
+if ($invoices) {
+  $inv_id_list = array_map('intval', array_column($invoices, 'id'));
+  $placeholders = implode(',', array_fill(0, count($inv_id_list), '?'));
+  $applied_stmt = $pdo->prepare("SELECT DISTINCT quote_id FROM invoice_credit_applications WHERE quote_id IN ($placeholders)");
+  $applied_stmt->execute($inv_id_list);
+  foreach ($applied_stmt->fetchAll(PDO::FETCH_COLUMN) as $qid) {
+    $applied_invoice_ids[(int)$qid] = true;
+  }
+}
+
 $hero_total_invoices = count($invoices);
 $hero_month_invoices = 0;
 $hero_total_billed = 0.0;
@@ -581,6 +593,8 @@ render_header('Invoice Tracker');
 .it-actions .btn { font-size:0.78em; padding:3px 8px; white-space:nowrap; }
 .it-actions .btn-danger { background:#fef2f2; color:#991b1b; border-color:#fecaca; }
 .it-actions .btn-danger:hover { background:#fee2e2; }
+.it-actions .it-btn-disabled { opacity:0.45; cursor:not-allowed; }
+.it-actions .btn-danger:disabled { opacity:0.45; cursor:not-allowed; }
 
 /* Email status cell */
 .it-email-cell { display:flex; align-items:center; gap:6px; flex-wrap:nowrap; }
@@ -617,6 +631,8 @@ render_header('Invoice Tracker');
             $online_payment = (int)($invoice['enable_online_payment'] ?? 0) === 1;
             $approval_status = (string)($invoice['approval_status'] ?? 'none');
             [$approval_bg, $approval_color] = invoice_approval_badge_colors($approval_status);
+            $has_applied_payment = isset($applied_invoice_ids[$inv_id]);
+            $applied_tooltip = 'This payment has been applied to an invoice and cannot be modified';
           ?>
           <tr>
             <td class="muted"><?= $inv_id ?></td>
@@ -678,7 +694,11 @@ render_header('Invoice Tracker');
             <td class="col-actions">
               <div class="it-actions">
                 <a class="btn" href="invoice_form.php?id=<?= $inv_id ?>&mode=view">View</a>
-                <a class="btn" href="invoice_form.php?id=<?= $inv_id ?>">Edit</a>
+                <?php if ($has_applied_payment): ?>
+                  <a class="btn it-btn-disabled" aria-disabled="true" title="<?= h($applied_tooltip) ?>">Edit</a>
+                <?php else: ?>
+                  <a class="btn" href="invoice_form.php?id=<?= $inv_id ?>">Edit</a>
+                <?php endif; ?>
                 <button type="button" class="btn it-print-btn" data-inv-id="<?= $inv_id ?>">🖨 Print</button>
 
                 <!-- Email Invoice: POST to invoice_form.php using shared CSRF -->
@@ -704,7 +724,7 @@ render_header('Invoice Tracker');
                   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_tracker_csrf']) ?>" />
                   <input type="hidden" name="action" value="delete_invoice" />
                   <input type="hidden" name="invoice_id" value="<?= $inv_id ?>" />
-                  <button type="submit" class="btn btn-danger">Delete</button>
+                  <button type="submit" class="btn btn-danger"<?= $has_applied_payment ? ' disabled title="' . h($applied_tooltip) . '"' : '' ?>>Delete</button>
                 </form>
               </div>
             </td>
