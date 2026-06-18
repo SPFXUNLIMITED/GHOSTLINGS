@@ -1731,6 +1731,27 @@ if (!$_te_cleanup_done) {
 }
 unset($_te_cleanup_done);
 
+// Create customer_payments table for recording payments received from customers
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS customer_payments (
+    id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    customer_id     INT UNSIGNED NOT NULL,
+    payment_date    DATE NOT NULL,
+    amount          DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    payment_method  VARCHAR(50) NOT NULL DEFAULT 'check',
+    reference_no    VARCHAR(100) NULL,
+    notes           TEXT NULL,
+    created_by      INT UNSIGNED NULL,
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_cp_customer_id (customer_id),
+    KEY idx_cp_payment_date (payment_date),
+    KEY idx_cp_created_at (created_at),
+    CONSTRAINT fk_cp_customer FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 if (!function_exists('log_admin_activity')) {
   function log_admin_activity(PDO $pdo, ?int $user_id, string $action_name, string $details = '', ?string $fallback_user = null): void {
     $safe_user_id = $user_id !== null && $user_id > 0 ? $user_id : null;
