@@ -758,7 +758,7 @@ render_header('Invoice Tracker');
         errorEl.style.display = 'block';
         return;
       }
-      iframeEl.src = 'email_preview.php?id=' + encodeURIComponent(String(invIdNum)) + '&_ts=' + Date.now();
+      iframeEl.src = 'email_preview.php?id=' + encodeURIComponent(String(invIdNum)) + '&context=invoice&_ts=' + Date.now();
     });
   });
 }());
