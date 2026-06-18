@@ -7,8 +7,17 @@ require_login();
 $current_user_id = (int)$_SESSION['user_id'];
 $is_admin = !empty($_SESSION['is_admin']);
 
-// Handle "Mark as Read" AJAX/POST action for a single approval alert
+if (empty($_SESSION['notifications_csrf'])) {
+  $_SESSION['notifications_csrf'] = bin2hex(random_bytes(24));
+}
+
+// Handle "Mark as Read" POST action for a single approval alert
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_dismissed_id'])) {
+  $csrf = (string)($_POST['csrf_token'] ?? '');
+  if (!hash_equals((string)$_SESSION['notifications_csrf'], $csrf)) {
+    http_response_code(403);
+    exit('Security token mismatch. Please refresh and try again.');
+  }
   $dismiss_id = (int)$_POST['mark_dismissed_id'];
   if ($dismiss_id > 0) {
     $dismiss_stmt = $pdo->prepare("UPDATE approval_alerts SET dismissed = 1 WHERE id = ? AND recipient_id = ?");
@@ -98,6 +107,7 @@ render_header('Notifications');
         <td style="white-space:nowrap;">
           <a class="btn btn-sm" href="<?= h((string)$alert['link_url']) ?>">Open</a>
           <form method="post" action="notifications.php" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="<?= h($_SESSION['notifications_csrf']) ?>">
             <input type="hidden" name="mark_dismissed_id" value="<?= (int)$alert['id'] ?>">
             <button type="submit" class="btn btn-sm">Mark as Read</button>
           </form>
