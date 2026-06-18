@@ -496,7 +496,7 @@ render_header('Invoice Tracker');
         <span class="it-spinner" aria-hidden="true"></span>
         Loading invoice&hellip;
       </div>
-      <iframe id="it-print-modal-iframe" title="Invoice preview" style="display:none;" loading="lazy"></iframe>
+      <iframe id="it-print-modal-iframe" title="Invoice preview" style="display:none;" loading="lazy" sandbox="allow-same-origin allow-scripts allow-modals allow-popups allow-popups-to-escape-sandbox"></iframe>
       <div id="it-print-modal-error" class="it-modal-error" style="display:none;" role="alert"></div>
     </div>
 
@@ -725,7 +725,11 @@ render_header('Invoice Tracker');
   document.querySelectorAll('.it-print-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var invId = btn.getAttribute('data-inv-id');
-      if (!invId) return;
+      if (!invId) {
+        errorEl.textContent = 'Missing invoice ID for preview.';
+        errorEl.style.display = 'block';
+        return;
+      }
       openModal();
       printBtn.disabled = true;
       loadingEl.style.display = 'flex';
