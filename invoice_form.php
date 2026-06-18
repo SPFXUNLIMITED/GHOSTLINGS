@@ -86,9 +86,13 @@ function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, 
   if (!$is_paid && invoice_online_payment_enabled($quote)) {
     $payment_error = null;
     $payment_link = invoice_checkout_session_url($pdo, $quote, $payment_error);
-    if ($payment_link === '' && $require_payment_link) {
-      $error_message = trim((string)$payment_error) !== '' ? trim((string)$payment_error) : 'Unable to create Stripe checkout link for this invoice.';
-      return null;
+    if ($payment_link === '') {
+      $logged_err = trim((string)$payment_error) !== '' ? trim((string)$payment_error) : 'no error message returned';
+      error_log('invoice_checkout_session_url returned empty for invoice #' . (int)($quote['id'] ?? 0) . ': ' . $logged_err);
+      if ($require_payment_link) {
+        $error_message = trim((string)$payment_error) !== '' ? trim((string)$payment_error) : 'Unable to create Stripe checkout link for this invoice.';
+        return null;
+      }
     }
   }
 
@@ -189,9 +193,9 @@ function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, 
       . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '')
     . '</div>'
     . ($is_paid
-        ? '<div style="background:#ffffff;padding:12px 32px 0;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
-            . '<div style="margin:0 0 4px;padding:8px 12px;border:3px solid #dc2626;border-radius:10px;background:#fee2e2;text-align:center;">'
-              . '<span style="display:inline-block;font-size:34px;line-height:1;font-weight:900;letter-spacing:0.12em;color:#b91c1c;text-transform:uppercase;">PAID</span>'
+        ? '<div style="background:#ffffff;padding:6px 32px 0;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
+            . '<div style="margin:0 0 4px;padding:4px 10px;border:2px solid #dc2626;border-radius:6px;background:#fee2e2;text-align:center;">'
+              . '<span style="display:inline-block;font-size:20px;line-height:1;font-weight:900;letter-spacing:0.12em;color:#b91c1c;text-transform:uppercase;">PAID</span>'
             . '</div>'
           . '</div>'
         : '')
@@ -735,6 +739,7 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
 
   $email_payload = invoice_build_email_message_data($pdo, $quote, $items, true, $error_message);
   if ($email_payload === null) {
+    error_log('Invoice email send failed for quote #' . (int)($quote['id'] ?? 0) . ' — ' . ($error_message ?? 'invoice_build_email_message_data returned null'));
     return false;
   }
 
