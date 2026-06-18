@@ -1752,6 +1752,26 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Create invoice_credit_applications table for tracking customer credit applied to specific invoices
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS invoice_credit_applications (
+    id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    quote_id        INT UNSIGNED NOT NULL,
+    customer_id     INT UNSIGNED NOT NULL,
+    applied_amount  DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    applied_date    DATE NOT NULL,
+    notes           TEXT NULL,
+    applied_by      INT UNSIGNED NULL,
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_ica_quote_id (quote_id),
+    KEY idx_ica_customer_id (customer_id),
+    KEY idx_ica_applied_date (applied_date),
+    CONSTRAINT fk_ica_quote FOREIGN KEY (quote_id) REFERENCES quotes (id) ON DELETE CASCADE,
+    CONSTRAINT fk_ica_customer FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 if (!function_exists('log_admin_activity')) {
   function log_admin_activity(PDO $pdo, ?int $user_id, string $action_name, string $details = '', ?string $fallback_user = null): void {
     $safe_user_id = $user_id !== null && $user_id > 0 ? $user_id : null;
