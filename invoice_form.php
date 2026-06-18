@@ -1077,10 +1077,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($apply_amount <= 0) {
       $credit_errors[] = 'Amount must be greater than zero.';
     }
-    if ($apply_amount > $available_credit + 0.005) {
+    if ($apply_amount > $available_credit) {
       $credit_errors[] = 'Amount exceeds available customer credit ($' . number_format($available_credit, 2) . ').';
     }
-    if ($apply_amount > $outstanding_balance + 0.005) {
+    if ($apply_amount > $outstanding_balance) {
       $credit_errors[] = 'Amount exceeds the outstanding invoice balance ($' . number_format($outstanding_balance, 2) . ').';
     }
 
@@ -1656,7 +1656,7 @@ render_header($invoice_heading);
     if (openBtn) openBtn.addEventListener('click', openModal);
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
     if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
-    if (backdrop) backdrop.addEventListener('click', closeModal);
+    if (backdrop) backdrop.addEventListener('click', function(e) { if (e.target === backdrop) closeModal(); });
     document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && modal.style.display === 'block') closeModal(); });
   })();
   </script>
