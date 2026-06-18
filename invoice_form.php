@@ -541,7 +541,7 @@ function invoice_has_valid_checkout_session(array $quote, float $amount): bool {
 
 function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_message = null): string {
   $error_message = null;
-  $log_failure = static function (string $reason, ?string &$error_message, int $quote_id, array $context = []): string {
+  $log_failure = static function (string $reason, int $quote_id, ?string &$error_message, array $context = []): string {
     $details = [];
     foreach ($context as $key => $value) {
       if ($value === null || $value === '') continue;
@@ -565,17 +565,12 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
 
   $quote_id = (int)($quote['id'] ?? 0);
   if ($quote_id <= 0) {
-    return $log_failure('Invoice must be saved before generating an online payment link.', $error_message, $quote_id);
+    return $log_failure('Invoice must be saved before generating an online payment link.', -1, $error_message, ['invoice_state' => 'unsaved']);
   }
 
   $amount = round((float)($quote['subtotal_amount'] ?? 0), 2);
   if ($amount <= 0) {
-    return $log_failure(
-      'Online payment requires an invoice total greater than $0.00.',
-      $error_message,
-      $quote_id,
-      ['amount' => $amount]
-    );
+    return $log_failure('Online payment requires an invoice total greater than $0.00.', $quote_id, $error_message, ['amount' => $amount]);
   }
 
   if (invoice_has_valid_checkout_session($quote, $amount)) {
@@ -583,16 +578,12 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
   }
 
   if (!function_exists('curl_init')) {
-    return $log_failure('Stripe checkout could not be created because cURL is not available on this server.', $error_message, $quote_id);
+    return $log_failure('Stripe checkout could not be created because cURL is not available on this server.', $quote_id, $error_message);
   }
 
   $secret_key = invoice_stripe_secret_key($pdo);
   if ($secret_key === '') {
-    return $log_failure(
-      'Stripe secret key is not configured. Please save it in Admin > Integrations or set STRIPE_SECRET_KEY.',
-      $error_message,
-      $quote_id
-    );
+    return $log_failure('Stripe secret key is not configured. Please save it in Admin > Integrations or set STRIPE_SECRET_KEY.', $quote_id, $error_message);
   }
 
   $invoice_number = trim((string)($quote['converted_invoice_no'] ?? ''));
@@ -639,7 +630,7 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
 
   $ch = curl_init('https://api.stripe.com/v1/checkout/sessions');
   if ($ch === false) {
-    return $log_failure('Failed to initialize cURL session for Stripe checkout.', $error_message, $quote_id);
+    return $log_failure('Failed to initialize cURL session for Stripe checkout.', $quote_id, $error_message);
   }
 
   curl_setopt_array($ch, [
@@ -660,8 +651,8 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
   if ($response_body === false) {
     return $log_failure(
       $curl_error !== '' ? $curl_error : 'Stripe checkout request failed.',
-      $error_message,
       $quote_id,
+      $error_message,
       ['http_code' => $http_code]
     );
   }
@@ -670,8 +661,8 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
   if (!is_array($response)) {
     return $log_failure(
       'Stripe returned an invalid response.',
-      $error_message,
       $quote_id,
+      $error_message,
       [
         'http_code' => $http_code,
         'response_body_length' => strlen($response_body),
@@ -683,8 +674,8 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
     $stripe_error = trim((string)($response['error']['message'] ?? ''));
     return $log_failure(
       $stripe_error !== '' ? $stripe_error : 'Stripe checkout request failed.',
-      $error_message,
       $quote_id,
+      $error_message,
       [
         'http_code' => $http_code,
         'stripe_error_type' => trim((string)($response['error']['type'] ?? '')),
@@ -698,8 +689,8 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
   if ($checkout_url === '' || $session_id === '') {
     return $log_failure(
       'Stripe did not return a hosted checkout link.',
-      $error_message,
       $quote_id,
+      $error_message,
       [
         'http_code' => $http_code,
         'has_url' => $checkout_url !== '',
