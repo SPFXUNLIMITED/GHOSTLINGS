@@ -7,6 +7,18 @@ require_once __DIR__ . '/lib/PHPMailer/src/PHPMailer.php';
 require_once __DIR__ . '/lib/PHPMailer/src/SMTP.php';
 require_admin_or_moderator();
 
+// ---------- Constants ----------
+const INVOICE_DEFAULT_QTY              = '1.00';
+const INVOICE_DEFAULT_COST             = '0.00';
+const INVOICE_DEFAULT_MARKUP           = '20.00';
+const INVOICE_DEFAULT_PRICE            = '0.00';
+const INVOICE_MIN_QTY                  = 0.01;
+const STRIPE_AMOUNT_TOLERANCE          = 0.01;
+const STRIPE_API_TIMEOUT_SECONDS       = 20;
+const INVOICE_BALANCE_EPSILON          = 0.005;
+const INVOICE_PAYMENT_STATUS_UNPAID    = 'unpaid';
+const INVOICE_PAYMENT_STATUS_PAID      = 'paid';
+
 // EMAIL PREVIEW HANDLER - Must be at the very top, right after requires
 if (isset($_GET['email_preview']) && isset($_GET['id'])) {
     $id = (int)$_GET['id'];
@@ -720,17 +732,6 @@ function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_m
   return $checkout_url;
 }
 
-
-const INVOICE_DEFAULT_QTY = '1.00';
-const INVOICE_DEFAULT_COST = '0.00';
-const INVOICE_DEFAULT_MARKUP = '20.00';
-const INVOICE_DEFAULT_PRICE = '0.00';
-const INVOICE_MIN_QTY = 0.01;
-const STRIPE_AMOUNT_TOLERANCE = 0.01;
-const STRIPE_API_TIMEOUT_SECONDS = 20;
-const INVOICE_BALANCE_EPSILON = 0.005;
-const INVOICE_PAYMENT_STATUS_UNPAID = 'unpaid';
-const INVOICE_PAYMENT_STATUS_PAID = 'paid';
 
 // ---------- CSRF ----------
 if (empty($_SESSION['invoice_form_csrf'])) {
