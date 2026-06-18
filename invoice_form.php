@@ -1105,6 +1105,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
   }
 
+  if (trim((string)($_POST['action'] ?? '')) === 'remove_credit_from_invoice') {
+    $row_id = (int)($_POST['row_id'] ?? 0);
+    $credit_app_id = (int)($_POST['credit_app_id'] ?? 0);
+    $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
+    if ($row_id <= 0 || $credit_app_id <= 0) {
+      header('Location: invoice_tracker.php');
+      exit;
+    }
+
+    $inv_stmt = $pdo->prepare("SELECT id, subtotal_amount, tax_amount FROM quotes WHERE id = ? LIMIT 1");
+    $inv_stmt->execute([$row_id]);
+    $inv_row = $inv_stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$inv_row) {
+      header('Location: invoice_tracker.php');
+      exit;
+    }
+
+    $credit_stmt = $pdo->prepare("SELECT id FROM invoice_credit_applications WHERE id = ? AND quote_id = ? LIMIT 1");
+    $credit_stmt->execute([$credit_app_id, $row_id]);
+    if (!$credit_stmt->fetch(PDO::FETCH_ASSOC)) {
+      header('Location: invoice_form.php?id=' . $row_id . '&mode=view&credit_error=' . urlencode('Credit application not found.'));
+      exit;
+    }
+
+    try {
+      $pdo->beginTransaction();
+
+      $delete_stmt = $pdo->prepare("DELETE FROM invoice_credit_applications WHERE id = ? AND quote_id = ?");
+      $delete_stmt->execute([$credit_app_id, $row_id]);
+      if ($delete_stmt->rowCount() !== 1) {
+        throw new RuntimeException('Unable to remove the selected credit application.');
+      }
+
+      $remaining_stmt = $pdo->prepare("SELECT COALESCE(SUM(applied_amount), 0) FROM invoice_credit_applications WHERE quote_id = ?");
+      $remaining_stmt->execute([$row_id]);
+      $remaining_applied = round((float)$remaining_stmt->fetchColumn(), 2);
+      $invoice_total = round((float)$inv_row['subtotal_amount'] + (float)($inv_row['tax_amount'] ?? 0), 2);
+      $outstanding_balance = round($invoice_total - $remaining_applied, 2);
+
+      if ($outstanding_balance > 0.005) {
+        $pdo->prepare("UPDATE quotes SET payment_status = ?, paid_at = NULL WHERE id = ?")->execute([
+          INVOICE_PAYMENT_STATUS_UNPAID,
+          $row_id,
+        ]);
+      }
+
+      $pdo->commit();
+    } catch (Throwable $e) {
+      if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+      }
+      header('Location: invoice_form.php?id=' . $row_id . '&mode=view&credit_error=' . urlencode('Unable to remove credit from invoice.'));
+      exit;
+    }
+
+    header('Location: invoice_form.php?id=' . $row_id . '&mode=view&credit_removed=1');
+    exit;
+  }
+
   if ($view_mode_requested) {
     http_response_code(405);
     exit('Viewing mode is read only.');
@@ -1390,6 +1449,7 @@ $invoice_approval_approved = isset($_GET['approval_approved']) && $_GET['approva
 $invoice_payment_marked = isset($_GET['payment_marked']) && $_GET['payment_marked'] === '1';
 $invoice_already_paid = isset($_GET['already_paid']) && $_GET['already_paid'] === '1';
 $invoice_credit_applied = isset($_GET['credit_applied']) && $_GET['credit_applied'] === '1';
+$invoice_credit_removed = isset($_GET['credit_removed']) && $_GET['credit_removed'] === '1';
 $invoice_credit_error = isset($_GET['credit_error']) && $_GET['credit_error'] !== '' ? trim((string)$_GET['credit_error']) : '';
 $invoice_approval_status = is_array($quote) ? (string)($quote['approval_status'] ?? 'none') : 'none';
 $invoice_is_paid = is_array($quote) && invoice_is_paid($quote);
@@ -1456,6 +1516,9 @@ render_header($invoice_heading);
 <?php endif; ?>
 <?php if ($invoice_credit_applied): ?>
   <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Credit applied to invoice successfully.</div>
+<?php endif; ?>
+<?php if ($invoice_credit_removed): ?>
+  <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Credit removed from invoice successfully.</div>
 <?php endif; ?>
 <?php if ($invoice_credit_error !== ''): ?>
   <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b;"><?= h($invoice_credit_error) ?></div>
@@ -1541,6 +1604,7 @@ render_header($invoice_heading);
               <th style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;">Date</th>
               <th style="padding:6px 10px; border:1px solid #e2e8f0; text-align:right; white-space:nowrap;">Amount</th>
               <th style="padding:6px 10px; border:1px solid #e2e8f0;">Notes</th>
+              <th style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -1549,6 +1613,15 @@ render_header($invoice_heading);
               <td style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;"><?= h((string)($app['applied_date'] ?? '')) ?></td>
               <td style="padding:6px 10px; border:1px solid #e2e8f0; text-align:right; font-weight:600; white-space:nowrap;">$<?= h(number_format((float)$app['applied_amount'], 2)) ?></td>
               <td style="padding:6px 10px; border:1px solid #e2e8f0; color:#64748b;"><?= $app['notes'] !== null && $app['notes'] !== '' ? h((string)$app['notes']) : '<span class="muted">—</span>' ?></td>
+              <td style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;">
+                <form method="post" style="margin:0;" action="" onsubmit="return confirm('Remove this credit application for $<?= addslashes(number_format((float)$app['applied_amount'], 2)) ?>? This will increase the invoice balance and return the amount to available customer credit.');">
+                  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
+                  <input type="hidden" name="action" value="remove_credit_from_invoice" />
+                  <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
+                  <input type="hidden" name="credit_app_id" value="<?= (int)($app['id'] ?? 0) ?>" />
+                  <button type="submit" class="btn" style="padding:4px 8px; font-size:0.8em;">Remove</button>
+                </form>
+              </td>
             </tr>
             <?php endforeach; ?>
           </tbody>
