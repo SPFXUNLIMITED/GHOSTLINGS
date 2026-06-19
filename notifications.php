@@ -102,7 +102,7 @@ render_header('Notifications');
       ?>
       <tr>
         <td><?= h($type_label) ?></td>
-        <td><?= h((string)$alert['message']) ?></td>
+        <td><?= (string)$alert['message'] ?></td>
         <td><?= h((string)$alert['created_at']) ?></td>
         <td style="white-space:nowrap;">
           <a class="btn btn-sm" href="<?= h((string)$alert['link_url']) ?>">Open</a>
