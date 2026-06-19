@@ -624,6 +624,7 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
   <a class="left-quick-access-link <?= $current === 'customers.php' ? 'active' : '' ?>" href="customers.php">Customers</a>
   <a class="left-quick-access-link <?= in_array($current, ['vendors.php', 'vendor_form.php', 'vendor_details.php'], true) ? 'active' : '' ?>" href="vendors.php">Vendors</a>
   <a class="left-quick-access-link <?= in_array($current, ['inventory_list.php', 'inventory_form.php'], true) ? 'active' : '' ?>" href="inventory_list.php">Inventory</a>
+  <a class="left-quick-access-link <?= in_array($current, ['freight_quote_tracker.php', 'freight_quote_form.php'], true) ? 'active' : '' ?>" href="freight_quote_tracker.php">Incoming Shipments</a>
   <a class="left-quick-access-link <?= in_array($current, ['labor_list.php', 'labor_form.php'], true) ? 'active' : '' ?>" href="labor_list.php">Labor / Services</a>
   <a class="left-quick-access-link <?= $current === 'alibaba_responses.php' ? 'active' : '' ?>" href="alibaba_responses.php">Alibaba Responses</a>
   <a class="left-quick-access-link <?= $current === 'quick_order_list.php' ? 'active' : '' ?>" href="quick_order_list.php">Quick Orders</a>
