@@ -333,7 +333,7 @@ render_header('Incoming Shipments');
           </td>
           <td class="incoming-actions">
             <button type="button" class="btn incoming-edit-btn" data-shipment="<?= h((string)$shipment_json) ?>">Edit</button>
-            <button type="button" class="btn btn-danger incoming-delete-btn" data-id="<?= $row_id ?>" data-tracking="<?= h($row_tracking) ?>">Delete</button>
+            <button type="button" class="btn btn-danger incoming-delete-btn" data-id="<?= $row_id ?>" data-tracking="<?= h($row_tracking) ?>" aria-label="Delete shipment with tracking number <?= h($row_tracking) ?>">Delete</button>
           </td>
         </tr>
       <?php endforeach; ?>
@@ -561,7 +561,7 @@ render_header('Incoming Shipments');
     var deleteBtn = event.target.closest('.incoming-delete-btn');
     if (deleteBtn) {
       var tracking = deleteBtn.dataset.tracking || 'this shipment';
-      if (!confirm('Delete shipment with tracking number "' + tracking + '"? This cannot be undone.')) {
+      if (!confirm('Delete shipment with tracking number ' + JSON.stringify(tracking) + '? This cannot be undone.')) {
         return;
       }
       document.getElementById('incoming-delete-id').value = deleteBtn.dataset.id || '';
