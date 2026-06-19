@@ -182,34 +182,50 @@ function split_name_parts(string $full_name): array {
 }
 
 /**
- * Returns an array of suggested service date strings (Y-m-d) based on priority.
- * Weekends (Saturday, Sunday) are skipped.
- *
- * - emergency : today's date (or next business day if today is a weekend)
- * - vip       : tomorrow (or next business day after tomorrow if weekend)
- * - standard  : next 3 available business days
+ * Returns the number of active (non-cancelled, non-completed) service_requests
+ * whose scheduled date falls on $date_str (Y-m-d).
  */
-function get_suggested_dates(string $priority): array {
+function count_jobs_on_date(PDO $pdo, string $date_str): int {
+    $stmt = $pdo->prepare(
+        "SELECT COUNT(*) FROM service_requests
+         WHERE DATE(created_at) = ?
+           AND request_status NOT IN ('cancelled', 'completed')"
+    );
+    $stmt->execute([$date_str]);
+    return (int)$stmt->fetchColumn();
+}
+
+/**
+ * Returns an array of suggested service date strings (Y-m-d) based on priority.
+ * Maximum of 3 active jobs are allowed per day.
+ *
+ * - emergency : today's date (weekends allowed); no capacity check
+ * - vip       : next business day (skip weekends) with fewer than 3 active jobs
+ * - standard  : next 3 business days (skip weekends) each with fewer than 3 active jobs
+ */
+function get_suggested_dates(string $priority, PDO $pdo): array {
     $dates = [];
     $today = new DateTimeImmutable('today');
+    $max_jobs = 3;
 
     if ($priority === 'emergency') {
-        $day = $today;
-        while ((int)$day->format('N') >= 6) {
-            $day = $day->modify('+1 day');
-        }
-        $dates[] = $day->format('Y-m-d');
+        // Any day including weekends; return today regardless of capacity
+        $dates[] = $today->format('Y-m-d');
     } elseif ($priority === 'vip') {
+        // Next business day with capacity
         $day = $today->modify('+1 day');
-        while ((int)$day->format('N') >= 6) {
+        while (true) {
+            if ((int)$day->format('N') < 6 && count_jobs_on_date($pdo, $day->format('Y-m-d')) < $max_jobs) {
+                $dates[] = $day->format('Y-m-d');
+                break;
+            }
             $day = $day->modify('+1 day');
         }
-        $dates[] = $day->format('Y-m-d');
     } else {
-        // standard: next 3 business days
+        // standard: next 3 business days with capacity
         $day = $today->modify('+1 day');
         while (count($dates) < 3) {
-            if ((int)$day->format('N') < 6) {
+            if ((int)$day->format('N') < 6 && count_jobs_on_date($pdo, $day->format('Y-m-d')) < $max_jobs) {
                 $dates[] = $day->format('Y-m-d');
             }
             $day = $day->modify('+1 day');
@@ -479,7 +495,7 @@ try {
         // Non-fatal
     }
 
-    $suggested_dates = get_suggested_dates($priority);
+    $suggested_dates = get_suggested_dates($priority, $pdo);
 
     http_response_code(201);
     echo json_encode([
