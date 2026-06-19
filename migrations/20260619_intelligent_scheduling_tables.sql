@@ -104,7 +104,7 @@ CREATE TABLE IF NOT EXISTS service_route_stops (
   arrival_window_start                 DATETIME NULL,
   arrival_window_end                   DATETIME NULL,
   estimated_drive_minutes_from_prev    SMALLINT UNSIGNED NULL,
-  estimated_service_minutes             SMALLINT UNSIGNED NULL,
+  estimated_service_minutes            SMALLINT UNSIGNED NULL,
   is_priority_insertion                TINYINT(1) NOT NULL DEFAULT 0,
   stop_status                          ENUM('planned','dispatched','in_progress','completed','skipped','cancelled') NOT NULL DEFAULT 'planned',
   created_at                           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
