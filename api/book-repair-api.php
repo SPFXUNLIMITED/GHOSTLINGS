@@ -73,6 +73,83 @@ function str_field(array $body, string $key): string {
     return trim((string)($body[$key] ?? ''));
 }
 
+function split_name_parts(string $full_name): array {
+    $full_name = trim($full_name);
+    if ($full_name === '') {
+        return ['', ''];
+    }
+    $parts = preg_split('/\s+/', $full_name) ?: [];
+    if (!$parts) {
+        return [$full_name, ''];
+    }
+    $first = (string)array_shift($parts);
+    $last = trim(implode(' ', $parts));
+    return [$first, $last];
+}
+
+function resolve_customer_id(
+    PDO $pdo,
+    string $name,
+    string $phone,
+    string $email,
+    string $street,
+    string $city,
+    string $state,
+    string $zip,
+    string $country
+): int {
+    [$first_name, $last_name] = split_name_parts($name);
+
+    if ($email !== '') {
+        $stmt = $pdo->prepare("SELECT id FROM customers WHERE email = ? ORDER BY id ASC LIMIT 1");
+        $stmt->execute([$email]);
+        $id = (int)($stmt->fetchColumn() ?: 0);
+        if ($id > 0) {
+            return $id;
+        }
+    }
+
+    if ($phone !== '') {
+        $stmt = $pdo->prepare("SELECT id FROM customers WHERE phone = ? ORDER BY id ASC LIMIT 1");
+        $stmt->execute([$phone]);
+        $id = (int)($stmt->fetchColumn() ?: 0);
+        if ($id > 0) {
+            return $id;
+        }
+    }
+
+    if ($first_name !== '' && $last_name !== '') {
+        $stmt = $pdo->prepare("SELECT id FROM customers WHERE first_name = ? AND last_name = ? ORDER BY id ASC LIMIT 1");
+        $stmt->execute([$first_name, $last_name]);
+        $id = (int)($stmt->fetchColumn() ?: 0);
+        if ($id > 0) {
+            return $id;
+        }
+    }
+
+    $hubspot_contact_id = 'service_api_' . bin2hex(random_bytes(10));
+    $insert = $pdo->prepare("
+        INSERT INTO customers (
+            hubspot_contact_id, first_name, last_name, company, phone, email,
+            address, city, state, zip, country, last_updated
+        ) VALUES (?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, NULL)
+    ");
+    $insert->execute([
+        $hubspot_contact_id,
+        $first_name,
+        $last_name,
+        $phone,
+        $email,
+        $street,
+        $city,
+        $state,
+        $zip,
+        $country,
+    ]);
+
+    return (int)$pdo->lastInsertId();
+}
+
 // ── Collect fields ────────────────────────────────────────────────────────────
 $name          = str_field($body, 'name');
 $phone         = str_field($body, 'phone');
@@ -222,26 +299,35 @@ $problem_summary = mb_substr($problem, 0, 255);
 
 // ── Insert into service_requests ──────────────────────────────────────────────
 try {
+    $customer_id = resolve_customer_id(
+        $pdo,
+        $name,
+        $phone,
+        $email,
+        $street,
+        $city,
+        $state,
+        $zip,
+        $country
+    );
+
     $stmt = $pdo->prepare(
         "INSERT INTO service_requests
-           (contact_name, contact_phone, contact_email,
+          (customer_id,
             laser_brand, laser_model, laser_watts, laser_age,
             problem_summary, problem_details,
-            service_street, service_city, service_state, service_zip, service_country,
             priority_level, source, request_status)
          VALUES
-           (?, ?, ?,
+           (?,
             ?, ?, ?, ?,
             ?, ?,
-            ?, ?, ?, ?, ?,
             ?, 'api', 'new')"
     );
 
     $stmt->execute([
-        $name, $phone, $email,
+        $customer_id,
         $machine_brand, $machine_model, $machine_watts ?: null, $machine_age ?: null,
         $problem_summary, $problem,
-        $street, $city, $state, $zip, $country,
         $priority,
     ]);
 
