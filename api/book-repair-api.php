@@ -332,39 +332,38 @@ try {
     $table_columns = service_request_table_columns($pdo);
     $insert_values = ['customer_id' => $customer_id];
 
-    $assign_required = static function (array $candidates, $value, string $label) use (&$insert_values, $table_columns): void {
+    $assign_column = static function (array $candidates, $value, string $label, bool $required = true) use (&$insert_values, $table_columns): void {
         foreach ($candidates as $candidate) {
             if (isset($table_columns[$candidate])) {
                 $insert_values[$candidate] = $value;
                 return;
             }
         }
-        throw new RuntimeException("Missing service_requests column for {$label}");
-    };
-
-    $assign_optional = static function (array $candidates, $value) use (&$insert_values, $table_columns): void {
-        foreach ($candidates as $candidate) {
-            if (isset($table_columns[$candidate])) {
-                $insert_values[$candidate] = $value;
-                return;
-            }
+        if ($required) {
+            throw new RuntimeException("Missing service_requests column for {$label}");
         }
     };
 
-    $assign_required(['machine_brand', 'laser_brand'], $machine_brand, 'machine brand');
-    $assign_required(['machine_model', 'laser_model'], $machine_model, 'machine model');
-    $assign_required(['machine_watts', 'laser_watts'], $machine_watts ?: null, 'machine watts');
-    $assign_required(['machine_age', 'laser_age'], $machine_age ?: null, 'machine age');
-    $assign_optional(['problem_summary'], $problem_summary);
-    $assign_required(['problem_details', 'problem_description', 'problem'], $problem, 'problem');
-    $assign_required(['priority_level', 'priority'], $priority, 'priority');
-    $assign_required(['source', 'request_source'], 'api', 'source');
-    $assign_required(['request_status', 'status'], 'new', 'request status');
+    $assign_column(['machine_brand', 'laser_brand'], $machine_brand, 'machine brand');
+    $assign_column(['machine_model', 'laser_model'], $machine_model, 'machine model');
+    $assign_column(['machine_watts', 'laser_watts'], $machine_watts ?: null, 'machine watts');
+    $assign_column(['machine_age', 'laser_age'], $machine_age ?: null, 'machine age');
+    $assign_column(['problem_summary'], $problem_summary, 'problem summary', false);
+    $assign_column(['problem_details', 'problem_description', 'problem'], $problem, 'problem');
+    $assign_column(['priority_level', 'priority'], $priority, 'priority');
+    $assign_column(['source', 'request_source'], 'api', 'source');
+    $assign_column(['request_status', 'status'], 'new', 'request status');
 
     $columns = array_keys($insert_values);
+    $quoted_columns = array_map(static function (string $column): string {
+        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $column)) {
+            throw new RuntimeException('Invalid service_requests column name.');
+        }
+        return '`' . $column . '`';
+    }, $columns);
     $placeholders = array_fill(0, count($columns), '?');
     $stmt = $pdo->prepare(
-        'INSERT INTO service_requests (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')'
+        'INSERT INTO service_requests (' . implode(', ', $quoted_columns) . ') VALUES (' . implode(', ', $placeholders) . ')'
     );
     $stmt->execute(array_values($insert_values));
 
