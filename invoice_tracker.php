@@ -131,14 +131,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($inv_id <= 0) {
         $tracker_errors[] = 'Invalid invoice.';
       } else {
-        $check = $pdo->prepare("SELECT id FROM quotes WHERE id = ? LIMIT 1");
+        $check = $pdo->prepare("SELECT id, customer_name FROM quotes WHERE id = ? LIMIT 1");
         $check->execute([$inv_id]);
-        if (!$check->fetch()) {
+        $check_row = $check->fetch(PDO::FETCH_ASSOC);
+        if (!$check_row) {
           $tracker_errors[] = 'Invoice not found.';
         } else {
           $pdo->prepare("UPDATE quotes SET approval_status = 'pending_approval' WHERE id = ?")->execute([$inv_id]);
           $actor = trim((string)($_SESSION['username'] ?? 'A team member'));
-          invoice_create_admin_approval_alerts($pdo, $inv_id, $actor . ' sent Invoice #' . $inv_id . ' for approval.');
+          $customer_name_val = trim((string)($check_row['customer_name'] ?? ''));
+          $customer_bold = $customer_name_val !== '' ? ' for <strong>' . h($customer_name_val) . '</strong>' : '';
+          invoice_create_admin_approval_alerts($pdo, $inv_id, h($actor) . ' sent Invoice #' . $inv_id . $customer_bold . ' for approval.');
           header('Location: invoice_tracker.php?approval_sent=1');
           exit;
         }

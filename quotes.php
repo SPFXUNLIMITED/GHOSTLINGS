@@ -1186,14 +1186,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($row_id <= 0) {
         $errors[] = 'Invalid quote selected for approval.';
       } else {
-        $check = $pdo->prepare("SELECT id FROM quotes WHERE id = ? LIMIT 1");
+        $check = $pdo->prepare("SELECT id, customer_name FROM quotes WHERE id = ? LIMIT 1");
         $check->execute([$row_id]);
-        if (!$check->fetch()) {
+        $check_row = $check->fetch(PDO::FETCH_ASSOC);
+        if (!$check_row) {
           $errors[] = 'Quote not found.';
         } else {
           $pdo->prepare("UPDATE quotes SET approval_status = 'pending_approval' WHERE id = ?")->execute([$row_id]);
           $actor = trim((string)($_SESSION['username'] ?? 'A team member'));
-          $msg = $actor . ' sent Quote #' . $row_id . ' for approval.';
+          $customer_name_val = trim((string)($check_row['customer_name'] ?? ''));
+          $customer_bold = $customer_name_val !== '' ? ' for <strong>' . h($customer_name_val) . '</strong>' : '';
+          $msg = h($actor) . ' sent Quote #' . $row_id . $customer_bold . ' for approval.';
           quote_create_admin_approval_alerts($pdo, $row_id, 'quote', 'quotes.php?view=id&id=' . $row_id, $msg);
           $_SESSION['quotes_csrf'] = bin2hex(random_bytes(24));
           header('Location: quotes.php?view=all&approval_sent=1');
