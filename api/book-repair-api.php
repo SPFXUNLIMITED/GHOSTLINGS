@@ -8,7 +8,7 @@ error_reporting(E_ALL);
  * validates all fields, and inserts a new record into service_requests.
  *
  * Success response (HTTP 201):
- *   { "success": true, "id": <new_request_id> }
+ *   { "success": true, "id": <new_request_id>, "suggested_dates": [...], "priority": "..." }
  *
  * Error response (HTTP 400 / 405 / 500):
  *   { "success": false, "errors": [ "…", … ] }
@@ -179,6 +179,60 @@ function split_name_parts(string $full_name): array {
     $first = (string)array_shift($parts);
     $last = trim(implode(' ', $parts));
     return [$first, $last];
+}
+
+/**
+ * Returns the number of active (non-cancelled, non-completed) service_requests
+ * whose scheduled date falls on $date_str (Y-m-d).
+ */
+function count_jobs_on_date(PDO $pdo, string $date_str): int {
+    $stmt = $pdo->prepare(
+        "SELECT COUNT(*) FROM service_requests
+         WHERE DATE(created_at) = ?
+           AND request_status NOT IN ('cancelled', 'completed')"
+    );
+    $stmt->execute([$date_str]);
+    return (int)$stmt->fetchColumn();
+}
+
+/**
+ * Returns an array of suggested service date strings (Y-m-d) based on priority.
+ * Maximum of 3 active jobs are allowed per day.
+ *
+ * - emergency : today's date (weekends allowed); no capacity check
+ * - vip       : next business day (skip weekends) with fewer than 3 active jobs
+ * - standard  : next 3 business days (skip weekends) each with fewer than 3 active jobs
+ */
+function get_suggested_dates(string $priority, PDO $pdo): array {
+    $dates = [];
+    $today = new DateTimeImmutable('today');
+    $max_jobs = 3;
+
+    if ($priority === 'emergency') {
+        // Any day including weekends; return today regardless of capacity
+        $dates[] = $today->format('Y-m-d');
+    } elseif ($priority === 'vip') {
+        // Next business day with capacity
+        $day = $today->modify('+1 day');
+        while (true) {
+            if ((int)$day->format('N') < 6 && count_jobs_on_date($pdo, $day->format('Y-m-d')) < $max_jobs) {
+                $dates[] = $day->format('Y-m-d');
+                break;
+            }
+            $day = $day->modify('+1 day');
+        }
+    } else {
+        // standard: next 3 business days with capacity
+        $day = $today->modify('+1 day');
+        while (count($dates) < 3) {
+            if ((int)$day->format('N') < 6 && count_jobs_on_date($pdo, $day->format('Y-m-d')) < $max_jobs) {
+                $dates[] = $day->format('Y-m-d');
+            }
+            $day = $day->modify('+1 day');
+        }
+    }
+
+    return $dates;
 }
 
 function resolve_customer_id(
@@ -441,8 +495,15 @@ try {
         // Non-fatal
     }
 
+    $suggested_dates = get_suggested_dates($priority, $pdo);
+
     http_response_code(201);
-    echo json_encode(['success' => true, 'id' => $new_id]);
+    echo json_encode([
+        'success'         => true,
+        'id'              => $new_id,
+        'suggested_dates' => $suggested_dates,
+        'priority'        => $priority,
+    ]);
 } catch (\Throwable $ex) {
     error_log('api/book-repair-api.php DB error: ' . $ex->getMessage());
     http_response_code(500);
