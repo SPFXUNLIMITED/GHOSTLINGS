@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/functions.php';
+
 function h($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
 /**
@@ -493,7 +495,7 @@ function render_header(string $title): void {
 <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=3">
 <link rel="apple-touch-icon" href="/favicon.ico?v=3">
 
-  <link rel="stylesheet" href="styles.css?v=<?= urlencode((string)filemtime(__DIR__ . '/styles.css')) ?>" />
+  <link rel="stylesheet" href="<?= asset('styles.css') ?>" />
 </head>
 <body>
   <div class="container">
@@ -904,7 +906,7 @@ function render_footer(): void {
   </nav>
 <?php endif; ?>
 
-  <script src="sort.js?v=<?= urlencode((string)filemtime(__DIR__ . '/sort.js')) ?>"></script>
+  <script src="<?= asset('sort.js') ?>"></script>
 
 <?php if ($is_logged_in): ?>
   <script>
