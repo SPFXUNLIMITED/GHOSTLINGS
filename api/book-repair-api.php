@@ -8,7 +8,7 @@ error_reporting(E_ALL);
  * validates all fields, and inserts a new record into service_requests.
  *
  * Success response (HTTP 201):
- *   { "success": true, "id": <new_request_id> }
+ *   { "success": true, "id": <new_request_id>, "suggested_dates": [...], "priority": "..." }
  *
  * Error response (HTTP 400 / 405 / 500):
  *   { "success": false, "errors": [ "…", … ] }
@@ -179,6 +179,44 @@ function split_name_parts(string $full_name): array {
     $first = (string)array_shift($parts);
     $last = trim(implode(' ', $parts));
     return [$first, $last];
+}
+
+/**
+ * Returns an array of suggested service date strings (Y-m-d) based on priority.
+ * Weekends (Saturday, Sunday) are skipped.
+ *
+ * - emergency : today's date (or next business day if today is a weekend)
+ * - vip       : tomorrow (or next business day after tomorrow if weekend)
+ * - standard  : next 3 available business days
+ */
+function get_suggested_dates(string $priority): array {
+    $dates = [];
+    $today = new DateTimeImmutable('today');
+
+    if ($priority === 'emergency') {
+        $day = $today;
+        while ((int)$day->format('N') >= 6) {
+            $day = $day->modify('+1 day');
+        }
+        $dates[] = $day->format('Y-m-d');
+    } elseif ($priority === 'vip') {
+        $day = $today->modify('+1 day');
+        while ((int)$day->format('N') >= 6) {
+            $day = $day->modify('+1 day');
+        }
+        $dates[] = $day->format('Y-m-d');
+    } else {
+        // standard: next 3 business days
+        $day = $today->modify('+1 day');
+        while (count($dates) < 3) {
+            if ((int)$day->format('N') < 6) {
+                $dates[] = $day->format('Y-m-d');
+            }
+            $day = $day->modify('+1 day');
+        }
+    }
+
+    return $dates;
 }
 
 function resolve_customer_id(
@@ -441,8 +479,15 @@ try {
         // Non-fatal
     }
 
+    $suggested_dates = get_suggested_dates($priority);
+
     http_response_code(201);
-    echo json_encode(['success' => true, 'id' => $new_id]);
+    echo json_encode([
+        'success'         => true,
+        'id'              => $new_id,
+        'suggested_dates' => $suggested_dates,
+        'priority'        => $priority,
+    ]);
 } catch (\Throwable $ex) {
     error_log('api/book-repair-api.php DB error: ' . $ex->getMessage());
     http_response_code(500);
