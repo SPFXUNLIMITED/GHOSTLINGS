@@ -8,6 +8,7 @@ const INCOMING_DEFAULT_STATUS = 'Ordered';
 const INCOMING_MAX_ITEM_DESCRIPTION_LENGTH = 65535;
 
 $status_options = [INCOMING_DEFAULT_STATUS, 'In Transit', 'Delayed', 'Received'];
+$carrier_options = ['Amazon Logistics', 'UPS', 'FedEx', 'DHL', 'USPS', 'Alibaba Express', 'Other'];
 $status_colors = [
   'Ordered' => ['#e0f2fe', '#075985'],
   'In Transit' => ['#fef3c7', '#92400e'],
@@ -24,6 +25,26 @@ function incoming_is_valid_ymd(string $value): bool {
   }
   $dt = DateTime::createFromFormat('Y-m-d', $value);
   return $dt instanceof DateTime && $dt->format('Y-m-d') === $value;
+}
+
+function incoming_tracking_url(string $carrier, string $tracking): string {
+  $t = rawurlencode($tracking);
+  switch ($carrier) {
+    case 'Amazon Logistics':
+      return 'https://www.amazon.com/progress-tracker/package/?packageId=' . $t;
+    case 'UPS':
+      return 'https://www.ups.com/track?tracknum=' . $t;
+    case 'FedEx':
+      return 'https://www.fedex.com/fedextrack/?trknbr=' . $t;
+    case 'DHL':
+      return 'https://www.dhl.com/us-en/home/tracking/tracking-express.html?submit=1&tracking-id=' . $t;
+    case 'USPS':
+      return 'https://tools.usps.com/go/TrackConfirmAction?tLabels=' . $t;
+    case 'Alibaba Express':
+      return 'https://t.17track.net/en#nums=' . $t;
+    default:
+      return '';
+  }
 }
 
 try {
@@ -50,6 +71,27 @@ try {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = trim((string)($_POST['action'] ?? ''));
+
+  // Handle delete separately — no other field validation needed
+  if ($action === 'delete_shipment') {
+    $delete_id_raw = trim((string)($_POST['delete_id'] ?? ''));
+    if ($delete_id_raw === '' || !ctype_digit($delete_id_raw) || (int)$delete_id_raw <= 0) {
+      $incoming_errors[] = 'Invalid shipment selected for deletion.';
+    } else {
+      try {
+        $del_stmt = $pdo->prepare("DELETE FROM incoming_shipments WHERE id = ?");
+        $del_stmt->execute([(int)$delete_id_raw]);
+        if ($del_stmt->rowCount() > 0) {
+          $incoming_success = 'Incoming shipment deleted.';
+        } else {
+          $incoming_errors[] = 'Could not find shipment to delete.';
+        }
+      } catch (Throwable $e) {
+        error_log('incoming_shipments delete error: ' . $e->getMessage());
+        $incoming_errors[] = 'Unable to delete shipment right now. Please try again.';
+      }
+    }
+  } else {
   $order_date = trim((string)($_POST['order_date'] ?? ''));
   $expected_arrival = trim((string)($_POST['expected_arrival'] ?? ''));
   $carrier = trim((string)($_POST['carrier'] ?? ''));
@@ -65,6 +107,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
   if ($carrier === '') {
     $incoming_errors[] = 'Carrier is required.';
+  } elseif (!in_array($carrier, $carrier_options, true)) {
+    $incoming_errors[] = 'Select a valid carrier.';
   }
   if ($tracking_number === '') {
     $incoming_errors[] = 'Tracking Number is required.';
@@ -83,9 +127,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $incoming_errors[] = 'Expected Arrival must be a valid date.';
   }
 
-  if (strlen($carrier) > 120) {
-    $incoming_errors[] = 'Carrier is too long.';
-  }
   if (strlen($tracking_number) > 160) {
     $incoming_errors[] = 'Tracking Number is too long.';
   }
@@ -154,6 +195,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $incoming_errors[] = 'Unable to save shipment right now. Please try again.';
     }
   }
+  } // end else (not delete_shipment)
 }
 
 $incoming_shipments = [];
@@ -258,21 +300,31 @@ render_header('Incoming Shipments');
         <?php
           $status = (string)($shipment['status'] ?? 'Ordered');
           [$bg, $fg] = $status_colors[$status] ?? ['#e5e7eb', '#374151'];
+          $row_carrier = (string)($shipment['carrier'] ?? '');
+          $row_tracking = (string)($shipment['tracking_number'] ?? '');
+          $row_tracking_url = incoming_tracking_url($row_carrier, $row_tracking);
           $shipment_json = json_encode([
             'id' => (int)($shipment['id'] ?? 0),
             'order_date' => (string)($shipment['order_date'] ?? ''),
             'expected_arrival' => (string)($shipment['expected_arrival'] ?? ''),
-            'carrier' => (string)($shipment['carrier'] ?? ''),
-            'tracking_number' => (string)($shipment['tracking_number'] ?? ''),
+            'carrier' => $row_carrier,
+            'tracking_number' => $row_tracking,
             'item_description' => (string)($shipment['item_description'] ?? ''),
             'status' => $status,
           ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+          $row_id = (int)($shipment['id'] ?? 0);
         ?>
         <tr>
           <td><?= h((string)$shipment['order_date']) ?></td>
           <td><?= h((string)$shipment['expected_arrival']) ?></td>
-          <td><?= h((string)$shipment['carrier']) ?></td>
-          <td><code><?= h((string)$shipment['tracking_number']) ?></code></td>
+          <td><?= h($row_carrier) ?></td>
+          <td>
+            <?php if ($row_tracking_url !== ''): ?>
+              <a href="<?= h($row_tracking_url) ?>" target="_blank" rel="noopener noreferrer"><code><?= h($row_tracking) ?></code></a>
+            <?php else: ?>
+              <code><?= h($row_tracking) ?></code>
+            <?php endif; ?>
+          </td>
           <td style="max-width:340px; white-space:normal;"><?= h((string)$shipment['item_description']) ?></td>
           <td>
             <span style="display:inline-block; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:600; background:<?= h($bg) ?>; color:<?= h($fg) ?>;">
@@ -281,6 +333,7 @@ render_header('Incoming Shipments');
           </td>
           <td class="incoming-actions">
             <button type="button" class="btn incoming-edit-btn" data-shipment="<?= h((string)$shipment_json) ?>">Edit</button>
+            <button type="button" class="btn btn-danger incoming-delete-btn" data-id="<?= $row_id ?>" data-tracking="<?= h($row_tracking) ?>" aria-label="Delete shipment with tracking number <?= h($row_tracking) ?>">Delete</button>
           </td>
         </tr>
       <?php endforeach; ?>
@@ -312,7 +365,11 @@ render_header('Incoming Shipments');
           </div>
           <div>
             <label for="incoming-carrier">Carrier</label>
-            <input id="incoming-carrier" type="text" name="carrier" maxlength="120" required />
+            <select id="incoming-carrier" name="carrier" required>
+              <?php foreach ($carrier_options as $carrier_option): ?>
+                <option value="<?= h($carrier_option) ?>"><?= h($carrier_option) ?></option>
+              <?php endforeach; ?>
+            </select>
           </div>
           <div>
             <label for="incoming-tracking-number">Tracking Number</label>
@@ -340,9 +397,16 @@ render_header('Incoming Shipments');
   </div>
 </div>
 
+<form method="post" action="incoming_shipments.php" id="incoming-delete-form" style="display:none;">
+  <input type="hidden" name="action" value="delete_shipment" />
+  <input type="hidden" name="delete_id" id="incoming-delete-id" value="" />
+</form>
+
 <style>
 .incoming-actions { white-space:nowrap; }
 .incoming-actions .btn { font-size:0.8em; padding:3px 9px; }
+.btn-danger { background:#fee2e2; color:#991b1b; border:1px solid #fecaca; }
+.btn-danger:hover { background:#fecaca; }
 
 #incoming-modal {
   position:fixed; inset:0; z-index:9000; display:none;
@@ -482,17 +546,26 @@ render_header('Incoming Shipments');
 
   document.addEventListener('click', function (event) {
     var editBtn = event.target.closest('.incoming-edit-btn');
-    if (!editBtn) {
+    if (editBtn) {
+      try {
+        var shipment = JSON.parse(editBtn.dataset.shipment || '{}');
+        setFormForEdit(shipment);
+        openModal();
+      } catch (error) {
+        console.error('Incoming shipment parse error:', error);
+        alert('Failed to load shipment data due to a formatting error. Please refresh and try again.');
+      }
       return;
     }
 
-    try {
-      var shipment = JSON.parse(editBtn.dataset.shipment || '{}');
-      setFormForEdit(shipment);
-      openModal();
-    } catch (error) {
-      console.error('Incoming shipment parse error:', error);
-      alert('Failed to load shipment data due to a formatting error. Please refresh and try again.');
+    var deleteBtn = event.target.closest('.incoming-delete-btn');
+    if (deleteBtn) {
+      var tracking = deleteBtn.dataset.tracking || 'this shipment';
+      if (!confirm('Delete shipment with tracking number ' + JSON.stringify(tracking) + '? This cannot be undone.')) {
+        return;
+      }
+      document.getElementById('incoming-delete-id').value = deleteBtn.dataset.id || '';
+      document.getElementById('incoming-delete-form').submit();
     }
   });
 })();
