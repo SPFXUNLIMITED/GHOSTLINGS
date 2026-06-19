@@ -1785,6 +1785,22 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Add service address columns to service_requests if they do not exist yet
+foreach ([
+  "ALTER TABLE service_requests ADD COLUMN service_street VARCHAR(255) NULL",
+  "ALTER TABLE service_requests ADD COLUMN service_city   VARCHAR(100) NULL",
+  "ALTER TABLE service_requests ADD COLUMN service_state  VARCHAR(100) NULL",
+  "ALTER TABLE service_requests ADD COLUMN service_zip    VARCHAR(20)  NULL",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    if ($e->getCode() !== MYSQL_DUPLICATE_COLUMN_ERROR) {
+      throw $e;
+    }
+  }
+}
+
 if (!function_exists('log_admin_activity')) {
   function log_admin_activity(PDO $pdo, ?int $user_id, string $action_name, string $details = '', ?string $fallback_user = null): void {
     $safe_user_id = $user_id !== null && $user_id > 0 ? $user_id : null;

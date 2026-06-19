@@ -87,6 +87,81 @@ function split_name_parts(string $full_name): array {
     return [$first, $last];
 }
 
+/**
+ * Geocode a full address string using the Google Maps Geocoding API.
+ *
+ * Reads GOOGLE_MAPS_API_KEY from environment variables or the root .env file,
+ * matching the pattern used by other API integrations in this project.
+ *
+ * @return array{lat: float|null, lng: float|null, status: 'ok'|'failed'}
+ */
+function geocode_address(string $full_address): array {
+    // Resolve the API key: env var first, then .env file (project root is one level up from api/)
+    $api_key = '';
+    foreach (['GOOGLE_MAPS_API_KEY', 'REDIRECT_GOOGLE_MAPS_API_KEY'] as $env_key) {
+        $val = getenv($env_key);
+        if ($val !== false && trim($val) !== '') {
+            $api_key = trim($val);
+            break;
+        }
+    }
+    if ($api_key === '') {
+        $api_key = trim((string)($_ENV['GOOGLE_MAPS_API_KEY'] ?? $_SERVER['GOOGLE_MAPS_API_KEY'] ?? ''));
+    }
+    if ($api_key === '') {
+        $dotenv_path = __DIR__ . '/../.env';
+        if (is_file($dotenv_path) && is_readable($dotenv_path)) {
+            foreach (file($dotenv_path, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
+                $line = trim((string)$line);
+                if (str_starts_with($line, 'GOOGLE_MAPS_API_KEY=')) {
+                    $api_key = trim(substr($line, strlen('GOOGLE_MAPS_API_KEY=')));
+                    break;
+                }
+            }
+        }
+    }
+
+    if ($api_key === '' || $api_key === 'your_google_maps_api_key_here') {
+        return ['lat' => null, 'lng' => null, 'status' => 'failed'];
+    }
+
+    $url = 'https://maps.googleapis.com/maps/api/geocode/json?' . http_build_query([
+        'address' => $full_address,
+        'key'     => $api_key,
+    ]);
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 3,
+        CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $response = curl_exec($ch);
+    $curl_err = curl_error($ch);
+    curl_close($ch);
+
+    if ($curl_err || !$response) {
+        return ['lat' => null, 'lng' => null, 'status' => 'failed'];
+    }
+
+    $data = json_decode($response, true);
+    if (!is_array($data) || ($data['status'] ?? '') !== 'OK' || empty($data['results'])) {
+        return ['lat' => null, 'lng' => null, 'status' => 'failed'];
+    }
+
+    $location = $data['results'][0]['geometry']['location'] ?? null;
+    if (!is_array($location) || !isset($location['lat'], $location['lng'])) {
+        return ['lat' => null, 'lng' => null, 'status' => 'failed'];
+    }
+
+    return [
+        'lat'    => (float)$location['lat'],
+        'lng'    => (float)$location['lng'],
+        'status' => 'ok',
+    ];
+}
+
 function resolve_customer_id(
     PDO $pdo,
     string $name,
@@ -297,6 +372,13 @@ if ($errors) {
 // ── Derive problem_summary from the first 255 chars of problem ────────────────
 $problem_summary = mb_substr($problem, 0, 255);
 
+// ── Geocode the service address ───────────────────────────────────────────────
+$full_address   = trim("{$street}, {$city}, {$state} {$zip}, {$country}");
+$geo            = geocode_address($full_address);
+$geo_lat        = $geo['lat'];
+$geo_lng        = $geo['lng'];
+$geo_status     = $geo['status'];   // 'ok' or 'failed'
+
 // ── Insert into service_requests ──────────────────────────────────────────────
 try {
     $customer_id = resolve_customer_id(
@@ -316,12 +398,16 @@ try {
           (customer_id,
             laser_brand, laser_model, laser_watts, laser_age,
             problem_summary, problem_details,
-            priority_level, source, request_status)
+            priority_level, source, request_status,
+            service_street, service_city, service_state, service_zip,
+            latitude, longitude, geocode_status)
          VALUES
            (?,
             ?, ?, ?, ?,
             ?, ?,
-            ?, 'api', 'new')"
+            ?, 'api', 'new',
+            ?, ?, ?, ?,
+            ?, ?, ?)"
     );
 
     $stmt->execute([
@@ -329,6 +415,8 @@ try {
         $machine_brand, $machine_model, $machine_watts ?: null, $machine_age ?: null,
         $problem_summary, $problem,
         $priority,
+        $street, $city, $state, $zip,
+        $geo_lat, $geo_lng, $geo_status,
     ]);
 
     $new_id = (int) $pdo->lastInsertId();
