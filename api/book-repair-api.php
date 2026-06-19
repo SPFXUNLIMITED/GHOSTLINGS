@@ -1,4 +1,7 @@
 <?php
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 /**
  * api/book-repair-api.php – Public API endpoint for the customer booking system.
  * Accepts JSON or form-encoded POST data from the frontend website,
@@ -87,85 +90,130 @@ $country       = str_field($body, 'country') ?: 'USA';
 $priority      = str_field($body, 'priority') ?: 'standard';
 
 // ── Validate ──────────────────────────────────────────────────────────────────
-$errors = [];
+$errors       = [];
+$field_errors = [];
 
 if ($name === '') {
-    $errors[] = 'Name is required.';
+    $msg = 'Name is required.';
+    $errors[] = $msg; $field_errors['name'] = $msg;
 } elseif (strlen($name) > 255) {
-    $errors[] = 'Name must be 255 characters or fewer.';
+    $msg = 'Name must be 255 characters or fewer.';
+    $errors[] = $msg; $field_errors['name'] = $msg;
 }
 
 if ($phone === '') {
-    $errors[] = 'Phone number is required.';
+    $msg = 'Phone number is required.';
+    $errors[] = $msg; $field_errors['phone'] = $msg;
 } elseif (strlen($phone) > 100) {
-    $errors[] = 'Phone number must be 100 characters or fewer.';
+    $msg = 'Phone number must be 100 characters or fewer.';
+    $errors[] = $msg; $field_errors['phone'] = $msg;
 }
 
 if ($email === '') {
-    $errors[] = 'Email address is required.';
+    $msg = 'Email address is required.';
+    $errors[] = $msg; $field_errors['email'] = $msg;
 } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    $errors[] = 'A valid email address is required.';
+    $msg = 'A valid email address is required.';
+    $errors[] = $msg; $field_errors['email'] = $msg;
 } elseif (strlen($email) > 255) {
-    $errors[] = 'Email address must be 255 characters or fewer.';
+    $msg = 'Email address must be 255 characters or fewer.';
+    $errors[] = $msg; $field_errors['email'] = $msg;
 }
 
 if ($machine_brand === '') {
-    $errors[] = 'Machine brand is required.';
+    $msg = 'Machine brand is required.';
+    $errors[] = $msg; $field_errors['machine_brand'] = $msg;
 } elseif (strlen($machine_brand) > 100) {
-    $errors[] = 'Machine brand must be 100 characters or fewer.';
+    $msg = 'Machine brand must be 100 characters or fewer.';
+    $errors[] = $msg; $field_errors['machine_brand'] = $msg;
 }
 
 if ($machine_model === '') {
-    $errors[] = 'Machine model is required.';
+    $msg = 'Machine model is required.';
+    $errors[] = $msg; $field_errors['machine_model'] = $msg;
 } elseif (strlen($machine_model) > 100) {
-    $errors[] = 'Machine model must be 100 characters or fewer.';
+    $msg = 'Machine model must be 100 characters or fewer.';
+    $errors[] = $msg; $field_errors['machine_model'] = $msg;
 }
 
 if ($machine_watts !== '' && strlen($machine_watts) > 50) {
-    $errors[] = 'Machine wattage must be 50 characters or fewer.';
+    $msg = 'Machine wattage must be 50 characters or fewer.';
+    $errors[] = $msg; $field_errors['machine_watts'] = $msg;
 }
 
 if ($machine_age !== '' && strlen($machine_age) > 50) {
-    $errors[] = 'Machine age must be 50 characters or fewer.';
+    $msg = 'Machine age must be 50 characters or fewer.';
+    $errors[] = $msg; $field_errors['machine_age'] = $msg;
 }
 
 if ($problem === '') {
-    $errors[] = 'Problem description is required.';
+    $msg = 'Problem description is required.';
+    $errors[] = $msg; $field_errors['problem'] = $msg;
 } elseif (strlen($problem) > 5000) {
-    $errors[] = 'Problem description must be 5000 characters or fewer.';
+    $msg = 'Problem description must be 5000 characters or fewer.';
+    $errors[] = $msg; $field_errors['problem'] = $msg;
 }
 
 if ($street === '') {
-    $errors[] = 'Street address is required.';
+    $msg = 'Street address is required.';
+    $errors[] = $msg; $field_errors['street'] = $msg;
 } elseif (strlen($street) > 255) {
-    $errors[] = 'Street address must be 255 characters or fewer.';
+    $msg = 'Street address must be 255 characters or fewer.';
+    $errors[] = $msg; $field_errors['street'] = $msg;
 }
 
 if ($city === '') {
-    $errors[] = 'City is required.';
+    $msg = 'City is required.';
+    $errors[] = $msg; $field_errors['city'] = $msg;
 } elseif (strlen($city) > 100) {
-    $errors[] = 'City must be 100 characters or fewer.';
+    $msg = 'City must be 100 characters or fewer.';
+    $errors[] = $msg; $field_errors['city'] = $msg;
 }
 
 if ($state === '') {
-    $errors[] = 'State is required.';
+    $msg = 'State is required.';
+    $errors[] = $msg; $field_errors['state'] = $msg;
 } elseif (strlen($state) > 100) {
-    $errors[] = 'State must be 100 characters or fewer.';
+    $msg = 'State must be 100 characters or fewer.';
+    $errors[] = $msg; $field_errors['state'] = $msg;
 }
 
 if ($zip === '') {
-    $errors[] = 'ZIP / postal code is required.';
+    $msg = 'ZIP / postal code is required.';
+    $errors[] = $msg; $field_errors['zip'] = $msg;
 } elseif (strlen($zip) > 20) {
-    $errors[] = 'ZIP / postal code must be 20 characters or fewer.';
+    $msg = 'ZIP / postal code must be 20 characters or fewer.';
+    $errors[] = $msg; $field_errors['zip'] = $msg;
 }
 
 if (!in_array($priority, ['standard', 'vip', 'emergency'], true)) {
-    $errors[] = 'Priority must be one of: standard, vip, emergency.';
+    $msg = 'Priority must be one of: standard, vip, emergency.';
+    $errors[] = $msg; $field_errors['priority'] = $msg;
 }
 
 if ($errors) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'errors' => $errors]);
+    echo json_encode([
+        'success'      => false,
+        'errors'       => $errors,
+        'field_errors' => $field_errors,
+        'received'     => [
+            'name'          => $name,
+            'phone'         => $phone,
+            'email'         => $email,
+            'machine_brand' => $machine_brand,
+            'machine_model' => $machine_model,
+            'machine_watts' => $machine_watts,
+            'machine_age'   => $machine_age,
+            'problem'       => mb_substr($problem, 0, 200) . (mb_strlen($problem) > 200 ? '…' : ''),
+            'street'        => $street,
+            'city'          => $city,
+            'state'         => $state,
+            'zip'           => $zip,
+            'country'       => $country,
+            'priority'      => $priority,
+        ],
+    ]);
     exit;
 }
 
