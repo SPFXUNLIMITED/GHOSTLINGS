@@ -24,6 +24,33 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // ── Load DB ───────────────────────────────────────────────────────────────────
 require __DIR__ . '/../db.php';
 
+// ── Rate limit: max 10 submissions per IP per hour (reuses form_rate_limit) ───
+$_api_ip = (function (): string {
+    foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'] as $k) {
+        if (!empty($_SERVER[$k])) {
+            $ip = trim(explode(',', $_SERVER[$k])[0]);
+            if (filter_var($ip, FILTER_VALIDATE_IP)) {
+                return $ip;
+            }
+        }
+    }
+    return '0.0.0.0';
+})();
+
+try {
+    $rl_check = $pdo->prepare(
+        "SELECT COUNT(*) FROM form_rate_limit WHERE ip = ? AND submitted_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)"
+    );
+    $rl_check->execute([$_api_ip]);
+    if ((int) $rl_check->fetchColumn() >= 10) {
+        http_response_code(429);
+        echo json_encode(['success' => false, 'errors' => ['Too many submissions. Please try again later.']]);
+        exit;
+    }
+} catch (\Throwable $ex) {
+    // Non-fatal: proceed if rate-limit table is unavailable
+}
+
 // ── Parse input (JSON body or form-encoded) ───────────────────────────────────
 $content_type = strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '')[0]));
 if ($content_type === 'application/json') {
@@ -172,9 +199,17 @@ try {
 
     $new_id = (int) $pdo->lastInsertId();
 
+    // Log submission for rate limiting
+    try {
+        $pdo->prepare("INSERT INTO form_rate_limit (ip) VALUES (?)")->execute([$_api_ip]);
+    } catch (\Throwable $ex) {
+        // Non-fatal
+    }
+
     http_response_code(201);
     echo json_encode(['success' => true, 'id' => $new_id]);
 } catch (\Throwable $ex) {
+    error_log('api/book-repair.php DB error: ' . $ex->getMessage());
     http_response_code(500);
     echo json_encode(['success' => false, 'errors' => ['A database error occurred. Please try again.']]);
 }
