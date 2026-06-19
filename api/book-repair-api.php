@@ -67,7 +67,15 @@ if ($content_type === 'application/json') {
 } else {
     $body = $_POST;
 }
-
+ 
+// Backward compatibility for older clients still sending legacy keys.
+if (!array_key_exists('machine_watts', $body) && array_key_exists('watts', $body)) {
+    $body['machine_watts'] = $body['watts'];
+}
+if (!array_key_exists('machine_age', $body) && array_key_exists('age', $body)) {
+    $body['machine_age'] = $body['age'];
+}
+ 
 // ── Helper ────────────────────────────────────────────────────────────────────
 function str_field(array $body, string $key): string {
     return trim((string)($body[$key] ?? ''));
