@@ -4,7 +4,10 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_login();
 
-$status_options = ['Ordered', 'In Transit', 'Delayed', 'Received'];
+const INCOMING_DEFAULT_STATUS = 'Ordered';
+const INCOMING_MAX_ITEM_DESCRIPTION_LENGTH = 65535;
+
+$status_options = [INCOMING_DEFAULT_STATUS, 'In Transit', 'Delayed', 'Received'];
 $status_colors = [
   'Ordered' => ['#e0f2fe', '#075985'],
   'In Transit' => ['#fef3c7', '#92400e'],
@@ -15,22 +18,35 @@ $status_colors = [
 $incoming_errors = [];
 $incoming_success = '';
 
-$pdo->exec("
-  CREATE TABLE IF NOT EXISTS incoming_shipments (
-    id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    order_date       DATE NOT NULL,
-    expected_arrival DATE NOT NULL,
-    carrier          VARCHAR(120) NOT NULL,
-    tracking_number  VARCHAR(160) NOT NULL,
-    item_description TEXT NOT NULL,
-    status           VARCHAR(30) NOT NULL DEFAULT 'Ordered',
-    created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    KEY idx_incoming_shipments_expected_arrival (expected_arrival),
-    KEY idx_incoming_shipments_status (status)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-");
+function incoming_is_valid_ymd(string $value): bool {
+  if ($value === '') {
+    return false;
+  }
+  $dt = DateTime::createFromFormat('Y-m-d', $value);
+  return $dt instanceof DateTime && $dt->format('Y-m-d') === $value;
+}
+
+try {
+  $pdo->exec("
+    CREATE TABLE IF NOT EXISTS incoming_shipments (
+      id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
+      order_date       DATE NOT NULL,
+      expected_arrival DATE NOT NULL,
+      carrier          VARCHAR(120) NOT NULL,
+      tracking_number  VARCHAR(160) NOT NULL,
+      item_description TEXT NOT NULL,
+      status           VARCHAR(30) NOT NULL DEFAULT 'Ordered',
+      created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY idx_incoming_shipments_expected_arrival (expected_arrival),
+      KEY idx_incoming_shipments_status (status)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  ");
+} catch (Throwable $e) {
+  error_log('incoming_shipments table init error: ' . $e->getMessage());
+  $incoming_errors[] = 'Incoming shipments storage is temporarily unavailable.';
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = trim((string)($_POST['action'] ?? ''));
@@ -60,10 +76,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $incoming_errors[] = 'Select a valid shipment status.';
   }
 
-  if ($order_date !== '' && strtotime($order_date) === false) {
+  if ($order_date !== '' && !incoming_is_valid_ymd($order_date)) {
     $incoming_errors[] = 'Order Date must be a valid date.';
   }
-  if ($expected_arrival !== '' && strtotime($expected_arrival) === false) {
+  if ($expected_arrival !== '' && !incoming_is_valid_ymd($expected_arrival)) {
     $incoming_errors[] = 'Expected Arrival must be a valid date.';
   }
 
@@ -73,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (strlen($tracking_number) > 160) {
     $incoming_errors[] = 'Tracking Number is too long.';
   }
-  if (strlen($item_description) > 65535) {
+  if (strlen($item_description) > INCOMING_MAX_ITEM_DESCRIPTION_LENGTH) {
     $incoming_errors[] = 'Item Description is too long.';
   }
 
@@ -88,35 +104,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           if ($edit_id <= 0) {
             $incoming_errors[] = 'Invalid shipment selected for edit.';
           } else {
-            $stmt = $pdo->prepare(
-              "UPDATE incoming_shipments
-               SET order_date = :order_date,
-                   expected_arrival = :expected_arrival,
-                   carrier = :carrier,
-                   tracking_number = :tracking_number,
-                   item_description = :item_description,
-                   status = :status
-               WHERE id = :id"
-            );
-            $stmt->execute([
-              ':order_date' => $order_date,
-              ':expected_arrival' => $expected_arrival,
-              ':carrier' => $carrier,
-              ':tracking_number' => $tracking_number,
-              ':item_description' => $item_description,
-              ':status' => $status,
-              ':id' => $edit_id,
-            ]);
-
-            if ($stmt->rowCount() === 0) {
-              $exists_stmt = $pdo->prepare("SELECT id FROM incoming_shipments WHERE id = ? LIMIT 1");
-              $exists_stmt->execute([$edit_id]);
-              if ($exists_stmt->fetch() === false) {
-                $incoming_errors[] = 'Could not find shipment to edit.';
-              } else {
-                $incoming_success = 'Incoming shipment updated.';
-              }
+            $exists_stmt = $pdo->prepare("SELECT 1 FROM incoming_shipments WHERE id = ? LIMIT 1");
+            $exists_stmt->execute([$edit_id]);
+            if ($exists_stmt->fetch() === false) {
+              $incoming_errors[] = 'Could not find shipment to edit.';
             } else {
+              $stmt = $pdo->prepare(
+                "UPDATE incoming_shipments
+                 SET order_date = :order_date,
+                     expected_arrival = :expected_arrival,
+                     carrier = :carrier,
+                     tracking_number = :tracking_number,
+                     item_description = :item_description,
+                     status = :status
+                 WHERE id = :id"
+              );
+              $stmt->execute([
+                ':order_date' => $order_date,
+                ':expected_arrival' => $expected_arrival,
+                ':carrier' => $carrier,
+                ':tracking_number' => $tracking_number,
+                ':item_description' => $item_description,
+                ':status' => $status,
+                ':id' => $edit_id,
+              ]);
               $incoming_success = 'Incoming shipment updated.';
             }
           }
@@ -139,17 +150,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $incoming_success = 'Incoming shipment added.';
       }
     } catch (Throwable $e) {
+      error_log('incoming_shipments save error: ' . $e->getMessage());
       $incoming_errors[] = 'Unable to save shipment right now. Please try again.';
     }
   }
 }
 
-$incoming_shipments_stmt = $pdo->query(
-  "SELECT id, order_date, expected_arrival, carrier, tracking_number, item_description, status
-   FROM incoming_shipments
-   ORDER BY order_date DESC, id DESC"
-);
-$incoming_shipments = $incoming_shipments_stmt->fetchAll();
+$incoming_shipments = [];
+try {
+  $incoming_shipments_stmt = $pdo->query(
+    "SELECT id, order_date, expected_arrival, carrier, tracking_number, item_description, status
+     FROM incoming_shipments
+     ORDER BY order_date DESC, id DESC"
+  );
+  $incoming_shipments = $incoming_shipments_stmt->fetchAll();
+} catch (Throwable $e) {
+  error_log('incoming_shipments read error: ' . $e->getMessage());
+  $incoming_errors[] = 'Unable to load incoming shipments right now.';
+}
 
 $hero_total_incoming = count($incoming_shipments);
 $hero_in_transit = 0;
@@ -262,7 +280,7 @@ render_header('Incoming Shipments');
             </span>
           </td>
           <td class="incoming-actions">
-            <button type="button" class="btn incoming-edit-btn" data-shipment="<?= (string)$shipment_json ?>">Edit</button>
+            <button type="button" class="btn incoming-edit-btn" data-shipment="<?= h((string)$shipment_json) ?>">Edit</button>
           </td>
         </tr>
       <?php endforeach; ?>
@@ -302,7 +320,7 @@ render_header('Incoming Shipments');
           </div>
           <div style="grid-column:1/-1;">
             <label for="incoming-item-description">Item Description</label>
-            <textarea id="incoming-item-description" name="item_description" rows="3" maxlength="1000" required></textarea>
+            <textarea id="incoming-item-description" name="item_description" rows="3" maxlength="65535" required></textarea>
           </div>
           <div>
             <label for="incoming-status">Status</label>
@@ -474,7 +492,7 @@ render_header('Incoming Shipments');
       openModal();
     } catch (error) {
       console.error('Incoming shipment parse error:', error);
-      alert('The shipment data is invalid. Please refresh the page and try again.');
+      alert('Failed to load shipment data due to a formatting error. Please refresh and try again.');
     }
   });
 })();
