@@ -1196,7 +1196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $actor = trim((string)($_SESSION['username'] ?? 'A team member'));
           $customer_name_val = trim((string)($check_row['customer_name'] ?? ''));
           $customer_bold = $customer_name_val !== '' ? ' for <strong>' . h($customer_name_val) . '</strong>' : '';
-          $msg = $actor . ' sent Quote #' . $row_id . $customer_bold . ' for approval.';
+          $msg = h($actor) . ' sent Quote #' . $row_id . $customer_bold . ' for approval.';
           quote_create_admin_approval_alerts($pdo, $row_id, 'quote', 'quotes.php?view=id&id=' . $row_id, $msg);
           $_SESSION['quotes_csrf'] = bin2hex(random_bytes(24));
           header('Location: quotes.php?view=all&approval_sent=1');

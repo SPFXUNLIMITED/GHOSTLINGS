@@ -141,7 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $actor = trim((string)($_SESSION['username'] ?? 'A team member'));
           $customer_name_val = trim((string)($check_row['customer_name'] ?? ''));
           $customer_bold = $customer_name_val !== '' ? ' for <strong>' . h($customer_name_val) . '</strong>' : '';
-          invoice_create_admin_approval_alerts($pdo, $inv_id, $actor . ' sent Invoice #' . $inv_id . $customer_bold . ' for approval.');
+          invoice_create_admin_approval_alerts($pdo, $inv_id, h($actor) . ' sent Invoice #' . $inv_id . $customer_bold . ' for approval.');
           header('Location: invoice_tracker.php?approval_sent=1');
           exit;
         }
