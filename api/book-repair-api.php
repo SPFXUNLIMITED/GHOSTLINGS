@@ -1,6 +1,6 @@
 <?php
 /**
- * api/book-repair.php – Public API endpoint for the customer booking system.
+ * api/book-repair-api.php – Public API endpoint for the customer booking system.
  * Accepts JSON or form-encoded POST data from the frontend website,
  * validates all fields, and inserts a new record into service_requests.
  *
@@ -209,7 +209,7 @@ try {
     http_response_code(201);
     echo json_encode(['success' => true, 'id' => $new_id]);
 } catch (\Throwable $ex) {
-    error_log('api/book-repair.php DB error: ' . $ex->getMessage());
+    error_log('api/book-repair-api.php DB error: ' . $ex->getMessage());
     http_response_code(500);
     echo json_encode(['success' => false, 'errors' => ['A database error occurred. Please try again.']]);
 }
