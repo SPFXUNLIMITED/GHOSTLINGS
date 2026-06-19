@@ -596,6 +596,7 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
       ['href' => 'sourcing_rfq_tracker.php', 'files' => ['sourcing_rfq_tracker.php', 'sourcing_rfq_submitted.php', 'sourcing_rfq_image.php'], 'label' => 'RFQs'],
       ['href' => 'order_tracker.php', 'file' => 'order_tracker.php', 'label' => 'POs'],
       ['href' => 'freight_quote_tracker.php', 'file' => 'freight_quote_tracker.php', 'label' => 'Freight Quotes'],
+      ['href' => 'freight_forwarders.php', 'file' => 'freight_forwarders.php', 'label' => 'Freight Forwarders'],
     ], $current); ?>
     <?php render_menu_dropdown('Quotes & Invoices', [
       ['href' => 'quotes.php', 'files' => ['quotes.php'], 'label' => 'Quotes'],
