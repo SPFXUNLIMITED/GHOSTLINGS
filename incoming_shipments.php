@@ -4,10 +4,6 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_login();
 
-if (session_status() !== PHP_SESSION_ACTIVE) {
-  session_start();
-}
-
 $default_incoming_shipments = [
   [
     'order_date' => '2026-06-16',
@@ -241,7 +237,7 @@ render_header('Incoming Shipments');
             </span>
           </td>
           <td class="incoming-actions">
-            <button type="button" class="btn incoming-edit-btn" data-shipment="<?= h((string)$shipment_json) ?>">Edit</button>
+            <button type="button" class="btn incoming-edit-btn" data-shipment="<?= (string)$shipment_json ?>">Edit</button>
           </td>
         </tr>
       <?php endforeach; ?>
