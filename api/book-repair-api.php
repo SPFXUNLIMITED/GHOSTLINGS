@@ -188,7 +188,7 @@ function split_name_parts(string $full_name): array {
 function count_jobs_on_date(PDO $pdo, string $date_str): int {
     $stmt = $pdo->prepare(
         "SELECT COUNT(*) FROM service_requests
-         WHERE DATE(created_at) = ?
+         WHERE scheduled_date = ?
            AND request_status NOT IN ('cancelled', 'completed')"
     );
     $stmt->execute([$date_str]);
