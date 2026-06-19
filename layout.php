@@ -489,8 +489,8 @@ function render_header(string $title): void {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title><?= h($title) ?></title>
   
-<link rel="icon" href="favicon.ico">
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
 
   <link rel="stylesheet" href="styles.css?v=<?= urlencode((string)filemtime(__DIR__ . '/styles.css')) ?>" />
 </head>
