@@ -73,6 +73,100 @@ function str_field(array $body, string $key): string {
     return trim((string)($body[$key] ?? ''));
 }
 
+function load_env_value(string $key): string {
+    static $dotenv_values = null;
+
+    if ($dotenv_values === null) {
+        $dotenv_values = [];
+        $dotenv_path = __DIR__ . '/../.env';
+        if (is_file($dotenv_path) && is_readable($dotenv_path)) {
+            $lines = file($dotenv_path, FILE_IGNORE_NEW_LINES);
+            if (is_array($lines)) {
+                foreach ($lines as $line) {
+                    $line = trim((string)$line);
+                    if ($line === '' || str_starts_with($line, '#')) {
+                        continue;
+                    }
+                    $sep = strpos($line, '=');
+                    if ($sep === false) {
+                        continue;
+                    }
+                    $name = trim(substr($line, 0, $sep));
+                    if ($name === '' || !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $name)) {
+                        continue;
+                    }
+                    $value = trim(substr($line, $sep + 1));
+                    if (strlen($value) >= 2) {
+                        $first = $value[0];
+                        $last  = $value[strlen($value) - 1];
+                        if ($first === '"' && $last === '"') {
+                            $value = substr($value, 1, -1);
+                            $value = strtr($value, ['\\\\' => '\\', '\\"' => '"', '\\n' => "\n", '\\r' => "\r", '\\t' => "\t"]);
+                        } elseif ($first === "'" && $last === "'") {
+                            $value = substr($value, 1, -1);
+                            $value = strtr($value, ['\\\\' => '\\', "\\'" => "'"]);
+                        }
+                    } else {
+                        $value = preg_replace('/\s+#.*$/', '', $value) ?? $value;
+                        $value = rtrim($value);
+                    }
+                    $dotenv_values[$name] = $value;
+                }
+            }
+        }
+    }
+
+    foreach ([getenv($key), getenv('REDIRECT_' . $key), $_ENV[$key] ?? null, $_SERVER[$key] ?? null, $_SERVER['REDIRECT_' . $key] ?? null, $dotenv_values[$key] ?? null] as $candidate) {
+        if ($candidate !== null && trim((string)$candidate) !== '') {
+            return trim((string)$candidate);
+        }
+    }
+    return '';
+}
+
+/**
+ * Calls the Google Maps Geocoding API and returns an array with:
+ *   ['lat' => float|null, 'lng' => float|null, 'status' => 'ok'|'failed']
+ */
+function geocode_address(string $full_address): array {
+    $api_key = load_env_value('GOOGLE_MAPS_API_KEY');
+    if ($api_key === '') {
+        return ['lat' => null, 'lng' => null, 'status' => 'failed'];
+    }
+
+    $url = 'https://maps.googleapis.com/maps/api/geocode/json?'
+         . http_build_query(['address' => $full_address, 'key' => $api_key]);
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 5,
+        CURLOPT_CONNECTTIMEOUT => 5,
+        CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $response = curl_exec($ch);
+    $curl_err = curl_errno($ch);
+    curl_close($ch);
+
+    if ($curl_err || $response === false) {
+        return ['lat' => null, 'lng' => null, 'status' => 'failed'];
+    }
+
+    $data = json_decode((string)$response, true);
+    if (!is_array($data) || ($data['status'] ?? '') !== 'OK' || empty($data['results'][0]['geometry']['location'])) {
+        error_log('api/book-repair-api.php geocode_address failed: status=' . ($data['status'] ?? 'invalid_json') . ' address=' . $full_address);
+        return ['lat' => null, 'lng' => null, 'status' => 'failed'];
+    }
+
+    $location = $data['results'][0]['geometry']['location'];
+    return [
+        'lat'    => (float)$location['lat'],
+        'lng'    => (float)$location['lng'],
+        'status' => 'ok',
+    ];
+}
+
 function split_name_parts(string $full_name): array {
     $full_name = trim($full_name);
     if ($full_name === '') {
@@ -311,17 +405,23 @@ try {
         $country
     );
 
+    // ── Geocode the service address ────────────────────────────────────────────
+    $full_address = implode(', ', array_filter([$street, $city, $state, $zip], fn($p) => $p !== ''));
+    $geo = $full_address !== '' ? geocode_address($full_address) : ['lat' => null, 'lng' => null, 'status' => 'failed'];
+
     $stmt = $pdo->prepare(
         "INSERT INTO service_requests
           (customer_id,
             laser_brand, laser_model, laser_watts, laser_age,
             problem_summary, problem_details,
-            priority_level, source, request_status)
+            priority_level, source, request_status,
+            latitude, longitude, geocode_status)
          VALUES
            (?,
             ?, ?, ?, ?,
             ?, ?,
-            ?, 'api', 'new')"
+            ?, 'api', 'new',
+            ?, ?, ?)"
     );
 
     $stmt->execute([
@@ -329,6 +429,7 @@ try {
         $machine_brand, $machine_model, $machine_watts ?: null, $machine_age ?: null,
         $problem_summary, $problem,
         $priority,
+        $geo['lat'], $geo['lng'], $geo['status'],
     ]);
 
     $new_id = (int) $pdo->lastInsertId();
