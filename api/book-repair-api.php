@@ -87,6 +87,24 @@ function split_name_parts(string $full_name): array {
     return [$first, $last];
 }
 
+function service_request_table_columns(PDO $pdo): array {
+    static $columns = null;
+    if (is_array($columns)) {
+        return $columns;
+    }
+
+    $columns = [];
+    $stmt = $pdo->query("SHOW COLUMNS FROM service_requests");
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $column) {
+        $field = (string)($column['Field'] ?? '');
+        if ($field !== '') {
+            $columns[$field] = true;
+        }
+    }
+
+    return $columns;
+}
+
 function resolve_customer_id(
     PDO $pdo,
     string $name,
@@ -311,25 +329,44 @@ try {
         $country
     );
 
-    $stmt = $pdo->prepare(
-        "INSERT INTO service_requests
-          (customer_id,
-            laser_brand, laser_model, laser_watts, laser_age,
-            problem_summary, problem_details,
-            priority_level, source, request_status)
-         VALUES
-           (?,
-            ?, ?, ?, ?,
-            ?, ?,
-            ?, 'api', 'new')"
-    );
+    $table_columns = service_request_table_columns($pdo);
+    $insert_values = ['customer_id' => $customer_id];
 
-    $stmt->execute([
-        $customer_id,
-        $machine_brand, $machine_model, $machine_watts ?: null, $machine_age ?: null,
-        $problem_summary, $problem,
-        $priority,
-    ]);
+    $assign_required = static function (array $candidates, $value, string $label) use (&$insert_values, $table_columns): void {
+        foreach ($candidates as $candidate) {
+            if (isset($table_columns[$candidate])) {
+                $insert_values[$candidate] = $value;
+                return;
+            }
+        }
+        throw new RuntimeException("Missing service_requests column for {$label}");
+    };
+
+    $assign_optional = static function (array $candidates, $value) use (&$insert_values, $table_columns): void {
+        foreach ($candidates as $candidate) {
+            if (isset($table_columns[$candidate])) {
+                $insert_values[$candidate] = $value;
+                return;
+            }
+        }
+    };
+
+    $assign_required(['machine_brand', 'laser_brand'], $machine_brand, 'machine brand');
+    $assign_required(['machine_model', 'laser_model'], $machine_model, 'machine model');
+    $assign_required(['machine_watts', 'laser_watts'], $machine_watts ?: null, 'machine watts');
+    $assign_required(['machine_age', 'laser_age'], $machine_age ?: null, 'machine age');
+    $assign_optional(['problem_summary'], $problem_summary);
+    $assign_required(['problem_details', 'problem_description', 'problem'], $problem, 'problem');
+    $assign_required(['priority_level', 'priority'], $priority, 'priority');
+    $assign_required(['source', 'request_source'], 'api', 'source');
+    $assign_required(['request_status', 'status'], 'new', 'request status');
+
+    $columns = array_keys($insert_values);
+    $placeholders = array_fill(0, count($columns), '?');
+    $stmt = $pdo->prepare(
+        'INSERT INTO service_requests (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')'
+    );
+    $stmt->execute(array_values($insert_values));
 
     $new_id = (int) $pdo->lastInsertId();
 
