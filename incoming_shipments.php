@@ -4,76 +4,6 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_login();
 
-$default_incoming_shipments = [
-  [
-    'id' => 'ship-1001',
-    'order_date' => '2026-06-16',
-    'expected_arrival' => '2026-06-21',
-    'carrier' => 'Amazon Logistics',
-    'tracking_number' => 'TBA781239104512',
-    'item_description' => 'CO₂ laser tube replacement kit',
-    'status' => 'In Transit',
-  ],
-  [
-    'id' => 'ship-1002',
-    'order_date' => '2026-06-14',
-    'expected_arrival' => '2026-06-24',
-    'carrier' => 'Alibaba Express',
-    'tracking_number' => 'ALI-620499321-US',
-    'item_description' => 'Linear rails and mounting brackets',
-    'status' => 'Ordered',
-  ],
-  [
-    'id' => 'ship-1003',
-    'order_date' => '2026-06-10',
-    'expected_arrival' => '2026-06-19',
-    'carrier' => 'UPS',
-    'tracking_number' => '1Z84Y2F90314566712',
-    'item_description' => 'Servo motor driver boards (x4)',
-    'status' => 'Delayed',
-  ],
-  [
-    'id' => 'ship-1004',
-    'order_date' => '2026-06-08',
-    'expected_arrival' => '2026-06-15',
-    'carrier' => 'DHL',
-    'tracking_number' => 'JD0146000058743210',
-    'item_description' => 'Fiber laser safety lenses and shields',
-    'status' => 'Received',
-  ],
-  [
-    'id' => 'ship-1005',
-    'order_date' => '2026-06-17',
-    'expected_arrival' => '2026-06-23',
-    'carrier' => 'FedEx',
-    'tracking_number' => '794813240159',
-    'item_description' => 'Cooling pump assembly',
-    'status' => 'In Transit',
-  ],
-];
-
-if (!isset($_SESSION['incoming_shipments']) || !is_array($_SESSION['incoming_shipments'])) {
-  $_SESSION['incoming_shipments'] = $default_incoming_shipments;
-}
-
-$session_shipments = [];
-foreach ($_SESSION['incoming_shipments'] as $idx => $shipment_row) {
-  $session_shipment_id = trim((string)($shipment_row['id'] ?? ''));
-  if ($session_shipment_id === '') {
-    $session_shipment_id = 'ship-' . ($idx + 1) . '-' . substr(bin2hex(random_bytes(6)), 0, 10);
-  }
-  $session_shipments[] = [
-    'id' => $session_shipment_id,
-    'order_date' => (string)($shipment_row['order_date'] ?? ''),
-    'expected_arrival' => (string)($shipment_row['expected_arrival'] ?? ''),
-    'carrier' => (string)($shipment_row['carrier'] ?? ''),
-    'tracking_number' => (string)($shipment_row['tracking_number'] ?? ''),
-    'item_description' => (string)($shipment_row['item_description'] ?? ''),
-    'status' => (string)($shipment_row['status'] ?? 'Ordered'),
-  ];
-}
-$_SESSION['incoming_shipments'] = $session_shipments;
-
 $status_options = ['Ordered', 'In Transit', 'Delayed', 'Received'];
 $status_colors = [
   'Ordered' => ['#e0f2fe', '#075985'],
@@ -84,6 +14,23 @@ $status_colors = [
 
 $incoming_errors = [];
 $incoming_success = '';
+
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS incoming_shipments (
+    id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    order_date       DATE NOT NULL,
+    expected_arrival DATE NOT NULL,
+    carrier          VARCHAR(120) NOT NULL,
+    tracking_number  VARCHAR(160) NOT NULL,
+    item_description TEXT NOT NULL,
+    status           VARCHAR(30) NOT NULL DEFAULT 'Ordered',
+    created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_incoming_shipments_expected_arrival (expected_arrival),
+    KEY idx_incoming_shipments_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = trim((string)($_POST['action'] ?? ''));
@@ -120,44 +67,89 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $incoming_errors[] = 'Expected Arrival must be a valid date.';
   }
 
-  if (empty($incoming_errors)) {
-    $shipment_payload = [
-      'id' => 'ship-' . substr(bin2hex(random_bytes(8)), 0, 14),
-      'order_date' => $order_date,
-      'expected_arrival' => $expected_arrival,
-      'carrier' => $carrier,
-      'tracking_number' => $tracking_number,
-      'item_description' => $item_description,
-      'status' => $status,
-    ];
+  if (strlen($carrier) > 120) {
+    $incoming_errors[] = 'Carrier is too long.';
+  }
+  if (strlen($tracking_number) > 160) {
+    $incoming_errors[] = 'Tracking Number is too long.';
+  }
+  if (strlen($item_description) > 65535) {
+    $incoming_errors[] = 'Item Description is too long.';
+  }
 
-    if ($action === 'edit_shipment') {
-      $edit_id = trim((string)($_POST['edit_id'] ?? ''));
-      if ($edit_id === '') {
-        $incoming_errors[] = 'Invalid shipment selected for edit.';
-      } else {
-        $edited = false;
-        foreach ($_SESSION['incoming_shipments'] as $shipment_idx => $existing_shipment) {
-          if ((string)($existing_shipment['id'] ?? '') === $edit_id) {
-            $shipment_payload['id'] = $edit_id;
-            $_SESSION['incoming_shipments'][$shipment_idx] = $shipment_payload;
-            $incoming_success = 'Incoming shipment updated.';
-            $edited = true;
-            break;
+  if (empty($incoming_errors)) {
+    try {
+      if ($action === 'edit_shipment') {
+        $edit_id_raw = trim((string)($_POST['edit_id'] ?? ''));
+        if ($edit_id_raw === '' || !ctype_digit($edit_id_raw)) {
+          $incoming_errors[] = 'Invalid shipment selected for edit.';
+        } else {
+          $edit_id = (int)$edit_id_raw;
+          if ($edit_id <= 0) {
+            $incoming_errors[] = 'Invalid shipment selected for edit.';
+          } else {
+            $stmt = $pdo->prepare(
+              "UPDATE incoming_shipments
+               SET order_date = :order_date,
+                   expected_arrival = :expected_arrival,
+                   carrier = :carrier,
+                   tracking_number = :tracking_number,
+                   item_description = :item_description,
+                   status = :status
+               WHERE id = :id"
+            );
+            $stmt->execute([
+              ':order_date' => $order_date,
+              ':expected_arrival' => $expected_arrival,
+              ':carrier' => $carrier,
+              ':tracking_number' => $tracking_number,
+              ':item_description' => $item_description,
+              ':status' => $status,
+              ':id' => $edit_id,
+            ]);
+
+            if ($stmt->rowCount() === 0) {
+              $exists_stmt = $pdo->prepare("SELECT id FROM incoming_shipments WHERE id = ? LIMIT 1");
+              $exists_stmt->execute([$edit_id]);
+              if ($exists_stmt->fetch() === false) {
+                $incoming_errors[] = 'Could not find shipment to edit.';
+              } else {
+                $incoming_success = 'Incoming shipment updated.';
+              }
+            } else {
+              $incoming_success = 'Incoming shipment updated.';
+            }
           }
         }
-        if (!$edited) {
-          $incoming_errors[] = 'Could not find shipment to edit.';
-        }
+      } else {
+        $stmt = $pdo->prepare(
+          "INSERT INTO incoming_shipments
+             (order_date, expected_arrival, carrier, tracking_number, item_description, status)
+           VALUES
+             (:order_date, :expected_arrival, :carrier, :tracking_number, :item_description, :status)"
+        );
+        $stmt->execute([
+          ':order_date' => $order_date,
+          ':expected_arrival' => $expected_arrival,
+          ':carrier' => $carrier,
+          ':tracking_number' => $tracking_number,
+          ':item_description' => $item_description,
+          ':status' => $status,
+        ]);
+        $incoming_success = 'Incoming shipment added.';
       }
-    } else {
-      array_unshift($_SESSION['incoming_shipments'], $shipment_payload);
-      $incoming_success = 'Incoming shipment added.';
+    } catch (Throwable $e) {
+      $incoming_errors[] = 'Unable to save shipment right now. Please try again.';
     }
   }
 }
 
-$incoming_shipments = array_values($_SESSION['incoming_shipments']);
+$incoming_shipments_stmt = $pdo->query(
+  "SELECT id, order_date, expected_arrival, carrier, tracking_number, item_description, status
+   FROM incoming_shipments
+   ORDER BY order_date DESC, id DESC"
+);
+$incoming_shipments = $incoming_shipments_stmt->fetchAll();
 
 $hero_total_incoming = count($incoming_shipments);
 $hero_in_transit = 0;
@@ -249,7 +241,7 @@ render_header('Incoming Shipments');
           $status = (string)($shipment['status'] ?? 'Ordered');
           [$bg, $fg] = $status_colors[$status] ?? ['#e5e7eb', '#374151'];
           $shipment_json = json_encode([
-            'id' => (string)($shipment['id'] ?? ''),
+            'id' => (int)($shipment['id'] ?? 0),
             'order_date' => (string)($shipment['order_date'] ?? ''),
             'expected_arrival' => (string)($shipment['expected_arrival'] ?? ''),
             'carrier' => (string)($shipment['carrier'] ?? ''),
@@ -259,11 +251,11 @@ render_header('Incoming Shipments');
           ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
         ?>
         <tr>
-          <td><?= h($shipment['order_date']) ?></td>
-          <td><?= h($shipment['expected_arrival']) ?></td>
-          <td><?= h($shipment['carrier']) ?></td>
-          <td><code><?= h($shipment['tracking_number']) ?></code></td>
-          <td style="max-width:340px; white-space:normal;"><?= h($shipment['item_description']) ?></td>
+          <td><?= h((string)$shipment['order_date']) ?></td>
+          <td><?= h((string)$shipment['expected_arrival']) ?></td>
+          <td><?= h((string)$shipment['carrier']) ?></td>
+          <td><code><?= h((string)$shipment['tracking_number']) ?></code></td>
+          <td style="max-width:340px; white-space:normal;"><?= h((string)$shipment['item_description']) ?></td>
           <td>
             <span style="display:inline-block; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:600; background:<?= h($bg) ?>; color:<?= h($fg) ?>;">
               <?= h($status) ?>
