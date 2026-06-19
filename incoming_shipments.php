@@ -6,6 +6,7 @@ require_login();
 
 $default_incoming_shipments = [
   [
+    'id' => 'ship-1001',
     'order_date' => '2026-06-16',
     'expected_arrival' => '2026-06-21',
     'carrier' => 'Amazon Logistics',
@@ -14,6 +15,7 @@ $default_incoming_shipments = [
     'status' => 'In Transit',
   ],
   [
+    'id' => 'ship-1002',
     'order_date' => '2026-06-14',
     'expected_arrival' => '2026-06-24',
     'carrier' => 'Alibaba Express',
@@ -22,6 +24,7 @@ $default_incoming_shipments = [
     'status' => 'Ordered',
   ],
   [
+    'id' => 'ship-1003',
     'order_date' => '2026-06-10',
     'expected_arrival' => '2026-06-19',
     'carrier' => 'UPS',
@@ -30,6 +33,7 @@ $default_incoming_shipments = [
     'status' => 'Delayed',
   ],
   [
+    'id' => 'ship-1004',
     'order_date' => '2026-06-08',
     'expected_arrival' => '2026-06-15',
     'carrier' => 'DHL',
@@ -38,6 +42,7 @@ $default_incoming_shipments = [
     'status' => 'Received',
   ],
   [
+    'id' => 'ship-1005',
     'order_date' => '2026-06-17',
     'expected_arrival' => '2026-06-23',
     'carrier' => 'FedEx',
@@ -50,6 +55,24 @@ $default_incoming_shipments = [
 if (!isset($_SESSION['incoming_shipments']) || !is_array($_SESSION['incoming_shipments'])) {
   $_SESSION['incoming_shipments'] = $default_incoming_shipments;
 }
+
+$session_shipments = [];
+foreach ($_SESSION['incoming_shipments'] as $idx => $shipment_row) {
+  $session_shipment_id = trim((string)($shipment_row['id'] ?? ''));
+  if ($session_shipment_id === '') {
+    $session_shipment_id = 'ship-' . ($idx + 1) . '-' . substr(bin2hex(random_bytes(6)), 0, 10);
+  }
+  $session_shipments[] = [
+    'id' => $session_shipment_id,
+    'order_date' => (string)($shipment_row['order_date'] ?? ''),
+    'expected_arrival' => (string)($shipment_row['expected_arrival'] ?? ''),
+    'carrier' => (string)($shipment_row['carrier'] ?? ''),
+    'tracking_number' => (string)($shipment_row['tracking_number'] ?? ''),
+    'item_description' => (string)($shipment_row['item_description'] ?? ''),
+    'status' => (string)($shipment_row['status'] ?? 'Ordered'),
+  ];
+}
+$_SESSION['incoming_shipments'] = $session_shipments;
 
 $status_options = ['Ordered', 'In Transit', 'Delayed', 'Received'];
 $status_colors = [
@@ -99,6 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   if (empty($incoming_errors)) {
     $shipment_payload = [
+      'id' => 'ship-' . substr(bin2hex(random_bytes(8)), 0, 14),
       'order_date' => $order_date,
       'expected_arrival' => $expected_arrival,
       'carrier' => $carrier,
@@ -108,17 +132,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ];
 
     if ($action === 'edit_shipment') {
-      $edit_index_raw = $_POST['edit_index'] ?? '';
-      if (is_string($edit_index_raw) && ctype_digit($edit_index_raw)) {
-        $edit_index = (int)$edit_index_raw;
-        if (isset($_SESSION['incoming_shipments'][$edit_index])) {
-          $_SESSION['incoming_shipments'][$edit_index] = $shipment_payload;
-          $incoming_success = 'Incoming shipment updated.';
-        } else {
+      $edit_id = trim((string)($_POST['edit_id'] ?? ''));
+      if ($edit_id === '') {
+        $incoming_errors[] = 'Invalid shipment selected for edit.';
+      } else {
+        $edited = false;
+        foreach ($_SESSION['incoming_shipments'] as $shipment_idx => $existing_shipment) {
+          if ((string)($existing_shipment['id'] ?? '') === $edit_id) {
+            $shipment_payload['id'] = $edit_id;
+            $_SESSION['incoming_shipments'][$shipment_idx] = $shipment_payload;
+            $incoming_success = 'Incoming shipment updated.';
+            $edited = true;
+            break;
+          }
+        }
+        if (!$edited) {
           $incoming_errors[] = 'Could not find shipment to edit.';
         }
-      } else {
-        $incoming_errors[] = 'Invalid shipment selected for edit.';
       }
     } else {
       array_unshift($_SESSION['incoming_shipments'], $shipment_payload);
@@ -165,7 +195,10 @@ render_header('Incoming Shipments');
   <div class="laser-rfq-hero-glow" aria-hidden="true"></div>
   <div class="page-header-body laser-rfq-hero-body">
     <span class="laser-rfq-hero-tag">🚚 Logistics Control Center</span>
-    <h1>Incoming Shipments <span class="laser-rfq-hero-count">(<?= (int)$hero_total_incoming ?>)</span></h1>
+    <h1>
+      Incoming Shipments
+      <span class="laser-rfq-hero-count" aria-label="Total incoming shipments: <?= (int)$hero_total_incoming ?>">(<?= (int)$hero_total_incoming ?>)</span>
+    </h1>
     <p class="muted">Track incoming packages, monitor delivery risks, and keep critical parts flowing into operations.</p>
     <ul class="laser-rfq-hero-pills" aria-label="Incoming shipment highlights">
       <li class="laser-rfq-hero-pill"><span aria-hidden="true">📦</span> Live inbound visibility</li>
@@ -211,12 +244,12 @@ render_header('Incoming Shipments');
       </tr>
     </thead>
     <tbody>
-      <?php foreach ($incoming_shipments as $index => $shipment): ?>
+      <?php foreach ($incoming_shipments as $shipment): ?>
         <?php
           $status = (string)($shipment['status'] ?? 'Ordered');
           [$bg, $fg] = $status_colors[$status] ?? ['#e5e7eb', '#374151'];
           $shipment_json = json_encode([
-            'index' => $index,
+            'id' => (string)($shipment['id'] ?? ''),
             'order_date' => (string)($shipment['order_date'] ?? ''),
             'expected_arrival' => (string)($shipment['expected_arrival'] ?? ''),
             'carrier' => (string)($shipment['carrier'] ?? ''),
@@ -256,7 +289,7 @@ render_header('Incoming Shipments');
     <form method="post" action="incoming_shipments.php" id="incoming-form">
       <div class="incoming-modal-body">
         <input type="hidden" name="action" id="incoming-action" value="add_shipment" />
-        <input type="hidden" name="edit_index" id="incoming-edit-index" value="" />
+        <input type="hidden" name="edit_id" id="incoming-edit-id" value="" />
 
         <div class="form-grid">
           <div>
@@ -380,7 +413,7 @@ render_header('Incoming Shipments');
   var title = document.getElementById('incoming-modal-title');
   var submitBtn = document.getElementById('incoming-modal-submit');
   var actionInput = document.getElementById('incoming-action');
-  var editIndexInput = document.getElementById('incoming-edit-index');
+  var editIdInput = document.getElementById('incoming-edit-id');
 
   var orderDateInput = document.getElementById('incoming-order-date');
   var expectedArrivalInput = document.getElementById('incoming-expected-arrival');
@@ -405,7 +438,7 @@ render_header('Incoming Shipments');
     title.textContent = 'Add Incoming Shipment';
     submitBtn.textContent = 'Save Shipment';
     actionInput.value = 'add_shipment';
-    editIndexInput.value = '';
+    editIdInput.value = '';
     statusInput.value = 'Ordered';
   }
 
@@ -413,7 +446,7 @@ render_header('Incoming Shipments');
     title.textContent = 'Edit Incoming Shipment';
     submitBtn.textContent = 'Update Shipment';
     actionInput.value = 'edit_shipment';
-    editIndexInput.value = shipment.index;
+    editIdInput.value = shipment.id || '';
     orderDateInput.value = shipment.order_date || '';
     expectedArrivalInput.value = shipment.expected_arrival || '';
     carrierInput.value = shipment.carrier || '';
@@ -448,7 +481,8 @@ render_header('Incoming Shipments');
       setFormForEdit(shipment);
       openModal();
     } catch (error) {
-      alert('Unable to load this shipment for editing. Please try again.');
+      console.error('Incoming shipment parse error:', error);
+      alert('The shipment data is invalid. Please refresh the page and try again.');
     }
   });
 })();
