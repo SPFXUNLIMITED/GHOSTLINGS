@@ -78,7 +78,7 @@ function load_env_value(string $key): string {
 
     if ($dotenv_values === null) {
         $dotenv_values = [];
-        $dotenv_path = __DIR__ . '/../.env';
+        $dotenv_path = dirname(__DIR__) . '/.env';
         if (is_file($dotenv_path) && is_readable($dotenv_path)) {
             $lines = file($dotenv_path, FILE_IGNORE_NEW_LINES);
             if (is_array($lines)) {
