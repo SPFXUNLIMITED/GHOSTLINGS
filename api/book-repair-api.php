@@ -477,9 +477,11 @@ try {
         )
     ");
     $suggested_dates = get_suggested_dates($priority, $pdo);
-    $reindexed_suggested_dates = array_values($suggested_dates);
-    $first_suggested_date = $reindexed_suggested_dates[0] ?? null;
-    $last_suggested_date = array_slice($reindexed_suggested_dates, -1)[0] ?? null;
+    $date_list = array_values($suggested_dates);
+    $first_suggested_date = $date_list[0] ?? null;
+    $last_suggested_date = $date_list !== []
+        ? $date_list[count($date_list) - 1]
+        : null;
 
     $stmt->execute([
         $customer_id,
