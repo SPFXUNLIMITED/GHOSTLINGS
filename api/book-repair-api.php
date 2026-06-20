@@ -476,11 +476,10 @@ try {
             ?, ?
         )
     ");
-
     $suggested_dates = get_suggested_dates($priority, $pdo);
-    $last_suggested_date = $suggested_dates !== []
-        ? $suggested_dates[array_key_last($suggested_dates)]
-        : null;
+    $suggested_dates = get_suggested_dates($priority, $pdo);
+    $first_suggested_date = $suggested_dates !== [] ? reset($suggested_dates) : null;
+    $last_suggested_date = $suggested_dates !== [] ? end($suggested_dates) : null;
 
     $stmt->execute([
         $customer_id,
@@ -494,7 +493,7 @@ try {
         $geo['lat'],
         $geo['lng'],
         $geo['status'],
-        $suggested_dates[0] ?? null,
+        $first_suggested_date,
         $last_suggested_date,
     ]);
 
