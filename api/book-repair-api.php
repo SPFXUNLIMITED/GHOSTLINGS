@@ -492,7 +492,7 @@ try {
         $geo['lng'],
         $geo['status'],
         $suggested_dates[0] ?? null,
-        $suggested_dates ? $suggested_dates[count($suggested_dates) - 1] : null,
+        $suggested_dates[count($suggested_dates) - 1] ?? null,
     ]);
 
     $new_id = (int) $pdo->lastInsertId();
