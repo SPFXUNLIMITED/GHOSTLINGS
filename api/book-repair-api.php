@@ -459,31 +459,44 @@ try {
         $country
     );
 
-    // ── Geocode the service address ────────────────────────────────────────────
-    $full_address = implode(', ', array_filter([$street, $city, $state, $zip], fn($p) => $p !== ''));
+    // Geocode the service address
+    $full_address = implode(', ', array_filter([$street, $city, $state, $zip, $country], fn($p) => $p !== ''));
     $geo = $full_address !== '' ? geocode_address($full_address) : ['lat' => null, 'lng' => null, 'status' => 'failed'];
 
-    $stmt = $pdo->prepare(
-        "INSERT INTO service_requests
-          (customer_id,
-            laser_brand, laser_model, laser_watts, laser_age,
-            problem_summary, problem_details,
-            priority_level, source, request_status,
-            latitude, longitude, geocode_status)
-         VALUES
-           (?,
-            ?, ?, ?, ?,
-            ?, ?,
-            ?, 'api', 'new',
-            ?, ?, ?)"
-    );
+    $stmt = $pdo->prepare("
+        INSERT INTO service_requests (
+            customer_id, laser_brand, laser_model, laser_watts, laser_age,
+            problem_summary, problem_details, priority_level, source,
+            request_status, latitude, longitude, geocode_status,
+            preferred_date_start, preferred_date_end
+        ) VALUES (
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, 'api',
+            'new', ?, ?, ?,
+            ?, ?
+        )
+    ");
+    $suggested_dates = get_suggested_dates($priority, $pdo);
+    $date_list = array_values($suggested_dates);
+    $first_suggested_date = $date_list[0] ?? null;
+    $last_suggested_date = $date_list !== []
+        ? $date_list[count($date_list) - 1]
+        : null;
 
     $stmt->execute([
         $customer_id,
-        $machine_brand, $machine_model, $machine_watts ?: null, $machine_age ?: null,
-        $problem_summary, $problem,
+        $machine_brand,
+        $machine_model,
+        $machine_watts ?: null,
+        $machine_age ?: null,
+        $problem_summary,
+        $problem,
         $priority,
-        $geo['lat'], $geo['lng'], $geo['status'],
+        $geo['lat'],
+        $geo['lng'],
+        $geo['status'],
+        $first_suggested_date,
+        $last_suggested_date,
     ]);
 
     $new_id = (int) $pdo->lastInsertId();
@@ -494,8 +507,6 @@ try {
     } catch (\Throwable $ex) {
         // Non-fatal
     }
-
-    $suggested_dates = get_suggested_dates($priority, $pdo);
 
     http_response_code(201);
     echo json_encode([
