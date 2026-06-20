@@ -478,8 +478,11 @@ try {
     ");
     $suggested_dates = get_suggested_dates($priority, $pdo);
     $suggested_dates = get_suggested_dates($priority, $pdo);
-    $first_suggested_date = $suggested_dates !== [] ? reset($suggested_dates) : null;
-    $last_suggested_date = $suggested_dates !== [] ? end($suggested_dates) : null;
+    $suggested_dates = get_suggested_dates($priority, $pdo);
+    $first_suggested_date = $ordered_suggested_dates[0] ?? null;
+    $last_suggested_date = $ordered_suggested_dates !== []
+        ? $ordered_suggested_dates[array_key_last($ordered_suggested_dates)]
+        : null;
 
     $stmt->execute([
         $customer_id,
