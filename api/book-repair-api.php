@@ -478,6 +478,9 @@ try {
     ");
 
     $suggested_dates = get_suggested_dates($priority, $pdo);
+    $last_suggested_date = $suggested_dates !== []
+        ? $suggested_dates[array_key_last($suggested_dates)]
+        : null;
 
     $stmt->execute([
         $customer_id,
@@ -492,7 +495,7 @@ try {
         $geo['lng'],
         $geo['status'],
         $suggested_dates[0] ?? null,
-        $suggested_dates[count($suggested_dates) - 1] ?? null,
+        $last_suggested_date,
     ]);
 
     $new_id = (int) $pdo->lastInsertId();
