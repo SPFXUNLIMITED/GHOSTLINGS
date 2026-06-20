@@ -459,43 +459,50 @@ try {
         $country
     );
 
-    // ── Geocode the service address ────────────────────────────────────────────
-    $full_address = implode(', ', array_filter([$street, $city, $state, $zip], fn($p) => $p !== ''));
+    // Geocode the service address
+    $full_address = implode(', ', array_filter([$street, $city, $state, $zip, $country], fn($p) => $p !== ''));
     $geo = $full_address !== '' ? geocode_address($full_address) : ['lat' => null, 'lng' => null, 'status' => 'failed'];
 
-    $stmt = $pdo->prepare(
-        "INSERT INTO service_requests
-          (customer_id,
-            laser_brand, laser_model, laser_watts, laser_age,
-            problem_summary, problem_details,
-            priority_level, source, request_status,
-            latitude, longitude, geocode_status)
-         VALUES
-           (?,
-            ?, ?, ?, ?,
-            ?, ?,
-            ?, 'api', 'new',
-            ?, ?, ?)"
-    );
+    $stmt = $pdo->prepare("
+        INSERT INTO service_requests (
+            customer_id, laser_brand, laser_model, laser_watts, laser_age,
+            problem_summary, problem_details, priority_level, source,
+            request_status, latitude, longitude, geocode_status,
+            preferred_date_start, preferred_date_end
+        ) VALUES (
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, 'api',
+            'new', ?, ?, ?,
+            ?, ?
+        )
+    ");
+
+    $suggested_dates = get_suggested_dates($priority, $pdo);
 
     $stmt->execute([
         $customer_id,
-        $machine_brand, $machine_model, $machine_watts ?: null, $machine_age ?: null,
-        $problem_summary, $problem,
+        $machine_brand,
+        $machine_model,
+        $machine_watts ?: null,
+        $machine_age ?: null,
+        $problem_summary,
+        $problem,
         $priority,
-        $geo['lat'], $geo['lng'], $geo['status'],
+        $geo['lat'],
+        $geo['lng'],
+        $geo['status'],
+        $suggested_dates[0] ?? null,
+        $suggested_dates ? $suggested_dates[count($suggested_dates) - 1] : null,
     ]);
 
     $new_id = (int) $pdo->lastInsertId();
 
-    // Log submission for rate limiting
+    // Log rate limit
     try {
         $pdo->prepare("INSERT INTO form_rate_limit (ip) VALUES (?)")->execute([$_api_ip]);
     } catch (\Throwable $ex) {
         // Non-fatal
     }
-
-    $suggested_dates = get_suggested_dates($priority, $pdo);
 
     http_response_code(201);
     echo json_encode([
