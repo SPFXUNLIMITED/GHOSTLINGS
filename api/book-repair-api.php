@@ -477,8 +477,7 @@ try {
         )
     ");
     $suggested_dates = get_suggested_dates($priority, $pdo);
-    $suggested_dates = get_suggested_dates($priority, $pdo);
-    $suggested_dates = get_suggested_dates($priority, $pdo);
+    $ordered_suggested_dates = array_values($suggested_dates);
     $first_suggested_date = $ordered_suggested_dates[0] ?? null;
     $last_suggested_date = $ordered_suggested_dates !== []
         ? $ordered_suggested_dates[array_key_last($ordered_suggested_dates)]
@@ -502,7 +501,7 @@ try {
 
     $new_id = (int) $pdo->lastInsertId();
 
-    // Log rate limit
+    // Log submission for rate limiting
     try {
         $pdo->prepare("INSERT INTO form_rate_limit (ip) VALUES (?)")->execute([$_api_ip]);
     } catch (\Throwable $ex) {
