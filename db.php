@@ -1266,7 +1266,8 @@ try {
 try {
   $pdo->exec("ALTER TABLE rfq_requests MODIFY COLUMN request_category ENUM('machine','parts','po') NOT NULL DEFAULT 'machine'");
 } catch (PDOException $e) {
-  if ($e->getCode() !== '42S02') {
+  // Ignore if table or column does not exist yet
+  if (!in_array($e->getCode(), ['42S02', '42S22'], true)) {
     throw $e;
   }
 }
