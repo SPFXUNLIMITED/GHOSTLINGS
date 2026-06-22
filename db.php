@@ -167,6 +167,43 @@ function app_decrypt_setting_value(?string $encoded): string {
   return $plaintext === false ? '' : (string)$plaintext;
 }
 
+// Ensure core tables exist before running any ALTER TABLE migrations on them
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS users (
+    id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    username      VARCHAR(100) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY idx_users_username (username)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS projects (
+    id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    name        VARCHAR(255) NOT NULL,
+    description TEXT NULL,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS tasks (
+    id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    project_id INT UNSIGNED NOT NULL,
+    title      VARCHAR(255) NOT NULL,
+    details    TEXT NULL,
+    status     ENUM('todo','doing','done') NOT NULL DEFAULT 'todo',
+    due_date   DATE NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_tasks_project_id (project_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 // Add playbook column to projects if it does not exist yet
 try {
   $pdo->exec("ALTER TABLE projects ADD COLUMN playbook TINYINT(1) NOT NULL DEFAULT 0");
@@ -537,7 +574,7 @@ $pdo->exec("
   CREATE TABLE IF NOT EXISTS rfq_requests (
     id                 INT UNSIGNED NOT NULL AUTO_INCREMENT,
     requested_by       INT UNSIGNED NOT NULL,
-    request_category   ENUM('machine','parts') NOT NULL DEFAULT 'machine',
+    request_category   ENUM('machine','parts','po') NOT NULL DEFAULT 'machine',
     request_title      VARCHAR(255) NOT NULL,
     machine_size       VARCHAR(100) NULL,
     laser_watts        VARCHAR(50)  NULL,
@@ -568,7 +605,7 @@ $pdo->exec("
 
 // Add RFQ request category and parts fields if they do not exist yet
 foreach ([
-  "ALTER TABLE rfq_requests ADD COLUMN request_category ENUM('machine','parts') NOT NULL DEFAULT 'machine' AFTER requested_by",
+  "ALTER TABLE rfq_requests ADD COLUMN request_category ENUM('machine','parts','po') NOT NULL DEFAULT 'machine' AFTER requested_by",
   "ALTER TABLE rfq_requests ADD COLUMN part_category VARCHAR(100) NULL AFTER tube_type",
   "ALTER TABLE rfq_requests ADD COLUMN part_specs TEXT NULL AFTER part_category",
 ] as $sql) {
@@ -1216,7 +1253,23 @@ foreach ([
 }
 
 // Widen po_shipping_method to VARCHAR(20) to support incoterm codes (DDP, FOB, CIF, EXW, DAP)
-$pdo->exec("ALTER TABLE rfq_requests MODIFY COLUMN po_shipping_method VARCHAR(20) NULL");
+try {
+  $pdo->exec("ALTER TABLE rfq_requests MODIFY COLUMN po_shipping_method VARCHAR(20) NULL");
+} catch (PDOException $e) {
+  // Ignore if table or column does not exist yet
+  if (!in_array($e->getCode(), ['42S02', '42S22'], true)) {
+    throw $e;
+  }
+}
+
+// Expand request_category ENUM to include 'po' on existing servers
+try {
+  $pdo->exec("ALTER TABLE rfq_requests MODIFY COLUMN request_category ENUM('machine','parts','po') NOT NULL DEFAULT 'machine'");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S02') {
+    throw $e;
+  }
+}
 
 // Create machine_inquiries table for CO2 laser machine purchase inquiries
 $pdo->exec("
