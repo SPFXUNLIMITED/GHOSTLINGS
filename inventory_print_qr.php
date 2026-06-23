@@ -20,7 +20,7 @@ if (!$item) {
   exit;
 }
 
-define('QR_SIZE_COMPACT_LABEL_PX', 164);
+define('QR_SIZE_COMPACT_LABEL_PX', 140);
 $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '&view=qr';
 ?><!DOCTYPE html>
 <html lang="en">
@@ -174,7 +174,7 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       var canvas = qrTarget.querySelector('canvas');
       if (canvas) {
         var qrPx = <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>;
-        var logoSize = Math.round(qrPx * 0.30);
+        var logoSize = Math.round(qrPx * 0.36);
         var pad = 4;
         var logo = new Image();
         logo.onload = function () {
