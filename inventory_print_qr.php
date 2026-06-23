@@ -203,8 +203,14 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
   </div>
 
   <script>
-    /* ── Rounded-rect helper ── */
-    function glRoundedRect(ctx, x, y, w, h, r) {
+    /* ── Appearance constants ── */
+    var DOT_RADIUS_FACTOR          = 0.42; /* data module circle radius as a fraction of cell size */
+    var FINDER_OUTER_RADIUS_FACTOR = 1.10; /* corner radius for outer 7×7 finder square           */
+    var FINDER_RING_RADIUS_FACTOR  = 0.80; /* corner radius for white 5×5 ring                    */
+    var FINDER_DOT_RADIUS_FACTOR   = 0.65; /* corner radius for inner 3×3 dark dot                */
+
+    /* ── Rounded-rect path helper ── */
+    function drawRoundedRect(ctx, x, y, w, h, r) {
       r = Math.min(r, w / 2, h / 2);
       ctx.beginPath();
       ctx.moveTo(x + r, y);
@@ -220,7 +226,7 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
     }
 
     /* ── Draw cute rounded QR on canvas ── */
-    function glDrawCuteQR(canvas, qrData, size) {
+    function drawRoundedQR(canvas, qrData, size) {
       var n    = qrData.getModuleCount();
       var cell = size / n;
       var ctx  = canvas.getContext('2d');
@@ -238,14 +244,14 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
         return false;
       }
 
-      /* Data modules → circles */
+      /* Data modules → filled circles */
       ctx.fillStyle = dark;
       for (var r = 0; r < n; r++) {
         for (var c = 0; c < n; c++) {
           if (isFinderZone(r, c)) continue;
           if (qrData.isDark(r, c)) {
             ctx.beginPath();
-            ctx.arc((c + 0.5) * cell, (r + 0.5) * cell, cell * 0.42, 0, Math.PI * 2);
+            ctx.arc((c + 0.5) * cell, (r + 0.5) * cell, cell * DOT_RADIUS_FACTOR, 0, Math.PI * 2);
             ctx.fill();
           }
         }
@@ -259,17 +265,17 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
 
         /* Outer rounded square */
         ctx.fillStyle = dark;
-        glRoundedRect(ctx, px, py, s, s, cell * 1.1);
+        drawRoundedRect(ctx, px, py, s, s, cell * FINDER_OUTER_RADIUS_FACTOR);
         ctx.fill();
 
         /* White ring */
         ctx.fillStyle = '#ffffff';
-        glRoundedRect(ctx, px + cell, py + cell, 5 * cell, 5 * cell, cell * 0.8);
+        drawRoundedRect(ctx, px + cell, py + cell, 5 * cell, 5 * cell, cell * FINDER_RING_RADIUS_FACTOR);
         ctx.fill();
 
         /* Inner dark dot */
         ctx.fillStyle = dark;
-        glRoundedRect(ctx, px + 2 * cell, py + 2 * cell, 3 * cell, 3 * cell, cell * 0.65);
+        drawRoundedRect(ctx, px + 2 * cell, py + 2 * cell, 3 * cell, 3 * cell, cell * FINDER_DOT_RADIUS_FACTOR);
         ctx.fill();
       }
 
@@ -289,7 +295,10 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       var SIZE = <?= (int)QR_SIZE_PX ?>;
       var url  = <?= json_encode($qr_url) ?>;
 
-      /* Generate QR data via hidden off-screen element */
+      /* Generate QR data via hidden off-screen element.
+         _oQRCode is an internal property of qrcodejs that exposes the module
+         matrix via getModuleCount() and isDark(). It is the only way to access
+         the raw QR data for custom rendering without a separate library. */
       var hiddenDiv = document.createElement('div');
       hiddenDiv.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden;';
       document.body.appendChild(hiddenDiv);
@@ -303,7 +312,7 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
         correctLevel: QRCode.CorrectLevel.H
       });
 
-      var qrData = qrInstance._oQRCode;
+      var qrData = qrInstance._oQRCode; /* see comment above */
       document.body.removeChild(hiddenDiv);
 
       if (!qrData) {
@@ -316,7 +325,7 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       canvas.width  = SIZE;
       canvas.height = SIZE;
       qrTarget.appendChild(canvas);
-      glDrawCuteQR(canvas, qrData, SIZE);
+      drawRoundedQR(canvas, qrData, SIZE);
     });
   </script>
 </body>
