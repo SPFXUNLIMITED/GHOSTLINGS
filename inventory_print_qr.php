@@ -20,7 +20,7 @@ if (!$item) {
   exit;
 }
 
-define('QR_SIZE_COMPACT_LABEL_PX', 128);
+define('QR_SIZE_COMPACT_LABEL_PX', 164);
 $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '&view=qr';
 ?><!DOCTYPE html>
 <html lang="en">
@@ -49,8 +49,8 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: flex-start;
-      gap: 2px;
+      justify-content: center;
+      gap: 3px;
       overflow: hidden;
       box-shadow: 0 2px 10px rgba(0,0,0,0.12);
     }
@@ -79,28 +79,22 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       margin: 0 auto;
     }
     .brand-text {
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 1px;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 2px;
       text-transform: uppercase;
-      color: #555;
+      color: #111;
       margin: 0;
-    }
-    .part-number {
-      width: 100%;
-      font-size: 13px;
-      font-weight: 800;
-      margin: 0;
-      line-height: 1.15;
-      word-break: break-word;
     }
     .item-name {
       width: 100%;
       font-size: 10px;
+      font-weight: 600;
       margin: 0;
       color: #333;
-      line-height: 1.15;
+      line-height: 1.2;
       word-break: break-word;
+      text-align: center;
     }
     .print-btn {
       margin-top: 12px;
@@ -145,11 +139,10 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
 </head>
 <body>
   <div class="label-container">
+    <div class="brand-text">Ghost Laser</div>
     <div class="qr-frame">
       <div id="qrcode"></div>
     </div>
-    <div class="brand-text">Ghost Laser</div>
-    <div class="part-number"><?= h((string)$item['part_number']) ?></div>
     <div class="item-name"><?= h((string)$item['item_name']) ?></div>
   </div>
   <button class="print-btn" onclick="window.print()">Print This Label</button>
@@ -181,7 +174,7 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       var canvas = qrTarget.querySelector('canvas');
       if (canvas) {
         var qrPx = <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>;
-        var logoSize = Math.round(qrPx * 0.20);
+        var logoSize = Math.round(qrPx * 0.30);
         var pad = 4;
         var logo = new Image();
         logo.onload = function () {
