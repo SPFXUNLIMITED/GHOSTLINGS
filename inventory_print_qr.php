@@ -20,6 +20,7 @@ if (!$item) {
   exit;
 }
 
+define('QR_SIZE_COMPACT_LABEL_PX', 176);
 $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '&view=1';
 ?><!DOCTYPE html>
 <html lang="en">
@@ -32,64 +33,94 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      padding: 20px;
+      padding: 12px;
       font-family: Arial, sans-serif;
       background: #f5f5f5;
       text-align: center;
     }
     .label-container {
-      max-width: 420px;
+      width: 2in;
+      height: 2in;
       margin: 0 auto;
       background: #fff;
       border: 1px solid #ddd;
-      border-radius: 10px;
-      padding: 20px;
+      border-radius: 8px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 4px;
+      overflow: hidden;
     }
     #qrcode {
-      width: 280px;
-      height: 280px;
-      margin: 0 auto 20px auto;
+      width: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>px;
+      height: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>px;
+      margin: 0 auto;
       display: flex;
       align-items: center;
       justify-content: center;
+      flex: 0 0 auto;
     }
     #qrcode img,
     #qrcode canvas {
-      width: 280px !important;
-      height: 280px !important;
+      width: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>px !important;
+      height: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>px !important;
       display: block;
       margin: 0 auto;
     }
     .part-number {
-      font-size: 34px;
+      width: 100%;
+      font-size: 15px;
       font-weight: 800;
-      margin: 0 0 10px 0;
-      line-height: 1.1;
+      margin: 0;
+      line-height: 1.15;
+      word-break: break-word;
     }
     .item-name {
-      font-size: 20px;
+      width: 100%;
+      font-size: 11px;
       margin: 0;
       color: #333;
+      line-height: 1.15;
+      word-break: break-word;
     }
     .print-btn {
-      margin-top: 20px;
+      margin-top: 12px;
       background: #000;
       color: #fff;
       border: none;
-      padding: 12px 24px;
-      font-size: 18px;
+      padding: 10px 16px;
+      font-size: 14px;
       cursor: pointer;
       border-radius: 6px;
       font-weight: 700;
     }
+    .print-help {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #555;
+      line-height: 1.3;
+    }
     @media print {
-      body { background: #fff; padding: 0; }
-      .print-btn { display: none; }
+      @page { size: 2in 2in; margin: 0; }
+      html, body {
+        width: 2in;
+        height: 2in;
+      }
+      body {
+        background: #fff;
+        padding: 0;
+      }
+      .print-btn,
+      .print-help { display: none; }
       .label-container {
         border: 0;
         border-radius: 0;
-        width: 100%;
-        max-width: none;
+        width: 2in;
+        height: 2in;
+        margin: 0;
+        padding: 8px;
       }
     }
   </style>
@@ -99,8 +130,9 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
     <div id="qrcode"></div>
     <div class="part-number"><?= h((string)$item['part_number']) ?></div>
     <div class="item-name"><?= h((string)$item['item_name']) ?></div>
-    <button class="print-btn" onclick="window.print()">Print This Label</button>
   </div>
+  <button class="print-btn" onclick="window.print()">Print This Label</button>
+  <div class="print-help">If sizing looks off, set print scale to 100% and margins to None in the print dialog.</div>
 
   <script>
     window.addEventListener('DOMContentLoaded', function () {
@@ -117,8 +149,8 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       qrTarget.innerHTML = '';
       new QRCode(qrTarget, {
         text: <?= json_encode($qr_url) ?>,
-        width: 280,
-        height: 280,
+        width: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>,
+        height: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>,
         colorDark: '#000000',
         colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.M
