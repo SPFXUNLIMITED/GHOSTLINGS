@@ -21,6 +21,7 @@ if (!$item) {
 }
 
 $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '&view=1';
+$qr_size = 176;
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -38,6 +39,7 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       text-align: center;
     }
     .label-container {
+      --qr-size: <?= (int)$qr_size ?>px;
       width: 2in;
       height: 2in;
       margin: 0 auto;
@@ -53,8 +55,8 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       overflow: hidden;
     }
     #qrcode {
-      width: 176px;
-      height: 176px;
+      width: var(--qr-size);
+      height: var(--qr-size);
       margin: 0 auto;
       display: flex;
       align-items: center;
@@ -63,8 +65,8 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
     }
     #qrcode img,
     #qrcode canvas {
-      width: 176px !important;
-      height: 176px !important;
+      width: var(--qr-size) !important;
+      height: var(--qr-size) !important;
       display: block;
       margin: 0 auto;
     }
@@ -131,7 +133,7 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
     <div class="item-name"><?= h((string)$item['item_name']) ?></div>
   </div>
   <button class="print-btn" onclick="window.print()">Print This Label</button>
-  <div class="print-help">For best 2×2 printing, use Chrome or Firefox at 100% scale.</div>
+  <div class="print-help">For best 2x2 printing, use Chrome or Firefox at 100% scale.</div>
 
   <script>
     window.addEventListener('DOMContentLoaded', function () {
@@ -148,8 +150,8 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       qrTarget.innerHTML = '';
       new QRCode(qrTarget, {
         text: <?= json_encode($qr_url) ?>,
-        width: 176,
-        height: 176,
+        width: <?= (int)$qr_size ?>,
+        height: <?= (int)$qr_size ?>,
         colorDark: '#000000',
         colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.M
