@@ -70,15 +70,15 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
     }
     .part-number {
       width: 100%;
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 800;
       margin: 0;
-      line-height: 1.05;
+      line-height: 1.15;
       word-break: break-word;
     }
     .item-name {
       width: 100%;
-      font-size: 11px;
+      font-size: 10px;
       margin: 0;
       color: #333;
       line-height: 1.15;
