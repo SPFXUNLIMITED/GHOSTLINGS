@@ -85,14 +85,14 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       left: 50%;
       transform: translate(-50%, -50%);
       background: #fff;
-      padding: 3px;
+      padding: 2px;
       line-height: 0;
-      border-radius: 2px;
+      border-radius: 4px;
       pointer-events: none;
     }
     .qr-ghost-overlay img {
-      width: 36px !important;
-      height: 36px !important;
+      width: 18px !important;
+      height: 18px !important;
       display: block !important;
       margin: 0 !important;
     }
