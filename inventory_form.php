@@ -248,6 +248,7 @@ function normalize_optional_url(string $raw, string $label, array &$errors): str
 $id = (int)($_GET['id'] ?? 0);
 $is_edit = $id > 0;
 $is_view = $is_edit && (string)($_GET['view'] ?? '') === '1';
+$is_qr   = $is_edit && (string)($_GET['view'] ?? '') === 'qr';
 $categories = ['Machine', 'Part', 'Consumable'];
 $max_image_bytes = 5 * 1024 * 1024;
 $allowed_image_exts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
@@ -316,6 +317,108 @@ if ($is_edit) {
   $image_original_name = $existing['image_original_name'] ?? null;
   $image_stored_name = $existing['image_stored_name'] ?? null;
   $image_mime_type = $existing['image_mime_type'] ?? null;
+}
+
+if ($is_qr) {
+  $qr_image_url = $image_stored_name ? 'uploads/inventory/' . rawurlencode((string)$image_stored_name) : '';
+  $qr_name      = $fields['item_name'];
+  $qr_price     = $fields['retail_price'];
+  $qr_price_fmt = ($qr_price !== '' && is_numeric($qr_price))
+    ? '$' . number_format((float)$qr_price, 2)
+    : null;
+?><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title><?= h($qr_name) ?></title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: #0f172a;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #f8fafc;
+      overflow: hidden;
+    }
+    .qr-card {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      height: 100vh;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    .qr-photo {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
+      background: #1e293b;
+    }
+    .qr-photo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .qr-photo-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #475569;
+      font-size: 4rem;
+    }
+    .qr-info {
+      flex: 0 0 auto;
+      padding: 20px 20px 28px;
+      background: #0f172a;
+      border-top: 1px solid #1e293b;
+    }
+    .qr-item-name {
+      font-size: 1.25rem;
+      font-weight: 600;
+      line-height: 1.3;
+      color: #e2e8f0;
+      margin-bottom: 10px;
+    }
+    .qr-price {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: #34d399;
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+    .qr-price-unavailable {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+  <div class="qr-card">
+    <div class="qr-photo">
+      <?php if ($qr_image_url !== ''): ?>
+        <img src="<?= h($qr_image_url) ?>" alt="<?= h($qr_name) ?>">
+      <?php else: ?>
+        <div class="qr-photo-placeholder">📦</div>
+      <?php endif; ?>
+    </div>
+    <div class="qr-info">
+      <div class="qr-item-name"><?= h($qr_name) ?></div>
+      <?php if ($qr_price_fmt !== null): ?>
+        <div class="qr-price"><?= h($qr_price_fmt) ?></div>
+      <?php else: ?>
+        <div class="qr-price-unavailable">Price not set</div>
+      <?php endif; ?>
+    </div>
+  </div>
+</body>
+</html>
+<?php
+  exit;
 }
 
 if ($is_edit && (string)($_GET['delete_error'] ?? '') === 'image') {
