@@ -70,6 +70,7 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       align-items: center;
       justify-content: center;
       flex: 0 0 auto;
+      position: relative;
     }
     #qrcode img,
     #qrcode canvas {
@@ -77,6 +78,23 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       height: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>px !important;
       display: block;
       margin: 0 auto;
+    }
+    .qr-ghost-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #fff;
+      padding: 3px;
+      line-height: 0;
+      border-radius: 2px;
+      pointer-events: none;
+    }
+    .qr-ghost-overlay img {
+      width: 36px !important;
+      height: 36px !important;
+      display: block !important;
+      margin: 0 !important;
     }
     .brand-text {
       font-size: 11px;
@@ -170,23 +188,14 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
         correctLevel: QRCode.CorrectLevel.H
       });
 
-      // Overlay ghost logo in center of QR canvas
-      var canvas = qrTarget.querySelector('canvas');
-      if (canvas) {
-        var qrPx = <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>;
-        var logoSize = Math.round(qrPx * 0.36);
-        var pad = 4;
-        var logo = new Image();
-        logo.onload = function () {
-          var ctx = canvas.getContext('2d');
-          var bx = Math.round((canvas.width  - logoSize - pad * 2) / 2);
-          var by = Math.round((canvas.height - logoSize - pad * 2) / 2);
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(bx, by, logoSize + pad * 2, logoSize + pad * 2);
-          ctx.drawImage(logo, bx + pad, by + pad, logoSize, logoSize);
-        };
-        logo.src = '/project/favicon-32x32.png.png';
-      }
+      // Place ghost logo as a CSS-positioned overlay so it always appears centered
+      var overlay = document.createElement('div');
+      overlay.className = 'qr-ghost-overlay';
+      var ghostImg = document.createElement('img');
+      ghostImg.src = '/project/favicon-32x32.png.png';
+      ghostImg.alt = 'Ghost Laser';
+      overlay.appendChild(ghostImg);
+      qrTarget.appendChild(overlay);
     });
   </script>
 </body>
