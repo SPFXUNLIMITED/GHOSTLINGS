@@ -344,8 +344,8 @@ if ($is_qr) {
     .qr-card {
       display: flex;
       flex-direction: column;
+      height: 100vh; /* fallback for browsers without dvh support */
       height: 100dvh;
-      height: 100vh;
       max-width: 480px;
       margin: 0 auto;
     }
