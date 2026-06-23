@@ -20,7 +20,7 @@ if (!$item) {
   exit;
 }
 
-define('QR_SIZE_2X2_LABEL', 176);
+define('QR_SIZE_COMPACT_LABEL_PX', 176);
 $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '&view=1';
 ?><!DOCTYPE html>
 <html lang="en">
@@ -39,7 +39,6 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       text-align: center;
     }
     .label-container {
-      --qr-size: <?= (int)QR_SIZE_2X2_LABEL ?>px;
       width: 2in;
       height: 2in;
       margin: 0 auto;
@@ -55,8 +54,8 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       overflow: hidden;
     }
     #qrcode {
-      width: var(--qr-size);
-      height: var(--qr-size);
+      width: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>px;
+      height: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>px;
       margin: 0 auto;
       display: flex;
       align-items: center;
@@ -65,8 +64,8 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
     }
     #qrcode img,
     #qrcode canvas {
-      width: var(--qr-size) !important;
-      height: var(--qr-size) !important;
+      width: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>px !important;
+      height: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>px !important;
       display: block;
       margin: 0 auto;
     }
@@ -133,7 +132,7 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
     <div class="item-name"><?= h((string)$item['item_name']) ?></div>
   </div>
   <button class="print-btn" onclick="window.print()">Print This Label</button>
-  <div class="print-help">If the label scaling looks off, print at 100% scale or try another browser.</div>
+  <div class="print-help">If sizing looks off, set print scale to 100% and margins to None in the print dialog.</div>
 
   <script>
     window.addEventListener('DOMContentLoaded', function () {
@@ -150,8 +149,8 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       qrTarget.innerHTML = '';
       new QRCode(qrTarget, {
         text: <?= json_encode($qr_url) ?>,
-        width: <?= (int)QR_SIZE_2X2_LABEL ?>,
-        height: <?= (int)QR_SIZE_2X2_LABEL ?>,
+        width: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>,
+        height: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>,
         colorDark: '#000000',
         colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.M
