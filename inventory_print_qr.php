@@ -21,7 +21,7 @@ if (!$item) {
 }
 
 define('QR_SIZE_COMPACT_LABEL_PX', 176);
-$qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '&view=1';
+$qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '&view=qr';
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
