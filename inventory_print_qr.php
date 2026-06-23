@@ -153,8 +153,26 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
         height: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>,
         colorDark: '#000000',
         colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.M
+        correctLevel: QRCode.CorrectLevel.H
       });
+
+      // Overlay ghost logo in center of QR canvas
+      var canvas = qrTarget.querySelector('canvas');
+      if (canvas) {
+        var qrPx = <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>;
+        var logoSize = Math.round(qrPx * 0.20);
+        var pad = 4;
+        var logo = new Image();
+        logo.onload = function () {
+          var ctx = canvas.getContext('2d');
+          var bx = Math.round((canvas.width  - logoSize - pad * 2) / 2);
+          var by = Math.round((canvas.height - logoSize - pad * 2) / 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(bx, by, logoSize + pad * 2, logoSize + pad * 2);
+          ctx.drawImage(logo, bx + pad, by + pad, logoSize, logoSize);
+        };
+        logo.src = '/project/favicon-32x32.png.png';
+      }
     });
   </script>
 </body>
