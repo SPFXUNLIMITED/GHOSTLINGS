@@ -21,7 +21,7 @@ if (!$item) {
 }
 
 $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '&view=1';
-$qr_size = 176;
+define('QR_SIZE_2X2_LABEL', 176);
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -39,7 +39,7 @@ $qr_size = 176;
       text-align: center;
     }
     .label-container {
-      --qr-size: <?= (int)$qr_size ?>px;
+      --qr-size: <?= (int)QR_SIZE_2X2_LABEL ?>px;
       width: 2in;
       height: 2in;
       margin: 0 auto;
@@ -150,8 +150,8 @@ $qr_size = 176;
       qrTarget.innerHTML = '';
       new QRCode(qrTarget, {
         text: <?= json_encode($qr_url) ?>,
-        width: <?= (int)$qr_size ?>,
-        height: <?= (int)$qr_size ?>,
+        width: <?= (int)QR_SIZE_2X2_LABEL ?>,
+        height: <?= (int)QR_SIZE_2X2_LABEL ?>,
         colorDark: '#000000',
         colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.M
