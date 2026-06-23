@@ -20,7 +20,8 @@ if (!$item) {
   exit;
 }
 
-define('QR_SIZE_COMPACT_LABEL_PX', 140);
+define('QR_SIZE_PX', 128);
+define('GHOST_OVERLAY_PX', 24);
 $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '&view=qr';
 ?><!DOCTYPE html>
 <html lang="en">
@@ -28,174 +29,178 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QR Label – <?= h((string)$item['part_number']) ?></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap" rel="stylesheet">
   <script src="js/qrcode.min.js"></script>
   <style>
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      margin: 0;
-      padding: 12px;
-      font-family: Arial, sans-serif;
-      background: #f5f5f5;
-      text-align: center;
-    }
-    .label-container {
-      width: 2in;
-      height: 2in;
-      margin: 0 auto;
-      background: #fff;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      padding: 6px;
+      background: #ececec;
+      font-family: 'Nunito', Arial, sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      gap: 3px;
-      overflow: hidden;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+      padding: 24px 16px 20px;
+      min-height: 100vh;
     }
-    .qr-frame {
-      border: 1.5px solid #d0d0d0;
-      border-radius: 6px;
-      padding: 2px;
+
+    /* ── 2×2 inch label ── */
+    .label {
+      width: 2in;
+      height: 2in;
       background: #fff;
-      line-height: 0;
-      flex: 0 0 auto;
-    }
-    #qrcode {
-      width: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>px;
-      height: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>px;
-      margin: 0 auto;
+      border-radius: 10px;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.15);
       display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 6px 8px;
+      overflow: hidden;
+    }
+
+    /* Brand header */
+    .brand {
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+      color: #1a1a2e;
+      line-height: 1;
+    }
+
+    /* QR wrapper */
+    .qr-wrap {
+      position: relative;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
-      flex: 0 0 auto;
-      position: relative;
+      flex: 1 1 auto;
     }
+
     #qrcode img,
     #qrcode canvas {
-      width: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>px !important;
-      height: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>px !important;
+      width: <?= (int)QR_SIZE_PX ?>px !important;
+      height: <?= (int)QR_SIZE_PX ?>px !important;
       display: block;
-      margin: 0 auto;
     }
-    .qr-ghost-overlay {
+
+    /* Ghost logo centered on QR */
+    .ghost-overlay {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
       background: #fff;
+      border-radius: 3px;
       padding: 2px;
       line-height: 0;
-      border-radius: 2px;
       pointer-events: none;
     }
-    .qr-ghost-overlay img {
-      width: 18px !important;
-      height: 18px !important;
+
+    .ghost-overlay img {
+      width: <?= (int)GHOST_OVERLAY_PX ?>px !important;
+      height: <?= (int)GHOST_OVERLAY_PX ?>px !important;
       display: block !important;
-      margin: 0 !important;
     }
-    .brand-text {
-      font-size: 11px;
-      font-weight: 900;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: #111;
-      margin: 0;
-    }
+
+    /* Item name footer */
     .item-name {
-      width: 100%;
-      font-size: 10px;
-      font-weight: 600;
-      margin: 0;
+      font-size: 9.5px;
+      font-weight: 700;
       color: #333;
-      line-height: 1.2;
-      word-break: break-word;
       text-align: center;
+      line-height: 1.25;
+      word-break: break-word;
+      width: 100%;
+      max-height: 30px;
+      overflow: hidden;
     }
+
+    /* ── Controls (hidden on print) ── */
+    .controls {
+      margin-top: 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
     .print-btn {
-      margin-top: 12px;
-      background: #000;
+      background: #1a1a2e;
       color: #fff;
       border: none;
-      padding: 10px 16px;
+      padding: 10px 22px;
       font-size: 14px;
-      cursor: pointer;
-      border-radius: 6px;
       font-weight: 700;
+      font-family: 'Nunito', Arial, sans-serif;
+      border-radius: 8px;
+      cursor: pointer;
+      letter-spacing: 0.5px;
     }
-    .print-help {
-      margin-top: 8px;
+
+    .print-btn:hover { background: #2d2d6b; }
+
+    .print-hint {
       font-size: 11px;
-      color: #555;
-      line-height: 1.3;
+      color: #777;
+      text-align: center;
+      line-height: 1.4;
     }
+
+    /* ── Print styles ── */
     @media print {
       @page { size: 2in 2in; margin: 0; }
-      html, body {
-        width: 2in;
-        height: 2in;
-      }
-      body {
-        background: #fff;
-        padding: 0;
-      }
-      .print-btn,
-      .print-help { display: none; }
-      .label-container {
-        border: 0;
+      html, body { width: 2in; height: 2in; background: #fff; padding: 0; }
+      .controls { display: none; }
+      .label {
         border-radius: 0;
         box-shadow: none;
         width: 2in;
         height: 2in;
-        margin: 0;
-        padding: 8px;
+        padding: 7px 6px 8px;
       }
     }
   </style>
 </head>
 <body>
-  <div class="label-container">
-    <div class="brand-text">Ghost Laser</div>
-    <div class="qr-frame">
+
+  <div class="label">
+    <div class="brand">Ghost Laser</div>
+
+    <div class="qr-wrap">
       <div id="qrcode"></div>
+      <div class="ghost-overlay">
+        <img src="/project/ghost-logo2-32x32.png" alt="Ghost Laser">
+      </div>
     </div>
+
     <div class="item-name"><?= h((string)$item['item_name']) ?></div>
   </div>
-  <button class="print-btn" onclick="window.print()">Print This Label</button>
-  <div class="print-help">If sizing looks off, set print scale to 100% and margins to None in the print dialog.</div>
+
+  <div class="controls">
+    <button class="print-btn" onclick="window.print()">🖨️ Print Label</button>
+    <div class="print-hint">Set scale to 100% and margins to None in the print dialog.</div>
+  </div>
 
   <script>
     window.addEventListener('DOMContentLoaded', function () {
       var qrTarget = document.getElementById('qrcode');
-      if (!qrTarget) {
+      if (!qrTarget || typeof QRCode === 'undefined') {
+        if (qrTarget) qrTarget.textContent = 'QR library unavailable.';
         return;
       }
 
-      if (typeof QRCode === 'undefined') {
-        qrTarget.textContent = 'Unable to load QR code.';
-        return;
-      }
-
-      qrTarget.innerHTML = '';
       new QRCode(qrTarget, {
         text: <?= json_encode($qr_url) ?>,
-        width: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>,
-        height: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>,
-        colorDark: '#000000',
+        width: <?= (int)QR_SIZE_PX ?>,
+        height: <?= (int)QR_SIZE_PX ?>,
+        colorDark:  '#000000',
         colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.H
       });
-
-      // Place ghost logo as a CSS-positioned overlay so it always appears centered
-      var overlay = document.createElement('div');
-      overlay.className = 'qr-ghost-overlay';
-      var ghostImg = document.createElement('img');
-      ghostImg.src = '/project/ghost-logo2-32x32.png';
-      ghostImg.alt = 'Ghost Laser';
-      overlay.appendChild(ghostImg);
-      qrTarget.appendChild(overlay);
     });
   </script>
 </body>
