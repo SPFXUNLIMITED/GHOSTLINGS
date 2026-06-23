@@ -39,7 +39,7 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
     }
     .label-container {
       width: 2in;
-      min-height: 2in;
+      height: 2in;
       margin: 0 auto;
       background: #fff;
       border: 1px solid #ddd;
@@ -95,6 +95,12 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       border-radius: 6px;
       font-weight: 700;
     }
+    .print-help {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #555;
+      line-height: 1.3;
+    }
     @media print {
       @page { size: 2in 2in; margin: 0; }
       html, body {
@@ -105,12 +111,13 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
         background: #fff;
         padding: 0;
       }
-      .print-btn { display: none; }
+      .print-btn,
+      .print-help { display: none; }
       .label-container {
         border: 0;
         border-radius: 0;
         width: 2in;
-        min-height: 2in;
+        height: 2in;
         margin: 0;
         padding: 8px;
       }
@@ -122,8 +129,9 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
     <div id="qrcode"></div>
     <div class="part-number"><?= h((string)$item['part_number']) ?></div>
     <div class="item-name"><?= h((string)$item['item_name']) ?></div>
-    <button class="print-btn" onclick="window.print()">Print This Label</button>
   </div>
+  <button class="print-btn" onclick="window.print()">Print This Label</button>
+  <div class="print-help">For best 2×2 printing, use Chrome or Firefox at 100% scale.</div>
 
   <script>
     window.addEventListener('DOMContentLoaded', function () {
