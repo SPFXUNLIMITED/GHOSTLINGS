@@ -20,8 +20,8 @@ if (!$item) {
   exit;
 }
 
-$qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '&view=1';
 define('QR_SIZE_2X2_LABEL', 176);
+$qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '&view=1';
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -133,7 +133,7 @@ define('QR_SIZE_2X2_LABEL', 176);
     <div class="item-name"><?= h((string)$item['item_name']) ?></div>
   </div>
   <button class="print-btn" onclick="window.print()">Print This Label</button>
-  <div class="print-help">For best 2x2 printing, use Chrome or Firefox at 100% scale.</div>
+  <div class="print-help">If the label scaling looks off, print at 100% scale or try another browser.</div>
 
   <script>
     window.addEventListener('DOMContentLoaded', function () {
