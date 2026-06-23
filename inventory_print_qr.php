@@ -20,7 +20,7 @@ if (!$item) {
   exit;
 }
 
-define('QR_SIZE_COMPACT_LABEL_PX', 176);
+define('QR_SIZE_COMPACT_LABEL_PX', 128);
 $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '&view=1';
 ?><!DOCTYPE html>
 <html lang="en">
@@ -45,13 +45,22 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       background: #fff;
       border: 1px solid #ddd;
       border-radius: 8px;
-      padding: 8px;
+      padding: 6px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      gap: 4px;
+      gap: 2px;
       overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+    }
+    .qr-frame {
+      border: 1.5px solid #d0d0d0;
+      border-radius: 6px;
+      padding: 2px;
+      background: #fff;
+      line-height: 0;
+      flex: 0 0 auto;
     }
     #qrcode {
       width: <?= (int)QR_SIZE_COMPACT_LABEL_PX ?>px;
@@ -69,9 +78,17 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       display: block;
       margin: 0 auto;
     }
+    .brand-text {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #555;
+      margin: 0;
+    }
     .part-number {
       width: 100%;
-      font-size: 15px;
+      font-size: 13px;
       font-weight: 800;
       margin: 0;
       line-height: 1.15;
@@ -79,7 +96,7 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
     }
     .item-name {
       width: 100%;
-      font-size: 11px;
+      font-size: 10px;
       margin: 0;
       color: #333;
       line-height: 1.15;
@@ -117,6 +134,7 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       .label-container {
         border: 0;
         border-radius: 0;
+        box-shadow: none;
         width: 2in;
         height: 2in;
         margin: 0;
@@ -127,7 +145,10 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
 </head>
 <body>
   <div class="label-container">
-    <div id="qrcode"></div>
+    <div class="qr-frame">
+      <div id="qrcode"></div>
+    </div>
+    <div class="brand-text">Ghost Laser</div>
     <div class="part-number"><?= h((string)$item['part_number']) ?></div>
     <div class="item-name"><?= h((string)$item['item_name']) ?></div>
   </div>
