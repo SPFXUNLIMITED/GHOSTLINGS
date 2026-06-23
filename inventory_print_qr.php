@@ -192,7 +192,7 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       var overlay = document.createElement('div');
       overlay.className = 'qr-ghost-overlay';
       var ghostImg = document.createElement('img');
-      ghostImg.src = '/project/favicon-32x32.png.png';
+      ghostImg.src = '/project/ghost-logo2-32x32.png';
       ghostImg.alt = 'Ghost Laser';
       overlay.appendChild(ghostImg);
       qrTarget.appendChild(overlay);
