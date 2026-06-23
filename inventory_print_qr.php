@@ -53,8 +53,8 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       overflow: hidden;
     }
     #qrcode {
-      width: 180px;
-      height: 180px;
+      width: 176px;
+      height: 176px;
       margin: 0 auto;
       display: flex;
       align-items: center;
@@ -63,14 +63,14 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
     }
     #qrcode img,
     #qrcode canvas {
-      width: 180px !important;
-      height: 180px !important;
+      width: 176px !important;
+      height: 176px !important;
       display: block;
       margin: 0 auto;
     }
     .part-number {
       width: 100%;
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 800;
       margin: 0;
       line-height: 1.15;
@@ -78,7 +78,7 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
     }
     .item-name {
       width: 100%;
-      font-size: 10px;
+      font-size: 11px;
       margin: 0;
       color: #333;
       line-height: 1.15;
@@ -140,8 +140,8 @@ $qr_url = 'https://ghostlaser.com/project/inventory_form.php?id=' . (int)$id . '
       qrTarget.innerHTML = '';
       new QRCode(qrTarget, {
         text: <?= json_encode($qr_url) ?>,
-        width: 180,
-        height: 180,
+        width: 176,
+        height: 176,
         colorDark: '#000000',
         colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.M
