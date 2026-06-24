@@ -2106,11 +2106,10 @@ render_header('Quotes');
           </thead>
           <tbody id="laborItemsBody">
             <tr class="labor-row">
-              <td style="position:relative;">
+              <td>
                 <input type="text" class="item-desc labor-desc" name="item_desc[]" maxlength="500" value="" autocomplete="off" placeholder="Search labor / service…" />
                 <input type="hidden" name="item_markup[]" value="0" />
                 <input type="hidden" name="item_price[]" class="labor-price" value="0.00" />
-                <div class="item-suggestions" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:50; background:#fff; border:1px solid #d1d5db; border-radius:10px; box-shadow:0 12px 24px rgba(2,6,23,.12); margin-top:4px; max-height:200px; overflow:auto;"></div>
               </td>
               <td><input type="number" step="0.01" min="0.01" class="labor-qty" name="item_qty[]" value="1" /></td>
               <td><input type="number" step="0.01" min="0" class="labor-cost" name="item_cost[]" value="0.00" /></td>
@@ -2150,9 +2149,8 @@ render_header('Quotes');
           <tbody id="inventoryItemsBody">
             <?php foreach ($line_items as $row): ?>
               <tr class="inv-row">
-                <td style="position:relative;">
+                <td>
                   <input type="text" class="item-desc inv-desc" name="item_desc[]" maxlength="500" value="<?= h((string)$row['description']) ?>" autocomplete="off" placeholder="Search inventory / part…" />
-                  <div class="item-suggestions" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:50; background:#fff; border:1px solid #d1d5db; border-radius:10px; box-shadow:0 12px 24px rgba(2,6,23,.12); margin-top:4px; max-height:200px; overflow:auto;"></div>
                 </td>
                 <td><input type="number" step="0.01" min="0.01" class="inv-qty" name="item_qty[]" value="<?= h((string)$row['quantity']) ?>" /></td>
                 <td><input type="number" step="0.01" min="0" class="inv-cost" name="item_cost[]" value="<?= h((string)$row['cost']) ?>" /></td>
@@ -2304,11 +2302,28 @@ render_header('Quotes');
 
       if (taxRateInput) taxRateInput.addEventListener('input', updateGrandTotal);
 
-      function makeSuggestDropdown() {
-        return 'display:none; position:absolute; top:100%; left:0; right:0; z-index:50; '
-          + 'background:#fff; border:1px solid #d1d5db; border-radius:10px; '
-          + 'box-shadow:0 12px 24px rgba(2,6,23,.12); margin-top:4px; max-height:200px; overflow:auto;';
+      // ── Global floating suggestion dropdown (body-appended to escape overflow) ──
+      const globalSuggestBox = document.createElement('div');
+      globalSuggestBox.id = 'globalSuggestBox';
+      globalSuggestBox.style.cssText = 'display:none;position:fixed;z-index:9999;background:#fff;'
+        + 'border:1px solid #d1d5db;border-radius:10px;'
+        + 'box-shadow:0 12px 24px rgba(2,6,23,.12);max-height:200px;overflow:auto;';
+      document.body.appendChild(globalSuggestBox);
+
+      function positionSuggestBox(input) {
+        const rect = input.getBoundingClientRect();
+        globalSuggestBox.style.top   = (rect.bottom + 4) + 'px';
+        globalSuggestBox.style.left  = rect.left + 'px';
+        globalSuggestBox.style.width = rect.width + 'px';
       }
+
+      function hideSuggestBox() {
+        globalSuggestBox.style.display = 'none';
+        globalSuggestBox.innerHTML = '';
+      }
+
+      window.addEventListener('scroll', hideSuggestBox, true);
+      window.addEventListener('resize', hideSuggestBox);
 
       function buildSuggestBtn(mainText, subText) {
         const btn = document.createElement('button');
@@ -2354,20 +2369,19 @@ render_header('Quotes');
         const descInput = row.querySelector('.labor-desc');
         const costInput = row.querySelector('.labor-cost');
         const qtyInput  = row.querySelector('.labor-qty');
-        const suggestBox = row.querySelector('.item-suggestions');
         let timer = null;
 
         descInput.addEventListener('input', () => {
           const q = descInput.value.trim();
           if (timer) clearTimeout(timer);
-          if (q.length < 1) { suggestBox.style.display = 'none'; suggestBox.innerHTML = ''; return; }
+          if (q.length < 1) { hideSuggestBox(); return; }
           timer = setTimeout(() => {
             fetch('quotes.php?labor_search=1&q=' + encodeURIComponent(q), {
               credentials: 'same-origin',
               headers: { 'X-CSRF-Token': csrfToken }
             }).then((r) => r.ok ? r.json() : []).then((items) => {
-              suggestBox.innerHTML = '';
-              if (!items.length) { suggestBox.style.display = 'none'; return; }
+              globalSuggestBox.innerHTML = '';
+              if (!items.length) { hideSuggestBox(); return; }
               items.forEach((item) => {
                 const rate = item.hourly_rate ? '$' + parseFloat(item.hourly_rate).toFixed(2) : '';
                 const sub  = item.pricing_type + (rate ? ' • ' + rate : '');
@@ -2376,18 +2390,19 @@ render_header('Quotes');
                   descInput.value = item.service_name;
                   if (item.hourly_rate != null) costInput.value = parseFloat(item.hourly_rate).toFixed(2);
                   if (item.typical_hours && parseFloat(item.typical_hours) > 0) qtyInput.value = parseFloat(item.typical_hours).toFixed(2);
-                  suggestBox.style.display = 'none'; suggestBox.innerHTML = '';
+                  hideSuggestBox();
                   computeLaborTotals();
                 });
-                suggestBox.appendChild(btn);
+                globalSuggestBox.appendChild(btn);
               });
-              suggestBox.style.display = 'block';
-            }).catch(() => { suggestBox.style.display = 'none'; });
+              positionSuggestBox(descInput);
+              globalSuggestBox.style.display = 'block';
+            }).catch(() => { hideSuggestBox(); });
           }, 200);
         });
 
         descInput.addEventListener('blur', () => {
-          setTimeout(() => { suggestBox.style.display = 'none'; suggestBox.innerHTML = ''; }, 200);
+          setTimeout(hideSuggestBox, 200);
         });
       }
 
@@ -2422,11 +2437,10 @@ render_header('Quotes');
       addLaborBtn.addEventListener('click', () => {
         const tr = document.createElement('tr');
         tr.className = 'labor-row';
-        tr.innerHTML = '<td style="position:relative;">'
+        tr.innerHTML = '<td>'
           + '<input type="text" class="item-desc labor-desc" name="item_desc[]" maxlength="500" autocomplete="off" placeholder="Search labor / service…" />'
           + '<input type="hidden" name="item_markup[]" value="0" />'
           + '<input type="hidden" name="item_price[]" class="labor-price" value="0.00" />'
-          + '<div class="item-suggestions" style="' + makeSuggestDropdown() + '"></div>'
           + '</td>'
           + '<td><input type="number" step="0.01" min="0.01" class="labor-qty" name="item_qty[]" value="1" /></td>'
           + '<td><input type="number" step="0.01" min="0" class="labor-cost" name="item_cost[]" value="0.00" /></td>'
@@ -2469,20 +2483,19 @@ render_header('Quotes');
         const descInput   = row.querySelector('.inv-desc');
         const costInput   = row.querySelector('.inv-cost');
         const markupInput = row.querySelector('.inv-markup');
-        const suggestBox  = row.querySelector('.item-suggestions');
         let timer = null;
 
         descInput.addEventListener('input', () => {
           const q = descInput.value.trim();
           if (timer) clearTimeout(timer);
-          if (q.length < 1) { suggestBox.style.display = 'none'; suggestBox.innerHTML = ''; return; }
+          if (q.length < 1) { hideSuggestBox(); return; }
           timer = setTimeout(() => {
             fetch('quotes.php?inventory_search=1&q=' + encodeURIComponent(q), {
               credentials: 'same-origin',
               headers: { 'X-CSRF-Token': csrfToken }
             }).then((r) => r.ok ? r.json() : []).then((items) => {
-              suggestBox.innerHTML = '';
-              if (!items.length) { suggestBox.style.display = 'none'; return; }
+              globalSuggestBox.innerHTML = '';
+              if (!items.length) { hideSuggestBox(); return; }
               items.forEach((item) => {
                 const costVal   = item.cost_price   != null ? '$' + parseFloat(item.cost_price).toFixed(2)   : '';
                 const markupVal = item.markup_percent != null ? parseFloat(item.markup_percent).toFixed(0) + '%' : '20%';
@@ -2492,18 +2505,19 @@ render_header('Quotes');
                   descInput.value   = item.item_name;
                   costInput.value   = item.cost_price   != null ? parseFloat(item.cost_price).toFixed(2)   : '0.00';
                   markupInput.value = item.markup_percent != null ? parseFloat(item.markup_percent).toFixed(2) : '20.00';
-                  suggestBox.style.display = 'none'; suggestBox.innerHTML = '';
+                  hideSuggestBox();
                   computeInvTotals();
                 });
-                suggestBox.appendChild(btn);
+                globalSuggestBox.appendChild(btn);
               });
-              suggestBox.style.display = 'block';
-            }).catch(() => { suggestBox.style.display = 'none'; });
+              positionSuggestBox(descInput);
+              globalSuggestBox.style.display = 'block';
+            }).catch(() => { hideSuggestBox(); });
           }, 200);
         });
 
         descInput.addEventListener('blur', () => {
-          setTimeout(() => { suggestBox.style.display = 'none'; suggestBox.innerHTML = ''; }, 200);
+          setTimeout(hideSuggestBox, 200);
         });
       }
 
@@ -2541,9 +2555,8 @@ render_header('Quotes');
       addInvBtn.addEventListener('click', () => {
         const tr = document.createElement('tr');
         tr.className = 'inv-row';
-        tr.innerHTML = '<td style="position:relative;">'
+        tr.innerHTML = '<td>'
           + '<input type="text" class="item-desc inv-desc" name="item_desc[]" maxlength="500" autocomplete="off" placeholder="Search inventory / part…" />'
-          + '<div class="item-suggestions" style="' + makeSuggestDropdown() + '"></div>'
           + '</td>'
           + '<td><input type="number" step="0.01" min="0.01" class="inv-qty" name="item_qty[]" value="1" /></td>'
           + '<td><input type="number" step="0.01" min="0" class="inv-cost" name="item_cost[]" value="0.00" /></td>'
