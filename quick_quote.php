@@ -279,6 +279,16 @@ function qq_send_quote_email(PDO $pdo, array $quote, array $items, array $sender
     return false;
   }
 
+  function qq_today_ymd(): string {
+    $tz_name = defined('APP_TZ') ? (string)APP_TZ : 'UTC';
+    try {
+      $tz = new DateTimeZone($tz_name);
+    } catch (Throwable $e) {
+      $tz = new DateTimeZone('UTC');
+    }
+    return (new DateTime('now', $tz))->format('Y-m-d');
+  }
+
   $smtp_host = qq_env_value('SMTP_HOST');
   $smtp_port = (int)qq_env_value('SMTP_PORT');
   $smtp_username = qq_env_value('SMTP_USERNAME');
@@ -443,7 +453,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['inventory_search'])) {
 
 $errors = [];
 $messages = [];
-$today = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Y-m-d');
+$today = qq_today_ymd();
 $form = [
   'customer_id' => '',
   'customer_name' => '',
@@ -524,7 +534,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         array &$errors
       ): array {
         $rows = [];
-        $limit = min(count($desc), count($qty), count($cost), count($markup), QQ_MAX_LINE_ITEMS);
+        $limit = min(count($desc), count($qty), count($cost), count($markup), count($taxable), QQ_MAX_LINE_ITEMS);
         for ($i = 0; $i < $limit; $i++) {
           $d = trim((string)($desc[$i] ?? ''));
           $q = trim((string)($qty[$i] ?? ''));
