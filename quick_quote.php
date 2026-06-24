@@ -136,9 +136,31 @@ function qq_ensure_quote_item_columns(PDO $pdo): void {
       }
     }
   }
+  $stmt2 = $pdo->query("SHOW COLUMNS FROM quote_items LIKE 'inventory_item_id'");
+  if ($stmt2 === false || $stmt2->fetch(PDO::FETCH_ASSOC) === false) {
+    try {
+      $pdo->exec("ALTER TABLE quote_items ADD COLUMN inventory_item_id INT UNSIGNED NULL DEFAULT NULL AFTER is_taxable");
+    } catch (Throwable $e) {
+      $recheck = $pdo->query("SHOW COLUMNS FROM quote_items LIKE 'inventory_item_id'");
+      if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) {
+        throw $e;
+      }
+    }
+  }
+  $stmt3 = $pdo->query("SHOW COLUMNS FROM quote_items LIKE 'image_filename'");
+  if ($stmt3 === false || $stmt3->fetch(PDO::FETCH_ASSOC) === false) {
+    try {
+      $pdo->exec("ALTER TABLE quote_items ADD COLUMN image_filename VARCHAR(255) NULL DEFAULT NULL AFTER inventory_item_id");
+    } catch (Throwable $e) {
+      $recheck = $pdo->query("SHOW COLUMNS FROM quote_items LIKE 'image_filename'");
+      if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) {
+        throw $e;
+      }
+    }
+  }
 }
 
-function qq_document_html(array $quote, array $items, array $sender): string {
+function qq_document_html(array $quote, array $items, array $sender, string $base_url = ''): string {
   $h = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 
   $sender_name = trim((string)($sender['sender_name'] ?? ''));
@@ -209,14 +231,22 @@ function qq_document_html(array $quote, array $items, array $sender): string {
     $grouped[$group][] = $item;
   }
 
-  $build_rows = static function (array $rows) use ($h): string {
+  $build_rows = static function (array $rows, bool $with_image = false) use ($h, $base_url): string {
     if (!$rows) {
       return '<tr><td colspan="5" style="padding:12px;text-align:center;color:#64748b;">No line items.</td></tr>';
     }
     $out = '';
     foreach ($rows as $row) {
+      $thumb_html = '';
+      if ($with_image && trim((string)($row['image_filename'] ?? '')) !== '') {
+        $safe_name = preg_replace('/[^A-Za-z0-9_\-.]/', '', basename((string)$row['image_filename']));
+        if ($safe_name !== '') {
+          $img_src = ($base_url !== '' ? $base_url . '/' : '') . 'uploads/inventory/' . rawurlencode($safe_name);
+          $thumb_html = '<img src="' . $h($img_src) . '" width="48" height="48" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:8px;display:inline-block;">';
+        }
+      }
       $out .= '<tr>'
-        . '<td style="padding:10px;border-top:1px solid #e2e8f0;">' . $h(trim((string)($row['description'] ?? ''))) . '</td>'
+        . '<td style="padding:10px;border-top:1px solid #e2e8f0;">' . $thumb_html . $h(trim((string)($row['description'] ?? ''))) . '</td>'
         . '<td style="padding:10px;border-top:1px solid #e2e8f0;text-align:right;">' . $h(qq_money((float)($row['quantity'] ?? 0))) . '</td>'
         . '<td style="padding:10px;border-top:1px solid #e2e8f0;text-align:right;">$' . $h(qq_money((float)($row['unit_price'] ?? 0))) . '</td>'
         . '<td style="padding:10px;border-top:1px solid #e2e8f0;text-align:center;">' . (((int)($row['is_taxable'] ?? 0) === 1) ? 'Yes' : 'No') . '</td>'
@@ -270,7 +300,7 @@ function qq_document_html(array $quote, array $items, array $sender): string {
     . '<div class="qq-card"><h4>Company Information</h4><p>' . implode('<br>', $from_lines ?: ['Not provided']) . '</p></div>'
     . '</div>'
     . '<div class="qq-table-wrap"><h3 class="qq-label">Labor / Services</h3><table class="qq-table"><thead><tr><th>Description</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Unit</th><th style="text-align:center;">Taxable</th><th style="text-align:right;">Line Total</th></tr></thead><tbody>' . $build_rows($grouped['labor']) . '</tbody></table></div>'
-    . '<div class="qq-table-wrap"><h3 class="qq-label">Inventory / Parts</h3><table class="qq-table"><thead><tr><th>Description</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Unit</th><th style="text-align:center;">Taxable</th><th style="text-align:right;">Line Total</th></tr></thead><tbody>' . $build_rows($grouped['inventory']) . '</tbody></table></div>'
+    . '<div class="qq-table-wrap"><h3 class="qq-label">Inventory / Parts</h3><table class="qq-table"><thead><tr><th>Description</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Unit</th><th style="text-align:center;">Taxable</th><th style="text-align:right;">Line Total</th></tr></thead><tbody>' . $build_rows($grouped['inventory'], true) . '</tbody></table></div>'
     . '<div class="qq-totals">'
     . '<div><span>Subtotal</span><span>$' . $h(qq_money($subtotal)) . '</span></div>'
     . '<div><span>Tax (' . $h(qq_money($tax_rate)) . '%)</span><span>$' . $h(qq_money($tax_amount)) . '</span></div>'
@@ -307,7 +337,26 @@ function qq_send_quote_email(PDO $pdo, array $quote, array $items, array $sender
   }
 
   $subject = $sender_company . ' - Quote #' . (int)$quote['id'];
-  $html = '<!doctype html><html><body style="margin:0;padding:24px;background:#f1f5f9;">' . qq_document_html($quote, $items, $sender) . '</body></html>';
+
+  $email_base_url = rtrim(qq_env_value('APP_URL'), '/');
+  if ($email_base_url === '') {
+    $fwd_proto = strtolower(trim((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')));
+    if (!in_array($fwd_proto, ['http', 'https'], true)) {
+      $fwd_proto = '';
+    }
+    $https_on = !empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off';
+    $scheme = $fwd_proto !== '' ? $fwd_proto : ($https_on ? 'https' : 'http');
+    $host = trim((string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? ''));
+    if ($host !== '') {
+      $script_dir = str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? '/')));
+      if ($script_dir === '.' || $script_dir === '/') {
+        $script_dir = '';
+      }
+      $email_base_url = $scheme . '://' . $host . rtrim($script_dir, '/');
+    }
+  }
+
+  $html = '<!doctype html><html><body style="margin:0;padding:24px;background:#f1f5f9;">' . qq_document_html($quote, $items, $sender, $email_base_url) . '</body></html>';
   $text = "Quote #" . (int)$quote['id'] . "\nTotal: $" . qq_money((float)($quote['subtotal_amount'] ?? 0) + (float)($quote['tax_amount'] ?? 0));
 
   try {
@@ -437,7 +486,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['inventory_search'])) {
   $like = '%' . qq_escape_like($query) . '%';
   try {
     $stmt = $pdo->prepare(
-      "SELECT id, item_name, cost_price, markup_percent
+      "SELECT id, item_name, cost_price, markup_percent, image_stored_name
        FROM inventory_items
        WHERE item_name LIKE ? ESCAPE '\\\\' OR part_number LIKE ? ESCAPE '\\\\'
        ORDER BY item_name ASC
@@ -531,7 +580,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         array $markup,
         array $taxable,
         string $group,
-        array &$errors
+        array &$errors,
+        array $image_filenames = []
       ): array {
         if (count($desc) !== count($qty) || count($desc) !== count($cost) || count($desc) !== count($markup) || count($desc) !== count($taxable)) {
           $errors[] = ucfirst($group) . ' line item data is malformed. Please reload and try again.';
@@ -572,6 +622,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $unit = ($group === 'labor') ? $cost_val : round($cost_val * (1 + $markup_val / 100), 2);
           $line = round($qty_val * $unit, 2);
 
+          $img = trim((string)($image_filenames[$i] ?? ''));
           $rows[] = [
             'item_group' => $group,
             'description' => $d,
@@ -581,6 +632,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'unit_price' => $unit,
             'line_total' => $line,
             'is_taxable' => ((int)($taxable[$i] ?? 0) === 1) ? 1 : 0,
+            'image_filename' => $img !== '' ? $img : null,
           ];
         }
         return $rows;
@@ -603,7 +655,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         is_array($_POST['inv_markup'] ?? null) ? $_POST['inv_markup'] : [],
         is_array($_POST['inv_taxable'] ?? null) ? $_POST['inv_taxable'] : [],
         'inventory',
-        $errors
+        $errors,
+        is_array($_POST['inv_image_filename'] ?? null) ? $_POST['inv_image_filename'] : []
       );
 
       $line_items = array_merge($labor_rows, $inventory_rows);
@@ -657,8 +710,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $quote_id = (int)$pdo->lastInsertId();
           $item_ins = $pdo->prepare(
             "INSERT INTO quote_items
-               (quote_id, line_position, item_group, description, quantity, cost, markup_percent, unit_price, line_total, is_taxable)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+               (quote_id, line_position, item_group, description, quantity, cost, markup_percent, unit_price, line_total, is_taxable, image_filename)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
           );
 
           $position = 1;
@@ -674,6 +727,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $row['unit_price'],
               $row['line_total'],
               $row['is_taxable'],
+              $row['image_filename'] ?? null,
             ]);
             $position++;
           }
@@ -862,7 +916,7 @@ render_header('Quick Quote');
           </thead>
           <tbody id="inventoryItemsBody">
             <tr class="inv-row">
-              <td><input type="text" class="item-desc inv-desc" name="inv_desc[]" maxlength="500" autocomplete="off" placeholder="Search inventory / part…"></td>
+              <td><input type="text" class="item-desc inv-desc" name="inv_desc[]" maxlength="500" autocomplete="off" placeholder="Search inventory / part…"><input type="hidden" class="inv-image-filename" name="inv_image_filename[]" value=""></td>
               <td><input type="number" step="0.01" min="0.01" class="inv-qty" name="inv_qty[]" value="1"></td>
               <td><input type="number" step="0.01" min="0" class="inv-cost" name="inv_cost[]" value="0.00"></td>
               <td><input type="number" step="0.01" min="0" class="inv-markup" name="inv_markup[]" value="20.00"></td>
@@ -1153,11 +1207,13 @@ render_header('Quick Quote');
         const descInput = row.querySelector('.inv-desc');
         const costInput = row.querySelector('.inv-cost');
         const markupInput = row.querySelector('.inv-markup');
+        const imgInput = row.querySelector('.inv-image-filename');
         let timer = null;
 
         descInput.addEventListener('input', () => {
           const q = descInput.value.trim();
           if (timer) clearTimeout(timer);
+          if (imgInput) imgInput.value = '';
           if (q.length < 1) {
             hideSuggestBox();
             return;
@@ -1185,6 +1241,7 @@ render_header('Quick Quote');
                     descInput.value = item.item_name || '';
                     costInput.value = item.cost_price != null ? parseFloat(item.cost_price || 0).toFixed(2) : '0.00';
                     markupInput.value = item.markup_percent != null ? parseFloat(item.markup_percent || 0).toFixed(2) : '20.00';
+                    if (imgInput) imgInput.value = item.image_stored_name || '';
                     hideSuggestBox();
                     computeInvTotals();
                   });
@@ -1235,6 +1292,8 @@ render_header('Quick Quote');
             row.querySelector('.inv-price').value = '0.00';
             row.querySelector('.taxable-hidden').value = '0';
             row.querySelector('.taxable-check').checked = false;
+            const imgHidden = row.querySelector('.inv-image-filename');
+            if (imgHidden) imgHidden.value = '';
           } else {
             row.remove();
           }
@@ -1258,7 +1317,7 @@ render_header('Quick Quote');
       document.getElementById('addInventoryRow').addEventListener('click', () => {
         const tr = document.createElement('tr');
         tr.className = 'inv-row';
-        tr.innerHTML = '<td><input type="text" class="item-desc inv-desc" name="inv_desc[]" maxlength="500" autocomplete="off" placeholder="Search inventory / part…"></td>'
+        tr.innerHTML = '<td><input type="text" class="item-desc inv-desc" name="inv_desc[]" maxlength="500" autocomplete="off" placeholder="Search inventory / part…"><input type="hidden" class="inv-image-filename" name="inv_image_filename[]" value=""></td>'
           + '<td><input type="number" step="0.01" min="0.01" class="inv-qty" name="inv_qty[]" value="1"></td>'
           + '<td><input type="number" step="0.01" min="0" class="inv-cost" name="inv_cost[]" value="0.00"></td>'
           + '<td><input type="number" step="0.01" min="0" class="inv-markup" name="inv_markup[]" value="20.00"></td>'
