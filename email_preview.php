@@ -390,7 +390,7 @@ try {
         $inv_image = trim((string)($item['inv_image_stored_name'] ?? ''));
         $thumb_html = '';
         if ($inv_image !== '' && strpbrk($inv_image, '/\\') === false && strpos($inv_image, '..') === false) {
-            $thumb_src = '/uploads/inventory/' . rawurlencode($inv_image);
+            $thumb_src = '/project/uploads/inventory/' . rawurlencode($inv_image);
             $thumb_html = '<img src="' . $escape_html($thumb_src) . '" alt="" width="48" height="48" style="display:inline-block;vertical-align:middle;object-fit:cover;border-radius:4px;margin-right:8px;" />';
         }
         $rows_html[] = '<tr style="background:' . $row_bg . ';">'
