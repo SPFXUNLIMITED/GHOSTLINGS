@@ -297,9 +297,8 @@ try {
     }
 
     $stmt = $pdo->prepare(
-        'SELECT qi.*, ii.image_stored_name AS inv_image_stored_name
+        'SELECT qi.*
          FROM quote_items qi
-         LEFT JOIN inventory_items ii ON ii.id = qi.inventory_item_id
          WHERE qi.quote_id = ?
          ORDER BY qi.line_position ASC, qi.id ASC'
     );
@@ -387,7 +386,7 @@ try {
         $unit_price = preview_format_money($item['unit_price'] ?? 0);
         $line_total = preview_format_money($item['line_total'] ?? 0);
         $row_bg = ($row_index++ % 2 === 0) ? '#ffffff' : '#f9fafb';
-        $inv_image = trim((string)($item['inv_image_stored_name'] ?? ''));
+        $inv_image = trim((string)($item['image_filename'] ?? ''));
         $thumb_html = '';
         if ($inv_image !== '' && strpbrk($inv_image, '/\\') === false && strpos($inv_image, '..') === false) {
             $thumb_src = '/project/uploads/inventory/' . rawurlencode($inv_image);
