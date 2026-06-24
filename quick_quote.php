@@ -599,7 +599,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $pdo->prepare("UPDATE quotes SET approval_status = 'approved' WHERE id = ?")->execute([$row_id]);
           try {
             $pdo->prepare("UPDATE approval_alerts SET is_read = 1 WHERE entity_type = 'quote' AND entity_id = ?")->execute([$row_id]);
-          } catch (Throwable $e) {}
+          } catch (Throwable $e) {
+            error_log('Quick quote approval alert update failed: ' . $e->getMessage());
+          }
           header('Location: quick_quote.php?view=id&id=' . $row_id . '&approval_approved=1');
           exit;
         }
@@ -609,20 +611,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($row_id <= 0) {
         $errors[] = 'Invalid quote selected for invoice conversion.';
       } else {
-        $inv_no = qq_invoice_number($row_id);
-        $stmt = $pdo->prepare(
-          "UPDATE quotes
-           SET status = 'converted',
-               converted_invoice_no = COALESCE(converted_invoice_no, ?),
-               converted_at = COALESCE(converted_at, NOW())
-           WHERE id = ? AND status <> 'converted'"
-        );
-        $stmt->execute([$inv_no, $row_id]);
-        if ($stmt->rowCount() < 1) {
-          $errors[] = 'This quote is already converted to an invoice.';
+        $check = $pdo->prepare("SELECT id FROM quotes WHERE id = ? LIMIT 1");
+        $check->execute([$row_id]);
+        if (!$check->fetch(PDO::FETCH_ASSOC)) {
+          $errors[] = 'Quote not found.';
         } else {
-          header('Location: invoice_form.php?id=' . $row_id . '&invoice_converted=1');
-          exit;
+          $inv_no = qq_invoice_number($row_id);
+          $stmt = $pdo->prepare(
+            "UPDATE quotes
+             SET status = 'converted',
+                 converted_invoice_no = COALESCE(converted_invoice_no, ?),
+                 converted_at = COALESCE(converted_at, NOW())
+             WHERE id = ? AND status <> 'converted'"
+          );
+          $stmt->execute([$inv_no, $row_id]);
+          if ($stmt->rowCount() < 1) {
+            $errors[] = 'This quote is already converted to an invoice.';
+          } else {
+            header('Location: invoice_form.php?id=' . $row_id . '&invoice_converted=1');
+            exit;
+          }
         }
       }
     } else {
@@ -876,12 +884,14 @@ render_header('Quick Quote');
         <input type="hidden" name="quote_id" value="<?= (int)$detail_quote['id'] ?>">
         <button type="submit" class="btn">Send for Approval</button>
       </form>
-      <form method="post" style="margin:0;">
-        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quick_quote_csrf']) ?>">
-        <input type="hidden" name="action" value="approve_quote">
-        <input type="hidden" name="quote_id" value="<?= (int)$detail_quote['id'] ?>">
-        <button type="submit" class="btn primary" <?= is_admin() ? '' : 'disabled title="Only admins can approve quotes"' ?>>Approve</button>
-      </form>
+      <?php if (is_admin()): ?>
+        <form method="post" style="margin:0;">
+          <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quick_quote_csrf']) ?>">
+          <input type="hidden" name="action" value="approve_quote">
+          <input type="hidden" name="quote_id" value="<?= (int)$detail_quote['id'] ?>">
+          <button type="submit" class="btn primary">Approve</button>
+        </form>
+      <?php endif; ?>
       <form method="post" style="margin:0;" onsubmit="return confirm('Convert this quote to invoice?');">
         <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quick_quote_csrf']) ?>">
         <input type="hidden" name="action" value="convert_invoice">
