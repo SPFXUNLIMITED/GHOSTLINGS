@@ -239,8 +239,11 @@ function qq_document_html(array $quote, array $items, array $sender, string $bas
     foreach ($rows as $row) {
       $thumb_html = '';
       if ($with_image && trim((string)($row['image_filename'] ?? '')) !== '') {
-        $img_src = ($base_url !== '' ? $base_url . '/' : '') . 'uploads/inventory/' . rawurlencode(basename((string)$row['image_filename']));
-        $thumb_html = '<img src="' . $h($img_src) . '" width="48" height="48" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:8px;display:inline-block;">';
+        $safe_name = preg_replace('/[^A-Za-z0-9_\-.]/', '', basename((string)$row['image_filename']));
+        if ($safe_name !== '') {
+          $img_src = ($base_url !== '' ? $base_url . '/' : '') . 'uploads/inventory/' . rawurlencode($safe_name);
+          $thumb_html = '<img src="' . $h($img_src) . '" width="48" height="48" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:8px;display:inline-block;">';
+        }
       }
       $out .= '<tr>'
         . '<td style="padding:10px;border-top:1px solid #e2e8f0;">' . $thumb_html . $h(trim((string)($row['description'] ?? ''))) . '</td>'
@@ -338,6 +341,9 @@ function qq_send_quote_email(PDO $pdo, array $quote, array $items, array $sender
   $email_base_url = rtrim(qq_env_value('APP_URL'), '/');
   if ($email_base_url === '') {
     $fwd_proto = strtolower(trim((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')));
+    if (!in_array($fwd_proto, ['http', 'https'], true)) {
+      $fwd_proto = '';
+    }
     $https_on = !empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off';
     $scheme = $fwd_proto !== '' ? $fwd_proto : ($https_on ? 'https' : 'http');
     $host = trim((string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? ''));
