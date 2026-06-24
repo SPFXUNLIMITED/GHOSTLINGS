@@ -296,7 +296,13 @@ try {
         throw new RuntimeException('Record not found.');
     }
 
-    $stmt = $pdo->prepare('SELECT * FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC');
+    $stmt = $pdo->prepare(
+        'SELECT qi.*, ii.image_stored_name AS inv_image_stored_name
+         FROM quote_items qi
+         LEFT JOIN inventory_items ii ON ii.id = qi.inventory_item_id
+         WHERE qi.quote_id = ?
+         ORDER BY qi.line_position ASC, qi.id ASC'
+    );
     $stmt->execute([$id]);
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -381,8 +387,14 @@ try {
         $unit_price = preview_format_money($item['unit_price'] ?? 0);
         $line_total = preview_format_money($item['line_total'] ?? 0);
         $row_bg = ($row_index++ % 2 === 0) ? '#ffffff' : '#f9fafb';
+        $inv_image = trim((string)($item['inv_image_stored_name'] ?? ''));
+        $thumb_html = '';
+        if ($inv_image !== '' && strpbrk($inv_image, '/\\') === false && strpos($inv_image, '..') === false) {
+            $thumb_src = '/uploads/inventory/' . rawurlencode($inv_image);
+            $thumb_html = '<img src="' . $escape_html($thumb_src) . '" alt="" width="48" height="48" style="display:inline-block;vertical-align:middle;object-fit:cover;border-radius:4px;margin-right:8px;" />';
+        }
         $rows_html[] = '<tr style="background:' . $row_bg . ';">'
-            . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">' . $escape_html($description) . '</td>'
+            . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">' . $thumb_html . $escape_html($description) . '</td>'
             . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">' . $escape_html($quantity) . '</td>'
             . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . $escape_html($unit_price) . '</td>'
             . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . $escape_html($line_total) . '</td>'

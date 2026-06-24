@@ -781,7 +781,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['inventory_search'])) {
   $like = '%' . quote_escape_like($query) . '%';
   try {
     $stmt = $pdo->prepare(
-      "SELECT id, item_name, cost_price, markup_percent
+      "SELECT id, item_name, cost_price, markup_percent, image_stored_name
        FROM inventory_items
        WHERE item_name LIKE ? ESCAPE '\\\\'
           OR part_number LIKE ? ESCAPE '\\\\'
@@ -1050,7 +1050,7 @@ $fields = [
   'tax_rate' => '0.00',
 ];
 $line_items = [
-  ['description' => '', 'quantity' => '1', 'cost' => '0.00', 'markup_percent' => '20', 'unit_price' => '0.00', 'is_taxable' => 0],
+  ['description' => '', 'quantity' => '1', 'cost' => '0.00', 'markup_percent' => '20', 'unit_price' => '0.00', 'is_taxable' => 0, 'inventory_item_id' => null],
 ];
 
 $view = (string)($_GET['view'] ?? 'all');
@@ -1098,19 +1098,20 @@ if ($raw_edit !== null && (int)$raw_edit > 0) {
     $fields['notes'] = (string)($edit_record['notes'] ?? '');
     $fields['tax_rate'] = number_format((float)($edit_record['tax_rate'] ?? 0), 2);
 
-    $item_stmt = $pdo->prepare("SELECT description, quantity, cost, markup_percent, unit_price, is_taxable FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC");
+    $item_stmt = $pdo->prepare("SELECT description, quantity, cost, markup_percent, unit_price, is_taxable, inventory_item_id FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC");
     $item_stmt->execute([$edit_id]);
     $rows = $item_stmt->fetchAll();
     if ($rows) {
       $line_items = [];
       foreach ($rows as $row) {
         $line_items[] = [
-          'description'    => (string)$row['description'],
-          'quantity'       => quote_format_money($row['quantity']),
-          'cost'           => quote_format_money($row['cost']),
-          'markup_percent' => number_format((float)$row['markup_percent'], 2),
-          'unit_price'     => quote_format_money($row['unit_price']),
-          'is_taxable'     => (int)($row['is_taxable'] ?? 0),
+          'description'       => (string)$row['description'],
+          'quantity'          => quote_format_money($row['quantity']),
+          'cost'              => quote_format_money($row['cost']),
+          'markup_percent'    => number_format((float)$row['markup_percent'], 2),
+          'unit_price'        => quote_format_money($row['unit_price']),
+          'is_taxable'        => (int)($row['is_taxable'] ?? 0),
+          'inventory_item_id' => $row['inventory_item_id'] !== null ? (int)$row['inventory_item_id'] : null,
         ];
       }
     }
@@ -1285,9 +1286,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $posted_markup = $_POST['item_markup'] ?? [];
       $posted_price = $_POST['item_price'] ?? [];
       $posted_taxable = $_POST['item_taxable'] ?? [];
-      if (!is_array($posted_desc) || !is_array($posted_qty) || !is_array($posted_cost) || !is_array($posted_markup) || !is_array($posted_price) || !is_array($posted_taxable)) {
+      $posted_inv_id = $_POST['item_inv_id'] ?? [];
+      if (!is_array($posted_desc) || !is_array($posted_qty) || !is_array($posted_cost) || !is_array($posted_markup) || !is_array($posted_price) || !is_array($posted_taxable) || !is_array($posted_inv_id)) {
         $errors[] = 'Line item data is invalid.';
-      } elseif (count($posted_desc) !== count($posted_qty) || count($posted_desc) !== count($posted_cost) || count($posted_desc) !== count($posted_markup) || count($posted_desc) !== count($posted_price) || count($posted_desc) !== count($posted_taxable)) {
+      } elseif (count($posted_desc) !== count($posted_qty) || count($posted_desc) !== count($posted_cost) || count($posted_desc) !== count($posted_markup) || count($posted_desc) !== count($posted_price) || count($posted_desc) !== count($posted_taxable) || count($posted_desc) !== count($posted_inv_id)) {
         $errors[] = 'Line item data is malformed. Please reload and try again.';
       } else {
         $line_items = [];
@@ -1324,14 +1326,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $markup = round((float)$markup_raw, 2);
           $price = round($cost * (1 + $markup / 100), 2);
           $is_taxable = (int)($posted_taxable[$i] ?? 0) === 1 ? 1 : 0;
+          $inv_id_raw = trim((string)($posted_inv_id[$i] ?? ''));
+          $inv_id = ($inv_id_raw !== '' && ctype_digit($inv_id_raw) && (int)$inv_id_raw > 0) ? (int)$inv_id_raw : null;
           $line_items[] = [
-            'description'    => $desc,
-            'quantity'       => $qty,
-            'cost'           => $cost,
-            'markup_percent' => $markup,
-            'unit_price'     => $price,
-            'line_total'     => round($qty * $price, 2),
-            'is_taxable'     => $is_taxable,
+            'description'       => $desc,
+            'quantity'          => $qty,
+            'cost'              => $cost,
+            'markup_percent'    => $markup,
+            'unit_price'        => $price,
+            'line_total'        => round($qty * $price, 2),
+            'is_taxable'        => $is_taxable,
+            'inventory_item_id' => $inv_id,
           ];
         }
 
@@ -1426,8 +1431,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           quote_backfill_customer($pdo, $customer_id, $fields);
 
           $item_ins = $pdo->prepare(
-            "INSERT INTO quote_items (quote_id, line_position, description, quantity, cost, markup_percent, unit_price, line_total, is_taxable)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO quote_items (quote_id, line_position, description, quantity, cost, markup_percent, unit_price, line_total, is_taxable, inventory_item_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
           );
           $position = 1;
           foreach ($line_items as $row) {
@@ -1441,6 +1446,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $row['unit_price'],
               $row['line_total'],
               $row['is_taxable'],
+              $row['inventory_item_id'] ?? null,
             ]);
             $position++;
           }
@@ -2151,6 +2157,7 @@ render_header('Quotes');
             <?php foreach ($line_items as $row): ?>
               <tr class="inv-row">
                 <td style="position:relative;">
+                  <input type="hidden" class="inv-inv-id" name="item_inv_id[]" value="<?= (int)($row['inventory_item_id'] ?? 0) > 0 ? (int)$row['inventory_item_id'] : '' ?>" />
                   <input type="text" class="item-desc inv-desc" name="item_desc[]" maxlength="500" value="<?= h((string)$row['description']) ?>" autocomplete="off" placeholder="Search inventory / part…" />
                   <div class="item-suggestions" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:50; background:#fff; border:1px solid #d1d5db; border-radius:10px; box-shadow:0 12px 24px rgba(2,6,23,.12); margin-top:4px; max-height:200px; overflow:auto;"></div>
                 </td>
@@ -2470,10 +2477,12 @@ render_header('Quotes');
         const costInput   = row.querySelector('.inv-cost');
         const markupInput = row.querySelector('.inv-markup');
         const suggestBox  = row.querySelector('.item-suggestions');
+        const invIdInput  = row.querySelector('.inv-inv-id');
         let timer = null;
 
         descInput.addEventListener('input', () => {
           const q = descInput.value.trim();
+          if (invIdInput) invIdInput.value = '';
           if (timer) clearTimeout(timer);
           if (q.length < 1) { suggestBox.style.display = 'none'; suggestBox.innerHTML = ''; return; }
           timer = setTimeout(() => {
@@ -2492,6 +2501,7 @@ render_header('Quotes');
                   descInput.value   = item.item_name;
                   costInput.value   = item.cost_price   != null ? parseFloat(item.cost_price).toFixed(2)   : '0.00';
                   markupInput.value = item.markup_percent != null ? parseFloat(item.markup_percent).toFixed(2) : '20.00';
+                  if (invIdInput) invIdInput.value = item.id != null ? item.id : '';
                   suggestBox.style.display = 'none'; suggestBox.innerHTML = '';
                   computeInvTotals();
                 });
@@ -2542,6 +2552,7 @@ render_header('Quotes');
         const tr = document.createElement('tr');
         tr.className = 'inv-row';
         tr.innerHTML = '<td style="position:relative;">'
+          + '<input type="hidden" class="inv-inv-id" name="item_inv_id[]" value="" />'
           + '<input type="text" class="item-desc inv-desc" name="item_desc[]" maxlength="500" autocomplete="off" placeholder="Search inventory / part…" />'
           + '<div class="item-suggestions" style="' + makeSuggestDropdown() + '"></div>'
           + '</td>'
