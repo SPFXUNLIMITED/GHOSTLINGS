@@ -1287,9 +1287,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $posted_price = $_POST['item_price'] ?? [];
       $posted_taxable = $_POST['item_taxable'] ?? [];
       $posted_inv_id = $_POST['item_inv_id'] ?? [];
-      if (!is_array($posted_desc) || !is_array($posted_qty) || !is_array($posted_cost) || !is_array($posted_markup) || !is_array($posted_price) || !is_array($posted_taxable)) {
+      if (!is_array($posted_desc) || !is_array($posted_qty) || !is_array($posted_cost) || !is_array($posted_markup) || !is_array($posted_price) || !is_array($posted_taxable) || !is_array($posted_inv_id)) {
         $errors[] = 'Line item data is invalid.';
-      } elseif (count($posted_desc) !== count($posted_qty) || count($posted_desc) !== count($posted_cost) || count($posted_desc) !== count($posted_markup) || count($posted_desc) !== count($posted_price) || count($posted_desc) !== count($posted_taxable)) {
+      } elseif (count($posted_desc) !== count($posted_qty) || count($posted_desc) !== count($posted_cost) || count($posted_desc) !== count($posted_markup) || count($posted_desc) !== count($posted_price) || count($posted_desc) !== count($posted_taxable) || count($posted_desc) !== count($posted_inv_id)) {
         $errors[] = 'Line item data is malformed. Please reload and try again.';
       } else {
         $line_items = [];
