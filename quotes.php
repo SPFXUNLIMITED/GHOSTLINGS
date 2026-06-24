@@ -1293,12 +1293,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Line item data is malformed. Please reload and try again.';
       } else {
         $line_items = [];
-        $line_count = min(count($posted_desc), count($posted_qty), count($posted_cost), count($posted_markup), count($posted_price), count($posted_taxable), QUOTE_MAX_LINE_ITEMS);
+        $line_count = min(count($posted_desc), QUOTE_MAX_LINE_ITEMS);
         for ($i = 0; $i < $line_count; $i++) {
-          $desc = trim((string)($posted_desc[$i] ?? ''));
-          $qty_raw = trim((string)($posted_qty[$i] ?? ''));
-          $cost_raw = trim((string)($posted_cost[$i] ?? ''));
-          $markup_raw = trim((string)($posted_markup[$i] ?? ''));
+          $desc = trim((string)$posted_desc[$i]);
+          $qty_raw = trim((string)$posted_qty[$i]);
+          $cost_raw = trim((string)$posted_cost[$i]);
+          $markup_raw = trim((string)$posted_markup[$i]);
 
           if ($desc === '' && $qty_raw === '' && $cost_raw === '' && $markup_raw === '') {
             continue;
