@@ -33,8 +33,17 @@ function qq_today_ymd(): string {
   return (new DateTime('now', $tz))->format('Y-m-d');
 }
 
-function qq_invoice_number(int $quote_id): string {
+function qq_format_invoice_number(int $quote_id): string {
   return 'INV-' . str_pad((string)$quote_id, 6, '0', STR_PAD_LEFT);
+}
+
+function qq_quote_exists(PDO $pdo, int $quote_id): bool {
+  if ($quote_id <= 0) {
+    return false;
+  }
+  $check = $pdo->prepare("SELECT id FROM quotes WHERE id = ? LIMIT 1");
+  $check->execute([$quote_id]);
+  return (bool)$check->fetch(PDO::FETCH_ASSOC);
 }
 
 function qq_env_value(string $key): string {
@@ -574,9 +583,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($row_id <= 0) {
         $errors[] = 'Invalid quote selected for approval.';
       } else {
-        $check = $pdo->prepare("SELECT id FROM quotes WHERE id = ? LIMIT 1");
-        $check->execute([$row_id]);
-        if (!$check->fetch(PDO::FETCH_ASSOC)) {
+        if (!qq_quote_exists($pdo, $row_id)) {
           $errors[] = 'Quote not found.';
         } else {
           $pdo->prepare("UPDATE quotes SET approval_status = 'pending_approval' WHERE id = ?")->execute([$row_id]);
@@ -591,9 +598,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       } elseif ($row_id <= 0) {
         $errors[] = 'Invalid quote selected for approval.';
       } else {
-        $check = $pdo->prepare("SELECT id FROM quotes WHERE id = ? LIMIT 1");
-        $check->execute([$row_id]);
-        if (!$check->fetch(PDO::FETCH_ASSOC)) {
+        if (!qq_quote_exists($pdo, $row_id)) {
           $errors[] = 'Quote not found.';
         } else {
           $pdo->prepare("UPDATE quotes SET approval_status = 'approved' WHERE id = ?")->execute([$row_id]);
@@ -611,12 +616,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($row_id <= 0) {
         $errors[] = 'Invalid quote selected for invoice conversion.';
       } else {
-        $check = $pdo->prepare("SELECT id FROM quotes WHERE id = ? LIMIT 1");
-        $check->execute([$row_id]);
-        if (!$check->fetch(PDO::FETCH_ASSOC)) {
+        if (!qq_quote_exists($pdo, $row_id)) {
           $errors[] = 'Quote not found.';
         } else {
-          $inv_no = qq_invoice_number($row_id);
+          $inv_no = qq_format_invoice_number($row_id);
           $stmt = $pdo->prepare(
             "UPDATE quotes
              SET status = 'converted',
