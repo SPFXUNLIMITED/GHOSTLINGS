@@ -33,6 +33,10 @@ function qq_today_ymd(): string {
   return (new DateTime('now', $tz))->format('Y-m-d');
 }
 
+function qq_invoice_number(int $quote_id): string {
+  return 'INV-' . str_pad((string)$quote_id, 6, '0', STR_PAD_LEFT);
+}
+
 function qq_env_value(string $key): string {
   static $dotenv_values = null;
 
@@ -521,9 +525,13 @@ $form = [
 $view_id = (($_GET['view'] ?? '') === 'id') ? (int)($_GET['id'] ?? 0) : 0;
 $saved = isset($_GET['saved']) && $_GET['saved'] === '1';
 $emailed = isset($_GET['emailed']) && $_GET['emailed'] === '1';
+$approval_sent = isset($_GET['approval_sent']) && $_GET['approval_sent'] === '1';
+$approval_approved = isset($_GET['approval_approved']) && $_GET['approval_approved'] === '1';
 
 if ($saved) $messages[] = 'Quote saved successfully.';
 if ($emailed) $messages[] = 'Quote emailed successfully.';
+if ($approval_sent) $messages[] = 'Quote sent for approval.';
+if ($approval_approved) $messages[] = 'Quote approved.';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $csrf = trim((string)($_POST['csrf_token'] ?? ''));
@@ -559,6 +567,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               exit;
             }
           }
+        }
+      }
+    } elseif ($action === 'send_for_approval') {
+      $row_id = (int)($_POST['quote_id'] ?? 0);
+      if ($row_id <= 0) {
+        $errors[] = 'Invalid quote selected for approval.';
+      } else {
+        $check = $pdo->prepare("SELECT id FROM quotes WHERE id = ? LIMIT 1");
+        $check->execute([$row_id]);
+        if (!$check->fetch(PDO::FETCH_ASSOC)) {
+          $errors[] = 'Quote not found.';
+        } else {
+          $pdo->prepare("UPDATE quotes SET approval_status = 'pending_approval' WHERE id = ?")->execute([$row_id]);
+          header('Location: quick_quote.php?view=id&id=' . $row_id . '&approval_sent=1');
+          exit;
+        }
+      }
+    } elseif ($action === 'approve_quote') {
+      $row_id = (int)($_POST['quote_id'] ?? 0);
+      if (!is_admin()) {
+        $errors[] = 'Only admins can approve quotes.';
+      } elseif ($row_id <= 0) {
+        $errors[] = 'Invalid quote selected for approval.';
+      } else {
+        $check = $pdo->prepare("SELECT id FROM quotes WHERE id = ? LIMIT 1");
+        $check->execute([$row_id]);
+        if (!$check->fetch(PDO::FETCH_ASSOC)) {
+          $errors[] = 'Quote not found.';
+        } else {
+          $pdo->prepare("UPDATE quotes SET approval_status = 'approved' WHERE id = ?")->execute([$row_id]);
+          try {
+            $pdo->prepare("UPDATE approval_alerts SET is_read = 1 WHERE entity_type = 'quote' AND entity_id = ?")->execute([$row_id]);
+          } catch (Throwable $e) {}
+          header('Location: quick_quote.php?view=id&id=' . $row_id . '&approval_approved=1');
+          exit;
+        }
+      }
+    } elseif ($action === 'convert_invoice') {
+      $row_id = (int)($_POST['quote_id'] ?? 0);
+      if ($row_id <= 0) {
+        $errors[] = 'Invalid quote selected for invoice conversion.';
+      } else {
+        $inv_no = qq_invoice_number($row_id);
+        $stmt = $pdo->prepare(
+          "UPDATE quotes
+           SET status = 'converted',
+               converted_invoice_no = COALESCE(converted_invoice_no, ?),
+               converted_at = COALESCE(converted_at, NOW())
+           WHERE id = ? AND status <> 'converted'"
+        );
+        $stmt->execute([$inv_no, $row_id]);
+        if ($stmt->rowCount() < 1) {
+          $errors[] = 'This quote is already converted to an invoice.';
+        } else {
+          header('Location: invoice_form.php?id=' . $row_id . '&invoice_converted=1');
+          exit;
         }
       }
     } else {
@@ -794,15 +858,35 @@ render_header('Quick Quote');
 <?php endforeach; ?>
 
 <?php if ($detail_quote): ?>
-  <div class="card no-print" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;">
+  <div class="card no-print" style="margin-bottom:14px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between;">
     <div class="muted">Quote #<?= (int)$detail_quote['id'] ?></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <a class="btn" href="quotes.php?view=all">Back to Quotes</a>
+      <a class="btn" href="quotes.php?edit=<?= (int)$detail_quote['id'] ?>">Edit Quote</a>
       <button type="button" class="btn" onclick="window.print()">Print Quote</button>
       <form method="post" style="margin:0;">
         <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quick_quote_csrf']) ?>">
         <input type="hidden" name="action" value="send_quote">
         <input type="hidden" name="quote_id" value="<?= (int)$detail_quote['id'] ?>">
         <button type="submit" class="btn primary">Email Quote</button>
+      </form>
+      <form method="post" style="margin:0;">
+        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quick_quote_csrf']) ?>">
+        <input type="hidden" name="action" value="send_for_approval">
+        <input type="hidden" name="quote_id" value="<?= (int)$detail_quote['id'] ?>">
+        <button type="submit" class="btn">Send for Approval</button>
+      </form>
+      <form method="post" style="margin:0;">
+        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quick_quote_csrf']) ?>">
+        <input type="hidden" name="action" value="approve_quote">
+        <input type="hidden" name="quote_id" value="<?= (int)$detail_quote['id'] ?>">
+        <button type="submit" class="btn primary" <?= is_admin() ? '' : 'disabled title="Only admins can approve quotes"' ?>>Approve</button>
+      </form>
+      <form method="post" style="margin:0;" onsubmit="return confirm('Convert this quote to invoice?');">
+        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quick_quote_csrf']) ?>">
+        <input type="hidden" name="action" value="convert_invoice">
+        <input type="hidden" name="quote_id" value="<?= (int)$detail_quote['id'] ?>">
+        <button type="submit" class="btn primary">Convert to Invoice</button>
       </form>
     </div>
   </div>
