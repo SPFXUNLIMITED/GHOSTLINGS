@@ -23,6 +23,16 @@ function qq_escape_like(string $value, string $escape = '\\'): string {
   return strtr($value, [$escape => $escape . $escape, '%' => $escape . '%', '_' => $escape . '_']);
 }
 
+function qq_today_ymd(): string {
+  $tz_name = defined('APP_TZ') ? (string)APP_TZ : 'UTC';
+  try {
+    $tz = new DateTimeZone($tz_name);
+  } catch (Throwable $e) {
+    $tz = new DateTimeZone('UTC');
+  }
+  return (new DateTime('now', $tz))->format('Y-m-d');
+}
+
 function qq_env_value(string $key): string {
   static $dotenv_values = null;
 
@@ -279,16 +289,6 @@ function qq_send_quote_email(PDO $pdo, array $quote, array $items, array $sender
     return false;
   }
 
-  function qq_today_ymd(): string {
-    $tz_name = defined('APP_TZ') ? (string)APP_TZ : 'UTC';
-    try {
-      $tz = new DateTimeZone($tz_name);
-    } catch (Throwable $e) {
-      $tz = new DateTimeZone('UTC');
-    }
-    return (new DateTime('now', $tz))->format('Y-m-d');
-  }
-
   $smtp_host = qq_env_value('SMTP_HOST');
   $smtp_port = (int)qq_env_value('SMTP_PORT');
   $smtp_username = qq_env_value('SMTP_USERNAME');
@@ -533,6 +533,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         string $group,
         array &$errors
       ): array {
+        if (count($desc) !== count($qty) || count($desc) !== count($cost) || count($desc) !== count($markup) || count($desc) !== count($taxable)) {
+          $errors[] = ucfirst($group) . ' line item data is malformed. Please reload and try again.';
+          return [];
+        }
         $rows = [];
         $limit = min(count($desc), count($qty), count($cost), count($markup), count($taxable), QQ_MAX_LINE_ITEMS);
         for ($i = 0; $i < $limit; $i++) {
