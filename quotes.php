@@ -2317,13 +2317,17 @@ render_header('Quotes');
         globalSuggestBox.style.width = rect.width + 'px';
       }
 
+      const BLUR_HIDE_DELAY = 200;
+
       function hideSuggestBox() {
         globalSuggestBox.style.display = 'none';
         globalSuggestBox.innerHTML = '';
       }
 
-      window.addEventListener('scroll', hideSuggestBox, true);
-      window.addEventListener('resize', hideSuggestBox);
+      window.addEventListener('scroll', (e) => {
+        if (!globalSuggestBox.contains(e.target)) hideSuggestBox();
+      }, { capture: true, passive: true });
+      window.addEventListener('resize', hideSuggestBox, { passive: true });
 
       function buildSuggestBtn(mainText, subText) {
         const btn = document.createElement('button');
@@ -2402,7 +2406,7 @@ render_header('Quotes');
         });
 
         descInput.addEventListener('blur', () => {
-          setTimeout(hideSuggestBox, 200);
+          setTimeout(hideSuggestBox, BLUR_HIDE_DELAY);
         });
       }
 
@@ -2517,7 +2521,7 @@ render_header('Quotes');
         });
 
         descInput.addEventListener('blur', () => {
-          setTimeout(hideSuggestBox, 200);
+          setTimeout(hideSuggestBox, BLUR_HIDE_DELAY);
         });
       }
 
