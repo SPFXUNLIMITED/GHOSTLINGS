@@ -895,7 +895,7 @@ render_header('Quick Quote');
           <button type="submit" class="btn primary">Approve</button>
         </form>
       <?php endif; ?>
-      <form method="post" style="margin:0;" onsubmit="return confirm('Convert this quote to invoice?');">
+      <form method="post" style="margin:0;" onsubmit="return confirm('Convert Quote #<?= (int)$detail_quote['id'] ?> to an invoice?');">
         <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quick_quote_csrf']) ?>">
         <input type="hidden" name="action" value="convert_invoice">
         <input type="hidden" name="quote_id" value="<?= (int)$detail_quote['id'] ?>">
