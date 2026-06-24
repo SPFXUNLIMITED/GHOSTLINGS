@@ -1289,11 +1289,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $posted_inv_id = $_POST['item_inv_id'] ?? [];
       if (!is_array($posted_desc) || !is_array($posted_qty) || !is_array($posted_cost) || !is_array($posted_markup) || !is_array($posted_price) || !is_array($posted_taxable) || !is_array($posted_inv_id)) {
         $errors[] = 'Line item data is invalid.';
-      } elseif (count($posted_desc) !== count($posted_qty) || count($posted_desc) !== count($posted_cost) || count($posted_desc) !== count($posted_markup)) {
+      } elseif (count($posted_desc) !== count($posted_qty) || count($posted_desc) !== count($posted_cost) || count($posted_desc) !== count($posted_markup) || count($posted_desc) !== count($posted_price) || count($posted_desc) !== count($posted_taxable)) {
         $errors[] = 'Line item data is malformed. Please reload and try again.';
       } else {
         $line_items = [];
-        $line_count = min(count($posted_desc), QUOTE_MAX_LINE_ITEMS);
+        $line_count = min(count($posted_desc), count($posted_qty), count($posted_cost), count($posted_markup), count($posted_price), count($posted_taxable), QUOTE_MAX_LINE_ITEMS);
         for ($i = 0; $i < $line_count; $i++) {
           $desc = trim((string)($posted_desc[$i] ?? ''));
           $qty_raw = trim((string)($posted_qty[$i] ?? ''));
