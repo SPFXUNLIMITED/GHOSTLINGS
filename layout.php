@@ -584,6 +584,7 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
       ['href' => 'notifications.php', 'file' => 'notifications.php', 'label' => 'Notifications'],
     ], $current); ?>
     <?php render_menu_link(['href' => 'time_clock.php', 'files' => ['time_clock.php', 'time_report.php'], 'label' => 'Time Clock'], $current); ?>
+    <?php render_menu_link(['href' => 'agenda.php', 'file' => 'agenda.php', 'label' => 'Agenda'], $current); ?>
     <?php render_menu_dropdown('Inquiries', [
       ['href' => 'machine_inquiry_form.php', 'file' => 'machine_inquiry_form.php', 'label' => 'Machine Inquiry Form'],
       ['href' => 'machine_inquiry_admin.php', 'file' => 'machine_inquiry_admin.php', 'label' => 'Inquiry Admin'],
