@@ -1714,7 +1714,7 @@ render_header('Sourcing RFQ Tracker');
                  value="<?= $editing_quote['shipping_cost'] !== null ? h((string)$editing_quote['shipping_cost']) : '' ?>" />
         </div>
         <div>
-          <label>Shipping Method</label>
+          <label>Incoterm / Shipping Method</label>
           <input type="text" name="shipping_method" maxlength="<?= MAX_SHIPPING_METHOD_LENGTH ?>"
                  value="<?= h((string)($editing_quote['shipping_method'] ?? '')) ?>" />
         </div>
@@ -1845,7 +1845,7 @@ render_header('Sourcing RFQ Tracker');
                  value="<?= h($add_quote_post['shipping_cost'] ?? '') ?>" />
         </div>
         <div>
-          <label>Shipping Method</label>
+          <label>Incoterm / Shipping Method</label>
           <input type="text" name="shipping_method" maxlength="<?= MAX_SHIPPING_METHOD_LENGTH ?>" placeholder="e.g. DDP / FOB / EXW"
                  value="<?= h($add_quote_post['shipping_method'] ?? '') ?>" />
         </div>
@@ -1894,6 +1894,7 @@ render_header('Sourcing RFQ Tracker');
         <thead>
           <tr>
             <th>Supplier</th>
+            <th>Incoterm</th>
             <th>Quote Per Unit</th>
             <th>Status</th>
             <th>Attachment</th>
@@ -1903,7 +1904,7 @@ render_header('Sourcing RFQ Tracker');
         </thead>
         <tbody>
           <?php if (!$quotes): ?>
-            <tr><td colspan="6" class="muted">No quotes added yet for this RFQ.</td></tr>
+            <tr><td colspan="7" class="muted">No quotes added yet for this RFQ.</td></tr>
           <?php endif; ?>
           <?php foreach ($quotes as $q): ?>
             <tr>
@@ -1929,6 +1930,7 @@ render_header('Sourcing RFQ Tracker');
                   <div class="muted" style="font-size:12px;">SKU: <?= h((string)$q['sku']) ?></div>
                 <?php endif; ?>
               </td>
+              <td><?= h((string)($q['shipping_method'] ?? '')) ?: '—' ?></td>
               <td>
                 <?= h($q['currency']) ?> <?= h(number_format((float)$q['quote_amount'], 2)) ?>
                 <?php if (!empty($q['moq'])): ?>
