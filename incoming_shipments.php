@@ -384,8 +384,9 @@ render_header('Incoming Shipments');
             </select>
           </div>
           <div>
-            <label for="incoming-tracking-number">Tracking Number</label>
+            <label id="incoming-tracking-label" for="incoming-tracking-number">Tracking Number</label>
             <input id="incoming-tracking-number" type="text" name="tracking_number" maxlength="1000" size="80" required />
+            <small id="incoming-tracking-note" style="display:none; color:#6b7280;">Please paste the complete Amazon ship-track URL</small>
           </div>
           <div style="grid-column:1/-1;">
             <label for="incoming-item-description">Item Description</label>
@@ -505,8 +506,19 @@ render_header('Incoming Shipments');
   var expectedArrivalInput = document.getElementById('incoming-expected-arrival');
   var carrierInput = document.getElementById('incoming-carrier');
   var trackingInput = document.getElementById('incoming-tracking-number');
+  var trackingLabel = document.getElementById('incoming-tracking-label');
+  var trackingNote = document.getElementById('incoming-tracking-note');
   var itemDescriptionInput = document.getElementById('incoming-item-description');
   var statusInput = document.getElementById('incoming-status');
+
+  function updateTrackingLabel() {
+    var isAmazon = carrierInput.value === 'Amazon Logistics';
+    trackingLabel.textContent = isAmazon ? 'Full Amazon Tracking URL' : 'Tracking Number';
+    trackingInput.placeholder = isAmazon ? 'https://track.amazon.com/tracking/...' : '';
+    trackingNote.style.display = isAmazon ? '' : 'none';
+  }
+
+  carrierInput.addEventListener('change', updateTrackingLabel);
 
   function openModal() {
     modal.classList.add('open');
@@ -526,6 +538,7 @@ render_header('Incoming Shipments');
     actionInput.value = 'add_shipment';
     editIdInput.value = '';
     statusInput.value = 'Ordered';
+    updateTrackingLabel();
   }
 
   function setFormForEdit(shipment) {
@@ -539,6 +552,7 @@ render_header('Incoming Shipments');
     trackingInput.value = shipment.tracking_number || '';
     itemDescriptionInput.value = shipment.item_description || '';
     statusInput.value = shipment.status || 'Ordered';
+    updateTrackingLabel();
   }
 
   addBtn.addEventListener('click', function () {
