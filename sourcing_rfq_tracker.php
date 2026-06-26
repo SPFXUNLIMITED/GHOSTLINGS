@@ -1952,6 +1952,9 @@ render_header('Sourcing RFQ Tracker');
                 <?php if ($q['shipping_cost'] !== null && $q['shipping_cost'] !== ''): ?>
                   <div class="muted" style="font-size:12px;">Shipping: <?= h($q['currency']) ?> <?= h(number_format((float)$q['shipping_cost'], 2)) ?></div>
                 <?php endif; ?>
+                <?php if (!empty($q['crate_cost']) && (float)$q['crate_cost'] > 0): ?>
+                  <div class="muted" style="font-size:12px;">Crate: <?= h($q['currency']) ?> <?= h(number_format((float)$q['crate_cost'], 2)) ?></div>
+                <?php endif; ?>
                 <?php if (!empty($q['moq'])): ?>
                   <div class="muted" style="font-size:12px;">MOQ: <?= h((string)$q['moq']) ?></div>
                 <?php endif; ?>
