@@ -386,7 +386,7 @@ render_header('Incoming Shipments');
           <div>
             <label id="incoming-tracking-label" for="incoming-tracking-number">Tracking Number</label>
             <input id="incoming-tracking-number" type="text" name="tracking_number" maxlength="1000" size="80" required />
-            <small id="incoming-tracking-note" style="display:none; color:#6b7280;">Please paste the complete Amazon ship-track URL</small>
+            <small id="incoming-tracking-note" style="display:none; color:#6b7280;">Please paste the complete Amazon tracking URL</small>
           </div>
           <div style="grid-column:1/-1;">
             <label for="incoming-item-description">Item Description</label>
