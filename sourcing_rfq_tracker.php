@@ -4,7 +4,14 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 
 // Add crate_cost column if it doesn't exist
-$pdo->exec("ALTER TABLE rfq_quotes ADD COLUMN IF NOT EXISTS crate_cost DECIMAL(12,2) NULL DEFAULT NULL AFTER shipping_cost");
+try {
+  $pdo->exec("ALTER TABLE rfq_quotes ADD COLUMN IF NOT EXISTS crate_cost DECIMAL(12,2) NULL DEFAULT NULL AFTER shipping_cost");
+} catch (Throwable $e) {
+  $crate_cost_column = $pdo->query("SHOW COLUMNS FROM rfq_quotes LIKE 'crate_cost'");
+  if ($crate_cost_column === false || $crate_cost_column->fetch(PDO::FETCH_ASSOC) === false) {
+    throw $e;
+  }
+}
 
 require_rfq_access();
 
