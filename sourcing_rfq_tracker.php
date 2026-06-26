@@ -1511,13 +1511,14 @@ render_header('Sourcing RFQ Tracker');
             <th>Image</th>
             <th>#</th>
             <th>RFQ</th>
+            <th>Quotes</th>
             <th>Status</th>
             <th class="col-actions">Actions</th>
           </tr>
         </thead>
         <tbody>
           <?php if (!$rfqs): ?>
-            <tr><td colspan="5" class="muted">No RFQ requests found.</td></tr>
+            <tr><td colspan="6" class="muted">No RFQ requests found.</td></tr>
           <?php endif; ?>
           <?php foreach ($rfqs as $r): ?>
             <tr>
@@ -1569,7 +1570,7 @@ render_header('Sourcing RFQ Tracker');
               <td>
                 <strong><?= h($r['request_title']) ?></strong><br>
                 <span class="muted">
-                  <?= ($r['request_category'] ?? 'machine') === 'parts' ? 'Parts' : 'Machine' ?> · Qty: <?= (int)$r['quantity'] ?> · Quotes: <?= (int)$r['quote_count'] ?> · Urgency:
+                  <?= ($r['request_category'] ?? 'machine') === 'parts' ? 'Parts' : 'Machine' ?> · Qty: <?= (int)$r['quantity'] ?> · Urgency:
                   <?php
                     $urgency_val = (string)($r['urgency'] ?? 'normal');
                     $ub = $urgency_badges[$urgency_val] ?? [ucfirst($urgency_val), '#e2e8f0', '#334155'];
@@ -1577,6 +1578,21 @@ render_header('Sourcing RFQ Tracker');
                   <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:0.72em; font-weight:600; letter-spacing:0.04em; background:<?= h($ub[1]) ?>; color:<?= h($ub[2]) ?>;"><?= h($ub[0]) ?></span>
                   <br>Acquisition: <?= h(format_acquisition_purpose($r)) ?>
                 </span>
+              </td>
+              <td>
+                <?php
+                 $qc = (int)$r['quote_count'];
+                 if ($qc === 0) {
+                   $qc_color = '#dc2626';
+                 } elseif ($qc <= 2) {
+                   $qc_color = '#ea580c';
+                 } elseif ($qc <= 4) {
+                   $qc_color = '#2563eb';
+                 } else {
+                   $qc_color = '#16a34a';
+                 }
+                ?>
+                <span style="color:<?= h($qc_color) ?>; font-weight:600;"><?= $qc ?> quote<?= $qc !== 1 ? 's' : '' ?></span>
               </td>
               <td>
                 <form method="post" class="row" style="gap:6px; align-items:center;">
