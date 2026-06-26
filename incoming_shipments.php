@@ -323,7 +323,16 @@ render_header('Incoming Shipments');
           <td><?= h($row_carrier) ?></td>
           <td>
             <?php if ($row_tracking_url !== ''): ?>
-              <a href="<?= h($row_tracking_url) ?>" target="_blank" rel="noopener noreferrer"><code><?= h($row_tracking) ?></code></a>
+              <?php
+                $row_tracking_label = $row_tracking;
+                if (strcasecmp($row_carrier, 'Amazon Logistics') === 0 && stripos($row_tracking, 'http') === 0) {
+                  parse_str(parse_url($row_tracking, PHP_URL_QUERY) ?? '', $qs);
+                  if (!empty($qs['shipmentId'])) {
+                    $row_tracking_label = $qs['shipmentId'];
+                  }
+                }
+              ?>
+              <a href="<?= h($row_tracking_url) ?>" target="_blank" rel="noopener noreferrer"><code><?= h($row_tracking_label) ?></code></a>
             <?php else: ?>
               <code><?= h($row_tracking) ?></code>
             <?php endif; ?>
