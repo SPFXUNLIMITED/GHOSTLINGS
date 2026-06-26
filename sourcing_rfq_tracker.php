@@ -541,6 +541,7 @@ function empty_quote_form_values(): array {
     'currency'          => 'USD',
     'lead_time_days'    => '',
     'shipping_cost'     => '',
+    'crate_cost'        => '',
     'shipping_origin'   => '',
     'shipping_method'   => '',
     'quote_status'      => 'received',
@@ -562,6 +563,7 @@ function quote_row_to_form_values(array $quote): array {
     'currency'          => trim((string)($quote['currency'] ?? 'USD')),
     'lead_time_days'    => $quote['lead_time_days'] !== null ? (string)$quote['lead_time_days'] : '',
     'shipping_cost'     => $quote['shipping_cost'] !== null ? (string)$quote['shipping_cost'] : '',
+    'crate_cost'        => $quote['crate_cost'] !== null ? (string)$quote['crate_cost'] : '',
     'shipping_origin'   => trim((string)($quote['shipping_origin'] ?? '')),
     'shipping_method'   => trim((string)($quote['shipping_method'] ?? '')),
     'quote_status'      => trim((string)($quote['quote_status'] ?? 'received')),
@@ -747,6 +749,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $currency = strtoupper(trim((string)($_POST['currency'] ?? 'USD')));
       $lead_time_days_raw = trim((string)($_POST['lead_time_days'] ?? ''));
       $shipping_cost_raw = trim((string)($_POST['shipping_cost'] ?? ''));
+      $crate_cost_raw = trim((string)($_POST['crate_cost'] ?? ''));
       $shipping_origin = trim((string)($_POST['shipping_origin'] ?? ''));
       $shipping_method = trim((string)($_POST['shipping_method'] ?? ''));
       $quote_status = (string)($_POST['quote_status'] ?? 'received');
@@ -775,6 +778,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
       if ($shipping_cost_raw !== '' && (!is_numeric($shipping_cost_raw) || (float)$shipping_cost_raw < 0)) {
         $errors[] = 'Shipping cost must be a non-negative number.';
+      }
+      if ($crate_cost_raw !== '' && (!is_numeric($crate_cost_raw) || (float)$crate_cost_raw < 0)) {
+        $errors[] = 'Crate cost must be a non-negative number.';
       }
       if (!isset($quote_statuses[$quote_status])) {
         $errors[] = 'Invalid quote status selected.';
@@ -873,10 +879,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           } else {
           $ins = $pdo->prepare(
             "INSERT INTO rfq_quotes
-            (rfq_request_id, supplier_name, alibaba_chat_link, model_name, dimensions, weight, sku, quote_amount, moq, currency, lead_time_days, shipping_cost,
+            (rfq_request_id, supplier_name, alibaba_chat_link, model_name, dimensions, weight, sku, quote_amount, moq, currency, lead_time_days, shipping_cost, crate_cost,
                shipping_origin, shipping_method, quote_status, received_on, notes, created_by,
                quote_file_original_name, quote_file_stored_name, quote_file_mime_type, quote_file_size_bytes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
           );
           $ins->execute([
             $rfq_id,
@@ -891,6 +897,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $currency,
             $lead_time_days_raw === '' ? null : (int)$lead_time_days_raw,
             $shipping_cost_raw === '' ? null : (float)$shipping_cost_raw,
+            $crate_cost_raw === '' ? null : (float)$crate_cost_raw,
             $shipping_origin === '' ? null : $shipping_origin,
             $shipping_method === '' ? null : $shipping_method,
             $quote_status,
@@ -923,6 +930,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           'currency'        => $currency,
           'lead_time_days'  => $lead_time_days_raw,
           'shipping_cost'   => $shipping_cost_raw,
+          'crate_cost'      => $crate_cost_raw,
           'shipping_origin' => $shipping_origin,
           'shipping_method' => $shipping_method,
           'quote_status'    => $quote_status,
@@ -944,6 +952,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $currency = strtoupper(trim((string)($_POST['currency'] ?? 'USD')));
       $lead_time_days_raw = trim((string)($_POST['lead_time_days'] ?? ''));
       $shipping_cost_raw = trim((string)($_POST['shipping_cost'] ?? ''));
+      $crate_cost_raw = trim((string)($_POST['crate_cost'] ?? ''));
       $shipping_origin = trim((string)($_POST['shipping_origin'] ?? ''));
       $shipping_method = trim((string)($_POST['shipping_method'] ?? ''));
       $quote_status = (string)($_POST['quote_status'] ?? 'received');
@@ -974,6 +983,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
       if ($shipping_cost_raw !== '' && (!is_numeric($shipping_cost_raw) || (float)$shipping_cost_raw < 0)) {
         $errors[] = 'Shipping cost must be a non-negative number.';
+      }
+      if ($crate_cost_raw !== '' && (!is_numeric($crate_cost_raw) || (float)$crate_cost_raw < 0)) {
+        $errors[] = 'Crate cost must be a non-negative number.';
       }
       if (!isset($quote_statuses[$quote_status])) {
         $errors[] = 'Invalid quote status selected.';
@@ -1074,7 +1086,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               "UPDATE rfq_quotes SET
                 supplier_name = ?, alibaba_chat_link = ?, model_name = ?, dimensions = ?, weight = ?, sku = ?,
                 quote_amount = ?, moq = ?, currency = ?, lead_time_days = ?,
-                shipping_cost = ?, shipping_origin = ?, shipping_method = ?, quote_status = ?,
+                shipping_cost = ?, crate_cost = ?, shipping_origin = ?, shipping_method = ?, quote_status = ?,
                 received_on = ?, notes = ?,
                 quote_file_original_name = ?, quote_file_stored_name = ?,
                 quote_file_mime_type = ?, quote_file_size_bytes = ?
@@ -1092,6 +1104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $currency,
               $lead_time_days_raw === '' ? null : (int)$lead_time_days_raw,
               $shipping_cost_raw === '' ? null : (float)$shipping_cost_raw,
+              $crate_cost_raw === '' ? null : (float)$crate_cost_raw,
               $shipping_origin === '' ? null : $shipping_origin,
               $shipping_method === '' ? null : $shipping_method,
               $quote_status,
@@ -1140,6 +1153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           'currency'        => $currency,
           'lead_time_days'  => $lead_time_days_raw !== '' ? $lead_time_days_raw : null,
           'shipping_cost'   => $shipping_cost_raw !== '' ? $shipping_cost_raw : null,
+          'crate_cost'      => $crate_cost_raw !== '' ? $crate_cost_raw : null,
           'shipping_origin' => $shipping_origin !== '' ? $shipping_origin : null,
           'shipping_method' => $shipping_method !== '' ? $shipping_method : null,
           'quote_status'    => $quote_status,
@@ -1730,6 +1744,11 @@ render_header('Sourcing RFQ Tracker');
                  value="<?= $editing_quote['shipping_cost'] !== null ? h((string)$editing_quote['shipping_cost']) : '' ?>" />
         </div>
         <div>
+          <label>Crate Cost</label>
+          <input type="number" name="crate_cost" min="0" step="0.01"
+                 value="<?= $editing_quote['crate_cost'] !== null ? h((string)$editing_quote['crate_cost']) : '' ?>" />
+        </div>
+        <div>
           <label>Incoterm / Shipping Method</label>
           <input type="text" name="shipping_method" maxlength="<?= MAX_SHIPPING_METHOD_LENGTH ?>"
                  value="<?= h((string)($editing_quote['shipping_method'] ?? '')) ?>" />
@@ -1859,6 +1878,11 @@ render_header('Sourcing RFQ Tracker');
           <label>Shipping Cost</label>
           <input type="number" name="shipping_cost" min="0" step="0.01" placeholder="e.g. 1800.00"
                  value="<?= h($add_quote_post['shipping_cost'] ?? '') ?>" />
+        </div>
+        <div>
+          <label>Crate Cost</label>
+          <input type="number" name="crate_cost" min="0" step="0.01" placeholder="e.g. 200.00"
+                 value="<?= h($add_quote_post['crate_cost'] ?? '') ?>" />
         </div>
         <div>
           <label>Incoterm / Shipping Method</label>
