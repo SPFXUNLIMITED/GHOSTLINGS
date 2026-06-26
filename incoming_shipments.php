@@ -28,6 +28,9 @@ function incoming_is_valid_ymd(string $value): bool {
 }
 
 function incoming_tracking_url(string $carrier, string $tracking): string {
+  if (stripos($tracking, 'http') === 0) {
+    return $tracking;
+  }
   $t = rawurlencode($tracking);
   switch ($carrier) {
     case 'Amazon Logistics':
@@ -54,7 +57,7 @@ try {
       order_date       DATE NOT NULL,
       expected_arrival DATE NOT NULL,
       carrier          VARCHAR(120) NOT NULL,
-      tracking_number  VARCHAR(160) NOT NULL,
+      tracking_number  VARCHAR(1000) NOT NULL,
       item_description TEXT NOT NULL,
       status           VARCHAR(30) NOT NULL DEFAULT 'Ordered',
       created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -127,7 +130,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $incoming_errors[] = 'Expected Arrival must be a valid date.';
   }
 
+<<<<<<< HEAD
   if (strlen($tracking_number) > 160) {
+=======
+  if (strlen($tracking_number) > 1000) {
+>>>>>>> 72c95d988588158764ac103fe4c9150ef9797076
     $incoming_errors[] = 'Tracking Number is too long.';
   }
   if (strlen($item_description) > INCOMING_MAX_ITEM_DESCRIPTION_LENGTH) {
@@ -373,7 +380,7 @@ render_header('Incoming Shipments');
           </div>
           <div>
             <label for="incoming-tracking-number">Tracking Number</label>
-            <input id="incoming-tracking-number" type="text" name="tracking_number" maxlength="255" size="80" required />
+            <input id="incoming-tracking-number" type="text" name="tracking_number" maxlength="1000" size="80" required />
           </div>
           <div style="grid-column:1/-1;">
             <label for="incoming-item-description">Item Description</label>
