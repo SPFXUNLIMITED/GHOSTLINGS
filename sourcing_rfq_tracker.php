@@ -647,7 +647,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       } else {
         if ($is_edit_ai_fill) {
           $existing_quote_stmt = $pdo->prepare(
-            "SELECT supplier_name, alibaba_chat_link, model_name, dimensions, weight, sku, quote_amount, currency, lead_time_days, shipping_cost,
+            "SELECT supplier_name, alibaba_chat_link, model_name, dimensions, weight, sku, quote_amount, currency, lead_time_days, shipping_cost, crate_cost,
                     shipping_origin, shipping_method, quote_status, received_on, notes, moq
                FROM rfq_quotes
               WHERE id = ? AND rfq_request_id = ?
