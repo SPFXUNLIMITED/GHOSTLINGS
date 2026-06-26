@@ -2,6 +2,10 @@
 require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
+
+// Add crate_cost column if it doesn't exist
+$pdo->exec("ALTER TABLE rfq_quotes ADD COLUMN IF NOT EXISTS crate_cost DECIMAL(12,2) NULL DEFAULT NULL AFTER shipping_cost");
+
 require_rfq_access();
 
 const MAX_LEAD_TIME_DAYS = 3650;
