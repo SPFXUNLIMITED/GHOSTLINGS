@@ -130,11 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $incoming_errors[] = 'Expected Arrival must be a valid date.';
   }
 
-<<<<<<< HEAD
-  if (strlen($tracking_number) > 160) {
-=======
   if (strlen($tracking_number) > 1000) {
->>>>>>> 72c95d988588158764ac103fe4c9150ef9797076
     $incoming_errors[] = 'Tracking Number is too long.';
   }
   if (strlen($item_description) > INCOMING_MAX_ITEM_DESCRIPTION_LENGTH) {
