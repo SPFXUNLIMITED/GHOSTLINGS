@@ -654,6 +654,7 @@ foreach ([
   "ALTER TABLE rfq_quotes ADD COLUMN quote_file_stored_name VARCHAR(255) NULL",
   "ALTER TABLE rfq_quotes ADD COLUMN quote_file_mime_type VARCHAR(191) NULL",
   "ALTER TABLE rfq_quotes ADD COLUMN quote_file_size_bytes BIGINT UNSIGNED NULL",
+  "ALTER TABLE rfq_quotes ADD COLUMN moq VARCHAR(255) NULL",
 ] as $sql) {
   try {
     $pdo->exec($sql);
