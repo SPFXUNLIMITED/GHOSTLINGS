@@ -491,9 +491,10 @@ function render_header(string $title): void {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title><?= h($title) ?></title>
   
-<link rel="icon" type="image/x-icon" href="/favicon.ico?v=3">
-<link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=3">
-<link rel="apple-touch-icon" href="/favicon.ico?v=3">
+    <title><?= htmlspecialchars($pageTitle ?? 'Ghost Laser') ?></title>
+    <link rel="icon" type="image/png" href="<?= asset('ghost-logo2-32x32.png') ?>">
+    <link rel="shortcut icon" type="image/png" href="<?= asset('ghost-logo2-32x32.png') ?>">
+    <link rel="apple-touch-icon" href="<?= asset('ghost-logo2-32x32.png') ?>">
 
   <link rel="stylesheet" href="<?= asset('styles.css') ?>" />
 </head>
