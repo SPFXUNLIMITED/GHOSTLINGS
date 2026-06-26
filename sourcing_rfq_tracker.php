@@ -536,12 +536,8 @@ function empty_quote_form_values(): array {
     'dimensions'        => '',
     'weight'            => '',
     'sku'               => '',
-    'msrp'              => '',
-    'map_price'         => '',
-    'moq_20_price'      => '',
-    'moq_10_price'      => '',
-    'drop_ship_price'   => '',
     'quote_amount'      => '',
+    'moq'               => '',
     'currency'          => 'USD',
     'lead_time_days'    => '',
     'shipping_cost'     => '',
@@ -561,12 +557,8 @@ function quote_row_to_form_values(array $quote): array {
     'dimensions'        => trim((string)($quote['dimensions'] ?? '')),
     'weight'            => trim((string)($quote['weight'] ?? '')),
     'sku'               => trim((string)($quote['sku'] ?? '')),
-    'msrp'              => $quote['msrp'] !== null ? (string)$quote['msrp'] : '',
-    'map_price'         => $quote['map_price'] !== null ? (string)$quote['map_price'] : '',
-    'moq_20_price'      => $quote['moq_20_price'] !== null ? (string)$quote['moq_20_price'] : '',
-    'moq_10_price'      => $quote['moq_10_price'] !== null ? (string)$quote['moq_10_price'] : '',
-    'drop_ship_price'   => $quote['drop_ship_price'] !== null ? (string)$quote['drop_ship_price'] : '',
     'quote_amount'      => $quote['quote_amount'] !== null ? (string)$quote['quote_amount'] : '',
+    'moq'               => trim((string)($quote['moq'] ?? '')),
     'currency'          => trim((string)($quote['currency'] ?? 'USD')),
     'lead_time_days'    => $quote['lead_time_days'] !== null ? (string)$quote['lead_time_days'] : '',
     'shipping_cost'     => $quote['shipping_cost'] !== null ? (string)$quote['shipping_cost'] : '',
@@ -653,9 +645,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       } else {
         if ($is_edit_ai_fill) {
           $existing_quote_stmt = $pdo->prepare(
-            "SELECT supplier_name, alibaba_chat_link, model_name, dimensions, weight, sku, msrp, map_price, moq_20_price,
-                    moq_10_price, drop_ship_price, quote_amount, currency, lead_time_days, shipping_cost,
-                    shipping_origin, shipping_method, quote_status, received_on, notes
+            "SELECT supplier_name, alibaba_chat_link, model_name, dimensions, weight, sku, quote_amount, currency, lead_time_days, shipping_cost,
+                    shipping_origin, shipping_method, quote_status, received_on, notes, moq
                FROM rfq_quotes
               WHERE id = ? AND rfq_request_id = ?
               LIMIT 1"
@@ -722,7 +713,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $note_lines[] = $notes;
           }
           if ($moq !== '') {
-            $note_lines[] = 'MOQ: ' . $moq;
+            $quote_form_post['moq'] = $moq;
+            $ai_fill_applied = true;
           }
           if ($note_lines) {
             $quote_form_post['notes'] = mb_substr(implode("\n", $note_lines), 0, MAX_QUOTE_NOTES_LENGTH);
@@ -750,12 +742,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $dimensions = trim((string)($_POST['dimensions'] ?? ''));
       $weight = trim((string)($_POST['weight'] ?? ''));
       $sku = trim((string)($_POST['sku'] ?? ''));
-      $msrp_raw = trim((string)($_POST['msrp'] ?? ''));
-      $map_price_raw = trim((string)($_POST['map_price'] ?? ''));
-      $moq_20_price_raw = trim((string)($_POST['moq_20_price'] ?? ''));
-      $moq_10_price_raw = trim((string)($_POST['moq_10_price'] ?? ''));
-      $drop_ship_price_raw = trim((string)($_POST['drop_ship_price'] ?? ''));
       $quote_amount_raw = trim((string)($_POST['quote_amount'] ?? ''));
+      $moq = trim((string)($_POST['moq'] ?? ''));
       $currency = strtoupper(trim((string)($_POST['currency'] ?? 'USD')));
       $lead_time_days_raw = trim((string)($_POST['lead_time_days'] ?? ''));
       $shipping_cost_raw = trim((string)($_POST['shipping_cost'] ?? ''));
@@ -776,23 +764,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (strlen($weight) > MAX_WEIGHT_LENGTH) $errors[] = 'Weight must be ' . MAX_WEIGHT_LENGTH . ' characters or fewer.';
       if (strlen($sku) > 100) $errors[] = 'SKU must be 100 characters or fewer.';
       if (strlen($shipping_method) > MAX_SHIPPING_METHOD_LENGTH) $errors[] = 'Shipping method must be ' . MAX_SHIPPING_METHOD_LENGTH . ' characters or fewer.';
-      if ($msrp_raw !== '' && (!is_numeric($msrp_raw) || (float)$msrp_raw < 0)) {
-        $errors[] = 'MSRP must be a non-negative number.';
-      }
-      if ($map_price_raw !== '' && (!is_numeric($map_price_raw) || (float)$map_price_raw < 0)) {
-        $errors[] = 'MAP must be a non-negative number.';
-      }
-      if ($moq_20_price_raw !== '' && (!is_numeric($moq_20_price_raw) || (float)$moq_20_price_raw < 0)) {
-        $errors[] = 'MOQ 20 must be a non-negative number.';
-      }
-      if ($moq_10_price_raw !== '' && (!is_numeric($moq_10_price_raw) || (float)$moq_10_price_raw < 0)) {
-        $errors[] = 'MOQ 10 must be a non-negative number.';
-      }
-      if ($drop_ship_price_raw !== '' && (!is_numeric($drop_ship_price_raw) || (float)$drop_ship_price_raw < 0)) {
-        $errors[] = 'Drop Ship must be a non-negative number.';
-      }
       if ($quote_amount_raw === '' || !is_numeric($quote_amount_raw) || (float)$quote_amount_raw < 0) {
-        $errors[] = 'Quote amount must be a non-negative number.';
+        $errors[] = 'Quote per unit must be a non-negative number.';
       }
       if (!preg_match('/^[A-Z]{3}$/', $currency)) {
         $errors[] = 'Currency must be a 3-letter code (e.g. USD, CNY).';
@@ -900,12 +873,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           } else {
           $ins = $pdo->prepare(
             "INSERT INTO rfq_quotes
-            (rfq_request_id, supplier_name, alibaba_chat_link, model_name, dimensions, weight, sku, msrp, map_price, moq_20_price, moq_20_margin_msrp,
-             moq_20_margin_map, moq_10_price, moq_10_margin_msrp, moq_10_margin_map, drop_ship_price,
-             drop_ship_margin_msrp, drop_ship_margin_map, quote_amount, currency, lead_time_days, shipping_cost,
+            (rfq_request_id, supplier_name, alibaba_chat_link, model_name, dimensions, weight, sku, quote_amount, moq, currency, lead_time_days, shipping_cost,
                shipping_origin, shipping_method, quote_status, received_on, notes, created_by,
                quote_file_original_name, quote_file_stored_name, quote_file_mime_type, quote_file_size_bytes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
           );
           $ins->execute([
             $rfq_id,
@@ -915,18 +886,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $dimensions === '' ? null : $dimensions,
             $weight === '' ? null : $weight,
             $sku === '' ? null : $sku,
-            $msrp_raw === '' ? null : (float)$msrp_raw,
-            $map_price_raw === '' ? null : (float)$map_price_raw,
-            $moq_20_price_raw === '' ? null : (float)$moq_20_price_raw,
-            null,
-            null,
-            $moq_10_price_raw === '' ? null : (float)$moq_10_price_raw,
-            null,
-            null,
-            $drop_ship_price_raw === '' ? null : (float)$drop_ship_price_raw,
-            null,
-            null,
             (float)$quote_amount_raw,
+            $moq === '' ? null : $moq,
             $currency,
             $lead_time_days_raw === '' ? null : (int)$lead_time_days_raw,
             $shipping_cost_raw === '' ? null : (float)$shipping_cost_raw,
@@ -957,12 +918,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           'dimensions'      => $dimensions,
           'weight'          => $weight,
           'sku'             => $sku,
-          'msrp'            => $msrp_raw,
-          'map_price'       => $map_price_raw,
-          'moq_20_price'    => $moq_20_price_raw,
-          'moq_10_price'    => $moq_10_price_raw,
-          'drop_ship_price' => $drop_ship_price_raw,
           'quote_amount'    => $quote_amount_raw,
+          'moq'             => $moq,
           'currency'        => $currency,
           'lead_time_days'  => $lead_time_days_raw,
           'shipping_cost'   => $shipping_cost_raw,
@@ -982,12 +939,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $dimensions = trim((string)($_POST['dimensions'] ?? ''));
       $weight = trim((string)($_POST['weight'] ?? ''));
       $sku = trim((string)($_POST['sku'] ?? ''));
-      $msrp_raw = trim((string)($_POST['msrp'] ?? ''));
-      $map_price_raw = trim((string)($_POST['map_price'] ?? ''));
-      $moq_20_price_raw = trim((string)($_POST['moq_20_price'] ?? ''));
-      $moq_10_price_raw = trim((string)($_POST['moq_10_price'] ?? ''));
-      $drop_ship_price_raw = trim((string)($_POST['drop_ship_price'] ?? ''));
       $quote_amount_raw = trim((string)($_POST['quote_amount'] ?? ''));
+      $moq = trim((string)($_POST['moq'] ?? ''));
       $currency = strtoupper(trim((string)($_POST['currency'] ?? 'USD')));
       $lead_time_days_raw = trim((string)($_POST['lead_time_days'] ?? ''));
       $shipping_cost_raw = trim((string)($_POST['shipping_cost'] ?? ''));
@@ -1010,23 +963,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (strlen($weight) > MAX_WEIGHT_LENGTH) $errors[] = 'Weight must be ' . MAX_WEIGHT_LENGTH . ' characters or fewer.';
       if (strlen($sku) > 100) $errors[] = 'SKU must be 100 characters or fewer.';
       if (strlen($shipping_method) > MAX_SHIPPING_METHOD_LENGTH) $errors[] = 'Shipping method must be ' . MAX_SHIPPING_METHOD_LENGTH . ' characters or fewer.';
-      if ($msrp_raw !== '' && (!is_numeric($msrp_raw) || (float)$msrp_raw < 0)) {
-        $errors[] = 'MSRP must be a non-negative number.';
-      }
-      if ($map_price_raw !== '' && (!is_numeric($map_price_raw) || (float)$map_price_raw < 0)) {
-        $errors[] = 'MAP must be a non-negative number.';
-      }
-      if ($moq_20_price_raw !== '' && (!is_numeric($moq_20_price_raw) || (float)$moq_20_price_raw < 0)) {
-        $errors[] = 'MOQ 20 must be a non-negative number.';
-      }
-      if ($moq_10_price_raw !== '' && (!is_numeric($moq_10_price_raw) || (float)$moq_10_price_raw < 0)) {
-        $errors[] = 'MOQ 10 must be a non-negative number.';
-      }
-      if ($drop_ship_price_raw !== '' && (!is_numeric($drop_ship_price_raw) || (float)$drop_ship_price_raw < 0)) {
-        $errors[] = 'Drop Ship must be a non-negative number.';
-      }
       if ($quote_amount_raw === '' || !is_numeric($quote_amount_raw) || (float)$quote_amount_raw < 0) {
-        $errors[] = 'Quote amount must be a non-negative number.';
+        $errors[] = 'Quote per unit must be a non-negative number.';
       }
       if (!preg_match('/^[A-Z]{3}$/', $currency)) {
         $errors[] = 'Currency must be a 3-letter code (e.g. USD, CNY).';
@@ -1134,10 +1072,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           if (!$errors) {
             $upd = $pdo->prepare(
               "UPDATE rfq_quotes SET
-                supplier_name = ?, alibaba_chat_link = ?, model_name = ?, dimensions = ?, weight = ?, sku = ?, msrp = ?, map_price = ?, moq_20_price = ?,
-                moq_20_margin_msrp = ?, moq_20_margin_map = ?, moq_10_price = ?, moq_10_margin_msrp = ?,
-                moq_10_margin_map = ?, drop_ship_price = ?, drop_ship_margin_msrp = ?, drop_ship_margin_map = ?,
-                quote_amount = ?, currency = ?, lead_time_days = ?,
+                supplier_name = ?, alibaba_chat_link = ?, model_name = ?, dimensions = ?, weight = ?, sku = ?,
+                quote_amount = ?, moq = ?, currency = ?, lead_time_days = ?,
                 shipping_cost = ?, shipping_origin = ?, shipping_method = ?, quote_status = ?,
                 received_on = ?, notes = ?,
                 quote_file_original_name = ?, quote_file_stored_name = ?,
@@ -1151,18 +1087,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $dimensions === '' ? null : $dimensions,
               $weight === '' ? null : $weight,
               $sku === '' ? null : $sku,
-              $msrp_raw === '' ? null : (float)$msrp_raw,
-              $map_price_raw === '' ? null : (float)$map_price_raw,
-              $moq_20_price_raw === '' ? null : (float)$moq_20_price_raw,
-              null,
-              null,
-              $moq_10_price_raw === '' ? null : (float)$moq_10_price_raw,
-              null,
-              null,
-              $drop_ship_price_raw === '' ? null : (float)$drop_ship_price_raw,
-              null,
-              null,
               (float)$quote_amount_raw,
+              $moq === '' ? null : $moq,
               $currency,
               $lead_time_days_raw === '' ? null : (int)$lead_time_days_raw,
               $shipping_cost_raw === '' ? null : (float)$shipping_cost_raw,
@@ -1209,12 +1135,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           'dimensions'      => $dimensions,
           'weight'          => $weight,
           'sku'             => $sku,
-          'msrp'            => $msrp_raw,
-          'map_price'       => $map_price_raw,
-          'moq_20_price'    => $moq_20_price_raw,
-          'moq_10_price'    => $moq_10_price_raw,
-          'drop_ship_price' => $drop_ship_price_raw,
           'quote_amount'    => $quote_amount_raw,
+          'moq'             => $moq,
           'currency'        => $currency,
           'lead_time_days'  => $lead_time_days_raw !== '' ? $lead_time_days_raw : null,
           'shipping_cost'   => $shipping_cost_raw !== '' ? $shipping_cost_raw : null,
@@ -1767,34 +1689,14 @@ render_header('Sourcing RFQ Tracker');
                  value="<?= h((string)($editing_quote['sku'] ?? '')) ?>" />
         </div>
         <div>
-          <label>MSRP</label>
-          <input type="number" name="msrp" min="0" step="0.01"
-                 value="<?= $editing_quote['msrp'] !== null ? h((string)$editing_quote['msrp']) : '' ?>" />
-        </div>
-        <div>
-          <label>MAP (Minimum Advertised Price)</label>
-          <input type="number" name="map_price" min="0" step="0.01"
-                 value="<?= $editing_quote['map_price'] !== null ? h((string)$editing_quote['map_price']) : '' ?>" />
-        </div>
-        <div>
-          <label>MOQ 20</label>
-          <input type="number" name="moq_20_price" min="0" step="0.01"
-                 value="<?= $editing_quote['moq_20_price'] !== null ? h((string)$editing_quote['moq_20_price']) : '' ?>" />
-        </div>
-        <div>
-          <label>MOQ 10</label>
-          <input type="number" name="moq_10_price" min="0" step="0.01"
-                 value="<?= $editing_quote['moq_10_price'] !== null ? h((string)$editing_quote['moq_10_price']) : '' ?>" />
-        </div>
-        <div>
-          <label>Drop Ship</label>
-          <input type="number" name="drop_ship_price" min="0" step="0.01"
-                 value="<?= $editing_quote['drop_ship_price'] !== null ? h((string)$editing_quote['drop_ship_price']) : '' ?>" />
-        </div>
-        <div>
-          <label>Quote Amount <span style="color:var(--d)">*</span></label>
+          <label>Quote Per Unit <span style="color:var(--d)">*</span></label>
           <input type="number" name="quote_amount" min="0" step="0.01" required
                  value="<?= h((string)$editing_quote['quote_amount']) ?>" />
+        </div>
+        <div>
+          <label>MOQ</label>
+          <input type="text" name="moq" maxlength="255" placeholder="e.g. 10 units"
+                 value="<?= h((string)($editing_quote['moq'] ?? '')) ?>" />
         </div>
         <div>
           <label>Currency <span style="color:var(--d)">*</span></label>
@@ -1918,34 +1820,14 @@ render_header('Sourcing RFQ Tracker');
                  value="<?= h($add_quote_post['sku'] ?? '') ?>" />
         </div>
         <div>
-          <label>MSRP</label>
-          <input type="number" name="msrp" min="0" step="0.01" placeholder="e.g. 12999.00"
-                 value="<?= h($add_quote_post['msrp'] ?? '') ?>" />
-        </div>
-        <div>
-          <label>MAP (Minimum Advertised Price)</label>
-          <input type="number" name="map_price" min="0" step="0.01" placeholder="e.g. 11999.00"
-                 value="<?= h($add_quote_post['map_price'] ?? '') ?>" />
-        </div>
-        <div>
-          <label>MOQ 20</label>
-          <input type="number" name="moq_20_price" min="0" step="0.01" placeholder="e.g. 9500.00"
-                 value="<?= h($add_quote_post['moq_20_price'] ?? '') ?>" />
-        </div>
-        <div>
-          <label>MOQ 10</label>
-          <input type="number" name="moq_10_price" min="0" step="0.01" placeholder="e.g. 9800.00"
-                 value="<?= h($add_quote_post['moq_10_price'] ?? '') ?>" />
-        </div>
-        <div>
-          <label>Drop Ship</label>
-          <input type="number" name="drop_ship_price" min="0" step="0.01" placeholder="e.g. 10200.00"
-                 value="<?= h($add_quote_post['drop_ship_price'] ?? '') ?>" />
-        </div>
-        <div>
-          <label>Quote Amount <span style="color:var(--d)">*</span></label>
+          <label>Quote Per Unit <span style="color:var(--d)">*</span></label>
           <input type="number" name="quote_amount" min="0" step="0.01" required placeholder="e.g. 10800.00"
                  value="<?= h($add_quote_post['quote_amount'] ?? '') ?>" />
+        </div>
+        <div>
+          <label>MOQ</label>
+          <input type="text" name="moq" maxlength="255" placeholder="e.g. 10 units"
+                 value="<?= h($add_quote_post['moq'] ?? '') ?>" />
         </div>
         <div>
           <label>Currency <span style="color:var(--d)">*</span></label>
@@ -2012,7 +1894,7 @@ render_header('Sourcing RFQ Tracker');
         <thead>
           <tr>
             <th>Supplier</th>
-            <th>Quote</th>
+            <th>Quote Per Unit</th>
             <th>Status</th>
             <th>Attachment</th>
             <th>Added By</th>
@@ -2046,12 +1928,12 @@ render_header('Sourcing RFQ Tracker');
                 <?php if (!empty($q['sku'])): ?>
                   <div class="muted" style="font-size:12px;">SKU: <?= h((string)$q['sku']) ?></div>
                 <?php endif; ?>
-                <?php if ($q['msrp'] !== null): ?>
-                  <div class="muted" style="font-size:12px;">MSRP: <?= h((string)$q['currency']) ?> <?= h(number_format((float)$q['msrp'], 2)) ?></div>
-                <?php endif; ?>
               </td>
               <td>
                 <?= h($q['currency']) ?> <?= h(number_format((float)$q['quote_amount'], 2)) ?>
+                <?php if (!empty($q['moq'])): ?>
+                  <div class="muted" style="font-size:12px;">MOQ: <?= h((string)$q['moq']) ?></div>
+                <?php endif; ?>
               </td>
               <td>
                 <form method="post" class="row" style="gap:4px; align-items:center; margin-top:4px;">
