@@ -1583,16 +1583,16 @@ render_header('Sourcing RFQ Tracker');
                 <?php
                  $qc = (int)$r['quote_count'];
                  if ($qc === 0) {
-                   $qc_color = '#dc2626';
+                   $qc_bg = '#dc2626'; $qc_text = '#fff';
                  } elseif ($qc <= 2) {
-                   $qc_color = '#ea580c';
+                   $qc_bg = '#ea580c'; $qc_text = '#fff';
                  } elseif ($qc <= 4) {
-                   $qc_color = '#2563eb';
+                   $qc_bg = '#2563eb'; $qc_text = '#fff';
                  } else {
-                   $qc_color = '#16a34a';
+                   $qc_bg = '#16a34a'; $qc_text = '#fff';
                  }
                 ?>
-                <span style="color:<?= h($qc_color) ?>; font-weight:600;"><?= $qc ?> quote<?= $qc !== 1 ? 's' : '' ?></span>
+                <span style="display:inline-block; background:<?= h($qc_bg) ?>; color:<?= h($qc_text) ?>; font-weight:600; font-size:0.78rem; padding:3px 10px; border-radius:999px; white-space:nowrap;"><?= $qc ?> quote<?= $qc !== 1 ? 's' : '' ?></span>
               </td>
               <td>
                 <form method="post" class="row" style="gap:6px; align-items:center;">
