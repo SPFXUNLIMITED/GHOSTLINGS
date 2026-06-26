@@ -2,6 +2,21 @@
 require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
+
+// Add crate_cost column if it doesn't exist
+try {
+  $crate_cost_column = $pdo->query("SHOW COLUMNS FROM rfq_quotes LIKE 'crate_cost'");
+  if ($crate_cost_column === false || $crate_cost_column->fetch(PDO::FETCH_ASSOC) === false) {
+    try {
+      $pdo->exec("ALTER TABLE rfq_quotes ADD COLUMN IF NOT EXISTS crate_cost DECIMAL(12,2) NULL DEFAULT NULL AFTER shipping_cost");
+    } catch (Throwable $e) {
+      $pdo->exec("ALTER TABLE rfq_quotes ADD COLUMN crate_cost DECIMAL(12,2) NULL DEFAULT NULL AFTER shipping_cost");
+    }
+  }
+} catch (Throwable $e) {
+  throw new RuntimeException('Unable to ensure rfq_quotes.crate_cost exists: ' . $e->getMessage(), 0, $e);
+}
+
 require_rfq_access();
 
 const MAX_LEAD_TIME_DAYS = 3650;
