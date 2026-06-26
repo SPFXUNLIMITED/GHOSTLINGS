@@ -373,7 +373,7 @@ render_header('Incoming Shipments');
           </div>
           <div>
             <label for="incoming-tracking-number">Tracking Number</label>
-            <input id="incoming-tracking-number" type="text" name="tracking_number" maxlength="160" required />
+            <input id="incoming-tracking-number" type="text" name="tracking_number" maxlength="255" style="width:100%;" required />
           </div>
           <div style="grid-column:1/-1;">
             <label for="incoming-item-description">Item Description</label>
