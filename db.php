@@ -619,7 +619,7 @@ $pdo->exec("
     shipping_cost      DECIMAL(12,2) NULL,
     shipping_origin    VARCHAR(255) NULL,
     shipping_method    VARCHAR(100) NULL,
-    quote_status       ENUM('received','under_review','negotiating','accepted','rejected') NOT NULL DEFAULT 'received',
+    quote_status       ENUM('received','shortlisted','under_review','negotiating','accepted','rejected') NOT NULL DEFAULT 'received',
     received_on        DATE NULL,
     notes              TEXT NULL,
     created_by         INT UNSIGNED NOT NULL,
@@ -664,6 +664,13 @@ foreach ([
       throw $e;
     }
   }
+}
+
+// Add 'shortlisted' to rfq_quotes.quote_status ENUM if not present
+try {
+  $pdo->exec("ALTER TABLE rfq_quotes MODIFY COLUMN quote_status ENUM('received','shortlisted','under_review','negotiating','accepted','rejected') NOT NULL DEFAULT 'received'");
+} catch (PDOException $e) {
+  // Ignore if column definition is already correct
 }
 
 // Create rfq_orders table for purchase orders converted from accepted RFQ quotes
