@@ -514,7 +514,7 @@ render_header('Incoming Shipments');
   function updateTrackingLabel() {
     var isAmazon = carrierInput.value === 'Amazon Logistics';
     trackingLabel.textContent = isAmazon ? 'Full Amazon Tracking URL' : 'Tracking Number';
-    trackingInput.placeholder = isAmazon ? 'https://track.amazon.com/tracking/...' : '';
+    trackingInput.placeholder = isAmazon ? 'https://www.amazon.com/gp/your-acount...' : '';
     trackingNote.style.display = isAmazon ? '' : 'none';
   }
 
