@@ -1169,7 +1169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $new_status = trim((string)($_POST['new_status'] ?? ''));
       if ($row_id <= 0) {
         $errors[] = 'Invalid quote selected for status change.';
-      } elseif (!in_array($new_status, ['draft', 'sent'], true)) {
+      } elseif (!in_array($new_status, ['draft', 'sent', 'shortlisted'], true)) {
         $errors[] = 'Invalid status value.';
       } else {
         $stmt = $pdo->prepare("UPDATE quotes SET status = ? WHERE id = ? AND status <> 'converted'");
@@ -1693,6 +1693,7 @@ render_header('Quotes');
                   <select name="new_status" aria-label="Status for quote #<?= (int)$quote['id'] ?>" style="font-size:0.82em;padding:3px 6px;">
                     <option value="draft" <?= $row_status === 'draft' ? 'selected' : '' ?>>Draft</option>
                     <option value="sent"  <?= $row_status === 'sent'  ? 'selected' : '' ?>>Sent</option>
+                    <option value="shortlisted" <?= $row_status === 'shortlisted' ? 'selected' : '' ?>>Shortlisted</option>
                   </select>
                   <button type="submit" class="btn" style="font-size:0.78em;padding:3px 8px;">Save</button>
                 </form>
