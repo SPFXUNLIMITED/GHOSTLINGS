@@ -765,7 +765,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (strlen($sku) > 100) $errors[] = 'SKU must be 100 characters or fewer.';
       if (strlen($shipping_method) > MAX_SHIPPING_METHOD_LENGTH) $errors[] = 'Shipping method must be ' . MAX_SHIPPING_METHOD_LENGTH . ' characters or fewer.';
       if ($quote_amount_raw === '' || !is_numeric($quote_amount_raw) || (float)$quote_amount_raw < 0) {
-        $errors[] = 'Quote amount must be a non-negative number.';
+        $errors[] = 'Quote per unit must be a non-negative number.';
       }
       if (!preg_match('/^[A-Z]{3}$/', $currency)) {
         $errors[] = 'Currency must be a 3-letter code (e.g. USD, CNY).';
@@ -964,7 +964,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (strlen($sku) > 100) $errors[] = 'SKU must be 100 characters or fewer.';
       if (strlen($shipping_method) > MAX_SHIPPING_METHOD_LENGTH) $errors[] = 'Shipping method must be ' . MAX_SHIPPING_METHOD_LENGTH . ' characters or fewer.';
       if ($quote_amount_raw === '' || !is_numeric($quote_amount_raw) || (float)$quote_amount_raw < 0) {
-        $errors[] = 'Quote amount must be a non-negative number.';
+        $errors[] = 'Quote per unit must be a non-negative number.';
       }
       if (!preg_match('/^[A-Z]{3}$/', $currency)) {
         $errors[] = 'Currency must be a 3-letter code (e.g. USD, CNY).';
