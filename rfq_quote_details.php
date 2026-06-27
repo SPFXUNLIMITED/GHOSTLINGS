@@ -12,41 +12,10 @@ $quote_statuses = [
   'rejected' => 'Rejected',
 ];
 
-function format_shipping_details(?string $origin, ?string $method): string {
-  $origin = trim((string)$origin);
-  $method = trim((string)$method);
-  if ($origin === '' && $method === '') {
-    return '—';
-  }
-  if ($origin !== '' && $method !== '') {
-    return $origin . ' • ' . $method;
-  }
-  return $origin !== '' ? $origin : $method;
-}
-
 function format_quote_money($value, string $currency): string {
   return $value !== null
     ? h($currency) . ' ' . h(number_format((float)$value, 2))
     : '<span class="muted">—</span>';
-}
-
-function format_quote_percent($value): string {
-  return $value !== null
-    ? h(number_format((float)$value, 2)) . '%'
-    : '<span class="muted">—</span>';
-}
-
-function format_quote_percent_with_amount($percent, $amount): string {
-  if ($percent === null) {
-    return '<span class="muted">—</span>';
-  }
-
-  $formatted = h(number_format((float)$percent, 2)) . '%';
-  if ($amount !== null) {
-    $formatted .= ' (USD $' . h(number_format((float)$amount, 2)) . ')';
-  }
-
-  return $formatted;
 }
 
 $rfq_id = isset($_GET['rfq_id']) ? (int)$_GET['rfq_id'] : 0;
@@ -77,44 +46,6 @@ if (!$quote) {
   exit;
 }
 
-// Calculate dealer margins from MSRP/MAP when both values are available
-$msrp        = isset($quote['msrp'])        && $quote['msrp']        !== null ? (float)$quote['msrp']        : null;
-$map_price   = isset($quote['map_price'])   && $quote['map_price']   !== null ? (float)$quote['map_price']   : null;
-$moq_20_price = isset($quote['moq_20_price']) && $quote['moq_20_price'] !== null ? (float)$quote['moq_20_price'] : null;
-$moq_10_price = isset($quote['moq_10_price']) && $quote['moq_10_price'] !== null ? (float)$quote['moq_10_price'] : null;
-$drop_ship_price = isset($quote['drop_ship_price']) && $quote['drop_ship_price'] !== null ? (float)$quote['drop_ship_price'] : null;
-$moq_20_margin_msrp_amount = null;
-$moq_20_margin_map_amount = null;
-$moq_10_margin_msrp_amount = null;
-$moq_10_margin_map_amount = null;
-$drop_ship_margin_msrp_amount = null;
-$drop_ship_margin_map_amount = null;
-
-if ($msrp !== null && $msrp != 0 && $moq_20_price !== null) {
-  $quote['moq_20_margin_msrp'] = (($msrp - $moq_20_price) / $msrp) * 100;
-  $moq_20_margin_msrp_amount = $msrp - $moq_20_price;
-}
-if ($map_price !== null && $map_price != 0 && $moq_20_price !== null) {
-  $quote['moq_20_margin_map'] = (($map_price - $moq_20_price) / $map_price) * 100;
-  $moq_20_margin_map_amount = $map_price - $moq_20_price;
-}
-if ($msrp !== null && $msrp != 0 && $moq_10_price !== null) {
-  $quote['moq_10_margin_msrp'] = (($msrp - $moq_10_price) / $msrp) * 100;
-  $moq_10_margin_msrp_amount = $msrp - $moq_10_price;
-}
-if ($map_price !== null && $map_price != 0 && $moq_10_price !== null) {
-  $quote['moq_10_margin_map'] = (($map_price - $moq_10_price) / $map_price) * 100;
-  $moq_10_margin_map_amount = $map_price - $moq_10_price;
-}
-if ($msrp !== null && $msrp != 0 && $drop_ship_price !== null) {
-  $quote['drop_ship_margin_msrp'] = (($msrp - $drop_ship_price) / $msrp) * 100;
-  $drop_ship_margin_msrp_amount = $msrp - $drop_ship_price;
-}
-if ($map_price !== null && $map_price != 0 && $drop_ship_price !== null) {
-  $quote['drop_ship_margin_map'] = (($map_price - $drop_ship_price) / $map_price) * 100;
-  $drop_ship_margin_map_amount = $map_price - $drop_ship_price;
-}
-
 render_header('Quote Details');
 ?>
 
@@ -136,7 +67,7 @@ render_header('Quote Details');
   <table>
     <tbody>
       <tr>
-        <th style="width:220px;">Supplier</th>
+        <th style="width:220px;">Supplier Name</th>
         <td><?= h((string)$quote['supplier_name']) ?></td>
       </tr>
       <tr>
@@ -144,75 +75,43 @@ render_header('Quote Details');
         <td><?= !empty($quote['model_name']) ? h((string)$quote['model_name']) : '<span class="muted">—</span>' ?></td>
       </tr>
       <tr>
-        <th>SKU</th>
-        <td><?= !empty($quote['sku']) ? h((string)$quote['sku']) : '<span class="muted">—</span>' ?></td>
-      </tr>
-      <tr>
-        <th>MSRP</th>
-        <td><?= format_quote_money($quote['msrp'], (string)$quote['currency']) ?></td>
-      </tr>
-      <tr>
-        <th>MAP (Minimum Advertised Price)</th>
-        <td><?= format_quote_money($quote['map_price'], (string)$quote['currency']) ?></td>
-      </tr>
-      <tr>
-        <th>MOQ 20</th>
-        <td><?= format_quote_money($quote['moq_20_price'], (string)$quote['currency']) ?></td>
-      </tr>
-      <tr>
-        <th>MOQ 20 Dealer Margin on MSRP</th>
-        <td><?= format_quote_percent_with_amount($quote['moq_20_margin_msrp'], $moq_20_margin_msrp_amount) ?></td>
-      </tr>
-      <tr>
-        <th>MOQ 20 Dealer Margin on MAP</th>
-        <td><?= format_quote_percent_with_amount($quote['moq_20_margin_map'], $moq_20_margin_map_amount) ?></td>
-      </tr>
-      <tr>
-        <th>MOQ 10</th>
-        <td><?= format_quote_money($quote['moq_10_price'], (string)$quote['currency']) ?></td>
-      </tr>
-      <tr>
-        <th>MOQ 10 Dealer Margin on MSRP</th>
-        <td><?= format_quote_percent_with_amount($quote['moq_10_margin_msrp'], $moq_10_margin_msrp_amount) ?></td>
-      </tr>
-      <tr>
-        <th>MOQ 10 Dealer Margin on MAP</th>
-        <td><?= format_quote_percent_with_amount($quote['moq_10_margin_map'], $moq_10_margin_map_amount) ?></td>
-      </tr>
-      <tr>
-        <th>Drop Ship</th>
-        <td><?= format_quote_money($quote['drop_ship_price'], (string)$quote['currency']) ?></td>
-      </tr>
-      <tr>
-        <th>Drop Ship Dealer Margin on MSRP</th>
-        <td><?= format_quote_percent_with_amount($quote['drop_ship_margin_msrp'], $drop_ship_margin_msrp_amount) ?></td>
-      </tr>
-      <tr>
-        <th>Drop Ship Dealer Margin on MAP</th>
-        <td><?= format_quote_percent_with_amount($quote['drop_ship_margin_map'], $drop_ship_margin_map_amount) ?></td>
-      </tr>
-      <tr>
-        <th>Quote Amount</th>
+        <th>Quote Per Unit</th>
         <td><?= format_quote_money($quote['quote_amount'], (string)$quote['currency']) ?></td>
       </tr>
       <tr>
-        <th>Lead Time</th>
+        <th>MOQ</th>
+        <td><?= !empty($quote['moq']) ? h((string)$quote['moq']) : '<span class="muted">—</span>' ?></td>
+      </tr>
+      <tr>
+        <th>Currency</th>
+        <td><?= h((string)$quote['currency']) ?></td>
+      </tr>
+      <tr>
+        <th>Lead Time (days)</th>
         <td><?= $quote['lead_time_days'] !== null ? h((string)$quote['lead_time_days']) . ' days' : '<span class="muted">—</span>' ?></td>
       </tr>
       <tr>
         <th>Shipping Cost</th>
-        <td><?= $quote['shipping_cost'] !== null ? h(number_format((float)$quote['shipping_cost'], 2)) : '<span class="muted">—</span>' ?></td>
+        <td><?= $quote['shipping_cost'] !== null ? h($quote['currency']) . ' ' . h(number_format((float)$quote['shipping_cost'], 2)) : '<span class="muted">—</span>' ?></td>
       </tr>
       <tr>
-        <th>Shipping Details</th>
-        <td><?= h(format_shipping_details($quote['shipping_origin'] ?? null, $quote['shipping_method'] ?? null)) ?></td>
+        <th>Crate Cost</th>
+        <td><?= $quote['crate_cost'] !== null ? h($quote['currency']) . ' ' . h(number_format((float)$quote['crate_cost'], 2)) : '<span class="muted">—</span>' ?></td>
       </tr>
       <tr>
-        <th>Status</th>
+        <th>Shipping Origin</th>
+        <td><?= !empty($quote['shipping_origin']) ? h((string)$quote['shipping_origin']) : '<span class="muted">—</span>' ?></td>
+      </tr>
+      <tr>
+        <th>Shipping Method / Incoterm</th>
+        <td><?= !empty($quote['shipping_method']) ? h((string)$quote['shipping_method']) : '<span class="muted">—</span>' ?></td>
+      </tr>
+      <tr>
+        <th>Quote Status</th>
         <td><?= h($quote_statuses[$quote['quote_status']] ?? (string)$quote['quote_status']) ?></td>
       </tr>
       <tr>
-        <th>Quote Received On</th>
+        <th>Received On</th>
         <td><?= !empty($quote['received_on']) ? h((string)$quote['received_on']) : '<span class="muted">—</span>' ?></td>
       </tr>
       <tr>
@@ -237,18 +136,6 @@ render_header('Quote Details');
             <span class="muted">—</span>
           <?php endif; ?>
         </td>
-      </tr>
-      <tr>
-        <th>Added By</th>
-        <td><?= h((string)($quote['created_by_username'] ?? 'Unknown')) ?></td>
-      </tr>
-      <tr>
-        <th>Created</th>
-        <td><?= h((string)$quote['created_at']) ?></td>
-      </tr>
-      <tr>
-        <th>Updated</th>
-        <td><?= h((string)$quote['updated_at']) ?></td>
       </tr>
     </tbody>
   </table>
