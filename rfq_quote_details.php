@@ -75,6 +75,14 @@ render_header('Quote Details');
         <td><?= !empty($quote['model_name']) ? h((string)$quote['model_name']) : '<span class="muted">—</span>' ?></td>
       </tr>
       <tr>
+        <th>Crate / Shipment Dimensions</th>
+        <td><?= !empty($quote['dimensions']) ? h((string)$quote['dimensions']) : '<span class="muted">—</span>' ?></td>
+      </tr>
+      <tr>
+        <th>Gross Weight (Total Crate Weight)</th>
+        <td><?= !empty($quote['weight']) ? h((string)$quote['weight']) : '<span class="muted">—</span>' ?></td>
+      </tr>
+      <tr>
         <th>Quote Per Unit</th>
         <td><?= format_quote_money($quote['quote_amount'], (string)$quote['currency']) ?></td>
       </tr>
