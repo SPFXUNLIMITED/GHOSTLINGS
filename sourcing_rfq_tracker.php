@@ -1719,14 +1719,10 @@ render_header('Sourcing RFQ Tracker');
                  value="<?= h((string)($editing_quote['model_name'] ?? '')) ?>" />
         </div>
         <div>
-          <label>Dimensions</label>
+          <label>Crate / Shipment Dimensions</label>
           <input type="text" name="dimensions" maxlength="<?= MAX_DIMENSIONS_LENGTH ?>" placeholder="e.g. 122 x 89 x 51 cm"
                  value="<?= h((string)($editing_quote['dimensions'] ?? '')) ?>" />
-        </div>
-        <div>
-          <label>Weight</label>
-          <input type="text" name="weight" maxlength="<?= MAX_WEIGHT_LENGTH ?>" placeholder="e.g. 115 kg"
-                 value="<?= h((string)($editing_quote['weight'] ?? '')) ?>" />
+          <div class="muted" style="font-size:12px; margin-top:4px;">(Enter the outer dimensions of the final packed crate or box that will be shipped)</div>
         </div>
         <div>
           <label>SKU</label>
@@ -1786,6 +1782,11 @@ render_header('Sourcing RFQ Tracker');
           <label>Quote Received On</label>
           <input type="date" name="received_on"
                  value="<?= h((string)($editing_quote['received_on'] ?? '')) ?>" />
+        </div>
+        <div>
+          <label>Gross Weight (Total Crate Weight)</label>
+          <input type="text" name="weight" maxlength="<?= MAX_WEIGHT_LENGTH ?>" placeholder="e.g. 115 kg"
+                 value="<?= h((string)($editing_quote['weight'] ?? '')) ?>" />
         </div>
         <div class="full">
           <label>Notes</label>
@@ -1855,14 +1856,10 @@ render_header('Sourcing RFQ Tracker');
                  value="<?= h($add_quote_post['model_name'] ?? '') ?>" />
         </div>
         <div>
-          <label>Dimensions</label>
+          <label>Crate / Shipment Dimensions</label>
           <input type="text" name="dimensions" maxlength="<?= MAX_DIMENSIONS_LENGTH ?>" placeholder="e.g. 122 x 89 x 51 cm"
                  value="<?= h($add_quote_post['dimensions'] ?? '') ?>" />
-        </div>
-        <div>
-          <label>Weight</label>
-          <input type="text" name="weight" maxlength="<?= MAX_WEIGHT_LENGTH ?>" placeholder="e.g. 115 kg"
-                 value="<?= h($add_quote_post['weight'] ?? '') ?>" />
+          <div class="muted" style="font-size:12px; margin-top:4px;">(Enter the outer dimensions of the final packed crate or box that will be shipped)</div>
         </div>
         <div>
           <label>SKU</label>
@@ -1922,6 +1919,11 @@ render_header('Sourcing RFQ Tracker');
           <label>Quote Received On</label>
           <input type="date" name="received_on"
                  value="<?= h($add_quote_post['received_on'] ?? '') ?>" />
+        </div>
+        <div>
+          <label>Gross Weight (Total Crate Weight)</label>
+          <input type="text" name="weight" maxlength="<?= MAX_WEIGHT_LENGTH ?>" placeholder="e.g. 115 kg"
+                 value="<?= h($add_quote_post['weight'] ?? '') ?>" />
         </div>
         <div class="full">
           <label>Notes</label>
