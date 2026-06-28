@@ -300,108 +300,212 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
 
 <style>
 /* ── Dashboard-specific styles ─────────────────────────────────────────────── */
-.dash-hero {
-  background: linear-gradient(135deg, #1d4ed8 0%, #0891b2 100%);
-  color: #fff;
-  border: none;
+.dash-shell {
+  --dash-bg: #f2f6fc;
+  --dash-text: #0f172a;
+  --dash-muted: #5b6b83;
+  --dash-border: #d8e1ee;
+  --dash-card-shadow: 0 12px 34px rgba(15, 23, 42, 0.08);
+  --dash-card-shadow-hover: 0 18px 40px rgba(15, 23, 42, 0.12);
+  --dash-blue: #1d4ed8;
+  --dash-blue-soft: #dbeafe;
+  --dash-indigo: #3730a3;
+  --dash-teal: #0f766e;
 }
-.dash-hero h1 { color: #fff; font-size: 1.75rem; margin: 6px 0 8px; }
-.dash-hero p  { margin: 0; color: rgba(255,255,255,0.95); }
-.dash-hero .muted { color: rgba(255,255,255,0.9); }
+.dash-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 10% -10%, rgba(59, 130, 246, 0.14), transparent 38%),
+    radial-gradient(circle at 95% 0%, rgba(14, 116, 144, 0.12), transparent 35%),
+    var(--dash-bg);
+}
+.dash-shell .muted { color: var(--dash-muted); }
+.dash-shell .card {
+  border: 1px solid var(--dash-border);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  box-shadow: var(--dash-card-shadow);
+  padding: 18px;
+  margin: 0;
+}
+.dash-shell .badge {
+  border-radius: 999px;
+  border-width: 1px;
+  font-weight: 700;
+}
+.dash-mini-metric {
+  padding: 12px 18px !important;
+  border-radius: 14px !important;
+  background: linear-gradient(180deg,#ffffff 0%,#f8fbff 100%) !important;
+  border: 1px solid #d8e3f2 !important;
+}
+.dash-kpi-card,
+.dash-metric-card {
+  border: 1px solid #d9e4f3 !important;
+  background: linear-gradient(180deg,#ffffff 0%,#f8fbff 100%) !important;
+}
+.dash-chart-total {
+  margin: 0 !important;
+  padding: 8px 14px !important;
+  text-align: right;
+  border-radius: 12px !important;
+}
+.dash-chart-total-rfq { background:#edf4ff !important; border-color:#c7dbff !important; }
+.dash-chart-total-ship { background:#ecfeff !important; border-color:#99f6e4 !important; }
+.dash-hero {
+  position: relative;
+  overflow: hidden;
+  border: none !important;
+  background:
+    radial-gradient(circle at 14% 14%, rgba(147, 197, 253, 0.3), transparent 38%),
+    radial-gradient(circle at 88% 12%, rgba(129, 140, 248, 0.3), transparent 44%),
+    linear-gradient(135deg, #0f172a 0%, #1d4ed8 52%, #0369a1 100%);
+  color: #fff;
+}
+.dash-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(112deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0) 38%);
+}
+.dash-hero h1 { position: relative; z-index: 1; color: #fff; font-size: 2rem; margin: 8px 0 10px; letter-spacing: -0.01em; }
+.dash-hero p  { position: relative; z-index: 1; margin: 0; color: rgba(241,245,249,0.96); max-width: 860px; }
+.dash-hero .muted { color: rgba(226,232,240,0.92); }
 .dash-hero-tag {
+  position: relative;
+  z-index: 1;
+  display: inline-block;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: rgba(255,255,255,0.9);
-  margin-bottom: 6px;
+  letter-spacing: 0.1em;
+  color: #dbeafe;
+  margin-bottom: 8px;
+  padding: 5px 12px;
+  border: 1px solid rgba(191, 219, 254, 0.45);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.34);
 }
 .dash-hero-stats {
-  display: flex;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 16px;
+  margin-top: 18px;
 }
 .dash-hero-stat {
-  background: rgba(15, 23, 42, 0.26);
-  border: 1px solid rgba(255,255,255,0.25);
-  border-radius: 10px;
-  padding: 10px 16px;
-  min-width: 130px;
+  background: rgba(15, 23, 42, 0.3);
+  border: 1px solid rgba(191, 219, 254, 0.35);
+  border-radius: 12px;
+  padding: 10px 14px;
 }
 .dash-hero-stat-label {
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: rgba(255,255,255,0.86);
+  letter-spacing: 0.08em;
+  color: rgba(219, 234, 254, 0.9);
 }
 .dash-hero-stat-value {
-  font-size: 1.3rem;
+  font-size: 1.2rem;
   font-weight: 700;
   color: #fff;
   margin-top: 4px;
 }
 .dash-pill {
+  position: relative;
+  z-index: 1;
   display: inline-block;
-  padding: 4px 12px;
+  padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.18);
-  font-size: 13px;
-  color: #fff;
-  margin: 8px 6px 0 0;
+  background: rgba(15, 23, 42, 0.34);
+  border: 1px solid rgba(191, 219, 254, 0.38);
+  font-size: 12px;
+  color: #e0e7ff;
+  margin: 10px 8px 0 0;
+  font-weight: 600;
 }
-.dash-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.dash-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
-.dash-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.dash-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.dash-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.dash-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 .dash-section-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 10px;
-  margin: 20px 0 12px;
+  gap: 12px;
+  margin: 26px 0 14px;
 }
-.dash-section-header h2 { margin: 0 0 4px; }
-.dash-section-header p  { margin: 0; }
+.dash-section-header h2 { margin: 0 0 4px; color: var(--dash-text); letter-spacing: -0.01em; }
+.dash-section-header p  { margin: 0; max-width: 760px; }
 .dash-progress {
-  height: 10px;
+  height: 9px;
   border-radius: 999px;
-  background: #e5e7eb;
+  background: #e8eef7;
   overflow: hidden;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 .dash-progress-bar { height: 100%; border-radius: 999px; }
 /* Goal tone colours */
 .goal-badge-green  { background: #dcfce7; color: #166534; border-color: #86efac; }
-.goal-badge-yellow { background: #fef9c3; color: #854d0e; border-color: #fde047; }
+.goal-badge-yellow { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
 .goal-badge-red    { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
-.goal-bar-green    { background: linear-gradient(90deg,#34d399,#14b8a6); }
-.goal-bar-yellow   { background: linear-gradient(90deg,#fbbf24,#fb923c); }
-.goal-bar-red      { background: linear-gradient(90deg,#f87171,#ef4444); }
-.goal-card-green   { border-left: 4px solid #34d399; }
-.goal-card-yellow  { border-left: 4px solid #fbbf24; }
-.goal-card-red     { border-left: 4px solid #f87171; }
-.dash-big-num { font-size: 3rem; font-weight: 700; line-height: 1.1; margin: 8px 0 4px; }
-.dash-motivation { background: linear-gradient(135deg,#0f766e 0%,#1d4ed8 100%); border: none; }
-.dash-motivation h3  { color: #fff; font-size: 1.25rem; margin: 8px 0; }
-.dash-motivation p   { color: rgba(255,255,255,0.85); margin: 0; }
-.dash-motivation .muted { color: rgba(255,255,255,0.72); }
+.goal-bar-green    { background: linear-gradient(90deg,#10b981,#0d9488); }
+.goal-bar-yellow   { background: linear-gradient(90deg,#f59e0b,#ea580c); }
+.goal-bar-red      { background: linear-gradient(90deg,#ef4444,#dc2626); }
+.goal-card-green   { border-left: 4px solid #10b981; }
+.goal-card-yellow  { border-left: 4px solid #f59e0b; }
+.goal-card-red     { border-left: 4px solid #ef4444; }
+.dash-big-num { font-size: 2.8rem; font-weight: 700; line-height: 1.06; margin: 8px 0 6px; letter-spacing: -0.02em; color: #0f172a; }
+.dash-motivation {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(136deg,#0f172a 0%,#1e3a8a 52%,#0f766e 100%);
+  border: none !important;
+}
+.dash-motivation::after {
+  content:'';
+  position:absolute;
+  width:240px;
+  height:240px;
+  right:-110px;
+  top:-95px;
+  border-radius:999px;
+  background:radial-gradient(circle, rgba(191,219,254,0.3), rgba(191,219,254,0));
+}
+.dash-motivation h3  { position:relative; z-index:1; color: #fff; font-size: 1.25rem; margin: 8px 0; }
+.dash-motivation p   { position:relative; z-index:1; color: rgba(226,232,240,0.9); margin: 0; }
+.dash-motivation .muted { position:relative; z-index:1; color: rgba(226,232,240,0.8); }
 .priority-item {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
   padding: 12px 14px;
-  background: #fff;
-  border: 1px solid #dbe3ee;
-  border-radius: 8px;
+  background: linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);
+  border: 1px solid #d6e2f1;
+  border-radius: 12px;
   margin: 0;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.priority-item:hover { background: #f8fbff; border-color: #93c5fd; box-shadow: 0 4px 12px rgba(37,99,235,0.10); }
-.priority-item input[type=checkbox] { margin-top: 3px; flex-shrink: 0; }
+.priority-item.card { box-shadow: 0 8px 20px rgba(15,23,42,0.06); }
+.priority-item:hover { background: #f5f9ff; border-color: #93c5fd; box-shadow: 0 10px 24px rgba(37,99,235,0.12); }
+.priority-item input[type=checkbox] { margin-top: 3px; flex-shrink: 0; accent-color: var(--dash-blue); }
 .priority-list { display: grid; gap: 8px; }
 .chart-panel canvas { width: 100% !important; height: 260px !important; display: block; }
-.chart-panel { min-height: 300px; }
+.chart-panel {
+  min-height: 300px;
+  border: 1px solid #dbe4f2;
+  box-shadow: 0 10px 26px rgba(15,23,42,0.08);
+}
+.dash-shell .card:hover {
+  box-shadow: var(--dash-card-shadow-hover);
+  border-color: #c7d6ea;
+}
 @media (max-width: 860px) {
   .dash-grid-4 { grid-template-columns: 1fr 1fr; }
 }
@@ -413,7 +517,7 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
 </style>
 
 
-<div class="container">
+<div class="container dash-shell">
 
   <!-- Hero banner -->
   <div class="card dash-hero">
@@ -446,7 +550,7 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
       <h2>Weekly Goals</h2>
       <p class="muted">Big targets, clear pacing, and a fast read on where Patty should push next.</p>
     </div>
-    <div class="card" style="margin:0;padding:10px 16px;text-align:right;">
+    <div class="card dash-mini-metric" style="margin:0;text-align:right;">
       <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;">Goals On Track</div>
       <div style="font-size:2rem;font-weight:700;color:#0d9488;line-height:1.1;">
         <?= number_format($goals_on_track) ?><span style="font-size:1.1rem;font-weight:600;color:#94a3b8;"> / <?= number_format(count($weekly_goals)) ?></span>
@@ -497,17 +601,17 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
 
   <?php
   $kpi_colors = [
-    'sky'     => ['accent' => '#0284c7', 'light' => '#e0f2fe', 'border' => '#7dd3fc'],
-    'violet'  => ['accent' => '#7c3aed', 'light' => '#ede9fe', 'border' => '#c4b5fd'],
-    'emerald' => ['accent' => '#059669', 'light' => '#d1fae5', 'border' => '#6ee7b7'],
-    'amber'   => ['accent' => '#d97706', 'light' => '#fef3c7', 'border' => '#fcd34d'],
+    'sky'     => ['accent' => '#1d4ed8', 'light' => '#eaf2ff', 'border' => '#c7dbff'],
+    'violet'  => ['accent' => '#4338ca', 'light' => '#eeedff', 'border' => '#c9c5ff'],
+    'emerald' => ['accent' => '#0f766e', 'light' => '#ebfffb', 'border' => '#99f6e4'],
+    'amber'   => ['accent' => '#b45309', 'light' => '#fff8eb', 'border' => '#fcd34d'],
   ];
   ?>
   <div class="dash-grid-4">
     <?php foreach ($weekly_goals as $card):
       $kc = $kpi_colors[$card['accent_key']] ?? ['accent' => '#2563eb', 'light' => '#eff6ff', 'border' => '#93c5fd'];
     ?>
-      <div class="card">
+      <div class="card dash-kpi-card">
         <span class="badge" style="background:<?= h($kc['light']) ?>;color:<?= h($kc['accent']) ?>;border-color:<?= h($kc['border']) ?>;font-size:11px;text-transform:uppercase;letter-spacing:0.07em;">This Week</span>
         <div class="muted" style="font-size:13px;margin-top:8px;"><?= h($card['label']) ?></div>
         <div style="font-size:3rem;font-weight:700;line-height:1.1;color:<?= h($kc['accent']) ?>;margin:8px 0 4px;"><?= number_format((int)$card['value']) ?></div>
@@ -550,17 +654,17 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
     </div>
   </div>
   <div class="dash-grid-3">
-    <div class="card">
+    <div class="card dash-metric-card">
       <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;">Items In Production</div>
       <div class="dash-big-num" style="color:#2563eb;"><?= number_format($items_in_production) ?></div>
       <p class="muted" style="font-size:13px;margin:4px 0 0;">Orders with production underway that have not shipped yet.</p>
     </div>
-    <div class="card">
+    <div class="card dash-metric-card">
       <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;">Shipments In Transit</div>
       <div class="dash-big-num" style="color:#0d9488;"><?= number_format($shipments_in_transit) ?></div>
       <p class="muted" style="font-size:13px;margin:4px 0 0;">Incoming shipments currently marked In Transit.</p>
     </div>
-    <div class="card">
+    <div class="card dash-metric-card">
       <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;">Expected Arrivals (30 Days)</div>
       <div class="dash-big-num" style="color:#0284c7;"><?= number_format($expected_arrivals) ?></div>
       <p class="muted" style="font-size:13px;margin:4px 0 0;">Open incoming shipments scheduled to arrive within the next month.</p>
@@ -581,7 +685,7 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
           <h3 style="margin:0 0 2px;">RFQs Sent Per Week</h3>
           <p class="muted" style="font-size:13px;margin:0;">Line chart &middot; last 8 weeks</p>
         </div>
-        <div class="card" style="margin:0;padding:8px 14px;text-align:right;background:#eff6ff;border-color:#bfdbfe;">
+        <div class="card dash-chart-total dash-chart-total-rfq">
           <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:#2563eb;font-weight:600;">8-Week Total</div>
           <div style="font-size:1.5rem;font-weight:700;color:#1d4ed8;"><?= number_format(array_sum($rfq_chart['values'])) ?></div>
         </div>
@@ -594,7 +698,7 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
           <h3 style="margin:0 0 2px;">Items Shipped Per Week</h3>
           <p class="muted" style="font-size:13px;margin:0;">Bar chart &middot; last 8 weeks</p>
         </div>
-        <div class="card" style="margin:0;padding:8px 14px;text-align:right;background:#f0fdfa;border-color:#99f6e4;">
+        <div class="card dash-chart-total dash-chart-total-ship">
           <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:#0d9488;font-weight:600;">8-Week Total</div>
           <div style="font-size:1.5rem;font-weight:700;color:#0f766e;"><?= number_format(array_sum($shipped_chart['values'])) ?></div>
         </div>
