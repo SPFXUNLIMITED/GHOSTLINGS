@@ -640,7 +640,13 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
   <!-- Today's Priorities -->
   <div style="margin-top:24px;">
     <h2>Today's Priorities</h2>
-    <p>Win the day by moving the next supplier action forward.</p>
+    <div>
+      <?php foreach ($today_priorities as $priority): ?>
+        <label style="display:block;margin:8px 0;">
+          <input type="checkbox"> <?= h($priority) ?>
+        </label>
+      <?php endforeach; ?>
+    </div>
   </div>
 
   <!-- Procurement Pipeline Snapshot -->
