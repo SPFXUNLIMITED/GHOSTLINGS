@@ -102,33 +102,24 @@ function dashboard_goal_state(int $value, int $target, float $expected_ratio): a
 
   if ($value >= $target || $pace_ratio >= 1) {
     return [
-      'label' => 'On Track',
-      'badge_classes' => 'tw-border-emerald-200 tw-bg-emerald-50 tw-text-emerald-700',
-      'bar_classes' => 'tw-bg-gradient-to-r tw-from-emerald-400 tw-to-teal-500',
-      'ring_classes' => 'tw-ring-emerald-200',
+      'label'   => 'On Track',
+      'tone'    => 'green',
       'message' => 'Excellent pace — keep the Alibaba pipeline moving and protect the win.',
-      'tone' => 'green',
     ];
   }
 
   if ($pace_ratio >= 0.65) {
     return [
-      'label' => 'Push Today',
-      'badge_classes' => 'tw-border-amber-200 tw-bg-amber-50 tw-text-amber-700',
-      'bar_classes' => 'tw-bg-gradient-to-r tw-from-amber-400 tw-to-orange-400',
-      'ring_classes' => 'tw-ring-amber-200',
+      'label'   => 'Push Today',
+      'tone'    => 'yellow',
       'message' => 'A focused follow-up block today gets this goal back on pace.',
-      'tone' => 'yellow',
     ];
   }
 
   return [
-    'label' => 'Needs Attention',
-    'badge_classes' => 'tw-border-rose-200 tw-bg-rose-50 tw-text-rose-700',
-    'bar_classes' => 'tw-bg-gradient-to-r tw-from-rose-400 tw-to-red-500',
-    'ring_classes' => 'tw-ring-rose-200',
+    'label'   => 'Needs Attention',
+    'tone'    => 'red',
     'message' => 'Prioritize this now so the week stays pointed at shipments and supplier wins.',
-    'tone' => 'red',
   ];
 }
 
@@ -305,238 +296,312 @@ $json_safe_flags = JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_H
 render_header('Alibaba Sourcing Dashboard - Weekly Goals');
 ?>
 
-<script>
-window.tailwind = window.tailwind || {};
-window.tailwind.config = {
-  prefix: 'tw-',
-  corePlugins: { preflight: false }
-};
-</script>
-<script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 
 <style>
-  .dash-shell {
-    background: #f1f5f9;
-  }
-  .dash-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.04);
-  }
-  .dash-card:hover {
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.09), 0 8px 20px rgba(15, 23, 42, 0.06);
-  }
-  .dash-shell canvas {
-    width: 100% !important;
-    height: 280px !important;
-  }
-  .dash-shell .chart-panel {
-    min-height: 280px;
-  }
+/* ── Dashboard-specific styles ─────────────────────────────────────────────── */
+.dash-hero {
+  background: linear-gradient(135deg, #1d4ed8 0%, #0891b2 100%);
+  color: #fff;
+  border: none;
+}
+.dash-hero h1 { color: #fff; font-size: 1.75rem; margin: 6px 0 8px; }
+.dash-hero p  { margin: 0; }
+.dash-hero-tag {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.75);
+  margin-bottom: 6px;
+}
+.dash-hero-stats {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.dash-hero-stat {
+  background: rgba(255,255,255,0.15);
+  border-radius: 10px;
+  padding: 10px 16px;
+  min-width: 130px;
+}
+.dash-hero-stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: rgba(255,255,255,0.72);
+}
+.dash-hero-stat-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #fff;
+  margin-top: 4px;
+}
+.dash-pill {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.18);
+  font-size: 13px;
+  color: #fff;
+  margin: 8px 6px 0 0;
+}
+.dash-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.dash-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.dash-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.dash-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 20px 0 12px;
+}
+.dash-section-header h2 { margin: 0 0 4px; }
+.dash-section-header p  { margin: 0; }
+.dash-progress {
+  height: 10px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+  margin-top: 8px;
+}
+.dash-progress-bar { height: 100%; border-radius: 999px; }
+/* Goal tone colours */
+.goal-badge-green  { background: #dcfce7; color: #166534; border-color: #86efac; }
+.goal-badge-yellow { background: #fef9c3; color: #854d0e; border-color: #fde047; }
+.goal-badge-red    { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+.goal-bar-green    { background: linear-gradient(90deg,#34d399,#14b8a6); }
+.goal-bar-yellow   { background: linear-gradient(90deg,#fbbf24,#fb923c); }
+.goal-bar-red      { background: linear-gradient(90deg,#f87171,#ef4444); }
+.goal-card-green   { border-left: 4px solid #34d399; }
+.goal-card-yellow  { border-left: 4px solid #fbbf24; }
+.goal-card-red     { border-left: 4px solid #f87171; }
+.dash-big-num { font-size: 3rem; font-weight: 700; line-height: 1.1; margin: 8px 0 4px; }
+.dash-motivation { background: linear-gradient(135deg,#0f766e 0%,#1d4ed8 100%); border: none; }
+.dash-motivation h3  { color: #fff; font-size: 1.25rem; margin: 8px 0; }
+.dash-motivation p   { color: rgba(255,255,255,0.85); margin: 0; }
+.dash-motivation .muted { color: rgba(255,255,255,0.72); }
+.priority-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.priority-item:hover { background: #eff6ff; border-color: #bfdbfe; }
+.priority-item input[type=checkbox] { margin-top: 3px; flex-shrink: 0; }
+.chart-panel canvas { width: 100% !important; height: 260px !important; display: block; }
+.chart-panel { min-height: 300px; }
+@media (max-width: 860px) {
+  .dash-grid-4 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .dash-grid-2,
+  .dash-grid-3,
+  .dash-grid-4 { grid-template-columns: 1fr; }
+}
 </style>
 
-<div class="dash-shell tw-px-4 tw-py-6 lg:tw-px-6">
-  <div class="tw-mx-auto tw-max-w-7xl tw-space-y-6">
 
-    <!-- Hero banner -->
-    <section class="tw-relative tw-overflow-hidden tw-rounded-2xl tw-bg-gradient-to-br tw-from-blue-600 tw-to-teal-500 tw-px-6 tw-py-8 tw-text-white lg:tw-px-10">
-      <div class="tw-pointer-events-none tw-absolute tw-inset-0 tw-bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_55%)]"></div>
-      <div class="tw-relative tw-flex tw-flex-col tw-gap-6 lg:tw-flex-row lg:tw-items-end lg:tw-justify-between">
-        <div class="tw-max-w-3xl">
-          <p class="tw-m-0 tw-text-sm tw-font-semibold tw-uppercase tw-tracking-widest tw-text-blue-100">Alibaba Sourcing Dashboard</p>
-          <h1 class="tw-mt-2 tw-text-3xl tw-font-bold tw-tracking-tight lg:tw-text-5xl">Keep Patty&apos;s Weekly Procurement Goals Charging Forward</h1>
-          <p class="tw-mt-3 tw-max-w-2xl tw-text-base tw-leading-7 tw-text-blue-50 lg:tw-text-lg">
-            Stay locked on the Alibaba sourcing workflow: send more RFQs, pull in more quotes, release more purchase orders, and keep shipments moving.
-          </p>
-          <div class="tw-mt-5 tw-flex tw-flex-wrap tw-gap-2">
-            <span class="tw-rounded-full tw-bg-white/20 tw-px-4 tw-py-1.5 tw-text-sm tw-font-medium tw-text-white">Goal-Driven Sourcing</span>
-            <span class="tw-rounded-full tw-bg-white/20 tw-px-4 tw-py-1.5 tw-text-sm tw-font-medium tw-text-white">Supplier Momentum Focus</span>
-          </div>
-        </div>
-        <div class="tw-grid tw-gap-3 sm:tw-grid-cols-3">
-          <div class="tw-rounded-xl tw-bg-white/15 tw-px-5 tw-py-4 tw-backdrop-blur-sm">
-            <p class="tw-m-0 tw-text-xs tw-font-semibold tw-uppercase tw-tracking-widest tw-text-blue-100">This Week Starts</p>
-            <p class="tw-mt-2 tw-text-xl tw-font-bold tw-text-white"><?= h($week_start->format('M j, Y')) ?></p>
-          </div>
-          <div class="tw-rounded-xl tw-bg-white/15 tw-px-5 tw-py-4 tw-backdrop-blur-sm">
-            <p class="tw-m-0 tw-text-xs tw-font-semibold tw-uppercase tw-tracking-widest tw-text-blue-100">Weekly Activity</p>
-            <p class="tw-mt-2 tw-text-3xl tw-font-bold tw-text-white"><?= number_format($weekly_activity_total) ?></p>
-          </div>
-          <div class="tw-rounded-xl tw-bg-white/15 tw-px-5 tw-py-4 tw-backdrop-blur-sm">
-            <p class="tw-m-0 tw-text-xs tw-font-semibold tw-uppercase tw-tracking-widest tw-text-blue-100">Last Updated</p>
-            <p class="tw-mt-2 tw-text-base tw-font-semibold tw-text-white"><?= h($last_updated) ?></p>
-          </div>
-        </div>
-      </div>
-    </section>
+<div class="container">
 
-    <!-- Weekly Goals -->
-    <section aria-labelledby="weekly-goals">
-      <div class="tw-mb-4 tw-flex tw-items-center tw-justify-between tw-gap-4">
-        <div>
-          <h2 id="weekly-goals" class="tw-m-0 tw-text-xl tw-font-semibold tw-text-slate-800">Weekly Goals</h2>
-          <p class="tw-mt-1 tw-text-sm tw-text-slate-500">Big targets, clear pacing, and a fast read on where Patty should push next.</p>
-        </div>
-        <div class="dash-card tw-rounded-xl tw-px-4 tw-py-3 tw-text-right">
-          <p class="tw-m-0 tw-text-xs tw-font-semibold tw-uppercase tw-tracking-widest tw-text-slate-500">Goals On Track</p>
-          <p class="tw-mt-1 tw-text-3xl tw-font-bold tw-text-teal-600"><?= number_format($goals_on_track) ?><span class="tw-text-lg tw-font-semibold tw-text-slate-400"> / <?= number_format(count($weekly_goals)) ?></span></p>
-        </div>
+  <!-- Hero banner -->
+  <div class="card dash-hero">
+    <div class="dash-hero-tag">Alibaba Sourcing Dashboard</div>
+    <h1>Keep Patty&rsquo;s Weekly Procurement Goals Charging Forward</h1>
+    <p class="muted">Stay locked on the Alibaba sourcing workflow: send more RFQs, pull in more quotes, release more purchase orders, and keep shipments moving.</p>
+    <div>
+      <span class="dash-pill">Goal-Driven Sourcing</span>
+      <span class="dash-pill">Supplier Momentum Focus</span>
+    </div>
+    <div class="dash-hero-stats">
+      <div class="dash-hero-stat">
+        <div class="dash-hero-stat-label">This Week Starts</div>
+        <div class="dash-hero-stat-value"><?= h($week_start->format('M j, Y')) ?></div>
       </div>
-      <div class="tw-grid tw-gap-4 xl:tw-grid-cols-2">
-        <?php foreach ($weekly_goals as $goal): ?>
-          <article class="dash-card tw-rounded-2xl tw-p-6 tw-ring-1 <?= h((string)$goal['state']['ring_classes']) ?>">
-            <div class="tw-flex tw-flex-col tw-gap-3 lg:tw-flex-row lg:tw-items-start lg:tw-justify-between">
-              <div>
-                <p class="tw-m-0 tw-text-xs tw-font-semibold tw-uppercase tw-tracking-widest tw-text-slate-400"><?= h((string)$goal['title']) ?></p>
-                <p class="tw-mt-2 tw-text-5xl tw-font-bold tw-tracking-tight tw-text-slate-800">
-                  <?= number_format((int)$goal['value']) ?>
-                  <span class="tw-text-2xl tw-font-medium tw-text-slate-400">/ <?= number_format((int)$goal['target']) ?></span>
-                </p>
-              </div>
-              <span class="tw-inline-flex tw-items-center tw-rounded-full tw-border tw-px-3 tw-py-1.5 tw-text-sm tw-font-semibold <?= h((string)$goal['state']['badge_classes']) ?>">
-                <?= h((string)$goal['state']['label']) ?>
-              </span>
-            </div>
-            <div class="tw-mt-5">
-              <div class="tw-mb-2 tw-flex tw-flex-wrap tw-items-center tw-justify-between tw-gap-3 tw-text-sm">
-                <span class="tw-font-semibold tw-text-slate-700"><?= number_format((int)round((float)$goal['progress_percent'])) ?>% complete</span>
-                <span class="tw-text-slate-500">Pace target by today: <?= number_format((int)$goal['pace_target']) ?></span>
-              </div>
-              <div class="tw-h-3 tw-overflow-hidden tw-rounded-full tw-bg-slate-100">
-                <div class="tw-h-full tw-rounded-full <?= h((string)$goal['state']['bar_classes']) ?>" style="width: <?= number_format((float)$goal['progress_percent'], 2, '.', '') ?>%;"></div>
-              </div>
-            </div>
-            <div class="tw-mt-4 tw-flex tw-flex-wrap tw-items-center tw-justify-between tw-gap-3">
-              <p class="tw-m-0 tw-text-sm tw-leading-6 tw-text-slate-600"><?= h((string)$goal['state']['message']) ?></p>
-              <p class="tw-m-0 tw-text-sm tw-font-semibold tw-text-slate-700">
-                <?= $goal['remaining'] > 0 ? number_format((int)$goal['remaining']) . ' more to goal' : 'Goal reached — keep stacking wins' ?>
-              </p>
-            </div>
-          </article>
-        <?php endforeach; ?>
+      <div class="dash-hero-stat">
+        <div class="dash-hero-stat-label">Weekly Activity</div>
+        <div class="dash-hero-stat-value"><?= number_format($weekly_activity_total) ?></div>
       </div>
-    </section>
-
-    <!-- Weekly KPI Cards -->
-    <section aria-labelledby="weekly-kpis">
-      <div class="tw-mb-4">
-        <h2 id="weekly-kpis" class="tw-m-0 tw-text-xl tw-font-semibold tw-text-slate-800">Weekly Execution Snapshot</h2>
-        <p class="tw-mt-1 tw-text-sm tw-text-slate-500">Action-oriented scorecards for the Alibaba sourcing and procurement workflow.</p>
+      <div class="dash-hero-stat">
+        <div class="dash-hero-stat-label">Last Updated</div>
+        <div class="dash-hero-stat-value" style="font-size:0.95rem;"><?= h($last_updated) ?></div>
       </div>
-      <div class="tw-grid tw-gap-4 md:tw-grid-cols-2 xl:tw-grid-cols-4">
-        <?php
-        $kpi_accent_classes = [
-          'sky'     => ['badge' => 'tw-bg-sky-50 tw-text-sky-700 tw-border-sky-200',     'num' => 'tw-text-sky-600',     'bar' => 'tw-bg-sky-500'],
-          'violet'  => ['badge' => 'tw-bg-violet-50 tw-text-violet-700 tw-border-violet-200', 'num' => 'tw-text-violet-600', 'bar' => 'tw-bg-violet-500'],
-          'emerald' => ['badge' => 'tw-bg-emerald-50 tw-text-emerald-700 tw-border-emerald-200', 'num' => 'tw-text-emerald-600', 'bar' => 'tw-bg-emerald-500'],
-          'amber'   => ['badge' => 'tw-bg-amber-50 tw-text-amber-700 tw-border-amber-200', 'num' => 'tw-text-amber-600',   'bar' => 'tw-bg-amber-500'],
-          'fuchsia' => ['badge' => 'tw-bg-fuchsia-50 tw-text-fuchsia-700 tw-border-fuchsia-200', 'num' => 'tw-text-fuchsia-600', 'bar' => 'tw-bg-fuchsia-500'],
-          'slate'   => ['badge' => 'tw-bg-slate-100 tw-text-slate-700 tw-border-slate-200', 'num' => 'tw-text-slate-600', 'bar' => 'tw-bg-slate-500'],
-        ];
-        foreach ($weekly_goals as $card):
-          $accent = $kpi_accent_classes[$card['accent_key']] ?? $kpi_accent_classes['slate'];
-        ?>
-          <article class="dash-card tw-relative tw-overflow-hidden tw-rounded-2xl tw-p-5">
-            <span class="tw-inline-flex tw-items-center tw-rounded-full tw-border tw-px-2.5 tw-py-1 tw-text-[11px] tw-font-semibold tw-uppercase tw-tracking-widest <?= $accent['badge'] ?>">This Week</span>
-            <p class="tw-mt-3 tw-text-sm tw-font-medium tw-leading-5 tw-text-slate-600"><?= h($card['label']) ?></p>
-            <p class="tw-mt-4 tw-text-5xl tw-font-bold tw-tracking-tight <?= $accent['num'] ?>"><?= number_format((int)$card['value']) ?></p>
-            <p class="tw-mt-3 tw-text-sm tw-text-slate-500">Weekly goal: <span class="tw-font-semibold tw-text-slate-700"><?= number_format((int)$card['target']) ?></span></p>
-            <div class="tw-mt-4 tw-h-1 tw-rounded-full tw-bg-slate-100">
-              <div class="tw-h-full tw-rounded-full <?= $accent['bar'] ?>" style="width: <?= number_format(min(100, (float)$card['progress_percent']), 2, '.', '') ?>%;"></div>
-            </div>
-          </article>
-        <?php endforeach; ?>
-      </div>
-    </section>
-
-    <!-- Today's Priorities + Motivation -->
-    <section aria-labelledby="today-priorities">
-      <div class="tw-grid tw-gap-4 xl:tw-grid-cols-[1.4fr_0.6fr]">
-        <article class="dash-card tw-rounded-2xl tw-p-6">
-          <h2 id="today-priorities" class="tw-m-0 tw-text-xl tw-font-semibold tw-text-slate-800">Today&apos;s Priorities</h2>
-          <p class="tw-mt-1 tw-text-sm tw-leading-6 tw-text-slate-500">Win the day by moving the next supplier action forward in every stage of the Alibaba workflow.</p>
-          <div class="tw-mt-5 tw-space-y-3">
-            <?php foreach ($today_priorities as $priority): ?>
-              <label class="tw-flex tw-cursor-pointer tw-items-start tw-gap-3 tw-rounded-xl tw-border tw-border-slate-100 tw-bg-slate-50 tw-p-4 tw-transition-colors hover:tw-bg-blue-50 hover:tw-border-blue-100">
-                <input type="checkbox" class="tw-mt-0.5 tw-h-4 tw-w-4 tw-rounded tw-border-slate-300 tw-text-blue-600 focus:tw-ring-blue-500">
-                <span class="tw-text-sm tw-leading-6 tw-text-slate-700"><?= h($priority) ?></span>
-              </label>
-            <?php endforeach; ?>
-          </div>
-        </article>
-        <article class="dash-card tw-rounded-2xl tw-bg-gradient-to-br tw-from-teal-500 tw-to-blue-600 tw-p-6 tw-text-white">
-          <p class="tw-m-0 tw-text-xs tw-font-semibold tw-uppercase tw-tracking-widest tw-text-teal-100">Motivation</p>
-          <h3 class="tw-mt-3 tw-text-2xl tw-font-bold tw-leading-snug tw-text-white">Every supplier touchpoint today sets up next week&apos;s wins.</h3>
-          <p class="tw-mt-4 tw-text-sm tw-leading-7 tw-text-teal-50">Keep Patty focused on fast follow-up, clean PO handoff, and shipment visibility so the sourcing pipeline keeps converting.</p>
-        </article>
-      </div>
-    </section>
-
-    <!-- Pipeline Snapshot -->
-    <section aria-labelledby="pipeline-status">
-      <div class="tw-mb-4">
-        <h2 id="pipeline-status" class="tw-m-0 tw-text-xl tw-font-semibold tw-text-slate-800">Procurement Pipeline Snapshot</h2>
-        <p class="tw-mt-1 tw-text-sm tw-text-slate-500">Stay close to production and shipment movement so today&apos;s sourcing work turns into delivered machines.</p>
-      </div>
-      <div class="tw-grid tw-gap-4 lg:tw-grid-cols-3">
-        <article class="dash-card tw-rounded-2xl tw-p-6">
-          <p class="tw-m-0 tw-text-xs tw-font-semibold tw-uppercase tw-tracking-widest tw-text-slate-400">Items In Production</p>
-          <p class="tw-mt-4 tw-text-6xl tw-font-bold tw-tracking-tight tw-text-blue-600"><?= number_format($items_in_production) ?></p>
-          <p class="tw-mt-3 tw-text-sm tw-leading-6 tw-text-slate-600">Orders with production underway that have not shipped yet.</p>
-        </article>
-        <article class="dash-card tw-rounded-2xl tw-p-6">
-          <p class="tw-m-0 tw-text-xs tw-font-semibold tw-uppercase tw-tracking-widest tw-text-slate-400">Shipments In Transit</p>
-          <p class="tw-mt-4 tw-text-6xl tw-font-bold tw-tracking-tight tw-text-teal-600"><?= number_format($shipments_in_transit) ?></p>
-          <p class="tw-mt-3 tw-text-sm tw-leading-6 tw-text-slate-600">Incoming shipments currently marked In Transit.</p>
-        </article>
-        <article class="dash-card tw-rounded-2xl tw-p-6">
-          <p class="tw-m-0 tw-text-xs tw-font-semibold tw-uppercase tw-tracking-widest tw-text-slate-400">Expected Arrivals (30 Days)</p>
-          <p class="tw-mt-4 tw-text-6xl tw-font-bold tw-tracking-tight tw-text-sky-600"><?= number_format($expected_arrivals) ?></p>
-          <p class="tw-mt-3 tw-text-sm tw-leading-6 tw-text-slate-600">Open incoming shipments scheduled to arrive within the next month.</p>
-        </article>
-      </div>
-    </section>
-
-    <!-- Trend Charts -->
-    <section aria-labelledby="dashboard-charts">
-      <div class="tw-mb-4">
-        <h2 id="dashboard-charts" class="tw-m-0 tw-text-xl tw-font-semibold tw-text-slate-800">Momentum Trends</h2>
-        <p class="tw-mt-1 tw-text-sm tw-text-slate-500">Use the last eight weeks of sourcing and shipping activity to keep momentum building.</p>
-      </div>
-      <div class="tw-grid tw-gap-4 xl:tw-grid-cols-2">
-        <article class="chart-panel dash-card tw-rounded-2xl tw-p-6">
-          <div class="tw-mb-4 tw-flex tw-items-start tw-justify-between tw-gap-4">
-            <div>
-              <h3 class="tw-m-0 tw-text-base tw-font-semibold tw-text-slate-800">RFQs Sent Per Week</h3>
-              <p class="tw-mt-0.5 tw-text-sm tw-text-slate-400">Line chart · last 8 weeks</p>
-            </div>
-            <div class="tw-rounded-xl tw-border tw-border-blue-100 tw-bg-blue-50 tw-px-4 tw-py-3 tw-text-right">
-              <p class="tw-m-0 tw-text-xs tw-font-semibold tw-uppercase tw-tracking-widest tw-text-blue-500">8-Week Total</p>
-              <p class="tw-mt-1 tw-text-3xl tw-font-bold tw-text-blue-700"><?= number_format(array_sum($rfq_chart['values'])) ?></p>
-            </div>
-          </div>
-          <canvas id="rfqWeeklyChart" aria-label="RFQs sent per week line chart" role="img"></canvas>
-        </article>
-
-        <article class="chart-panel dash-card tw-rounded-2xl tw-p-6">
-          <div class="tw-mb-4 tw-flex tw-items-start tw-justify-between tw-gap-4">
-            <div>
-              <h3 class="tw-m-0 tw-text-base tw-font-semibold tw-text-slate-800">Items Shipped Per Week</h3>
-              <p class="tw-mt-0.5 tw-text-sm tw-text-slate-400">Bar chart · last 8 weeks</p>
-            </div>
-            <div class="tw-rounded-xl tw-border tw-border-teal-100 tw-bg-teal-50 tw-px-4 tw-py-3 tw-text-right">
-              <p class="tw-m-0 tw-text-xs tw-font-semibold tw-uppercase tw-tracking-widest tw-text-teal-500">8-Week Total</p>
-              <p class="tw-mt-1 tw-text-3xl tw-font-bold tw-text-teal-700"><?= number_format(array_sum($shipped_chart['values'])) ?></p>
-            </div>
-          </div>
-          <canvas id="shippedWeeklyChart" aria-label="Items shipped per week bar chart" role="img"></canvas>
-        </article>
-      </div>
-    </section>
-
+    </div>
   </div>
+
+  <!-- Weekly Goals header -->
+  <div class="dash-section-header">
+    <div>
+      <h2>Weekly Goals</h2>
+      <p class="muted">Big targets, clear pacing, and a fast read on where Patty should push next.</p>
+    </div>
+    <div class="card" style="margin:0;padding:10px 16px;text-align:right;">
+      <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;">Goals On Track</div>
+      <div style="font-size:2rem;font-weight:700;color:#0d9488;line-height:1.1;">
+        <?= number_format($goals_on_track) ?><span style="font-size:1.1rem;font-weight:600;color:#94a3b8;"> / <?= number_format(count($weekly_goals)) ?></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Weekly Goal cards -->
+  <div class="dash-grid-2">
+    <?php foreach ($weekly_goals as $goal): ?>
+      <div class="card <?= h('goal-card-' . $goal['state']['tone']) ?>">
+        <div class="topbar" style="align-items:flex-start;margin-bottom:0;">
+          <div>
+            <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;"><?= h((string)$goal['title']) ?></div>
+            <div class="dash-big-num">
+              <?= number_format((int)$goal['value']) ?>
+              <span style="font-size:1.3rem;font-weight:500;color:#94a3b8;"> / <?= number_format((int)$goal['target']) ?></span>
+            </div>
+          </div>
+          <span class="badge <?= h('goal-badge-' . $goal['state']['tone']) ?>"><?= h((string)$goal['state']['label']) ?></span>
+        </div>
+        <div style="margin-top:12px;">
+          <div class="topbar" style="margin-bottom:4px;">
+            <span style="font-size:13px;font-weight:600;"><?= number_format((int)round((float)$goal['progress_percent'])) ?>% complete</span>
+            <span class="muted" style="font-size:13px;">Pace target today: <?= number_format((int)$goal['pace_target']) ?></span>
+          </div>
+          <div class="dash-progress">
+            <div class="dash-progress-bar <?= h('goal-bar-' . $goal['state']['tone']) ?>" style="width:<?= number_format((float)$goal['progress_percent'], 2, '.', '') ?>%;"></div>
+          </div>
+        </div>
+        <div class="topbar" style="margin-top:10px;margin-bottom:0;align-items:flex-start;">
+          <span class="muted" style="font-size:13px;flex:1;margin-right:12px;"><?= h((string)$goal['state']['message']) ?></span>
+          <span style="font-size:13px;font-weight:600;white-space:nowrap;">
+            <?= $goal['remaining'] > 0 ? number_format((int)$goal['remaining']) . ' more to goal' : 'Goal reached &#10003;' ?>
+          </span>
+        </div>
+      </div>
+    <?php endforeach; ?>
+  </div>
+
+  <!-- Weekly Execution KPI Cards -->
+  <div class="dash-section-header" style="margin-top:24px;">
+    <div>
+      <h2>Weekly Execution Snapshot</h2>
+      <p class="muted">Action-oriented scorecards for the Alibaba sourcing and procurement workflow.</p>
+    </div>
+  </div>
+
+  <?php
+  $kpi_colors = [
+    'sky'     => ['accent' => '#0284c7', 'light' => '#e0f2fe', 'border' => '#7dd3fc'],
+    'violet'  => ['accent' => '#7c3aed', 'light' => '#ede9fe', 'border' => '#c4b5fd'],
+    'emerald' => ['accent' => '#059669', 'light' => '#d1fae5', 'border' => '#6ee7b7'],
+    'amber'   => ['accent' => '#d97706', 'light' => '#fef3c7', 'border' => '#fcd34d'],
+  ];
+  ?>
+  <div class="dash-grid-4">
+    <?php foreach ($weekly_goals as $card):
+      $kc = $kpi_colors[$card['accent_key']] ?? ['accent' => '#2563eb', 'light' => '#eff6ff', 'border' => '#93c5fd'];
+    ?>
+      <div class="card">
+        <span class="badge" style="background:<?= h($kc['light']) ?>;color:<?= h($kc['accent']) ?>;border-color:<?= h($kc['border']) ?>;font-size:11px;text-transform:uppercase;letter-spacing:0.07em;">This Week</span>
+        <div class="muted" style="font-size:13px;margin-top:8px;"><?= h($card['label']) ?></div>
+        <div style="font-size:3rem;font-weight:700;line-height:1.1;color:<?= h($kc['accent']) ?>;margin:8px 0 4px;"><?= number_format((int)$card['value']) ?></div>
+        <div class="muted" style="font-size:13px;">Goal: <strong><?= number_format((int)$card['target']) ?></strong></div>
+        <div class="dash-progress">
+          <div class="dash-progress-bar" style="width:<?= number_format(min(100, (float)$card['progress_percent']), 2, '.', '') ?>%;background:<?= h($kc['accent']) ?>;"></div>
+        </div>
+      </div>
+    <?php endforeach; ?>
+  </div>
+
+  <!-- Today's Priorities + Motivation -->
+  <div class="dash-section-header" style="margin-top:24px;">
+    <div>
+      <h2>Today&rsquo;s Priorities</h2>
+      <p class="muted">Win the day by moving the next supplier action forward in every stage of the Alibaba workflow.</p>
+    </div>
+  </div>
+  <div class="dash-grid-2">
+    <div class="card">
+      <?php foreach ($today_priorities as $priority): ?>
+        <label class="priority-item">
+          <input type="checkbox">
+          <span style="font-size:14px;line-height:1.5;"><?= h($priority) ?></span>
+        </label>
+      <?php endforeach; ?>
+    </div>
+    <div class="card dash-motivation">
+      <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;">Motivation</div>
+      <h3>Every supplier touchpoint today sets up next week&rsquo;s wins.</h3>
+      <p class="muted">Keep Patty focused on fast follow-up, clean PO handoff, and shipment visibility so the sourcing pipeline keeps converting.</p>
+    </div>
+  </div>
+
+  <!-- Procurement Pipeline Snapshot -->
+  <div class="dash-section-header" style="margin-top:24px;">
+    <div>
+      <h2>Procurement Pipeline Snapshot</h2>
+      <p class="muted">Stay close to production and shipment movement so today&rsquo;s sourcing work turns into delivered machines.</p>
+    </div>
+  </div>
+  <div class="dash-grid-3">
+    <div class="card">
+      <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;">Items In Production</div>
+      <div class="dash-big-num" style="color:#2563eb;"><?= number_format($items_in_production) ?></div>
+      <p class="muted" style="font-size:13px;margin:4px 0 0;">Orders with production underway that have not shipped yet.</p>
+    </div>
+    <div class="card">
+      <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;">Shipments In Transit</div>
+      <div class="dash-big-num" style="color:#0d9488;"><?= number_format($shipments_in_transit) ?></div>
+      <p class="muted" style="font-size:13px;margin:4px 0 0;">Incoming shipments currently marked In Transit.</p>
+    </div>
+    <div class="card">
+      <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;">Expected Arrivals (30 Days)</div>
+      <div class="dash-big-num" style="color:#0284c7;"><?= number_format($expected_arrivals) ?></div>
+      <p class="muted" style="font-size:13px;margin:4px 0 0;">Open incoming shipments scheduled to arrive within the next month.</p>
+    </div>
+  </div>
+
+  <!-- Momentum Trend Charts -->
+  <div class="dash-section-header" style="margin-top:24px;">
+    <div>
+      <h2>Momentum Trends</h2>
+      <p class="muted">Use the last eight weeks of sourcing and shipping activity to keep momentum building.</p>
+    </div>
+  </div>
+  <div class="dash-grid-2">
+    <div class="card chart-panel">
+      <div class="topbar" style="margin-bottom:12px;align-items:flex-start;">
+        <div>
+          <h3 style="margin:0 0 2px;">RFQs Sent Per Week</h3>
+          <p class="muted" style="font-size:13px;margin:0;">Line chart &middot; last 8 weeks</p>
+        </div>
+        <div class="card" style="margin:0;padding:8px 14px;text-align:right;background:#eff6ff;border-color:#bfdbfe;">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:#2563eb;font-weight:600;">8-Week Total</div>
+          <div style="font-size:1.5rem;font-weight:700;color:#1d4ed8;"><?= number_format(array_sum($rfq_chart['values'])) ?></div>
+        </div>
+      </div>
+      <canvas id="rfqWeeklyChart" aria-label="RFQs sent per week line chart" role="img"></canvas>
+    </div>
+    <div class="card chart-panel">
+      <div class="topbar" style="margin-bottom:12px;align-items:flex-start;">
+        <div>
+          <h3 style="margin:0 0 2px;">Items Shipped Per Week</h3>
+          <p class="muted" style="font-size:13px;margin:0;">Bar chart &middot; last 8 weeks</p>
+        </div>
+        <div class="card" style="margin:0;padding:8px 14px;text-align:right;background:#f0fdfa;border-color:#99f6e4;">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:#0d9488;font-weight:600;">8-Week Total</div>
+          <div style="font-size:1.5rem;font-weight:700;color:#0f766e;"><?= number_format(array_sum($shipped_chart['values'])) ?></div>
+        </div>
+      </div>
+      <canvas id="shippedWeeklyChart" aria-label="Items shipped per week bar chart" role="img"></canvas>
+    </div>
+  </div>
+
 </div>
+
 
 <script>
 (() => {
