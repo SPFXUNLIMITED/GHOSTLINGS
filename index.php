@@ -53,8 +53,8 @@ function dashboard_table_exists(PDO $pdo, string $table): bool {
     return $cache[$table];
   }
 
-  dashboard_validate_identifier($table);
-  $stmt = $pdo->query("SHOW TABLES LIKE " . $pdo->quote($table));
+  $validated_table = trim(dashboard_validate_identifier($table), '`');
+  $stmt = $pdo->query("SHOW TABLES LIKE " . $pdo->quote($validated_table));
   return $cache[$table] = (bool)$stmt->fetchColumn();
 }
 
@@ -64,7 +64,7 @@ function dashboard_safe_count(PDO $pdo, string $sql, array $params = []): int {
     $stmt->execute($params);
     return (int)$stmt->fetchColumn();
   } catch (Throwable $e) {
-    error_log('CEO dashboard count query failed: ' . $e->getMessage());
+    error_log('Dashboard count query failed: ' . $e->getMessage());
     return 0;
   }
 }
@@ -112,7 +112,6 @@ function dashboard_weekly_total(PDO $pdo, string $table, string $date_expression
 
 function dashboard_goal_state(int $value, int $target, float $expected_ratio): array {
   $expected_ratio = max(0.0, min(1.0, $expected_ratio));
-  $progress_ratio = $target > 0 ? min($value / $target, 1) : 0.0;
   $expected_total = $target > 0 ? ($target * $expected_ratio) : 0.0;
   $pace_ratio = $expected_total > 0 ? ($value / $expected_total) : ($value > 0 ? 1.0 : 0.0);
 
@@ -205,7 +204,7 @@ function dashboard_weekly_series(PDO $pdo, string $table, string $date_expressio
       $weeks[$bucket]['total'] += (int)round((float)($row['total'] ?? 0));
     }
   } catch (Throwable $e) {
-    error_log('CEO dashboard series query failed: ' . $e->getMessage());
+    error_log('Dashboard series query failed: ' . $e->getMessage());
   }
 
   return [
