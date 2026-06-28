@@ -5,11 +5,28 @@ require __DIR__ . '/auth.php';
 
 require_login();
 
-function dashboard_ident(string $name): string {
+function dashboard_validate_identifier(string $name): string {
   if (!preg_match('/^[A-Za-z0-9_]+$/', $name)) {
     throw new InvalidArgumentException('Invalid SQL identifier: only letters, numbers, and underscores are allowed.');
   }
   return "`{$name}`";
+}
+
+function dashboard_accent_classes(string $key): string {
+  static $allowed = [
+    'sky' => 'tw-from-sky-500 tw-to-blue-600',
+    'violet' => 'tw-from-violet-500 tw-to-indigo-600',
+    'emerald' => 'tw-from-emerald-500 tw-to-teal-600',
+    'amber' => 'tw-from-amber-500 tw-to-orange-600',
+    'fuchsia' => 'tw-from-fuchsia-500 tw-to-pink-600',
+    'slate' => 'tw-from-slate-500 tw-to-slate-700',
+  ];
+
+  if (!isset($allowed[$key])) {
+    throw new InvalidArgumentException('Invalid dashboard accent key.');
+  }
+
+  return $allowed[$key];
 }
 
 function dashboard_sql_fragment(string $key): string {
@@ -36,7 +53,7 @@ function dashboard_table_exists(PDO $pdo, string $table): bool {
     return $cache[$table];
   }
 
-  dashboard_ident($table);
+  dashboard_validate_identifier($table);
   $stmt = $pdo->query("SHOW TABLES LIKE " . $pdo->quote($table));
   return $cache[$table] = (bool)$stmt->fetchColumn();
 }
@@ -60,7 +77,7 @@ function dashboard_weekly_count(PDO $pdo, string $table, string $date_expression
   $date_expression = dashboard_sql_fragment($date_expression_key);
   $sql = "
     SELECT COUNT(*)
-    FROM " . dashboard_ident($table) . "
+    FROM " . dashboard_validate_identifier($table) . "
     WHERE {$date_expression} IS NOT NULL
       AND DATE({$date_expression}) >= :start_date
       AND DATE({$date_expression}) < :end_date
@@ -97,7 +114,7 @@ function dashboard_weekly_series(PDO $pdo, string $table, string $date_expressio
   try {
     $stmt = $pdo->prepare("
       SELECT DATE({$date_expression}) AS activity_date, {$value_expression} AS total
-      FROM " . dashboard_ident($table) . "
+      FROM " . dashboard_validate_identifier($table) . "
       WHERE {$date_expression} IS NOT NULL
         AND DATE({$date_expression}) >= :start_date
         AND DATE({$date_expression}) < :end_date
@@ -120,7 +137,8 @@ function dashboard_weekly_series(PDO $pdo, string $table, string $date_expressio
         continue;
       }
 
-      $bucket = $activity->modify('monday this week')->format('Y-m-d');
+      $weekday = (int)$activity->format('N');
+      $bucket = $activity->modify('-' . ($weekday - 1) . ' days')->format('Y-m-d');
       if (!isset($weeks[$bucket])) {
         continue;
       }
@@ -148,36 +166,36 @@ $kpis = [
   [
     'label' => 'New RFQs Created This Week',
     'value' => dashboard_weekly_count($pdo, 'rfq_requests', 'created_at', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
-    'accent' => 'tw-from-sky-500 tw-to-blue-600',
+    'accent_key' => 'sky',
   ],
   [
     'label' => 'Quotes Received This Week',
     'value' => dashboard_weekly_count($pdo, 'rfq_quotes', 'rfq_quote_received', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
-    'accent' => 'tw-from-violet-500 tw-to-indigo-600',
+    'accent_key' => 'violet',
   ],
   [
     'label' => 'Purchase Orders Created This Week',
     'value' => dashboard_weekly_count($pdo, 'rfq_orders', 'rfq_order_created', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
-    'accent' => 'tw-from-emerald-500 tw-to-teal-600',
+    'accent_key' => 'emerald',
   ],
   [
     'label' => 'New Freight Quotes This Week',
     'value' => dashboard_weekly_count($pdo, 'shipping_rfq_quotes', 'shipping_quote_received', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
-    'accent' => 'tw-from-amber-500 tw-to-orange-600',
+    'accent_key' => 'amber',
   ],
   [
     'label' => 'New Incoming Shipments This Week',
     'value' => dashboard_weekly_count($pdo, 'incoming_shipments', 'created_at', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
-    'accent' => 'tw-from-fuchsia-500 tw-to-pink-600',
+    'accent_key' => 'fuchsia',
   ],
   [
     'label' => 'New Inventory Items Added This Week',
     'value' => dashboard_weekly_count($pdo, 'inventory_items', 'created_at', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
-    'accent' => 'tw-from-slate-500 tw-to-slate-700',
+    'accent_key' => 'slate',
   ],
 ];
 
-$weekly_activity_total = array_sum(array_map(static fn(array $card): int => (int)$card['value'], $kpis));
+$weekly_activity_total = (int)array_sum(array_column($kpis, 'value'));
 
 $items_in_production = dashboard_table_exists($pdo, 'rfq_orders')
   ? dashboard_safe_count(
@@ -300,7 +318,7 @@ window.tailwind.config = {
       <div class="tw-relative tw-flex tw-flex-col tw-gap-6 lg:tw-flex-row lg:tw-items-end lg:tw-justify-between">
         <div class="tw-max-w-3xl">
           <p class="tw-m-0 tw-text-sm tw-font-semibold tw-uppercase tw-tracking-[0.3em] tw-text-cyan-300">CEO Dashboard</p>
-          <h1 class="tw-mt-3 tw-text-3xl tw-font-black tw-tracking-[-0.04em] lg:tw-text-6xl">A full picture of business activity.</h1>
+          <h1 class="tw-mt-3 tw-text-3xl tw-font-black tw-tracking-[-0.04em] lg:tw-text-6xl">CEO Dashboard · Business Activity Overview</h1>
           <p class="tw-mt-3 tw-max-w-2xl tw-text-base tw-leading-7 tw-text-slate-300 lg:tw-text-lg">
             Monitor weekly demand, supplier momentum, purchase activity, shipment flow, and near-term arrivals from one executive view.
           </p>
@@ -337,7 +355,7 @@ window.tailwind.config = {
         <?php foreach ($kpis as $card): ?>
           <article class="ceo-neon-card ceo-card-glow tw-relative tw-overflow-hidden tw-rounded-[28px] tw-p-6 tw-ring-1 tw-ring-cyan-400/10">
             <div class="tw-absolute tw-right-5 tw-top-5 tw-h-3 tw-w-3 tw-rounded-full tw-bg-cyan-300 tw-shadow-[0_0_18px_rgba(103,232,249,0.9)]"></div>
-            <div class="tw-inline-flex tw-rounded-full tw-bg-gradient-to-r <?= h($card['accent']) ?> tw-p-[1px]">
+            <div class="tw-inline-flex tw-rounded-full tw-bg-gradient-to-r <?= h(dashboard_accent_classes((string)$card['accent_key'])) ?> tw-p-[1px]">
               <span class="tw-rounded-full tw-bg-slate-950/90 tw-px-3 tw-py-1 tw-text-[11px] tw-font-semibold tw-uppercase tw-tracking-[0.18em] tw-text-cyan-100">This Week</span>
             </div>
             <p class="tw-mt-4 tw-max-w-[16rem] tw-text-sm tw-font-medium tw-leading-6 tw-text-slate-300"><?= h($card['label']) ?></p>
@@ -412,9 +430,9 @@ window.tailwind.config = {
 
 <script>
 (() => {
-  const labels = <?= json_encode($rfq_chart['labels'], JSON_UNESCAPED_SLASHES) ?>;
-  const rfqValues = <?= json_encode($rfq_chart['values'], JSON_UNESCAPED_SLASHES) ?>;
-  const shippedValues = <?= json_encode($shipped_chart['values'], JSON_UNESCAPED_SLASHES) ?>;
+  const labels = <?= json_encode($rfq_chart['labels'], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+  const rfqValues = <?= json_encode($rfq_chart['values'], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+  const shippedValues = <?= json_encode($shipped_chart['values'], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
   const baseOptions = {
     responsive: true,
