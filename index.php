@@ -306,12 +306,13 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
   border: none;
 }
 .dash-hero h1 { color: #fff; font-size: 1.75rem; margin: 6px 0 8px; }
-.dash-hero p  { margin: 0; }
+.dash-hero p  { margin: 0; color: rgba(255,255,255,0.95); }
+.dash-hero .muted { color: rgba(255,255,255,0.9); }
 .dash-hero-tag {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(255,255,255,0.75);
+  color: rgba(255,255,255,0.9);
   margin-bottom: 6px;
 }
 .dash-hero-stats {
@@ -321,7 +322,8 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
   margin-top: 16px;
 }
 .dash-hero-stat {
-  background: rgba(255,255,255,0.15);
+  background: rgba(15, 23, 42, 0.26);
+  border: 1px solid rgba(255,255,255,0.25);
   border-radius: 10px;
   padding: 10px 16px;
   min-width: 130px;
@@ -330,7 +332,7 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: rgba(255,255,255,0.72);
+  color: rgba(255,255,255,0.86);
 }
 .dash-hero-stat-value {
   font-size: 1.3rem;
@@ -387,16 +389,17 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 10px 12px;
-  background: #f8fafc;
-  border: 1px solid #e5e7eb;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid #dbe3ee;
   border-radius: 8px;
-  margin-bottom: 8px;
+  margin: 0;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.priority-item:hover { background: #eff6ff; border-color: #bfdbfe; }
+.priority-item:hover { background: #f8fbff; border-color: #93c5fd; box-shadow: 0 4px 12px rgba(37,99,235,0.10); }
 .priority-item input[type=checkbox] { margin-top: 3px; flex-shrink: 0; }
+.priority-list { display: grid; gap: 8px; }
 .chart-panel canvas { width: 100% !important; height: 260px !important; display: block; }
 .chart-panel { min-height: 300px; }
 @media (max-width: 860px) {
@@ -415,7 +418,7 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
   <!-- Hero banner -->
   <div class="card dash-hero">
     <div class="dash-hero-tag">Alibaba Sourcing Dashboard</div>
-    <h1>Keep Patty&rsquo;s Weekly Procurement Goals Charging Forward</h1>
+    <h1>Keep Your Weekly Procurement Goals Charging Forward</h1>
     <p class="muted">Stay locked on the Alibaba sourcing workflow: send more RFQs, pull in more quotes, release more purchase orders, and keep shipments moving.</p>
     <div>
       <span class="dash-pill">Goal-Driven Sourcing</span>
@@ -524,9 +527,9 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
     </div>
   </div>
   <div class="dash-grid-2">
-    <div class="card">
+    <div class="priority-list">
       <?php foreach ($today_priorities as $priority): ?>
-        <label class="priority-item">
+        <label class="card priority-item">
           <input type="checkbox">
           <span style="font-size:14px;line-height:1.5;"><?= h($priority) ?></span>
         </label>
