@@ -299,49 +299,189 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 
 <style>
-/* Strong dashboard overrides to avoid collisions with shared styles.css */
+/* ── Dashboard shell variables ─────────────────────────────────── */
 .dash-shell {
-  --dash-text: #0f172a;
-  --dash-muted: #475569;
+  --dash-text:   #0f172a;
+  --dash-muted:  #475569;
   --dash-border: #d8e1ee;
-  --dash-card-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-  --dash-card-shadow-hover: 0 14px 28px rgba(15, 23, 42, 0.12);
-  --dash-blue: #1d4ed8;
+  --dash-shadow: 0 4px 16px rgba(15,23,42,0.08);
+  --dash-shadow-hover: 0 8px 24px rgba(15,23,42,0.13);
+  --dash-blue:   #1d4ed8;
+  color: var(--dash-text);
 }
+
+/* Page background */
 .dash-shell::before {
   content: '';
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: #f2f6fc;
+  background: #f1f5fb;
 }
-.dash-shell,
-.dash-shell * {
-  color: var(--dash-text);
-}
-.dash-shell .muted {
-  color: var(--dash-muted) !important;
-}
+
+/* Base card reset */
 .dash-shell .card {
   background: #ffffff !important;
   border: 1px solid var(--dash-border) !important;
   border-radius: 14px !important;
-  box-shadow: var(--dash-card-shadow) !important;
-  padding: 18px !important;
+  box-shadow: var(--dash-shadow) !important;
+  padding: 20px !important;
   margin: 0 !important;
+  color: var(--dash-text);
 }
 .dash-shell .card:hover {
-  box-shadow: var(--dash-card-shadow-hover) !important;
+  box-shadow: var(--dash-shadow-hover) !important;
 }
+.dash-shell .muted { color: var(--dash-muted) !important; }
 .dash-shell .badge {
   border-radius: 999px;
   border-width: 1px;
   font-weight: 700;
 }
-.dash-mini-metric,
+
+/* ── Hero banner ────────────────────────────────────────────────── */
+.dash-hero {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #0b1220 0%, #1e3a8a 55%, #0f766e 100%) !important;
+  border: 1px solid #1f3b7d !important;
+  padding: 28px 28px 24px !important;
+}
+/* Subtle sheen overlay – stays behind content */
+.dash-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(110deg, rgba(255,255,255,0.08) 0%, transparent 60%);
+}
+/* Every direct text element in the hero must sit above the sheen */
+.dash-hero > * { position: relative; z-index: 1; }
+
+.dash-hero-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #bfdbfe !important;
+  margin-bottom: 10px;
+  padding: 4px 12px;
+  border: 1px solid rgba(191,219,254,0.45);
+  border-radius: 999px;
+  background: rgba(15,23,42,0.35);
+}
+.dash-hero h1 {
+  margin: 0 0 10px;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #f8fafc !important;
+  line-height: 1.2;
+}
+.dash-hero > p {
+  margin: 0;
+  max-width: 820px;
+  color: #cbd5e1 !important;
+  font-size: 0.97rem;
+  line-height: 1.55;
+}
+.dash-hero .dash-pill {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(15,23,42,0.4);
+  border: 1px solid rgba(191,219,254,0.4);
+  font-size: 12px;
+  font-weight: 600;
+  color: #e2e8f0 !important;
+  margin: 10px 8px 0 0;
+}
+.dash-hero-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+.dash-hero-stat {
+  background: rgba(15,23,42,0.38) !important;
+  border: 1px solid rgba(191,219,254,0.35) !important;
+  border-radius: 12px !important;
+  padding: 12px 14px !important;
+  box-shadow: none !important;
+}
+.dash-hero-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8 !important;
+}
+.dash-hero-stat-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-top: 4px;
+  color: #f1f5f9 !important;
+}
+
+/* ── Layout grids ───────────────────────────────────────────────── */
+.dash-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.dash-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
+.dash-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+
+/* ── Section headers ────────────────────────────────────────────── */
+.dash-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 30px 0 16px;
+}
+.dash-section-header h2 {
+  margin: 0 0 4px;
+  color: var(--dash-text);
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+}
+.dash-section-header p { margin: 0; max-width: 720px; }
+
+/* ── Progress bar ───────────────────────────────────────────────── */
+.dash-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: #e2eaf5;
+  overflow: hidden;
+  margin-top: 10px;
+}
+.dash-progress-bar { height: 100%; border-radius: 999px; }
+
+/* ── Goal tone colours ──────────────────────────────────────────── */
+.dash-shell .goal-badge-green  { background: #dcfce7 !important; color: #166534 !important; border-color: #86efac !important; }
+.dash-shell .goal-badge-yellow { background: #fef3c7 !important; color: #92400e !important; border-color: #fcd34d !important; }
+.dash-shell .goal-badge-red    { background: #fee2e2 !important; color: #991b1b !important; border-color: #fca5a5 !important; }
+.goal-bar-green    { background: linear-gradient(90deg,#10b981,#0d9488); }
+.goal-bar-yellow   { background: linear-gradient(90deg,#f59e0b,#ea580c); }
+.goal-bar-red      { background: linear-gradient(90deg,#ef4444,#dc2626); }
+.goal-card-green   { border-left: 4px solid #10b981 !important; }
+.goal-card-yellow  { border-left: 4px solid #f59e0b !important; }
+.goal-card-red     { border-left: 4px solid #ef4444 !important; }
+
+.dash-big-num {
+  font-size: 2.8rem;
+  font-weight: 700;
+  line-height: 1.06;
+  margin: 8px 0 6px;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+/* ── KPI / metric cards ─────────────────────────────────────────── */
 .dash-kpi-card,
-.dash-metric-card {
+.dash-metric-card,
+.dash-mini-metric {
   background: #f8fbff !important;
 }
 .dash-chart-total {
@@ -350,176 +490,52 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
   text-align: right;
   border-radius: 12px !important;
 }
-.dash-chart-total-rfq { background:#edf4ff !important; border-color:#c7dbff !important; }
-.dash-chart-total-ship { background:#ecfeff !important; border-color:#99f6e4 !important; }
+.dash-chart-total-rfq  { background: #edf4ff !important; border-color: #c7dbff !important; }
+.dash-chart-total-ship { background: #ecfeff !important; border-color: #99f6e4 !important; }
 
-/* Hero banner */
-.dash-shell .card.dash-hero {
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(135deg, #0b1220 0%, #1e3a8a 55%, #0f766e 100%) !important;
-  border: 1px solid #1f3b7d !important;
-  color: #ffffff !important;
-}
-.dash-shell .dash-hero::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(110deg, rgba(255,255,255,0.12), rgba(255,255,255,0));
-}
-.dash-shell .dash-hero h1,
-.dash-shell .dash-hero p,
-.dash-shell .dash-hero .muted,
-.dash-shell .dash-hero .dash-hero-tag,
-.dash-shell .dash-hero .dash-pill,
-.dash-shell .dash-hero .dash-hero-stat-label,
-.dash-shell .dash-hero .dash-hero-stat-value {
-  position: relative;
-  z-index: 1;
-  color: #f8fafc !important;
-}
-.dash-shell .dash-hero h1 { margin: 8px 0 10px; font-size: 2rem; letter-spacing: -0.01em; }
-.dash-shell .dash-hero p { margin: 0; max-width: 860px; }
-.dash-shell .dash-hero-tag {
-  display: inline-block;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  margin-bottom: 8px;
-  padding: 5px 12px;
-  border: 1px solid rgba(191, 219, 254, 0.6);
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.45);
-}
-.dash-shell .dash-hero-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
-  margin-top: 18px;
-}
-.dash-shell .dash-hero-stat {
-  background: rgba(15, 23, 42, 0.42) !important;
-  border: 1px solid rgba(191, 219, 254, 0.5) !important;
-  border-radius: 12px;
-  padding: 10px 14px;
-}
-.dash-shell .dash-hero-stat-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-.dash-shell .dash-hero-stat-value {
-  font-size: 1.2rem;
-  font-weight: 700;
-  margin-top: 4px;
-}
-.dash-shell .dash-pill {
-  display: inline-block;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.45) !important;
-  border: 1px solid rgba(191, 219, 254, 0.5) !important;
-  font-size: 12px;
-  margin: 10px 8px 0 0;
-  font-weight: 600;
-}
-
-.dash-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.dash-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
-.dash-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-.dash-section-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin: 26px 0 14px;
-}
-.dash-section-header h2 { margin: 0 0 4px; color: var(--dash-text); letter-spacing: -0.01em; }
-.dash-section-header p  { margin: 0; max-width: 760px; }
-.dash-progress {
-  height: 9px;
-  border-radius: 999px;
-  background: #e8eef7;
-  overflow: hidden;
-  margin-top: 10px;
-}
-.dash-progress-bar { height: 100%; border-radius: 999px; }
-
-/* Goal tone colours */
-.goal-badge-green  { background: #dcfce7; color: #166534; border-color: #86efac; }
-.goal-badge-yellow { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
-.goal-badge-red    { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
-.goal-bar-green    { background: linear-gradient(90deg,#10b981,#0d9488); }
-.goal-bar-yellow   { background: linear-gradient(90deg,#f59e0b,#ea580c); }
-.goal-bar-red      { background: linear-gradient(90deg,#ef4444,#dc2626); }
-.goal-card-green   { border-left: 4px solid #10b981 !important; }
-.goal-card-yellow  { border-left: 4px solid #f59e0b !important; }
-.goal-card-red     { border-left: 4px solid #ef4444 !important; }
-.dash-big-num { font-size: 2.8rem; font-weight: 700; line-height: 1.06; margin: 8px 0 6px; letter-spacing: -0.02em; color: #0f172a !important; }
-
-.dash-shell .dash-motivation {
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(136deg,#0f172a 0%,#1e3a8a 52%,#0f766e 100%) !important;
-  border: 1px solid #1f3b7d !important;
-}
-.dash-shell .dash-motivation::after {
-  content:'';
-  position:absolute;
-  width:240px;
-  height:240px;
-  right:-110px;
-  top:-95px;
-  border-radius:999px;
-  background:radial-gradient(circle, rgba(191,219,254,0.3), rgba(191,219,254,0));
-}
-.dash-shell .dash-motivation h3,
-.dash-shell .dash-motivation p,
-.dash-shell .dash-motivation .muted {
-  position:relative;
-  z-index:1;
-  color: #f1f5f9 !important;
-}
-
-/* Today's priorities cards */
-.dash-shell .priority-list {
+/* ── Today's Priorities checklist ───────────────────────────────── */
+.priority-list {
   display: grid;
   gap: 10px;
+  margin-top: 14px;
 }
-.dash-shell label.card.priority-item {
+label.priority-item {
   display: flex !important;
   align-items: flex-start;
   gap: 12px;
-  padding: 14px !important;
-  background: #ffffff !important;
-  border: 1px solid #cbd8ea !important;
-  border-radius: 12px !important;
-  box-shadow: 0 8px 20px rgba(15,23,42,0.07) !important;
-  margin: 0 !important;
   cursor: pointer;
+  padding: 14px 16px !important;
+  background: #ffffff !important;
+  border: 1px solid #d1ddf0 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.06) !important;
+  margin: 0 !important;
+  transition: border-color 0.15s, background 0.15s;
 }
-.dash-shell label.card.priority-item:hover {
+label.priority-item:hover {
   border-color: #93c5fd !important;
-  background: #f8fbff !important;
+  background: #f5f9ff !important;
 }
-.dash-shell label.card.priority-item span {
-  color: #0f172a !important;
-  font-weight: 500;
-}
-.dash-shell label.card.priority-item input[type=checkbox] {
+label.priority-item input[type=checkbox] {
   margin-top: 3px;
   flex-shrink: 0;
+  width: 16px;
+  height: 16px;
   accent-color: var(--dash-blue);
 }
-
-.chart-panel canvas { width: 100% !important; height: 260px !important; display: block; }
-.chart-panel {
-  min-height: 300px;
-  border: 1px solid #dbe4f2 !important;
-  box-shadow: 0 10px 26px rgba(15,23,42,0.08) !important;
+label.priority-item span {
+  color: #1e293b;
+  font-weight: 500;
+  font-size: 0.95rem;
+  line-height: 1.5;
 }
+
+/* ── Chart panel ────────────────────────────────────────────────── */
+/* min-height accounts for the 260px canvas plus ~50px header content */
+.chart-panel { min-height: 310px; }
+.chart-panel canvas { width: 100% !important; height: 260px !important; display: block; }
+
+/* ── Responsive ─────────────────────────────────────────────────── */
 @media (max-width: 860px) {
   .dash-grid-4 { grid-template-columns: 1fr 1fr; }
 }
@@ -527,6 +543,7 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
   .dash-grid-2,
   .dash-grid-3,
   .dash-grid-4 { grid-template-columns: 1fr; }
+  .dash-hero h1 { font-size: 1.5rem; }
 }
 </style>
 
@@ -537,7 +554,7 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
   <div class="card dash-hero">
     <div class="dash-hero-tag">Alibaba Sourcing Dashboard</div>
     <h1>Keep Your Weekly Procurement Goals Charging Forward</h1>
-    <p class="muted">Stay locked on the Alibaba sourcing workflow: send more RFQs, pull in more quotes, release more purchase orders, and keep shipments moving.</p>
+    <p>Stay locked on the Alibaba sourcing workflow: send more RFQs, pull in more quotes, release more purchase orders, and keep shipments moving.</p>
     <div>
       <span class="dash-pill">Goal-Driven Sourcing</span>
       <span class="dash-pill">Supplier Momentum Focus</span>
@@ -553,7 +570,7 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
       </div>
       <div class="dash-hero-stat">
         <div class="dash-hero-stat-label">Last Updated</div>
-        <div class="dash-hero-stat-value" style="font-size:0.95rem;"><?= h($last_updated) ?></div>
+        <div class="dash-hero-stat-value" style="font-size:0.9rem;"><?= h($last_updated) ?></div>
       </div>
     </div>
   </div>
@@ -638,27 +655,31 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
   </div>
 
   <!-- Today's Priorities -->
-  <div style="margin-top:24px;">
-    <h2>Today's Priorities</h2>
-    <?php
-    $today_priority_items = $today_priorities ?? [];
-    if (!is_array($today_priority_items) || empty($today_priority_items)) {
-      $today_priority_items = [
-        'Send the next round of high-priority Alibaba RFQs so supplier conversations keep moving.',
-        'Follow up on open supplier responses and pull in the quotes still needed for this week.',
-        'Issue approved purchase orders and confirm acknowledgements before the day ends.',
-        'Check production and shipment updates so Patty finishes the day with a clear next step.',
-      ];
-    }
-    ?>
+  <div class="dash-section-header" style="margin-top:24px;">
     <div>
-      <?php foreach ($today_priority_items as $priority_index => $priority): ?>
-        <?php $priority_id = 'today-priority-' . ((int)$priority_index + 1); ?>
-        <label for="<?= h($priority_id) ?>" style="display:block;margin:8px 0;">
-          <input id="<?= h($priority_id) ?>" type="checkbox" name="today_priorities[]" value="priority_<?= (int)$priority_index + 1 ?>"> <?= h($priority) ?>
-        </label>
-      <?php endforeach; ?>
+      <h2>Today's Priorities</h2>
+      <p class="muted">Four focused actions to move the week forward — check them off as you go.</p>
     </div>
+  </div>
+  <?php
+  $today_priority_items = $today_priorities ?? [];
+  if (!is_array($today_priority_items) || empty($today_priority_items)) {
+    $today_priority_items = [
+      'Send the next round of high-priority Alibaba RFQs so supplier conversations keep moving.',
+      'Follow up on open supplier responses and pull in the quotes still needed for this week.',
+      'Issue approved purchase orders and confirm acknowledgements before the day ends.',
+      'Check production and shipment updates so Patty finishes the day with a clear next step.',
+    ];
+  }
+  ?>
+  <div class="priority-list">
+    <?php foreach ($today_priority_items as $priority_index => $priority): ?>
+      <?php $priority_id = 'today-priority-' . ((int)$priority_index + 1); ?>
+      <label class="priority-item" for="<?= h($priority_id) ?>">
+        <input id="<?= h($priority_id) ?>" type="checkbox" name="today_priorities[]" value="priority_<?= (int)$priority_index + 1 ?>">
+        <span><?= h($priority) ?></span>
+      </label>
+    <?php endforeach; ?>
   </div>
 
   <!-- Procurement Pipeline Snapshot -->
