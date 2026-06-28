@@ -5,136 +5,259 @@ require __DIR__ . '/auth.php';
 
 require_login();
 
-render_header('Home');
-render_alibaba_workflow_banner('create_rfq');
+$tz = new DateTimeZone('America/Los_Angeles');
+$now = new DateTimeImmutable('now', $tz);
+$monthStart = $now->modify('first day of this month')->setTime(0, 0, 0);
+$weekStart = $now->modify('monday this week')->setTime(0, 0, 0);
+
+$monthStartDateTime = $monthStart->format('Y-m-d H:i:s');
+$weekStartDateTime = $weekStart->format('Y-m-d H:i:s');
+$monthStartDate = $monthStart->format('Y-m-d');
+$weekStartDate = $weekStart->format('Y-m-d');
+
+$countScalar = static function (PDO $pdo, string $sql, array $params = []): int {
+  $stmt = $pdo->prepare($sql);
+  $stmt->execute($params);
+  return (int)$stmt->fetchColumn();
+};
+
+$rfqMonth = $countScalar(
+  $pdo,
+  "SELECT COUNT(*) FROM rfq_requests WHERE created_at >= ?",
+  [$monthStartDateTime]
+);
+$rfqWeek = $countScalar(
+  $pdo,
+  "SELECT COUNT(*) FROM rfq_requests WHERE created_at >= ?",
+  [$weekStartDateTime]
+);
+
+$quotesMonth = $countScalar(
+  $pdo,
+  "SELECT COUNT(*) FROM rfq_quotes WHERE COALESCE(received_on, DATE(created_at)) >= ?",
+  [$monthStartDate]
+);
+$quotesWeek = $countScalar(
+  $pdo,
+  "SELECT COUNT(*) FROM rfq_quotes WHERE COALESCE(received_on, DATE(created_at)) >= ?",
+  [$weekStartDate]
+);
+
+$poSentFilter = "
+  (
+    (po_number IS NOT NULL AND po_number <> '')
+    OR order_status NOT IN ('create_rfq', 'receive_quotes', 'evaluate_select_quote', 'negotiate_terms', 'cancelled', 'draft')
+  )
+";
+
+$poMonth = $countScalar(
+  $pdo,
+  "SELECT COUNT(*) FROM rfq_orders WHERE COALESCE(order_date, DATE(created_at)) >= ? AND {$poSentFilter}",
+  [$monthStartDate]
+);
+$poWeek = $countScalar(
+  $pdo,
+  "SELECT COUNT(*) FROM rfq_orders WHERE COALESCE(order_date, DATE(created_at)) >= ? AND {$poSentFilter}",
+  [$weekStartDate]
+);
+
+$inTransitSoon = $countScalar(
+  $pdo,
+  "
+    SELECT COUNT(*)
+    FROM rfq_orders
+    WHERE order_status <> 'cancelled'
+      AND (
+        order_status IN ('vendor_ships_machine', 'receive_tracking_documents', 'arrives_clears_customs', 'shipped', 'ready_to_ship')
+        OR (shipped_at IS NOT NULL AND accepted_at IS NULL)
+        OR (expected_ship_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 14 DAY))
+        OR (expected_ready_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 14 DAY))
+      )
+  "
+);
+
+$chartStart = $weekStart->modify('-7 weeks');
+$chartStartDate = $chartStart->format('Y-m-d');
+
+$weekMeta = [];
+$rfqSeriesMap = [];
+$quoteSeriesMap = [];
+for ($i = 7; $i >= 0; $i--) {
+  $weekDate = $weekStart->modify("-{$i} weeks");
+  $key = $weekDate->format('Y-m-d');
+  $weekMeta[] = [
+    'key' => $key,
+    'label' => $weekDate->format('M j'),
+  ];
+  $rfqSeriesMap[$key] = 0;
+  $quoteSeriesMap[$key] = 0;
+}
+
+$rfqSeriesStmt = $pdo->prepare("
+  SELECT DATE_SUB(DATE(created_at), INTERVAL WEEKDAY(created_at) DAY) AS week_start, COUNT(*) AS total
+  FROM rfq_requests
+  WHERE created_at >= ?
+  GROUP BY week_start
+");
+$rfqSeriesStmt->execute([$chartStart->format('Y-m-d H:i:s')]);
+foreach ($rfqSeriesStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+  $weekKey = (string)($row['week_start'] ?? '');
+  if (isset($rfqSeriesMap[$weekKey])) {
+    $rfqSeriesMap[$weekKey] = (int)$row['total'];
+  }
+}
+
+$quotesSeriesStmt = $pdo->prepare("
+  SELECT DATE_SUB(COALESCE(received_on, DATE(created_at)), INTERVAL WEEKDAY(COALESCE(received_on, DATE(created_at))) DAY) AS week_start, COUNT(*) AS total
+  FROM rfq_quotes
+  WHERE COALESCE(received_on, DATE(created_at)) >= ?
+  GROUP BY week_start
+");
+$quotesSeriesStmt->execute([$chartStartDate]);
+foreach ($quotesSeriesStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+  $weekKey = (string)($row['week_start'] ?? '');
+  if (isset($quoteSeriesMap[$weekKey])) {
+    $quoteSeriesMap[$weekKey] = (int)$row['total'];
+  }
+}
+
+$chartLabels = array_map(static fn(array $w): string => $w['label'], $weekMeta);
+$rfqWeekly = array_map(static fn(array $w): int => $rfqSeriesMap[$w['key']] ?? 0, $weekMeta);
+$quotesWeekly = array_map(static fn(array $w): int => $quoteSeriesMap[$w['key']] ?? 0, $weekMeta);
+
+render_header('CEO Dashboard');
 ?>
 
-<style>
-.home-hero-wrap {
-  margin: 0 auto;
-  max-width: 1100px;
-}
-.home-dashboard-card {
-  padding: 20px;
-}
-.home-hero-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
-  background: linear-gradient(160deg, #ffffff 0%, #f8fbff 100%);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-  padding: 36px;
-  margin-bottom: 22px;
-}
-.home-hero-title {
-  margin: 0 0 10px;
-  font-size: 34px;
-  line-height: 1.2;
-  color: #0f172a;
-}
-.home-hero-subtitle {
-  margin: 0;
-  font-size: 17px;
-  line-height: 1.6;
-  color: #475569;
-  max-width: 760px;
-}
-.home-entry-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
-}
-.home-entry-card {
-  display: block;
-  text-decoration: none;
-  border: 1px solid #dbe3ef;
-  border-radius: 16px;
-  padding: 26px;
-  background: #ffffff;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
-  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
-}
-.home-entry-card:hover,
-.home-entry-card:focus {
-  transform: translateY(-3px);
-  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.16);
-  border-color: #93c5fd;
-  outline: none;
-}
-.home-entry-icon {
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: .04em;
-  margin-bottom: 14px;
-  background: #eff6ff;
-}
-.home-entry-title {
-  margin: 0 0 8px;
-  font-size: 23px;
-  line-height: 1.3;
-  color: #0f172a;
-}
-.home-entry-text {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.55;
-  color: #475569;
-}
-@media (max-width: 980px) {
-  .home-entry-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 768px) {
-  .home-entry-grid {
-    grid-template-columns: 1fr;
-  }
-}
-@media (max-width: 640px) {
-  .home-dashboard-card {
-    padding: 14px;
-  }
-  .home-hero-card {
-    padding: 24px;
-  }
-  .home-hero-title {
-    font-size: 28px;
-  }
-}
-</style>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 
-<div class="card home-dashboard-card">
-  <div class="home-hero-wrap">
-    <section class="home-hero-card" aria-labelledby="home-dashboard-title">
-      <h1 id="home-dashboard-title" class="home-hero-title">Team Dashboard</h1>
-      <p class="home-hero-subtitle">Choose a workflow to start a new request. Use one of the options below to log customer inquiries, submit sourcing RFQs, or begin new purchase orders.</p>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="mb-8 flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Executive Overview</p>
+      <h1 class="mt-1 text-3xl font-bold text-slate-900">CEO Dashboard</h1>
+      <p class="mt-2 text-sm text-slate-600">Live sourcing and procurement metrics for the current week and month.</p>
+    </div>
+    <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Updated</p>
+      <p class="mt-1 text-sm font-medium text-slate-700"><?= htmlspecialchars($now->format('M j, Y g:i A T'), ENT_QUOTES, 'UTF-8') ?></p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600">Total RFQs Created</p>
+      <p class="mt-3 text-3xl font-bold text-slate-900"><?= number_format($rfqMonth) ?></p>
+      <p class="mt-2 text-sm text-slate-500">This month</p>
+      <p class="mt-1 text-sm font-medium text-slate-700">Week: <?= number_format($rfqWeek) ?></p>
+    </div>
+
+    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p class="text-xs font-semibold uppercase tracking-wide text-emerald-600">Quotes Received</p>
+      <p class="mt-3 text-3xl font-bold text-slate-900"><?= number_format($quotesMonth) ?></p>
+      <p class="mt-2 text-sm text-slate-500">This month</p>
+      <p class="mt-1 text-sm font-medium text-slate-700">Week: <?= number_format($quotesWeek) ?></p>
+    </div>
+
+    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p class="text-xs font-semibold uppercase tracking-wide text-blue-600">Purchase Orders Sent</p>
+      <p class="mt-3 text-3xl font-bold text-slate-900"><?= number_format($poMonth) ?></p>
+      <p class="mt-2 text-sm text-slate-500">This month</p>
+      <p class="mt-1 text-sm font-medium text-slate-700">Week: <?= number_format($poWeek) ?></p>
+    </div>
+
+    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p class="text-xs font-semibold uppercase tracking-wide text-amber-600">In Transit / Expected Soon</p>
+      <p class="mt-3 text-3xl font-bold text-slate-900"><?= number_format($inTransitSoon) ?></p>
+      <p class="mt-2 text-sm text-slate-500">Active items</p>
+      <p class="mt-1 text-sm font-medium text-slate-700">Next 14 days + in-transit</p>
+    </div>
+  </div>
+
+  <div class="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
+    <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div class="mb-4">
+        <h2 class="text-lg font-semibold text-slate-900">Weekly RFQ Activity</h2>
+        <p class="text-sm text-slate-500">Last 8 weeks</p>
+      </div>
+      <div class="h-80"><canvas id="rfqWeeklyChart"></canvas></div>
     </section>
 
-    <section class="home-entry-grid" aria-label="Primary actions">
-      <a class="home-entry-card" href="quick_order_form.php">
-        <span class="home-entry-icon" aria-hidden="true">CI</span>
-        <h2 class="home-entry-title">New Quick Order</h2>
-        <p class="home-entry-text">Capture customer details, order requirements, and notes for quick follow-up.</p>
-      </a>
-
-      <a class="home-entry-card" href="sourcing_rfq_form.php">
-        <span class="home-entry-icon" aria-hidden="true">RFQ</span>
-        <h2 class="home-entry-title">New RFQ</h2>
-        <p class="home-entry-text">Create a new sourcing request to collect supplier quotes and pricing.</p>
-      </a>
-
-      <a class="home-entry-card" href="order_form.php">
-        <span class="home-entry-icon" aria-hidden="true">PO</span>
-        <h2 class="home-entry-title">New Purchase Order</h2>
-        <p class="home-entry-text">Start a purchase order workflow and move it through fulfillment stages.</p>
-      </a>
+    <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div class="mb-4">
+        <h2 class="text-lg font-semibold text-slate-900">Weekly Quotes Received</h2>
+        <p class="text-sm text-slate-500">Last 8 weeks</p>
+      </div>
+      <div class="h-80"><canvas id="quotesWeeklyChart"></canvas></div>
     </section>
   </div>
 </div>
+
+<script>
+  (() => {
+    const labels = <?= json_encode($chartLabels, JSON_UNESCAPED_SLASHES) ?>;
+    const rfqWeekly = <?= json_encode($rfqWeekly, JSON_UNESCAPED_SLASHES) ?>;
+    const quotesWeekly = <?= json_encode($quotesWeekly, JSON_UNESCAPED_SLASHES) ?>;
+
+    const axisBase = {
+      beginAtZero: true,
+      ticks: { precision: 0, color: '#64748b' },
+      grid: { color: 'rgba(148, 163, 184, 0.25)' }
+    };
+
+    new Chart(document.getElementById('rfqWeeklyChart'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'RFQs',
+          data: rfqWeekly,
+          borderRadius: 6,
+          backgroundColor: 'rgba(79, 70, 229, 0.82)',
+          hoverBackgroundColor: 'rgba(67, 56, 202, 0.95)'
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: { ticks: { color: '#64748b' }, grid: { display: false } },
+          y: axisBase
+        }
+      }
+    });
+
+    new Chart(document.getElementById('quotesWeeklyChart'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Quotes',
+          data: quotesWeekly,
+          borderColor: 'rgba(5, 150, 105, 1)',
+          backgroundColor: 'rgba(5, 150, 105, 0.18)',
+          pointBackgroundColor: 'rgba(5, 150, 105, 1)',
+          pointRadius: 4,
+          pointHoverRadius: 5,
+          borderWidth: 3,
+          tension: 0.35,
+          fill: true
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: { ticks: { color: '#64748b' }, grid: { display: false } },
+          y: axisBase
+        }
+      }
+    });
+  })();
+</script>
 
 <?php render_footer(); ?>
