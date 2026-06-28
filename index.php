@@ -341,12 +341,13 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
 }
 
 /* ── Hero banner ────────────────────────────────────────────────── */
-.dash-hero {
+.dash-shell .card.dash-hero {
   position: relative;
   overflow: hidden;
   background: linear-gradient(135deg, #0b1220 0%, #1e3a8a 55%, #0f766e 100%) !important;
   border: 1px solid #1f3b7d !important;
   padding: 28px 28px 24px !important;
+  color: #f8fafc !important;
 }
 /* Subtle sheen overlay – stays behind content */
 .dash-hero::before {
