@@ -58,7 +58,7 @@ $shipmentsBooked = $countScalar(
     'send_purchase_order','vendor_accepts_po','make_deposit_payment',
     'vendor_produces_machine','make_final_payment','vendor_ships_machine',
     'receive_tracking_documents','arrives_clears_customs'
-  ) AND order_status <> 'cancelled'"
+  )"
 );
 $shipmentsIncoming = $countScalar(
   $pdo,
@@ -71,7 +71,7 @@ $inProduction = $countScalar(
   $pdo,
   "SELECT COUNT(*) FROM rfq_orders WHERE order_status IN (
     'vendor_accepts_po','make_deposit_payment','vendor_produces_machine','make_final_payment'
-  ) AND order_status <> 'cancelled'"
+  )"
 );
 
 // 7. Items Expected to Arrive in next 30 days
