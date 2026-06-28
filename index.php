@@ -89,6 +89,65 @@ function dashboard_weekly_count(PDO $pdo, string $table, string $date_expression
   ]);
 }
 
+function dashboard_weekly_total(PDO $pdo, string $table, string $date_expression_key, string $value_expression_key, string $start_date, string $end_date): int {
+  if (!dashboard_table_exists($pdo, $table)) {
+    return 0;
+  }
+
+  $date_expression = dashboard_sql_fragment($date_expression_key);
+  $value_expression = dashboard_sql_fragment($value_expression_key);
+  $sql = "
+    SELECT COALESCE({$value_expression}, 0)
+    FROM " . dashboard_validate_identifier($table) . "
+    WHERE {$date_expression} IS NOT NULL
+      AND DATE({$date_expression}) >= :start_date
+      AND DATE({$date_expression}) < :end_date
+  ";
+
+  return dashboard_safe_count($pdo, $sql, [
+    ':start_date' => $start_date,
+    ':end_date' => $end_date,
+  ]);
+}
+
+function dashboard_goal_state(int $value, int $target, float $expected_ratio): array {
+  $expected_ratio = max(0.0, min(1.0, $expected_ratio));
+  $progress_ratio = $target > 0 ? min($value / $target, 1) : 0.0;
+  $expected_total = $target > 0 ? ($target * $expected_ratio) : 0.0;
+  $pace_ratio = $expected_total > 0 ? ($value / $expected_total) : ($value > 0 ? 1.0 : 0.0);
+
+  if ($value >= $target || $pace_ratio >= 1) {
+    return [
+      'label' => 'On Track',
+      'badge_classes' => 'tw-border-emerald-400/30 tw-bg-emerald-400/15 tw-text-emerald-200',
+      'bar_classes' => 'tw-bg-gradient-to-r tw-from-emerald-400 tw-via-emerald-500 tw-to-lime-400',
+      'ring_classes' => 'tw-ring-emerald-400/20',
+      'message' => 'Excellent pace — keep the Alibaba pipeline moving and protect the win.',
+      'tone' => 'green',
+    ];
+  }
+
+  if ($pace_ratio >= 0.65) {
+    return [
+      'label' => 'Push Today',
+      'badge_classes' => 'tw-border-amber-400/30 tw-bg-amber-400/15 tw-text-amber-200',
+      'bar_classes' => 'tw-bg-gradient-to-r tw-from-amber-300 tw-via-amber-400 tw-to-orange-400',
+      'ring_classes' => 'tw-ring-amber-400/20',
+      'message' => 'A focused follow-up block today gets this goal back on pace.',
+      'tone' => 'yellow',
+    ];
+  }
+
+  return [
+    'label' => 'Needs Attention',
+    'badge_classes' => 'tw-border-rose-400/30 tw-bg-rose-400/15 tw-text-rose-200',
+    'bar_classes' => 'tw-bg-gradient-to-r tw-from-rose-400 tw-via-red-500 tw-to-orange-500',
+    'ring_classes' => 'tw-ring-rose-400/25',
+    'message' => 'Prioritize this now so the week stays pointed at shipments and supplier wins.',
+    'tone' => 'red',
+  ];
+}
+
 function dashboard_weekly_series(PDO $pdo, string $table, string $date_expression_key, string $value_expression_key, DateTimeImmutable $first_week_start): array {
   $weeks = [];
   $cursor = $first_week_start;
@@ -161,41 +220,55 @@ $week_start = $today->modify('monday this week');
 $next_week_start = $week_start->modify('+1 week');
 $chart_week_start = $week_start->modify('-7 weeks');
 $thirty_days_out = $today->modify('+30 days');
+$week_progress_ratio = ((int)$today->format('N')) / 7;
 
-$kpis = [
+$weekly_goals = [
   [
-    'label' => 'New RFQs Created This Week',
+    'title' => 'RFQs Sent',
+    'label' => 'RFQs Sent This Week',
     'value' => dashboard_weekly_count($pdo, 'rfq_requests', 'created_at', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
     'accent_key' => 'sky',
+    'target' => 10,
   ],
   [
+    'title' => 'Quotes Received',
     'label' => 'Quotes Received This Week',
     'value' => dashboard_weekly_count($pdo, 'rfq_quotes', 'rfq_quote_received', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
     'accent_key' => 'violet',
+    'target' => 25,
   ],
   [
-    'label' => 'Purchase Orders Created This Week',
+    'title' => 'Purchase Orders Sent',
+    'label' => 'Purchase Orders Sent This Week',
     'value' => dashboard_weekly_count($pdo, 'rfq_orders', 'rfq_order_created', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
     'accent_key' => 'emerald',
+    'target' => 4,
   ],
   [
-    'label' => 'New Freight Quotes This Week',
-    'value' => dashboard_weekly_count($pdo, 'shipping_rfq_quotes', 'shipping_quote_received', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
+    'title' => 'Items Shipped',
+    'label' => 'Items Shipped This Week',
+    'value' => dashboard_weekly_total($pdo, 'rfq_orders', 'shipped_at', 'sum_quantity', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
     'accent_key' => 'amber',
-  ],
-  [
-    'label' => 'New Incoming Shipments This Week',
-    'value' => dashboard_weekly_count($pdo, 'incoming_shipments', 'created_at', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
-    'accent_key' => 'fuchsia',
-  ],
-  [
-    'label' => 'New Inventory Items Added This Week',
-    'value' => dashboard_weekly_count($pdo, 'inventory_items', 'created_at', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
-    'accent_key' => 'slate',
+    'target' => 3,
   ],
 ];
 
-$weekly_activity_total = (int)array_sum(array_column($kpis, 'value'));
+foreach ($weekly_goals as &$goal) {
+  $goal['pace_target'] = min((int)$goal['target'], (int)ceil($goal['target'] * $week_progress_ratio));
+  $goal['remaining'] = max(0, (int)$goal['target'] - (int)$goal['value']);
+  $goal['progress_percent'] = $goal['target'] > 0 ? min(100, ((int)$goal['value'] / (int)$goal['target']) * 100) : 0;
+  $goal['state'] = dashboard_goal_state((int)$goal['value'], (int)$goal['target'], $week_progress_ratio);
+}
+unset($goal);
+
+$weekly_activity_total = (int)array_sum(array_column($weekly_goals, 'value'));
+$goals_on_track = count(array_filter($weekly_goals, static fn(array $goal): bool => ($goal['state']['tone'] ?? '') === 'green'));
+$today_priorities = [
+  'Send the next round of high-priority Alibaba RFQs so supplier conversations keep moving.',
+  'Follow up on open supplier responses and pull in the quotes still needed for this week.',
+  'Issue approved purchase orders and confirm acknowledgements before the day ends.',
+  'Check production and shipment updates so Patty finishes the day with a clear next step.',
+];
 
 $items_in_production = dashboard_table_exists($pdo, 'rfq_orders')
   ? dashboard_safe_count(
@@ -245,7 +318,7 @@ $shipped_chart = dashboard_weekly_series($pdo, 'rfq_orders', 'shipped_at', 'sum_
 $last_updated = (new DateTimeImmutable('now', $tz))->format('M j, Y g:i A T');
 $json_safe_flags = JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 
-render_header('CEO Dashboard - Business Activity Overview');
+render_header('Alibaba Sourcing Dashboard - Weekly Goals');
 ?>
 
 <script>
@@ -318,14 +391,14 @@ window.tailwind.config = {
       <div class="tw-pointer-events-none tw-absolute tw-inset-y-0 tw-right-0 tw-w-1/2 tw-bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.25),transparent_45%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.22),transparent_42%)]"></div>
       <div class="tw-relative tw-flex tw-flex-col tw-gap-6 lg:tw-flex-row lg:tw-items-end lg:tw-justify-between">
         <div class="tw-max-w-3xl">
-          <p class="tw-m-0 tw-text-sm tw-font-semibold tw-uppercase tw-tracking-[0.3em] tw-text-cyan-300">CEO Dashboard</p>
-          <h1 class="tw-mt-3 tw-text-3xl tw-font-black tw-tracking-[-0.04em] lg:tw-text-6xl">CEO Dashboard</h1>
+          <p class="tw-m-0 tw-text-sm tw-font-semibold tw-uppercase tw-tracking-[0.3em] tw-text-cyan-300">Alibaba Sourcing Dashboard</p>
+          <h1 class="tw-mt-3 tw-text-3xl tw-font-black tw-tracking-[-0.04em] lg:tw-text-6xl">Keep Patty&apos;s Weekly Procurement Goals Charging Forward</h1>
           <p class="tw-mt-3 tw-max-w-2xl tw-text-base tw-leading-7 tw-text-slate-300 lg:tw-text-lg">
-            Business activity overview across weekly demand, supplier momentum, purchase activity, shipment flow, and near-term arrivals.
+            Stay locked on the Alibaba sourcing workflow: send more RFQs, pull in more quotes, release more purchase orders, and keep shipments moving.
           </p>
           <div class="tw-mt-6 tw-flex tw-flex-wrap tw-gap-3">
-            <div class="tw-rounded-full tw-border tw-border-cyan-400/20 tw-bg-cyan-400/10 tw-px-4 tw-py-2 tw-text-sm tw-font-medium tw-text-cyan-100">Neon Operations View</div>
-            <div class="tw-rounded-full tw-border tw-border-violet-400/20 tw-bg-violet-400/10 tw-px-4 tw-py-2 tw-text-sm tw-font-medium tw-text-violet-100">Live Pipeline Signal</div>
+            <div class="tw-rounded-full tw-border tw-border-cyan-400/20 tw-bg-cyan-400/10 tw-px-4 tw-py-2 tw-text-sm tw-font-medium tw-text-cyan-100">Goal-Driven Sourcing</div>
+            <div class="tw-rounded-full tw-border tw-border-violet-400/20 tw-bg-violet-400/10 tw-px-4 tw-py-2 tw-text-sm tw-font-medium tw-text-violet-100">Supplier Momentum Focus</div>
           </div>
         </div>
         <div class="tw-grid tw-gap-3 sm:tw-grid-cols-3">
@@ -345,15 +418,61 @@ window.tailwind.config = {
       </div>
     </section>
 
+    <section aria-labelledby="weekly-goals">
+      <div class="tw-mb-4 tw-flex tw-items-center tw-justify-between tw-gap-4">
+        <div>
+          <h2 id="weekly-goals" class="tw-m-0 tw-text-2xl tw-font-semibold tw-text-white">Weekly Goals</h2>
+          <p class="tw-mt-1 tw-text-sm tw-text-slate-400">Big targets, clear pacing, and a fast read on where Patty should push next.</p>
+        </div>
+        <div class="tw-rounded-2xl tw-border tw-border-cyan-400/15 tw-bg-cyan-400/10 tw-px-4 tw-py-3 tw-text-right">
+          <p class="tw-m-0 tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.18em] tw-text-cyan-200">Goals On Track</p>
+          <p class="tw-mt-1 tw-text-3xl tw-font-black tw-text-cyan-300"><?= number_format($goals_on_track) ?><span class="tw-text-lg tw-font-semibold tw-text-slate-300"> / <?= number_format(count($weekly_goals)) ?></span></p>
+        </div>
+      </div>
+      <div class="tw-grid tw-gap-4 xl:tw-grid-cols-2">
+        <?php foreach ($weekly_goals as $goal): ?>
+          <article class="ceo-neon-card tw-rounded-[30px] tw-p-6 tw-ring-1 <?= h((string)$goal['state']['ring_classes']) ?>">
+            <div class="tw-flex tw-flex-col tw-gap-4 lg:tw-flex-row lg:tw-items-start lg:tw-justify-between">
+              <div>
+                <p class="tw-m-0 tw-text-sm tw-font-semibold tw-uppercase tw-tracking-[0.2em] tw-text-slate-400"><?= h((string)$goal['title']) ?></p>
+                <p class="tw-mt-3 tw-text-5xl tw-font-black tw-tracking-[-0.05em] tw-text-white">
+                  <?= number_format((int)$goal['value']) ?>
+                  <span class="tw-text-2xl tw-font-semibold tw-text-slate-400">/ <?= number_format((int)$goal['target']) ?></span>
+                </p>
+              </div>
+              <span class="tw-inline-flex tw-items-center tw-rounded-full tw-border tw-px-4 tw-py-2 tw-text-sm tw-font-semibold <?= h((string)$goal['state']['badge_classes']) ?>">
+                <?= h((string)$goal['state']['label']) ?>
+              </span>
+            </div>
+            <div class="tw-mt-6">
+              <div class="tw-mb-3 tw-flex tw-flex-wrap tw-items-center tw-justify-between tw-gap-3 tw-text-sm">
+                <span class="tw-font-semibold tw-text-slate-200"><?= number_format((int)round((float)$goal['progress_percent'])) ?>% complete</span>
+                <span class="tw-text-slate-400">Pace target by today: <?= number_format((int)$goal['pace_target']) ?></span>
+              </div>
+              <div class="tw-h-5 tw-overflow-hidden tw-rounded-full tw-bg-slate-900/90 tw-ring-1 tw-ring-white/5">
+                <div class="tw-h-full tw-rounded-full <?= h((string)$goal['state']['bar_classes']) ?>" style="width: <?= number_format((float)$goal['progress_percent'], 2, '.', '') ?>%;"></div>
+              </div>
+            </div>
+            <div class="tw-mt-4 tw-flex tw-flex-wrap tw-items-center tw-justify-between tw-gap-3">
+              <p class="tw-m-0 tw-text-sm tw-leading-6 tw-text-slate-300"><?= h((string)$goal['state']['message']) ?></p>
+              <p class="tw-m-0 tw-text-sm tw-font-semibold tw-text-slate-200">
+                <?= $goal['remaining'] > 0 ? number_format((int)$goal['remaining']) . ' more to goal' : 'Goal reached — keep stacking wins' ?>
+              </p>
+            </div>
+          </article>
+        <?php endforeach; ?>
+      </div>
+    </section>
+
     <section aria-labelledby="weekly-kpis">
       <div class="tw-mb-4 tw-flex tw-items-center tw-justify-between tw-gap-4">
         <div>
-          <h2 id="weekly-kpis" class="tw-m-0 tw-text-2xl tw-font-semibold tw-text-white">Weekly Activity KPI Cards</h2>
-          <p class="tw-mt-1 tw-text-sm tw-text-slate-400">Large-format weekly totals across the requested business systems.</p>
+          <h2 id="weekly-kpis" class="tw-m-0 tw-text-2xl tw-font-semibold tw-text-white">Weekly Execution Snapshot</h2>
+          <p class="tw-mt-1 tw-text-sm tw-text-slate-400">Action-oriented scorecards for the Alibaba sourcing and procurement workflow.</p>
         </div>
       </div>
-      <div class="tw-grid tw-gap-4 md:tw-grid-cols-2 xl:tw-grid-cols-3 2xl:tw-grid-cols-6">
-        <?php foreach ($kpis as $card): ?>
+      <div class="tw-grid tw-gap-4 md:tw-grid-cols-2 xl:tw-grid-cols-4">
+        <?php foreach ($weekly_goals as $card): ?>
           <article class="ceo-neon-card ceo-card-glow tw-relative tw-overflow-hidden tw-rounded-[28px] tw-p-6 tw-ring-1 tw-ring-cyan-400/10">
             <div class="tw-absolute tw-right-5 tw-top-5 tw-h-3 tw-w-3 tw-rounded-full tw-bg-cyan-300 tw-shadow-[0_0_18px_rgba(103,232,249,0.9)]"></div>
             <div class="tw-inline-flex tw-rounded-full tw-bg-gradient-to-r <?= h(dashboard_accent_classes((string)$card['accent_key'])) ?> tw-p-[1px]">
@@ -361,16 +480,39 @@ window.tailwind.config = {
             </div>
             <p class="tw-mt-4 tw-max-w-[16rem] tw-text-sm tw-font-medium tw-leading-6 tw-text-slate-300"><?= h($card['label']) ?></p>
             <p class="tw-mt-6 tw-text-6xl tw-font-black tw-tracking-[-0.05em] tw-text-white"><?= number_format((int)$card['value']) ?></p>
+            <p class="tw-mt-4 tw-text-sm tw-font-semibold tw-text-slate-200">Weekly goal: <?= number_format((int)$card['target']) ?></p>
             <div class="tw-mt-5 tw-h-px tw-w-full tw-bg-gradient-to-r tw-from-cyan-400/40 tw-via-violet-400/20 tw-to-transparent"></div>
           </article>
         <?php endforeach; ?>
       </div>
     </section>
 
+    <section aria-labelledby="today-priorities">
+      <div class="tw-grid tw-gap-4 xl:tw-grid-cols-[1.35fr_0.65fr]">
+        <article class="ceo-neon-card tw-rounded-[30px] tw-p-6 tw-ring-1 tw-ring-cyan-400/10">
+          <h2 id="today-priorities" class="tw-m-0 tw-text-2xl tw-font-semibold tw-text-white">Today&apos;s Priorities</h2>
+          <p class="tw-mt-2 tw-text-sm tw-leading-6 tw-text-slate-300">Win the day by moving the next supplier action forward in every stage of the Alibaba workflow.</p>
+          <div class="tw-mt-6 tw-space-y-4">
+            <?php foreach ($today_priorities as $priority): ?>
+              <label class="tw-flex tw-items-start tw-gap-4 tw-rounded-2xl tw-border tw-border-white/8 tw-bg-slate-950/35 tw-p-4 tw-text-slate-200">
+                <input type="checkbox" class="tw-mt-1 tw-h-5 tw-w-5 tw-rounded tw-border tw-border-cyan-300/35 tw-bg-slate-950/80 tw-text-cyan-400 focus:tw-ring-cyan-400/40">
+                <span class="tw-text-sm tw-leading-6"><?= h($priority) ?></span>
+              </label>
+            <?php endforeach; ?>
+          </div>
+        </article>
+        <article class="ceo-neon-card tw-rounded-[30px] tw-p-6 tw-ring-1 tw-ring-violet-400/10">
+          <p class="tw-m-0 tw-text-sm tw-font-semibold tw-uppercase tw-tracking-[0.2em] tw-text-violet-200">Motivation</p>
+          <h3 class="tw-mt-3 tw-text-3xl tw-font-black tw-tracking-[-0.04em] tw-text-white">Every supplier touchpoint today sets up next week&apos;s wins.</h3>
+          <p class="tw-mt-4 tw-text-sm tw-leading-7 tw-text-slate-300">Keep Patty focused on fast follow-up, clean PO handoff, and shipment visibility so the sourcing pipeline keeps converting.</p>
+        </article>
+      </div>
+    </section>
+
     <section aria-labelledby="pipeline-status">
       <div class="tw-mb-4">
-        <h2 id="pipeline-status" class="tw-m-0 tw-text-2xl tw-font-semibold tw-text-white">Pipeline Status</h2>
-        <p class="tw-mt-1 tw-text-sm tw-text-slate-400">Current production and logistics counts that matter most.</p>
+        <h2 id="pipeline-status" class="tw-m-0 tw-text-2xl tw-font-semibold tw-text-white">Procurement Pipeline Snapshot</h2>
+        <p class="tw-mt-1 tw-text-sm tw-text-slate-400">Stay close to production and shipment movement so today&apos;s sourcing work turns into delivered machines.</p>
       </div>
       <div class="tw-grid tw-gap-4 lg:tw-grid-cols-3">
         <article class="ceo-neon-card tw-rounded-[30px] tw-p-6 tw-ring-1 tw-ring-cyan-400/10">
@@ -393,14 +535,14 @@ window.tailwind.config = {
 
     <section aria-labelledby="dashboard-charts">
       <div class="tw-mb-4">
-        <h2 id="dashboard-charts" class="tw-m-0 tw-text-2xl tw-font-semibold tw-text-white">Charts</h2>
-        <p class="tw-mt-1 tw-text-sm tw-text-slate-400">Eight-week activity trends for RFQ creation and shipped item volume.</p>
+        <h2 id="dashboard-charts" class="tw-m-0 tw-text-2xl tw-font-semibold tw-text-white">Momentum Trends</h2>
+        <p class="tw-mt-1 tw-text-sm tw-text-slate-400">Use the last eight weeks of sourcing and shipping activity to keep momentum building.</p>
       </div>
       <div class="tw-grid tw-gap-4 xl:tw-grid-cols-2">
         <article class="chart-panel ceo-neon-card tw-rounded-[30px] tw-p-6 tw-ring-1 tw-ring-cyan-400/10">
           <div class="tw-mb-4 tw-flex tw-items-start tw-justify-between tw-gap-4">
             <div>
-              <h3 class="tw-m-0 tw-text-xl tw-font-semibold tw-text-white">Weekly RFQs Created</h3>
+              <h3 class="tw-m-0 tw-text-xl tw-font-semibold tw-text-white">RFQs Sent Per Week</h3>
               <p class="tw-mt-1 tw-text-sm tw-text-slate-400">Line chart · last 8 weeks</p>
             </div>
             <div class="tw-rounded-2xl tw-border tw-border-cyan-400/15 tw-bg-cyan-400/10 tw-px-4 tw-py-3 tw-text-right">
@@ -408,7 +550,7 @@ window.tailwind.config = {
               <p class="tw-mt-1 tw-text-3xl tw-font-black tw-text-cyan-300"><?= number_format(array_sum($rfq_chart['values'])) ?></p>
             </div>
           </div>
-          <canvas id="rfqWeeklyChart" aria-label="Weekly RFQs Created line chart" role="img"></canvas>
+          <canvas id="rfqWeeklyChart" aria-label="RFQs sent per week line chart" role="img"></canvas>
         </article>
 
         <article class="chart-panel ceo-neon-card tw-rounded-[30px] tw-p-6 tw-ring-1 tw-ring-violet-400/10">
@@ -422,7 +564,7 @@ window.tailwind.config = {
               <p class="tw-mt-1 tw-text-3xl tw-font-black tw-text-violet-300"><?= number_format(array_sum($shipped_chart['values'])) ?></p>
             </div>
           </div>
-          <canvas id="shippedWeeklyChart" aria-label="Items Shipped Per Week bar chart" role="img"></canvas>
+          <canvas id="shippedWeeklyChart" aria-label="Items shipped per week bar chart" role="img"></canvas>
         </article>
       </div>
     </section>
