@@ -299,18 +299,14 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 
 <style>
-/* ── Dashboard-specific styles ─────────────────────────────────────────────── */
+/* Strong dashboard overrides to avoid collisions with shared styles.css */
 .dash-shell {
-  --dash-bg: #f2f6fc;
   --dash-text: #0f172a;
-  --dash-muted: #5b6b83;
+  --dash-muted: #475569;
   --dash-border: #d8e1ee;
-  --dash-card-shadow: 0 12px 34px rgba(15, 23, 42, 0.08);
-  --dash-card-shadow-hover: 0 18px 40px rgba(15, 23, 42, 0.12);
+  --dash-card-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  --dash-card-shadow-hover: 0 14px 28px rgba(15, 23, 42, 0.12);
   --dash-blue: #1d4ed8;
-  --dash-blue-soft: #dbeafe;
-  --dash-indigo: #3730a3;
-  --dash-teal: #0f766e;
 }
 .dash-shell::before {
   content: '';
@@ -318,35 +314,35 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background:
-    radial-gradient(circle at 10% -10%, rgba(59, 130, 246, 0.14), transparent 38%),
-    radial-gradient(circle at 95% 0%, rgba(14, 116, 144, 0.12), transparent 35%),
-    var(--dash-bg);
+  background: #f2f6fc;
 }
-.dash-shell .muted { color: var(--dash-muted); }
+.dash-shell,
+.dash-shell * {
+  color: var(--dash-text);
+}
+.dash-shell .muted {
+  color: var(--dash-muted) !important;
+}
 .dash-shell .card {
-  border: 1px solid var(--dash-border);
-  border-radius: 16px;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
-  box-shadow: var(--dash-card-shadow);
-  padding: 18px;
-  margin: 0;
+  background: #ffffff !important;
+  border: 1px solid var(--dash-border) !important;
+  border-radius: 14px !important;
+  box-shadow: var(--dash-card-shadow) !important;
+  padding: 18px !important;
+  margin: 0 !important;
+}
+.dash-shell .card:hover {
+  box-shadow: var(--dash-card-shadow-hover) !important;
 }
 .dash-shell .badge {
   border-radius: 999px;
   border-width: 1px;
   font-weight: 700;
 }
-.dash-mini-metric {
-  padding: 12px 18px !important;
-  border-radius: 14px !important;
-  background: linear-gradient(180deg,#ffffff 0%,#f8fbff 100%) !important;
-  border: 1px solid #d8e3f2 !important;
-}
+.dash-mini-metric,
 .dash-kpi-card,
 .dash-metric-card {
-  border: 1px solid #d9e4f3 !important;
-  background: linear-gradient(180deg,#ffffff 0%,#f8fbff 100%) !important;
+  background: #f8fbff !important;
 }
 .dash-chart-total {
   margin: 0 !important;
@@ -356,79 +352,79 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
 }
 .dash-chart-total-rfq { background:#edf4ff !important; border-color:#c7dbff !important; }
 .dash-chart-total-ship { background:#ecfeff !important; border-color:#99f6e4 !important; }
-.dash-hero {
+
+/* Hero banner */
+.dash-shell .card.dash-hero {
   position: relative;
   overflow: hidden;
-  border: none !important;
-  background:
-    radial-gradient(circle at 14% 14%, rgba(147, 197, 253, 0.3), transparent 38%),
-    radial-gradient(circle at 88% 12%, rgba(129, 140, 248, 0.3), transparent 44%),
-    linear-gradient(135deg, #0f172a 0%, #1d4ed8 52%, #0369a1 100%);
-  color: #fff;
+  background: linear-gradient(135deg, #0b1220 0%, #1e3a8a 55%, #0f766e 100%) !important;
+  border: 1px solid #1f3b7d !important;
+  color: #ffffff !important;
 }
-.dash-hero::after {
+.dash-shell .dash-hero::after {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(112deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0) 38%);
+  background: linear-gradient(110deg, rgba(255,255,255,0.12), rgba(255,255,255,0));
 }
-.dash-hero h1 { position: relative; z-index: 1; color: #fff; font-size: 2rem; margin: 8px 0 10px; letter-spacing: -0.01em; }
-.dash-hero p  { position: relative; z-index: 1; margin: 0; color: rgba(241,245,249,0.96); max-width: 860px; }
-.dash-hero .muted { color: rgba(226,232,240,0.92); }
-.dash-hero-tag {
+.dash-shell .dash-hero h1,
+.dash-shell .dash-hero p,
+.dash-shell .dash-hero .muted,
+.dash-shell .dash-hero .dash-hero-tag,
+.dash-shell .dash-hero .dash-pill,
+.dash-shell .dash-hero .dash-hero-stat-label,
+.dash-shell .dash-hero .dash-hero-stat-value {
   position: relative;
   z-index: 1;
+  color: #f8fafc !important;
+}
+.dash-shell .dash-hero h1 { margin: 8px 0 10px; font-size: 2rem; letter-spacing: -0.01em; }
+.dash-shell .dash-hero p { margin: 0; max-width: 860px; }
+.dash-shell .dash-hero-tag {
   display: inline-block;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #dbeafe;
   margin-bottom: 8px;
   padding: 5px 12px;
-  border: 1px solid rgba(191, 219, 254, 0.45);
+  border: 1px solid rgba(191, 219, 254, 0.6);
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.34);
+  background: rgba(15, 23, 42, 0.45);
 }
-.dash-hero-stats {
-  position: relative;
-  z-index: 1;
+.dash-shell .dash-hero-stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
   margin-top: 18px;
 }
-.dash-hero-stat {
-  background: rgba(15, 23, 42, 0.3);
-  border: 1px solid rgba(191, 219, 254, 0.35);
+.dash-shell .dash-hero-stat {
+  background: rgba(15, 23, 42, 0.42) !important;
+  border: 1px solid rgba(191, 219, 254, 0.5) !important;
   border-radius: 12px;
   padding: 10px 14px;
 }
-.dash-hero-stat-label {
+.dash-shell .dash-hero-stat-label {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(219, 234, 254, 0.9);
 }
-.dash-hero-stat-value {
+.dash-shell .dash-hero-stat-value {
   font-size: 1.2rem;
   font-weight: 700;
-  color: #fff;
   margin-top: 4px;
 }
-.dash-pill {
-  position: relative;
-  z-index: 1;
+.dash-shell .dash-pill {
   display: inline-block;
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.34);
-  border: 1px solid rgba(191, 219, 254, 0.38);
+  background: rgba(15, 23, 42, 0.45) !important;
+  border: 1px solid rgba(191, 219, 254, 0.5) !important;
   font-size: 12px;
-  color: #e0e7ff;
   margin: 10px 8px 0 0;
   font-weight: 600;
 }
+
 .dash-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .dash-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
 .dash-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
@@ -450,6 +446,7 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
   margin-top: 10px;
 }
 .dash-progress-bar { height: 100%; border-radius: 999px; }
+
 /* Goal tone colours */
 .goal-badge-green  { background: #dcfce7; color: #166534; border-color: #86efac; }
 .goal-badge-yellow { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
@@ -457,17 +454,18 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
 .goal-bar-green    { background: linear-gradient(90deg,#10b981,#0d9488); }
 .goal-bar-yellow   { background: linear-gradient(90deg,#f59e0b,#ea580c); }
 .goal-bar-red      { background: linear-gradient(90deg,#ef4444,#dc2626); }
-.goal-card-green   { border-left: 4px solid #10b981; }
-.goal-card-yellow  { border-left: 4px solid #f59e0b; }
-.goal-card-red     { border-left: 4px solid #ef4444; }
-.dash-big-num { font-size: 2.8rem; font-weight: 700; line-height: 1.06; margin: 8px 0 6px; letter-spacing: -0.02em; color: #0f172a; }
-.dash-motivation {
+.goal-card-green   { border-left: 4px solid #10b981 !important; }
+.goal-card-yellow  { border-left: 4px solid #f59e0b !important; }
+.goal-card-red     { border-left: 4px solid #ef4444 !important; }
+.dash-big-num { font-size: 2.8rem; font-weight: 700; line-height: 1.06; margin: 8px 0 6px; letter-spacing: -0.02em; color: #0f172a !important; }
+
+.dash-shell .dash-motivation {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(136deg,#0f172a 0%,#1e3a8a 52%,#0f766e 100%);
-  border: none !important;
+  background: linear-gradient(136deg,#0f172a 0%,#1e3a8a 52%,#0f766e 100%) !important;
+  border: 1px solid #1f3b7d !important;
 }
-.dash-motivation::after {
+.dash-shell .dash-motivation::after {
   content:'';
   position:absolute;
   width:240px;
@@ -477,34 +475,50 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
   border-radius:999px;
   background:radial-gradient(circle, rgba(191,219,254,0.3), rgba(191,219,254,0));
 }
-.dash-motivation h3  { position:relative; z-index:1; color: #fff; font-size: 1.25rem; margin: 8px 0; }
-.dash-motivation p   { position:relative; z-index:1; color: rgba(226,232,240,0.9); margin: 0; }
-.dash-motivation .muted { position:relative; z-index:1; color: rgba(226,232,240,0.8); }
-.priority-item {
-  display: flex;
+.dash-shell .dash-motivation h3,
+.dash-shell .dash-motivation p,
+.dash-shell .dash-motivation .muted {
+  position:relative;
+  z-index:1;
+  color: #f1f5f9 !important;
+}
+
+/* Today's priorities cards */
+.dash-shell .priority-list {
+  display: grid;
+  gap: 10px;
+}
+.dash-shell label.card.priority-item {
+  display: flex !important;
   align-items: flex-start;
   gap: 12px;
-  padding: 12px 14px;
-  background: linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);
-  border: 1px solid #d6e2f1;
-  border-radius: 12px;
-  margin: 0;
+  padding: 14px !important;
+  background: #ffffff !important;
+  border: 1px solid #cbd8ea !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 20px rgba(15,23,42,0.07) !important;
+  margin: 0 !important;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.priority-item.card { box-shadow: 0 8px 20px rgba(15,23,42,0.06); }
-.priority-item:hover { background: #f5f9ff; border-color: #93c5fd; box-shadow: 0 10px 24px rgba(37,99,235,0.12); }
-.priority-item input[type=checkbox] { margin-top: 3px; flex-shrink: 0; accent-color: var(--dash-blue); }
-.priority-list { display: grid; gap: 8px; }
+.dash-shell label.card.priority-item:hover {
+  border-color: #93c5fd !important;
+  background: #f8fbff !important;
+}
+.dash-shell label.card.priority-item span {
+  color: #0f172a !important;
+  font-weight: 500;
+}
+.dash-shell label.card.priority-item input[type=checkbox] {
+  margin-top: 3px;
+  flex-shrink: 0;
+  accent-color: var(--dash-blue);
+}
+
 .chart-panel canvas { width: 100% !important; height: 260px !important; display: block; }
 .chart-panel {
   min-height: 300px;
-  border: 1px solid #dbe4f2;
-  box-shadow: 0 10px 26px rgba(15,23,42,0.08);
-}
-.dash-shell .card:hover {
-  box-shadow: var(--dash-card-shadow-hover);
-  border-color: #c7d6ea;
+  border: 1px solid #dbe4f2 !important;
+  box-shadow: 0 10px 26px rgba(15,23,42,0.08) !important;
 }
 @media (max-width: 860px) {
   .dash-grid-4 { grid-template-columns: 1fr 1fr; }
