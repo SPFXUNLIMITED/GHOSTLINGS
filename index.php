@@ -640,7 +640,25 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
   <!-- Today's Priorities -->
   <div style="margin-top:24px;">
     <h2>Today's Priorities</h2>
-    <p>Win the day by moving the next supplier action forward.</p>
+    <?php
+    $today_priority_items = $today_priorities ?? [];
+    if (!is_array($today_priority_items) || empty($today_priority_items)) {
+      $today_priority_items = [
+        'Send the next round of high-priority Alibaba RFQs so supplier conversations keep moving.',
+        'Follow up on open supplier responses and pull in the quotes still needed for this week.',
+        'Issue approved purchase orders and confirm acknowledgements before the day ends.',
+        'Check production and shipment updates so Patty finishes the day with a clear next step.',
+      ];
+    }
+    ?>
+    <div>
+      <?php foreach ($today_priority_items as $priority_index => $priority): ?>
+        <?php $priority_id = 'today-priority-' . ((int)$priority_index + 1); ?>
+        <label for="<?= h($priority_id) ?>" style="display:block;margin:8px 0;">
+          <input id="<?= h($priority_id) ?>" type="checkbox" name="today_priorities[]" value="priority_<?= (int)$priority_index + 1 ?>"> <?= h($priority) ?>
+        </label>
+      <?php endforeach; ?>
+    </div>
   </div>
 
   <!-- Procurement Pipeline Snapshot -->
