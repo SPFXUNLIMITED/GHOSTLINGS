@@ -7,9 +7,27 @@ require_login();
 
 function dashboard_ident(string $name): string {
   if (!preg_match('/^[A-Za-z0-9_]+$/', $name)) {
-    throw new InvalidArgumentException('Invalid SQL identifier.');
+    throw new InvalidArgumentException('Invalid SQL identifier: only letters, numbers, and underscores are allowed.');
   }
   return "`{$name}`";
+}
+
+function dashboard_sql_fragment(string $key): string {
+  static $allowed = [
+    'created_at' => 'created_at',
+    'rfq_quote_received' => 'COALESCE(received_on, DATE(created_at))',
+    'rfq_order_created' => 'COALESCE(order_date, DATE(created_at))',
+    'shipping_quote_received' => 'COALESCE(received_on, DATE(created_at))',
+    'shipped_at' => 'shipped_at',
+    'count_all' => 'COUNT(*)',
+    'sum_quantity' => 'SUM(COALESCE(quantity, 1))',
+  ];
+
+  if (!isset($allowed[$key])) {
+    throw new InvalidArgumentException('Invalid dashboard SQL fragment key.');
+  }
+
+  return $allowed[$key];
 }
 
 function dashboard_table_exists(PDO $pdo, string $table): bool {
@@ -34,11 +52,12 @@ function dashboard_safe_count(PDO $pdo, string $sql, array $params = []): int {
   }
 }
 
-function dashboard_weekly_count(PDO $pdo, string $table, string $date_expression, string $start_date, string $end_date): int {
+function dashboard_weekly_count(PDO $pdo, string $table, string $date_expression_key, string $start_date, string $end_date): int {
   if (!dashboard_table_exists($pdo, $table)) {
     return 0;
   }
 
+  $date_expression = dashboard_sql_fragment($date_expression_key);
   $sql = "
     SELECT COUNT(*)
     FROM " . dashboard_ident($table) . "
@@ -53,7 +72,7 @@ function dashboard_weekly_count(PDO $pdo, string $table, string $date_expression
   ]);
 }
 
-function dashboard_weekly_series(PDO $pdo, string $table, string $date_expression, string $value_expression, DateTimeImmutable $first_week_start): array {
+function dashboard_weekly_series(PDO $pdo, string $table, string $date_expression_key, string $value_expression_key, DateTimeImmutable $first_week_start): array {
   $weeks = [];
   $cursor = $first_week_start;
   for ($i = 0; $i < 8; $i++) {
@@ -71,6 +90,9 @@ function dashboard_weekly_series(PDO $pdo, string $table, string $date_expressio
       'values' => array_column($weeks, 'total'),
     ];
   }
+
+  $date_expression = dashboard_sql_fragment($date_expression_key);
+  $value_expression = dashboard_sql_fragment($value_expression_key);
 
   try {
     $stmt = $pdo->prepare("
@@ -130,17 +152,17 @@ $kpis = [
   ],
   [
     'label' => 'Quotes Received This Week',
-    'value' => dashboard_weekly_count($pdo, 'rfq_quotes', 'COALESCE(received_on, DATE(created_at))', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
+    'value' => dashboard_weekly_count($pdo, 'rfq_quotes', 'rfq_quote_received', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
     'accent' => 'tw-from-violet-500 tw-to-indigo-600',
   ],
   [
     'label' => 'Purchase Orders Created This Week',
-    'value' => dashboard_weekly_count($pdo, 'rfq_orders', 'COALESCE(order_date, DATE(created_at))', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
+    'value' => dashboard_weekly_count($pdo, 'rfq_orders', 'rfq_order_created', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
     'accent' => 'tw-from-emerald-500 tw-to-teal-600',
   ],
   [
     'label' => 'New Freight Quotes This Week',
-    'value' => dashboard_weekly_count($pdo, 'shipping_rfq_quotes', 'COALESCE(received_on, DATE(created_at))', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
+    'value' => dashboard_weekly_count($pdo, 'shipping_rfq_quotes', 'shipping_quote_received', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
     'accent' => 'tw-from-amber-500 tw-to-orange-600',
   ],
   [
@@ -200,8 +222,8 @@ $expected_arrivals = dashboard_table_exists($pdo, 'incoming_shipments')
     )
   : 0;
 
-$rfq_chart = dashboard_weekly_series($pdo, 'rfq_requests', 'created_at', 'COUNT(*)', $chart_week_start);
-$shipped_chart = dashboard_weekly_series($pdo, 'rfq_orders', 'shipped_at', 'SUM(COALESCE(quantity, 1))', $chart_week_start);
+$rfq_chart = dashboard_weekly_series($pdo, 'rfq_requests', 'created_at', 'count_all', $chart_week_start);
+$shipped_chart = dashboard_weekly_series($pdo, 'rfq_orders', 'shipped_at', 'sum_quantity', $chart_week_start);
 $last_updated = (new DateTimeImmutable('now', $tz))->format('M j, Y g:i A T');
 
 render_header('CEO Dashboard');
@@ -278,7 +300,7 @@ window.tailwind.config = {
       <div class="tw-relative tw-flex tw-flex-col tw-gap-6 lg:tw-flex-row lg:tw-items-end lg:tw-justify-between">
         <div class="tw-max-w-3xl">
           <p class="tw-m-0 tw-text-sm tw-font-semibold tw-uppercase tw-tracking-[0.3em] tw-text-cyan-300">CEO Dashboard</p>
-          <h1 class="tw-mt-3 tw-text-3xl tw-font-black tw-tracking-[-0.04em] lg:tw-text-6xl">Full picture of business activity.</h1>
+          <h1 class="tw-mt-3 tw-text-3xl tw-font-black tw-tracking-[-0.04em] lg:tw-text-6xl">A full picture of business activity.</h1>
           <p class="tw-mt-3 tw-max-w-2xl tw-text-base tw-leading-7 tw-text-slate-300 lg:tw-text-lg">
             Monitor weekly demand, supplier momentum, purchase activity, shipment flow, and near-term arrivals from one executive view.
           </p>
