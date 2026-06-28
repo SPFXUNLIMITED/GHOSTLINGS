@@ -637,27 +637,10 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
     <?php endforeach; ?>
   </div>
 
-  <!-- Today's Priorities + Motivation -->
-  <div class="dash-section-header" style="margin-top:24px;">
-    <div>
-      <h2>Today&rsquo;s Priorities</h2>
-      <p class="muted">Win the day by moving the next supplier action forward in every stage of the Alibaba workflow.</p>
-    </div>
-  </div>
-  <div class="dash-grid-2">
-    <div class="priority-list">
-      <?php foreach ($today_priorities as $priority): ?>
-        <label class="card priority-item">
-          <input type="checkbox">
-          <span style="font-size:14px;line-height:1.5;"><?= h($priority) ?></span>
-        </label>
-      <?php endforeach; ?>
-    </div>
-    <div class="card dash-motivation">
-      <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;">Motivation</div>
-      <h3>Every supplier touchpoint today sets up next week&rsquo;s wins.</h3>
-      <p class="muted">Keep Patty focused on fast follow-up, clean PO handoff, and shipment visibility so the sourcing pipeline keeps converting.</p>
-    </div>
+  <!-- Today's Priorities -->
+  <div style="margin-top:24px;">
+    <h2>Today's Priorities</h2>
+    <p>Win the day by moving the next supplier action forward.</p>
   </div>
 
   <!-- Procurement Pipeline Snapshot -->
