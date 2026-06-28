@@ -243,8 +243,9 @@ $expected_arrivals = dashboard_table_exists($pdo, 'incoming_shipments')
 $rfq_chart = dashboard_weekly_series($pdo, 'rfq_requests', 'created_at', 'count_all', $chart_week_start);
 $shipped_chart = dashboard_weekly_series($pdo, 'rfq_orders', 'shipped_at', 'sum_quantity', $chart_week_start);
 $last_updated = (new DateTimeImmutable('now', $tz))->format('M j, Y g:i A T');
+$json_safe_flags = JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 
-render_header('CEO Dashboard');
+render_header('CEO Dashboard - Business Activity Overview');
 ?>
 
 <script>
@@ -318,9 +319,9 @@ window.tailwind.config = {
       <div class="tw-relative tw-flex tw-flex-col tw-gap-6 lg:tw-flex-row lg:tw-items-end lg:tw-justify-between">
         <div class="tw-max-w-3xl">
           <p class="tw-m-0 tw-text-sm tw-font-semibold tw-uppercase tw-tracking-[0.3em] tw-text-cyan-300">CEO Dashboard</p>
-          <h1 class="tw-mt-3 tw-text-3xl tw-font-black tw-tracking-[-0.04em] lg:tw-text-6xl">CEO Dashboard · Business Activity Overview</h1>
+          <h1 class="tw-mt-3 tw-text-3xl tw-font-black tw-tracking-[-0.04em] lg:tw-text-6xl">CEO Dashboard</h1>
           <p class="tw-mt-3 tw-max-w-2xl tw-text-base tw-leading-7 tw-text-slate-300 lg:tw-text-lg">
-            Monitor weekly demand, supplier momentum, purchase activity, shipment flow, and near-term arrivals from one executive view.
+            Business activity overview across weekly demand, supplier momentum, purchase activity, shipment flow, and near-term arrivals.
           </p>
           <div class="tw-mt-6 tw-flex tw-flex-wrap tw-gap-3">
             <div class="tw-rounded-full tw-border tw-border-cyan-400/20 tw-bg-cyan-400/10 tw-px-4 tw-py-2 tw-text-sm tw-font-medium tw-text-cyan-100">Neon Operations View</div>
@@ -430,9 +431,9 @@ window.tailwind.config = {
 
 <script>
 (() => {
-  const labels = <?= json_encode($rfq_chart['labels'], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-  const rfqValues = <?= json_encode($rfq_chart['values'], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-  const shippedValues = <?= json_encode($shipped_chart['values'], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+  const labels = <?= json_encode($rfq_chart['labels'], $json_safe_flags) ?>;
+  const rfqValues = <?= json_encode($rfq_chart['values'], $json_safe_flags) ?>;
+  const shippedValues = <?= json_encode($shipped_chart['values'], $json_safe_flags) ?>;
 
   const baseOptions = {
     responsive: true,
