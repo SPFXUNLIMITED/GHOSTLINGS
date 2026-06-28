@@ -155,6 +155,8 @@ $kpis = [
   ],
 ];
 
+$weekly_activity_total = array_sum(array_map(static fn(array $card): int => (int)$card['value'], $kpis));
+
 $items_in_production = dashboard_table_exists($pdo, 'rfq_orders')
   ? dashboard_safe_count(
       $pdo,
@@ -207,13 +209,13 @@ render_header('CEO Dashboard');
 
 <script>
 window.tailwind = window.tailwind || {};
-tailwind.config = {
+window.tailwind.config = {
   prefix: 'tw-',
   corePlugins: { preflight: false },
   theme: {
     extend: {
       boxShadow: {
-        executive: '0 20px 45px rgba(15, 23, 42, 0.12)'
+        executive: '0 0 0 1px rgba(56, 189, 248, 0.12), 0 30px 90px rgba(37, 99, 235, 0.18), 0 0 80px rgba(168, 85, 247, 0.15)'
       }
     }
   }
@@ -223,6 +225,39 @@ tailwind.config = {
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 
 <style>
+  .ceo-dashboard-shell {
+    background:
+      radial-gradient(circle at top left, rgba(34, 211, 238, 0.18), transparent 30%),
+      radial-gradient(circle at top right, rgba(168, 85, 247, 0.16), transparent 28%),
+      linear-gradient(180deg, #020617 0%, #020617 100%);
+  }
+  .ceo-grid-pattern {
+    background-image:
+      linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+    background-size: 36px 36px;
+    mask-image: linear-gradient(180deg, rgba(255,255,255,0.38), transparent 78%);
+  }
+  .ceo-neon-card {
+    background:
+      linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(2, 6, 23, 0.9)),
+      linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(168, 85, 247, 0.08));
+    box-shadow:
+      0 0 0 1px rgba(96, 165, 250, 0.15),
+      0 18px 55px rgba(2, 6, 23, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+  .ceo-card-glow::before {
+    content: '';
+    position: absolute;
+    inset: -40% auto auto 55%;
+    width: 180px;
+    height: 180px;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(34, 211, 238, 0.22), transparent 68%);
+    filter: blur(12px);
+    pointer-events: none;
+  }
   .ceo-dashboard-shell canvas {
     width: 100% !important;
     height: 320px !important;
@@ -232,25 +267,38 @@ tailwind.config = {
   }
 </style>
 
-<div class="ceo-dashboard-shell tw-bg-slate-100 tw-px-4 tw-py-6 lg:tw-px-6">
-  <div class="tw-mx-auto tw-max-w-7xl tw-space-y-6">
-    <section class="tw-overflow-hidden tw-rounded-[28px] tw-bg-gradient-to-r tw-from-slate-900 tw-via-slate-800 tw-to-slate-900 tw-px-6 tw-py-8 tw-text-white tw-shadow-executive lg:tw-px-10">
-      <div class="tw-flex tw-flex-col tw-gap-6 lg:tw-flex-row lg:tw-items-end lg:tw-justify-between">
+<div class="ceo-dashboard-shell tw-relative tw-overflow-hidden tw-px-4 tw-py-6 lg:tw-px-6">
+  <div class="ceo-grid-pattern tw-pointer-events-none tw-absolute tw-inset-0 tw-opacity-60"></div>
+  <div class="tw-pointer-events-none tw-absolute tw-left-[-6rem] tw-top-[-5rem] tw-h-72 tw-w-72 tw-rounded-full tw-bg-cyan-400/20 tw-blur-3xl"></div>
+  <div class="tw-pointer-events-none tw-absolute tw-right-[-4rem] tw-top-24 tw-h-80 tw-w-80 tw-rounded-full tw-bg-violet-500/20 tw-blur-3xl"></div>
+  <div class="tw-pointer-events-none tw-absolute tw-bottom-[-8rem] tw-left-1/3 tw-h-80 tw-w-80 tw-rounded-full tw-bg-sky-500/10 tw-blur-3xl"></div>
+  <div class="tw-relative tw-mx-auto tw-max-w-7xl tw-space-y-6">
+    <section class="tw-relative tw-overflow-hidden tw-rounded-[32px] tw-border tw-border-cyan-400/15 tw-bg-[linear-gradient(135deg,rgba(8,47,73,0.92),rgba(15,23,42,0.96)_38%,rgba(59,7,100,0.92))] tw-px-6 tw-py-8 tw-text-white tw-shadow-executive lg:tw-px-10">
+      <div class="tw-pointer-events-none tw-absolute tw-inset-y-0 tw-right-0 tw-w-1/2 tw-bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.25),transparent_45%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.22),transparent_42%)]"></div>
+      <div class="tw-relative tw-flex tw-flex-col tw-gap-6 lg:tw-flex-row lg:tw-items-end lg:tw-justify-between">
         <div class="tw-max-w-3xl">
-          <p class="tw-m-0 tw-text-sm tw-font-semibold tw-uppercase tw-tracking-[0.24em] tw-text-sky-200">CEO Dashboard</p>
-          <h1 class="tw-mt-3 tw-text-3xl tw-font-semibold tw-tracking-tight lg:tw-text-5xl">Full picture of business activity.</h1>
+          <p class="tw-m-0 tw-text-sm tw-font-semibold tw-uppercase tw-tracking-[0.3em] tw-text-cyan-300">CEO Dashboard</p>
+          <h1 class="tw-mt-3 tw-text-3xl tw-font-black tw-tracking-[-0.04em] lg:tw-text-6xl">Full picture of business activity.</h1>
           <p class="tw-mt-3 tw-max-w-2xl tw-text-base tw-leading-7 tw-text-slate-300 lg:tw-text-lg">
             Monitor weekly demand, supplier momentum, purchase activity, shipment flow, and near-term arrivals from one executive view.
           </p>
-        </div>
-        <div class="tw-grid tw-gap-3 sm:tw-grid-cols-2">
-          <div class="tw-rounded-2xl tw-border tw-border-white/10 tw-bg-white/5 tw-px-5 tw-py-4 tw-backdrop-blur">
-            <p class="tw-m-0 tw-text-xs tw-font-medium tw-uppercase tw-tracking-[0.2em] tw-text-slate-300">This Week Starts</p>
-            <p class="tw-mt-2 tw-text-2xl tw-font-semibold"><?= h($week_start->format('M j, Y')) ?></p>
+          <div class="tw-mt-6 tw-flex tw-flex-wrap tw-gap-3">
+            <div class="tw-rounded-full tw-border tw-border-cyan-400/20 tw-bg-cyan-400/10 tw-px-4 tw-py-2 tw-text-sm tw-font-medium tw-text-cyan-100">Neon Operations View</div>
+            <div class="tw-rounded-full tw-border tw-border-violet-400/20 tw-bg-violet-400/10 tw-px-4 tw-py-2 tw-text-sm tw-font-medium tw-text-violet-100">Live Pipeline Signal</div>
           </div>
-          <div class="tw-rounded-2xl tw-border tw-border-white/10 tw-bg-white/5 tw-px-5 tw-py-4 tw-backdrop-blur">
-            <p class="tw-m-0 tw-text-xs tw-font-medium tw-uppercase tw-tracking-[0.2em] tw-text-slate-300">Last Updated</p>
-            <p class="tw-mt-2 tw-text-lg tw-font-semibold"><?= h($last_updated) ?></p>
+        </div>
+        <div class="tw-grid tw-gap-3 sm:tw-grid-cols-3">
+          <div class="tw-rounded-3xl tw-border tw-border-white/10 tw-bg-slate-950/35 tw-px-5 tw-py-4 tw-backdrop-blur">
+            <p class="tw-m-0 tw-text-xs tw-font-medium tw-uppercase tw-tracking-[0.22em] tw-text-slate-300">This Week Starts</p>
+            <p class="tw-mt-2 tw-text-2xl tw-font-bold tw-text-white"><?= h($week_start->format('M j, Y')) ?></p>
+          </div>
+          <div class="tw-rounded-3xl tw-border tw-border-white/10 tw-bg-slate-950/35 tw-px-5 tw-py-4 tw-backdrop-blur">
+            <p class="tw-m-0 tw-text-xs tw-font-medium tw-uppercase tw-tracking-[0.22em] tw-text-slate-300">Weekly Activity</p>
+            <p class="tw-mt-2 tw-text-3xl tw-font-black tw-text-cyan-300"><?= number_format($weekly_activity_total) ?></p>
+          </div>
+          <div class="tw-rounded-3xl tw-border tw-border-white/10 tw-bg-slate-950/35 tw-px-5 tw-py-4 tw-backdrop-blur">
+            <p class="tw-m-0 tw-text-xs tw-font-medium tw-uppercase tw-tracking-[0.22em] tw-text-slate-300">Last Updated</p>
+            <p class="tw-mt-2 tw-text-lg tw-font-bold tw-text-white"><?= h($last_updated) ?></p>
           </div>
         </div>
       </div>
@@ -259,18 +307,20 @@ tailwind.config = {
     <section aria-labelledby="weekly-kpis">
       <div class="tw-mb-4 tw-flex tw-items-center tw-justify-between tw-gap-4">
         <div>
-          <h2 id="weekly-kpis" class="tw-m-0 tw-text-2xl tw-font-semibold tw-text-slate-900">Weekly Activity KPI Cards</h2>
-          <p class="tw-mt-1 tw-text-sm tw-text-slate-500">Large-format weekly totals across the requested business systems.</p>
+          <h2 id="weekly-kpis" class="tw-m-0 tw-text-2xl tw-font-semibold tw-text-white">Weekly Activity KPI Cards</h2>
+          <p class="tw-mt-1 tw-text-sm tw-text-slate-400">Large-format weekly totals across the requested business systems.</p>
         </div>
       </div>
       <div class="tw-grid tw-gap-4 md:tw-grid-cols-2 xl:tw-grid-cols-3 2xl:tw-grid-cols-6">
         <?php foreach ($kpis as $card): ?>
-          <article class="tw-rounded-3xl tw-bg-white tw-p-5 tw-shadow-[0_18px_40px_rgba(15,23,42,0.08)] tw-ring-1 tw-ring-slate-200/80">
+          <article class="ceo-neon-card ceo-card-glow tw-relative tw-overflow-hidden tw-rounded-[28px] tw-p-6 tw-ring-1 tw-ring-cyan-400/10">
+            <div class="tw-absolute tw-right-5 tw-top-5 tw-h-3 tw-w-3 tw-rounded-full tw-bg-cyan-300 tw-shadow-[0_0_18px_rgba(103,232,249,0.9)]"></div>
             <div class="tw-inline-flex tw-rounded-full tw-bg-gradient-to-r <?= h($card['accent']) ?> tw-p-[1px]">
-              <span class="tw-rounded-full tw-bg-white tw-px-3 tw-py-1 tw-text-[11px] tw-font-semibold tw-uppercase tw-tracking-[0.18em] tw-text-slate-600">This Week</span>
+              <span class="tw-rounded-full tw-bg-slate-950/90 tw-px-3 tw-py-1 tw-text-[11px] tw-font-semibold tw-uppercase tw-tracking-[0.18em] tw-text-cyan-100">This Week</span>
             </div>
-            <p class="tw-mt-4 tw-text-sm tw-font-medium tw-leading-6 tw-text-slate-500"><?= h($card['label']) ?></p>
-            <p class="tw-mt-5 tw-text-5xl tw-font-semibold tw-tracking-tight tw-text-slate-950"><?= number_format((int)$card['value']) ?></p>
+            <p class="tw-mt-4 tw-max-w-[16rem] tw-text-sm tw-font-medium tw-leading-6 tw-text-slate-300"><?= h($card['label']) ?></p>
+            <p class="tw-mt-6 tw-text-6xl tw-font-black tw-tracking-[-0.05em] tw-text-white"><?= number_format((int)$card['value']) ?></p>
+            <div class="tw-mt-5 tw-h-px tw-w-full tw-bg-gradient-to-r tw-from-cyan-400/40 tw-via-violet-400/20 tw-to-transparent"></div>
           </article>
         <?php endforeach; ?>
       </div>
@@ -278,57 +328,57 @@ tailwind.config = {
 
     <section aria-labelledby="pipeline-status">
       <div class="tw-mb-4">
-        <h2 id="pipeline-status" class="tw-m-0 tw-text-2xl tw-font-semibold tw-text-slate-900">Pipeline Status</h2>
-        <p class="tw-mt-1 tw-text-sm tw-text-slate-500">Current production and logistics counts that matter most.</p>
+        <h2 id="pipeline-status" class="tw-m-0 tw-text-2xl tw-font-semibold tw-text-white">Pipeline Status</h2>
+        <p class="tw-mt-1 tw-text-sm tw-text-slate-400">Current production and logistics counts that matter most.</p>
       </div>
       <div class="tw-grid tw-gap-4 lg:tw-grid-cols-3">
-        <article class="tw-rounded-3xl tw-bg-white tw-p-6 tw-shadow-[0_18px_40px_rgba(15,23,42,0.08)] tw-ring-1 tw-ring-slate-200/80">
-          <p class="tw-m-0 tw-text-sm tw-font-semibold tw-uppercase tw-tracking-[0.18em] tw-text-slate-500">Items Currently In Production</p>
-          <p class="tw-mt-4 tw-text-5xl tw-font-semibold tw-tracking-tight tw-text-slate-950"><?= number_format($items_in_production) ?></p>
-          <p class="tw-mt-3 tw-text-sm tw-leading-6 tw-text-slate-500">Orders with production underway that have not shipped yet.</p>
+        <article class="ceo-neon-card tw-rounded-[30px] tw-p-6 tw-ring-1 tw-ring-cyan-400/10">
+          <p class="tw-m-0 tw-text-sm tw-font-semibold tw-uppercase tw-tracking-[0.18em] tw-text-slate-400">Items Currently In Production</p>
+          <p class="tw-mt-4 tw-text-6xl tw-font-black tw-tracking-[-0.05em] tw-text-cyan-300"><?= number_format($items_in_production) ?></p>
+          <p class="tw-mt-3 tw-text-sm tw-leading-6 tw-text-slate-300">Orders with production underway that have not shipped yet.</p>
         </article>
-        <article class="tw-rounded-3xl tw-bg-white tw-p-6 tw-shadow-[0_18px_40px_rgba(15,23,42,0.08)] tw-ring-1 tw-ring-slate-200/80">
-          <p class="tw-m-0 tw-text-sm tw-font-semibold tw-uppercase tw-tracking-[0.18em] tw-text-slate-500">Shipments In Transit</p>
-          <p class="tw-mt-4 tw-text-5xl tw-font-semibold tw-tracking-tight tw-text-slate-950"><?= number_format($shipments_in_transit) ?></p>
-          <p class="tw-mt-3 tw-text-sm tw-leading-6 tw-text-slate-500">Incoming shipments currently marked In Transit.</p>
+        <article class="ceo-neon-card tw-rounded-[30px] tw-p-6 tw-ring-1 tw-ring-violet-400/10">
+          <p class="tw-m-0 tw-text-sm tw-font-semibold tw-uppercase tw-tracking-[0.18em] tw-text-slate-400">Shipments In Transit</p>
+          <p class="tw-mt-4 tw-text-6xl tw-font-black tw-tracking-[-0.05em] tw-text-violet-300"><?= number_format($shipments_in_transit) ?></p>
+          <p class="tw-mt-3 tw-text-sm tw-leading-6 tw-text-slate-300">Incoming shipments currently marked In Transit.</p>
         </article>
-        <article class="tw-rounded-3xl tw-bg-white tw-p-6 tw-shadow-[0_18px_40px_rgba(15,23,42,0.08)] tw-ring-1 tw-ring-slate-200/80">
-          <p class="tw-m-0 tw-text-sm tw-font-semibold tw-uppercase tw-tracking-[0.18em] tw-text-slate-500">Expected Arrivals in Next 30 Days</p>
-          <p class="tw-mt-4 tw-text-5xl tw-font-semibold tw-tracking-tight tw-text-slate-950"><?= number_format($expected_arrivals) ?></p>
-          <p class="tw-mt-3 tw-text-sm tw-leading-6 tw-text-slate-500">Open incoming shipments scheduled to arrive within the next month.</p>
+        <article class="ceo-neon-card tw-rounded-[30px] tw-p-6 tw-ring-1 tw-ring-sky-400/10">
+          <p class="tw-m-0 tw-text-sm tw-font-semibold tw-uppercase tw-tracking-[0.18em] tw-text-slate-400">Expected Arrivals in Next 30 Days</p>
+          <p class="tw-mt-4 tw-text-6xl tw-font-black tw-tracking-[-0.05em] tw-text-sky-300"><?= number_format($expected_arrivals) ?></p>
+          <p class="tw-mt-3 tw-text-sm tw-leading-6 tw-text-slate-300">Open incoming shipments scheduled to arrive within the next month.</p>
         </article>
       </div>
     </section>
 
     <section aria-labelledby="dashboard-charts">
       <div class="tw-mb-4">
-        <h2 id="dashboard-charts" class="tw-m-0 tw-text-2xl tw-font-semibold tw-text-slate-900">Charts</h2>
-        <p class="tw-mt-1 tw-text-sm tw-text-slate-500">Eight-week activity trends for RFQ creation and shipped item volume.</p>
+        <h2 id="dashboard-charts" class="tw-m-0 tw-text-2xl tw-font-semibold tw-text-white">Charts</h2>
+        <p class="tw-mt-1 tw-text-sm tw-text-slate-400">Eight-week activity trends for RFQ creation and shipped item volume.</p>
       </div>
       <div class="tw-grid tw-gap-4 xl:tw-grid-cols-2">
-        <article class="chart-panel tw-rounded-3xl tw-bg-white tw-p-6 tw-shadow-[0_18px_40px_rgba(15,23,42,0.08)] tw-ring-1 tw-ring-slate-200/80">
+        <article class="chart-panel ceo-neon-card tw-rounded-[30px] tw-p-6 tw-ring-1 tw-ring-cyan-400/10">
           <div class="tw-mb-4 tw-flex tw-items-start tw-justify-between tw-gap-4">
             <div>
-              <h3 class="tw-m-0 tw-text-xl tw-font-semibold tw-text-slate-900">Weekly RFQs Created</h3>
-              <p class="tw-mt-1 tw-text-sm tw-text-slate-500">Line chart · last 8 weeks</p>
+              <h3 class="tw-m-0 tw-text-xl tw-font-semibold tw-text-white">Weekly RFQs Created</h3>
+              <p class="tw-mt-1 tw-text-sm tw-text-slate-400">Line chart · last 8 weeks</p>
             </div>
-            <div class="tw-rounded-2xl tw-bg-sky-50 tw-px-4 tw-py-3 tw-text-right">
-              <p class="tw-m-0 tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.18em] tw-text-sky-700">8-Week Total</p>
-              <p class="tw-mt-1 tw-text-3xl tw-font-semibold tw-text-sky-900"><?= number_format(array_sum($rfq_chart['values'])) ?></p>
+            <div class="tw-rounded-2xl tw-border tw-border-cyan-400/15 tw-bg-cyan-400/10 tw-px-4 tw-py-3 tw-text-right">
+              <p class="tw-m-0 tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.18em] tw-text-cyan-200">8-Week Total</p>
+              <p class="tw-mt-1 tw-text-3xl tw-font-black tw-text-cyan-300"><?= number_format(array_sum($rfq_chart['values'])) ?></p>
             </div>
           </div>
           <canvas id="rfqWeeklyChart" aria-label="Weekly RFQs Created line chart" role="img"></canvas>
         </article>
 
-        <article class="chart-panel tw-rounded-3xl tw-bg-white tw-p-6 tw-shadow-[0_18px_40px_rgba(15,23,42,0.08)] tw-ring-1 tw-ring-slate-200/80">
+        <article class="chart-panel ceo-neon-card tw-rounded-[30px] tw-p-6 tw-ring-1 tw-ring-violet-400/10">
           <div class="tw-mb-4 tw-flex tw-items-start tw-justify-between tw-gap-4">
             <div>
-              <h3 class="tw-m-0 tw-text-xl tw-font-semibold tw-text-slate-900">Items Shipped Per Week</h3>
-              <p class="tw-mt-1 tw-text-sm tw-text-slate-500">Bar chart · last 8 weeks</p>
+              <h3 class="tw-m-0 tw-text-xl tw-font-semibold tw-text-white">Items Shipped Per Week</h3>
+              <p class="tw-mt-1 tw-text-sm tw-text-slate-400">Bar chart · last 8 weeks</p>
             </div>
-            <div class="tw-rounded-2xl tw-bg-emerald-50 tw-px-4 tw-py-3 tw-text-right">
-              <p class="tw-m-0 tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.18em] tw-text-emerald-700">8-Week Total</p>
-              <p class="tw-mt-1 tw-text-3xl tw-font-semibold tw-text-emerald-900"><?= number_format(array_sum($shipped_chart['values'])) ?></p>
+            <div class="tw-rounded-2xl tw-border tw-border-violet-400/15 tw-bg-violet-400/10 tw-px-4 tw-py-3 tw-text-right">
+              <p class="tw-m-0 tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.18em] tw-text-violet-200">8-Week Total</p>
+              <p class="tw-mt-1 tw-text-3xl tw-font-black tw-text-violet-300"><?= number_format(array_sum($shipped_chart['values'])) ?></p>
             </div>
           </div>
           <canvas id="shippedWeeklyChart" aria-label="Items Shipped Per Week bar chart" role="img"></canvas>
@@ -350,23 +400,23 @@ tailwind.config = {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#0f172a',
+        backgroundColor: 'rgba(2, 6, 23, 0.96)',
         titleColor: '#f8fafc',
-        bodyColor: '#e2e8f0',
+        bodyColor: '#cbd5e1',
         padding: 12
       }
     },
     scales: {
       x: {
-        grid: { display: false },
-        ticks: { color: '#64748b', font: { size: 12, weight: '600' } }
+        grid: { color: 'rgba(51, 65, 85, 0.22)' },
+        ticks: { color: '#94a3b8', font: { size: 12, weight: '600' } }
       },
       y: {
         beginAtZero: true,
-        grid: { color: 'rgba(148, 163, 184, 0.18)' },
+        grid: { color: 'rgba(51, 65, 85, 0.32)' },
         ticks: {
           precision: 0,
-          color: '#64748b',
+          color: '#94a3b8',
           font: { size: 12, weight: '600' }
         }
       }
@@ -381,14 +431,16 @@ tailwind.config = {
         labels,
         datasets: [{
           data: rfqValues,
-          borderColor: '#0284c7',
-          backgroundColor: 'rgba(14, 165, 233, 0.16)',
+          borderColor: '#22d3ee',
+          backgroundColor: 'rgba(34, 211, 238, 0.12)',
           fill: true,
           tension: 0.35,
           borderWidth: 3,
           pointRadius: 4,
           pointHoverRadius: 5,
-          pointBackgroundColor: '#0369a1'
+          pointBackgroundColor: '#67e8f9',
+          pointBorderColor: '#082f49',
+          pointBorderWidth: 2
         }]
       },
       options: baseOptions
@@ -403,7 +455,9 @@ tailwind.config = {
         labels,
         datasets: [{
           data: shippedValues,
-          backgroundColor: '#10b981',
+          backgroundColor: 'rgba(129, 140, 248, 0.88)',
+          borderColor: '#38bdf8',
+          borderWidth: 1,
           borderRadius: 14,
           maxBarThickness: 44
         }]
