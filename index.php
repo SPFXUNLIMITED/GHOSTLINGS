@@ -32,6 +32,7 @@ function dashboard_accent_classes(string $key): string {
 function dashboard_sql_fragment(string $key): string {
   static $allowed = [
     'created_at' => 'created_at',
+    'received_on' => 'received_on',
     'rfq_quote_received' => 'COALESCE(received_on, DATE(created_at))',
     'rfq_order_created' => 'COALESCE(order_date, DATE(created_at))',
     'shipping_quote_received' => 'COALESCE(received_on, DATE(created_at))',
@@ -232,9 +233,9 @@ $weekly_goals = [
   [
     'title' => 'Quotes Received',
     'label' => 'Quotes Received This Week',
-    'value' => dashboard_weekly_count($pdo, 'rfq_quotes', 'rfq_quote_received', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
+    'value' => dashboard_weekly_count($pdo, 'rfq_quotes', 'received_on', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
     'accent_key' => 'violet',
-    'target' => 25,
+    'target' => 15,
   ],
   [
     'title' => 'Purchase Orders Sent',
