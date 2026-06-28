@@ -459,9 +459,9 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
 .dash-progress-bar { height: 100%; border-radius: 999px; }
 
 /* ── Goal tone colours ──────────────────────────────────────────── */
-.goal-badge-green  { background: #dcfce7 !important; color: #166534 !important; border-color: #86efac !important; }
-.goal-badge-yellow { background: #fef3c7 !important; color: #92400e !important; border-color: #fcd34d !important; }
-.goal-badge-red    { background: #fee2e2 !important; color: #991b1b !important; border-color: #fca5a5 !important; }
+.dash-shell .goal-badge-green  { background: #dcfce7 !important; color: #166534 !important; border-color: #86efac !important; }
+.dash-shell .goal-badge-yellow { background: #fef3c7 !important; color: #92400e !important; border-color: #fcd34d !important; }
+.dash-shell .goal-badge-red    { background: #fee2e2 !important; color: #991b1b !important; border-color: #fca5a5 !important; }
 .goal-bar-green    { background: linear-gradient(90deg,#10b981,#0d9488); }
 .goal-bar-yellow   { background: linear-gradient(90deg,#f59e0b,#ea580c); }
 .goal-bar-red      { background: linear-gradient(90deg,#ef4444,#dc2626); }
@@ -531,6 +531,7 @@ label.priority-item span {
 }
 
 /* ── Chart panel ────────────────────────────────────────────────── */
+/* min-height accounts for the 260px canvas plus ~50px header content */
 .chart-panel { min-height: 310px; }
 .chart-panel canvas { width: 100% !important; height: 260px !important; display: block; }
 
@@ -559,15 +560,15 @@ label.priority-item span {
       <span class="dash-pill">Supplier Momentum Focus</span>
     </div>
     <div class="dash-hero-stats">
-      <div class="card dash-hero-stat">
+      <div class="dash-hero-stat">
         <div class="dash-hero-stat-label">This Week Starts</div>
         <div class="dash-hero-stat-value"><?= h($week_start->format('M j, Y')) ?></div>
       </div>
-      <div class="card dash-hero-stat">
+      <div class="dash-hero-stat">
         <div class="dash-hero-stat-label">Weekly Activity</div>
         <div class="dash-hero-stat-value"><?= number_format($weekly_activity_total) ?></div>
       </div>
-      <div class="card dash-hero-stat">
+      <div class="dash-hero-stat">
         <div class="dash-hero-stat-label">Last Updated</div>
         <div class="dash-hero-stat-value" style="font-size:0.9rem;"><?= h($last_updated) ?></div>
       </div>
