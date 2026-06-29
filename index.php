@@ -539,10 +539,10 @@ label.priority-item span {
 .chart-panel canvas { width: 100% !important; height: 260px !important; display: block; }
 .chart-panel-title {
   margin: 0 0 2px;
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   line-height: 1.25;
-  font-weight: 800;
-  color: #0f172a;
+  font-weight: 900;
+  color: #020617;
   letter-spacing: -0.01em;
 }
 
@@ -759,7 +759,25 @@ label.priority-item span {
 
 <script>
 (() => {
-  const labels = <?= json_encode($rfq_chart['labels'], $json_safe_flags) ?>;
+  const getWeekStart = (date) => {
+    const mondayOffset = (date.getDay() + 6) % 7;
+    const weekStart = new Date(date);
+    weekStart.setHours(0, 0, 0, 0);
+    weekStart.setDate(weekStart.getDate() - mondayOffset);
+    return weekStart;
+  };
+
+  const formatLabel = (date) => {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${monthNames[date.getMonth()]} ${date.getDate()}`;
+  };
+
+  const currentWeekStart = getWeekStart(new Date());
+  const labels = Array.from({ length: 8 }, (_, index) => {
+    const weekStart = new Date(currentWeekStart);
+    weekStart.setDate(currentWeekStart.getDate() - ((7 - index) * 7));
+    return formatLabel(weekStart);
+  });
   const rfqValues = <?= json_encode($rfq_chart['values'], $json_safe_flags) ?>;
   const shippedValues = <?= json_encode($shipped_chart['values'], $json_safe_flags) ?>;
 
