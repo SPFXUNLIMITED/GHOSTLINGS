@@ -104,7 +104,7 @@ function dashboard_goal_state(int $value, int $target, float $expected_ratio): a
     return [
       'label'   => 'On Track',
       'tone'    => 'green',
-      'message' => 'Excellent pace — keep the Alibaba pipeline moving and protect the win.',
+      'message' => 'You\'re hitting your target — keep the momentum going.',
     ];
   }
 
@@ -112,14 +112,14 @@ function dashboard_goal_state(int $value, int $target, float $expected_ratio): a
     return [
       'label'   => 'Push Today',
       'tone'    => 'yellow',
-      'message' => 'A focused follow-up block today gets this goal back on pace.',
+      'message' => 'You\'re close — a focused effort today should close the gap.',
     ];
   }
 
   return [
     'label'   => 'Needs Attention',
     'tone'    => 'red',
-    'message' => 'Prioritize this now so the week stays pointed at shipments and supplier wins.',
+    'message' => 'You\'re running behind pace. Catch up today to hit the weekly target.',
   ];
 }
 
@@ -206,6 +206,7 @@ $weekly_goals = [
   [
     'title' => 'RFQs Sent',
     'label' => 'RFQs Sent This Week',
+    'desc'  => 'Reach out to enough suppliers to keep pricing competitive and your sourcing options open.',
     'value' => dashboard_weekly_count($pdo, 'rfq_requests', 'created_at', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
     'accent_key' => 'sky',
     'target' => 10,
@@ -213,6 +214,7 @@ $weekly_goals = [
   [
     'title' => 'Quotes Received',
     'label' => 'Quotes Received This Week',
+    'desc'  => 'Collect supplier responses so you can compare pricing, lead times, and terms before committing.',
     'value' => dashboard_weekly_count($pdo, 'rfq_quotes', 'received_on', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
     'accent_key' => 'violet',
     'target' => 15,
@@ -220,6 +222,7 @@ $weekly_goals = [
   [
     'title' => 'Purchase Orders Sent',
     'label' => 'Purchase Orders Sent This Week',
+    'desc'  => 'Convert approved quotes into purchase orders to lock in pricing and move stock toward fulfillment.',
     'value' => dashboard_weekly_count($pdo, 'rfq_orders', 'rfq_order_created', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
     'accent_key' => 'emerald',
     'target' => 4,
@@ -227,6 +230,7 @@ $weekly_goals = [
   [
     'title' => 'Items Shipped',
     'label' => 'Items Shipped This Week',
+    'desc'  => 'Verify shipments are on their way and that quantities match what was ordered.',
     'value' => dashboard_weekly_total($pdo, 'rfq_orders', 'shipped_at', 'sum_quantity', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
     'accent_key' => 'amber',
     'target' => 3,
@@ -627,7 +631,7 @@ label.priority-item span {
           </div>
         </div>
         <div class="topbar" style="margin-top:10px;margin-bottom:0;align-items:flex-start;">
-          <span class="muted" style="font-size:13px;flex:1;margin-right:12px;"><?= h((string)$goal['state']['message']) ?></span>
+          <span class="muted" style="font-size:13px;flex:1;margin-right:12px;"><?= h((string)$goal['desc']) ?></span>
           <span style="font-size:13px;font-weight:600;white-space:nowrap;">
             <?= $goal['remaining'] > 0 ? number_format((int)$goal['remaining']) . ' more to goal' : 'Goal reached &#10003;' ?>
           </span>
