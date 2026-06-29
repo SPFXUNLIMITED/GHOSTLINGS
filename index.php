@@ -239,10 +239,10 @@ unset($goal);
 $weekly_activity_total = (int)array_sum(array_column($weekly_goals, 'value'));
 $goals_on_track = count(array_filter($weekly_goals, static fn(array $goal): bool => ($goal['state']['tone'] ?? '') === 'green'));
 $today_priorities = [
-  'Send the next round of high-priority Alibaba RFQs so supplier conversations keep moving.',
-  'Follow up on open supplier responses and pull in the quotes still needed for this week.',
-  'Issue approved purchase orders and confirm acknowledgements before the day ends.',
-  'Check production and shipment updates so Patty finishes the day with a clear next step.',
+  'Send out new RFQs for various machine sizes, air pumps, centrifugal fans, mirrors, lenses, and different wattage laser tubes',
+  'Review all Alibaba chats for quotes that have not been input into the system yet and add them to the current RFQs',
+  'Review all quotes to ensure they include crate costs, crate weights, crate dimensions, lead time, and preferred shipping port so we can calculate accurate price per unit',
+  'Once you have 3–5 quotes, decide on the best quote and submit it for purchase approval',
 ];
 
 $items_in_production = dashboard_table_exists($pdo, 'rfq_orders')
