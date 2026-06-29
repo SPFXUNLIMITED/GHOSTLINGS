@@ -191,7 +191,8 @@ function dashboard_weekly_series(PDO $pdo, string $table, string $date_expressio
 
 $tz = new DateTimeZone(defined('APP_TZ') ? APP_TZ : date_default_timezone_get());
 $today = new DateTimeImmutable('today', $tz);
-$week_start = $today->modify('-' . (((int)$today->format('N')) - 1) . ' days');
+$days_since_monday = ((int)$today->format('N')) - 1;
+$week_start = $today->modify("-{$days_since_monday} days");
 $next_week_start = $week_start->modify('+1 week');
 $chart_week_start = $week_start->modify('-7 weeks');
 $thirty_days_out = $today->modify('+30 days');
