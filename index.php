@@ -191,8 +191,11 @@ function dashboard_weekly_series(PDO $pdo, string $table, string $date_expressio
 
 $tz = new DateTimeZone(defined('APP_TZ') ? APP_TZ : date_default_timezone_get());
 $today = new DateTimeImmutable('today', $tz);
-// Compute Monday from the current ISO week so Sundays stay in the active week range.
-$days_since_monday = ((int)$today->format('N')) - 1;
+// Compute Monday of the active work week.
+// On Sunday (ISO day 7) advance to the next Monday so the dashboard already
+// shows the upcoming week rather than the one that just ended.
+$iso_day = (int)$today->format('N');
+$days_since_monday = $iso_day === 7 ? -1 : $iso_day - 1;
 $week_start = $today->modify("-{$days_since_monday} days");
 $next_week_start = $week_start->modify('+1 week');
 $chart_week_start = $week_start->modify('-7 weeks');
@@ -760,7 +763,9 @@ label.priority-item span {
 <script>
 (() => {
   const getWeekStart = (date) => {
-    const mondayOffset = (date.getDay() + 6) % 7;
+    const day = date.getDay(); // 0 = Sunday
+    // On Sunday advance to the next Monday (upcoming week), otherwise step back to Monday.
+    const mondayOffset = day === 0 ? -1 : (day + 6) % 7;
     const weekStart = new Date(date);
     weekStart.setHours(0, 0, 0, 0);
     weekStart.setDate(weekStart.getDate() - mondayOffset);
