@@ -191,7 +191,7 @@ function dashboard_weekly_series(PDO $pdo, string $table, string $date_expressio
 
 $tz = new DateTimeZone(defined('APP_TZ') ? APP_TZ : date_default_timezone_get());
 $today = new DateTimeImmutable('today', $tz);
-$week_start = $today->modify('monday this week');
+$week_start = $today->modify('-' . (((int)$today->format('N')) - 1) . ' days');
 $next_week_start = $week_start->modify('+1 week');
 $chart_week_start = $week_start->modify('-7 weeks');
 $thirty_days_out = $today->modify('+30 days');
@@ -535,6 +535,14 @@ label.priority-item span {
 /* min-height accounts for the 260px canvas plus ~50px header content */
 .chart-panel { min-height: 310px; }
 .chart-panel canvas { width: 100% !important; height: 260px !important; display: block; }
+.chart-panel-title {
+  margin: 0 0 2px;
+  font-size: 1.25rem;
+  line-height: 1.25;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
 
 /* ── Responsive ─────────────────────────────────────────────────── */
 @media (max-width: 860px) {
@@ -719,7 +727,7 @@ label.priority-item span {
     <div class="card chart-panel">
       <div class="topbar" style="margin-bottom:12px;align-items:flex-start;">
         <div>
-          <h3 style="margin:0 0 2px;">RFQs Sent Per Week</h3>
+          <h3 class="chart-panel-title">RFQs Sent Per Week</h3>
           <p class="muted" style="font-size:13px;margin:0;">Line chart &middot; last 8 weeks</p>
         </div>
         <div class="card dash-chart-total dash-chart-total-rfq">
@@ -732,7 +740,7 @@ label.priority-item span {
     <div class="card chart-panel">
       <div class="topbar" style="margin-bottom:12px;align-items:flex-start;">
         <div>
-          <h3 style="margin:0 0 2px;">Items Shipped Per Week</h3>
+          <h3 class="chart-panel-title">Items Shipped Per Week</h3>
           <p class="muted" style="font-size:13px;margin:0;">Bar chart &middot; last 8 weeks</p>
         </div>
         <div class="card dash-chart-total dash-chart-total-ship">
