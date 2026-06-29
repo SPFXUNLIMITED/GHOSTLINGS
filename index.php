@@ -209,14 +209,14 @@ if ($user_display_name === '') {
 
 $daily_motivation_messages = [
   'Hope you crush it today and keep the deals moving.',
-  'Let\u2019s stack a few strong wins and build real sourcing momentum.',
-  'You\u2019re set up for a focused day\u2014keep the pipeline flowing.',
+  'Let’s stack a few strong wins and build real sourcing momentum.',
+  'You’re set up for a focused day—keep the pipeline flowing.',
   'Stay sharp, close the next best deal, and keep progress steady.',
   'One consistent push today can create a huge week.',
   'Make today count with clear decisions and fast follow-through.',
   'Keep your standards high and your execution even higher.',
-  'You\u2019ve got this\u2014move the right priorities forward today.',
-  'Turn today\u2019s outreach into tomorrow\u2019s results.',
+  'You’ve got this—move the right priorities forward today.',
+  'Turn today’s outreach into tomorrow’s results.',
   'Keep the momentum alive; every solid action compounds.',
   'Dial in, stay proactive, and keep the wins coming.',
   'Strong focus today sets up an even stronger finish this week.',
