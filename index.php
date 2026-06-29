@@ -191,6 +191,7 @@ function dashboard_weekly_series(PDO $pdo, string $table, string $date_expressio
 
 $tz = new DateTimeZone(defined('APP_TZ') ? APP_TZ : date_default_timezone_get());
 $today = new DateTimeImmutable('today', $tz);
+// Compute Monday from the current ISO week so Sundays stay in the active week range.
 $days_since_monday = ((int)$today->format('N')) - 1;
 $week_start = $today->modify("-{$days_since_monday} days");
 $next_week_start = $week_start->modify('+1 week');
