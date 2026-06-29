@@ -185,6 +185,44 @@ $week_start = $today->modify("-{$days_since_monday} days");
 $next_week_start = $week_start->modify('+1 week');
 $thirty_days_out = $today->modify('+30 days');
 $week_progress_ratio = ((int)$today->format('N')) / 7;
+$current_hour = (int)(new DateTimeImmutable('now', $tz))->format('G');
+$time_greeting = $current_hour < 12 ? 'Good morning' : ($current_hour < 17 ? 'Good afternoon' : 'Good evening');
+
+$user_display_name = trim((string)(current_username() ?? ''));
+if (($current_user_id = current_user_id()) !== null) {
+  try {
+    $user_stmt = $pdo->prepare("SELECT contact_name, username FROM users WHERE id = ? LIMIT 1");
+    $user_stmt->execute([$current_user_id]);
+    $user_row = $user_stmt->fetch(PDO::FETCH_ASSOC);
+    if ($user_row) {
+      $profile_name = trim((string)($user_row['contact_name'] ?? ''));
+      $username_name = trim((string)($user_row['username'] ?? ''));
+      $user_display_name = $profile_name !== '' ? $profile_name : ($username_name !== '' ? $username_name : $user_display_name);
+    }
+  } catch (Throwable $e) {
+    error_log('Dashboard user lookup failed: ' . $e->getMessage());
+  }
+}
+if ($user_display_name === '') {
+  $user_display_name = 'there';
+}
+
+$daily_motivation_messages = [
+  'Hope you crush it today and keep the deals moving.',
+  'Let’s stack a few strong wins and build real sourcing momentum.',
+  'You’re set up for a focused day—keep the pipeline flowing.',
+  'Stay sharp, close the next best deal, and keep progress steady.',
+  'One consistent push today can create a huge week.',
+  'Make today count with clear decisions and fast follow-through.',
+  'Keep your standards high and your execution even higher.',
+  'You’ve got this—move the right priorities forward today.',
+  'Turn today’s outreach into tomorrow’s results.',
+  'Keep the momentum alive; every solid action compounds.',
+  'Dial in, stay proactive, and keep the wins coming.',
+  'Strong focus today sets up an even stronger finish this week.',
+];
+$daily_message = $daily_motivation_messages[((int)$today->format('z')) % count($daily_motivation_messages)];
+$personalized_motivation = "{$time_greeting}, {$user_display_name}. {$daily_message}";
 
 $weekly_goals = [
   [
@@ -421,6 +459,19 @@ render_header('Alibaba Sourcing Dashboard - Weekly Goals');
   color: #f1f5f9 !important;
 }
 
+.dash-shell .card.dash-motivation {
+  margin-top: 14px !important;
+  background: #f8fbff !important;
+  border-left: 4px solid #2563eb !important;
+}
+.dash-motivation-text {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.02rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
 /* ── Layout grids ───────────────────────────────────────────────── */
 .dash-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .dash-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
@@ -576,6 +627,10 @@ label.priority-item span {
         <div class="dash-hero-stat-value" style="font-size:0.9rem;"><?= h($last_updated) ?></div>
       </div>
     </div>
+  </div>
+
+  <div class="card dash-motivation">
+    <p class="dash-motivation-text"><?= h($personalized_motivation) ?></p>
   </div>
 
   <!-- Weekly Goals header -->
