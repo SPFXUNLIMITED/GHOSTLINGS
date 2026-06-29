@@ -179,11 +179,9 @@ function dashboard_daily_series(PDO $pdo, string $table, string $date_expression
 
 $tz = new DateTimeZone(defined('APP_TZ') ? APP_TZ : date_default_timezone_get());
 $today = new DateTimeImmutable('today', $tz);
-// Compute Monday of the active work week.
-// On Sunday (ISO day 7) advance to the next Monday so the dashboard already
-// shows the upcoming week rather than the one that just ended.
+// Compute Monday of the active work week (current Monday–Sunday week).
 $iso_day = (int)$today->format('N');
-$days_since_monday = $iso_day === 7 ? -1 : $iso_day - 1;
+$days_since_monday = $iso_day - 1;
 $week_start = $today->modify("-{$days_since_monday} days");
 $next_week_start = $week_start->modify('+1 week');
 $thirty_days_out = $today->modify('+30 days');
@@ -585,7 +583,7 @@ label.priority-item span {
   <div class="dash-section-header">
     <div>
       <h2>Weekly Goals</h2>
-      <p class="muted">Big targets, clear pacing, and a fast read on where Patty should push next.</p>
+      <p class="muted">Track weekly targets and see exactly where to focus next.</p>
     </div>
     <div class="card dash-mini-metric" style="margin:0;text-align:right;">
       <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;">Goals On Track</div>
@@ -664,7 +662,7 @@ label.priority-item span {
   <div class="dash-section-header" style="margin-top:24px;">
     <div>
       <h2>Today's Priorities</h2>
-      <p class="muted">Four focused actions to move the week forward — check them off as you go.</p>
+      <p class="muted">Four focused actions to keep sourcing and shipping progress moving today.</p>
     </div>
   </div>
   <?php
@@ -674,7 +672,7 @@ label.priority-item span {
       'Send the next round of high-priority Alibaba RFQs so supplier conversations keep moving.',
       'Follow up on open supplier responses and pull in the quotes still needed for this week.',
       'Issue approved purchase orders and confirm acknowledgements before the day ends.',
-      'Check production and shipment updates so Patty finishes the day with a clear next step.',
+      'Check production and shipment updates so the business finishes the day with a clear next step.',
     ];
   }
   ?>
