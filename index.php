@@ -180,8 +180,7 @@ function dashboard_daily_series(PDO $pdo, string $table, string $date_expression
 $tz = new DateTimeZone(defined('APP_TZ') ? APP_TZ : date_default_timezone_get());
 $today = new DateTimeImmutable('today', $tz);
 // Compute Monday of the active work week (current Monday–Sunday week).
-$iso_day = (int)$today->format('N');
-$days_since_monday = $iso_day - 1;
+$days_since_monday = ((int)$today->format('N')) - 1;
 $week_start = $today->modify("-{$days_since_monday} days");
 $next_week_start = $week_start->modify('+1 week');
 $thirty_days_out = $today->modify('+30 days');
