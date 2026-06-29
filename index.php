@@ -123,22 +123,22 @@ function dashboard_goal_state(int $value, int $target, float $expected_ratio): a
   ];
 }
 
-function dashboard_weekly_series(PDO $pdo, string $table, string $date_expression_key, string $value_expression_key, DateTimeImmutable $first_week_start): array {
-  $weeks = [];
-  $cursor = $first_week_start;
-  for ($i = 0; $i < 8; $i++) {
+function dashboard_daily_series(PDO $pdo, string $table, string $date_expression_key, string $value_expression_key, DateTimeImmutable $start_date, DateTimeImmutable $end_date): array {
+  $days = [];
+  $cursor = $start_date;
+  while ($cursor <= $end_date) {
     $key = $cursor->format('Y-m-d');
-    $weeks[$key] = [
+    $days[$key] = [
       'label' => $cursor->format('M j'),
       'total' => 0,
     ];
-    $cursor = $cursor->modify('+1 week');
+    $cursor = $cursor->modify('+1 day');
   }
 
   if (!dashboard_table_exists($pdo, $table)) {
     return [
-      'labels' => array_column($weeks, 'label'),
-      'values' => array_column($weeks, 'total'),
+      'labels' => array_column($days, 'label'),
+      'values' => array_column($days, 'total'),
     ];
   }
 
@@ -151,54 +151,38 @@ function dashboard_weekly_series(PDO $pdo, string $table, string $date_expressio
       FROM " . dashboard_validate_identifier($table) . "
       WHERE {$date_expression} IS NOT NULL
         AND DATE({$date_expression}) >= :start_date
-        AND DATE({$date_expression}) < :end_date
+        AND DATE({$date_expression}) <= :end_date
       GROUP BY DATE({$date_expression})
       ORDER BY activity_date ASC
     ");
     $stmt->execute([
-      ':start_date' => $first_week_start->format('Y-m-d'),
-      ':end_date' => $first_week_start->modify('+8 weeks')->format('Y-m-d'),
+      ':start_date' => $start_date->format('Y-m-d'),
+      ':end_date'   => $end_date->format('Y-m-d'),
     ]);
 
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
       $activity_date = trim((string)($row['activity_date'] ?? ''));
-      if ($activity_date === '') {
+      if ($activity_date === '' || !isset($days[$activity_date])) {
         continue;
       }
-
-      $activity = DateTimeImmutable::createFromFormat('Y-m-d', $activity_date);
-      if (!$activity) {
-        continue;
-      }
-
-      $weekday = (int)$activity->format('N');
-      $bucket = $activity->modify('-' . ($weekday - 1) . ' days')->format('Y-m-d');
-      if (!isset($weeks[$bucket])) {
-        continue;
-      }
-
-      $weeks[$bucket]['total'] += (int)round((float)($row['total'] ?? 0));
+      $days[$activity_date]['total'] += (int)round((float)($row['total'] ?? 0));
     }
   } catch (Throwable $e) {
     error_log('Dashboard series query failed: ' . $e->getMessage());
   }
 
   return [
-    'labels' => array_column($weeks, 'label'),
-    'values' => array_column($weeks, 'total'),
+    'labels' => array_column($days, 'label'),
+    'values' => array_column($days, 'total'),
   ];
 }
 
 $tz = new DateTimeZone(defined('APP_TZ') ? APP_TZ : date_default_timezone_get());
 $today = new DateTimeImmutable('today', $tz);
-// Compute Monday of the active work week.
-// On Sunday (ISO day 7) advance to the next Monday so the dashboard already
-// shows the upcoming week rather than the one that just ended.
-$iso_day = (int)$today->format('N');
-$days_since_monday = $iso_day === 7 ? -1 : $iso_day - 1;
+// Compute Monday of the active work week (current Monday–Sunday week).
+$days_since_monday = ((int)$today->format('N')) - 1;
 $week_start = $today->modify("-{$days_since_monday} days");
 $next_week_start = $week_start->modify('+1 week');
-$chart_week_start = $week_start->modify('-7 weeks');
 $thirty_days_out = $today->modify('+30 days');
 $week_progress_ratio = ((int)$today->format('N')) / 7;
 
@@ -297,8 +281,9 @@ $expected_arrivals = dashboard_table_exists($pdo, 'incoming_shipments')
     )
   : 0;
 
-$rfq_chart = dashboard_weekly_series($pdo, 'rfq_requests', 'created_at', 'count_all', $chart_week_start);
-$shipped_chart = dashboard_weekly_series($pdo, 'rfq_orders', 'shipped_at', 'sum_quantity', $chart_week_start);
+$chart_start = $today->modify('-59 days');
+$rfq_chart = dashboard_daily_series($pdo, 'rfq_requests', 'created_at', 'count_all', $chart_start, $today);
+$shipped_chart = dashboard_daily_series($pdo, 'rfq_orders', 'shipped_at', 'sum_quantity', $chart_start, $today);
 $last_updated = (new DateTimeImmutable('now', $tz))->format('M j, Y g:i A T');
 $json_safe_flags = JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 
@@ -597,7 +582,7 @@ label.priority-item span {
   <div class="dash-section-header">
     <div>
       <h2>Weekly Goals</h2>
-      <p class="muted">Big targets, clear pacing, and a fast read on where Patty should push next.</p>
+      <p class="muted">Track weekly targets and see exactly where to focus next.</p>
     </div>
     <div class="card dash-mini-metric" style="margin:0;text-align:right;">
       <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;">Goals On Track</div>
@@ -676,7 +661,7 @@ label.priority-item span {
   <div class="dash-section-header" style="margin-top:24px;">
     <div>
       <h2>Today's Priorities</h2>
-      <p class="muted">Four focused actions to move the week forward — check them off as you go.</p>
+      <p class="muted">Four focused actions to keep sourcing and shipping progress moving today.</p>
     </div>
   </div>
   <?php
@@ -686,7 +671,7 @@ label.priority-item span {
       'Send the next round of high-priority Alibaba RFQs so supplier conversations keep moving.',
       'Follow up on open supplier responses and pull in the quotes still needed for this week.',
       'Issue approved purchase orders and confirm acknowledgements before the day ends.',
-      'Check production and shipment updates so Patty finishes the day with a clear next step.',
+      'Check production and shipment updates so the business finishes the day with a clear next step.',
     ];
   }
   ?>
@@ -729,35 +714,35 @@ label.priority-item span {
   <div class="dash-section-header" style="margin-top:24px;">
     <div>
       <h2>Momentum Trends</h2>
-      <p class="muted">Use the last eight weeks of sourcing and shipping activity to keep momentum building.</p>
+      <p class="muted">Use the last 60 days of sourcing and shipping activity to keep momentum building.</p>
     </div>
   </div>
   <div class="dash-grid-2">
     <div class="card chart-panel">
       <div class="topbar" style="margin-bottom:12px;align-items:flex-start;">
         <div>
-          <h3 class="chart-panel-title">RFQs Sent Per Week</h3>
-          <p class="muted" style="font-size:13px;margin:0;">Line chart &middot; last 8 weeks</p>
+          <h3 class="chart-panel-title">RFQs Sent — Last 60 Days</h3>
+          <p class="muted" style="font-size:13px;margin:0;">Line chart &middot; last 60 days</p>
         </div>
         <div class="card dash-chart-total dash-chart-total-rfq">
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:#2563eb;font-weight:600;">8-Week Total</div>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:#2563eb;font-weight:600;">60-Day Total</div>
           <div style="font-size:1.5rem;font-weight:700;color:#1d4ed8;"><?= number_format(array_sum($rfq_chart['values'])) ?></div>
         </div>
       </div>
-      <canvas id="rfqWeeklyChart" aria-label="RFQs sent per week line chart" role="img"></canvas>
+      <canvas id="rfqWeeklyChart" aria-label="RFQs sent last 60 days line chart" role="img"></canvas>
     </div>
     <div class="card chart-panel">
       <div class="topbar" style="margin-bottom:12px;align-items:flex-start;">
         <div>
-          <h3 class="chart-panel-title">Items Shipped Per Week</h3>
-          <p class="muted" style="font-size:13px;margin:0;">Bar chart &middot; last 8 weeks</p>
+          <h3 class="chart-panel-title">Items Shipped — Last 60 Days</h3>
+          <p class="muted" style="font-size:13px;margin:0;">Bar chart &middot; last 60 days</p>
         </div>
         <div class="card dash-chart-total dash-chart-total-ship">
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:#0d9488;font-weight:600;">8-Week Total</div>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:#0d9488;font-weight:600;">60-Day Total</div>
           <div style="font-size:1.5rem;font-weight:700;color:#0f766e;"><?= number_format(array_sum($shipped_chart['values'])) ?></div>
         </div>
       </div>
-      <canvas id="shippedWeeklyChart" aria-label="Items shipped per week bar chart" role="img"></canvas>
+      <canvas id="shippedWeeklyChart" aria-label="Items shipped last 60 days bar chart" role="img"></canvas>
     </div>
   </div>
 
@@ -766,27 +751,7 @@ label.priority-item span {
 
 <script>
 (() => {
-  const getWeekStart = (date) => {
-    const day = date.getDay(); // 0 = Sunday
-    // On Sunday advance to the next Monday (upcoming week), otherwise step back to Monday.
-    const mondayOffset = day === 0 ? -1 : (day + 6) % 7;
-    const weekStart = new Date(date);
-    weekStart.setHours(0, 0, 0, 0);
-    weekStart.setDate(weekStart.getDate() - mondayOffset);
-    return weekStart;
-  };
-
-  const formatLabel = (date) => {
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${monthNames[date.getMonth()]} ${date.getDate()}`;
-  };
-
-  const currentWeekStart = getWeekStart(new Date());
-  const labels = Array.from({ length: 8 }, (_, index) => {
-    const weekStart = new Date(currentWeekStart);
-    weekStart.setDate(currentWeekStart.getDate() - ((7 - index) * 7));
-    return formatLabel(weekStart);
-  });
+  const labels = <?= json_encode($rfq_chart['labels'], $json_safe_flags) ?>;
   const rfqValues = <?= json_encode($rfq_chart['values'], $json_safe_flags) ?>;
   const shippedValues = <?= json_encode($shipped_chart['values'], $json_safe_flags) ?>;
 
@@ -806,7 +771,13 @@ label.priority-item span {
     scales: {
       x: {
         grid: { color: 'rgba(148, 163, 184, 0.15)' },
-        ticks: { color: '#64748b', font: { size: 12, weight: '600' } }
+        ticks: {
+          color: '#64748b',
+          font: { size: 11, weight: '600' },
+          maxTicksLimit: 12,
+          maxRotation: 45,
+          minRotation: 0
+        }
       },
       y: {
         beginAtZero: true,
