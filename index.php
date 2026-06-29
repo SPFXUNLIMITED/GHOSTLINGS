@@ -201,7 +201,7 @@ $weekly_goals = [
     'desc'  => 'Collect supplier responses so you can compare pricing, lead times, and terms before committing.',
     'value' => dashboard_weekly_count($pdo, 'rfq_quotes', 'received_on', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
     'accent_key' => 'violet',
-    'target' => 15,
+    'target' => 10,
   ],
   [
     'title' => 'Purchase Orders Sent',
@@ -661,17 +661,15 @@ label.priority-item span {
   <div class="dash-section-header" style="margin-top:24px;">
     <div>
       <h2>Today's Priorities</h2>
-      <p class="muted">Four focused actions to keep sourcing and shipping progress moving today.</p>
+      <p class="muted">Two focused actions to keep sourcing and shipping progress moving today.</p>
     </div>
   </div>
   <?php
   $today_priority_items = $today_priorities ?? [];
   if (!is_array($today_priority_items) || empty($today_priority_items)) {
     $today_priority_items = [
-      'Send the next round of high-priority Alibaba RFQs so supplier conversations keep moving.',
-      'Follow up on open supplier responses and pull in the quotes still needed for this week.',
-      'Issue approved purchase orders and confirm acknowledgements before the day ends.',
-      'Check production and shipment updates so the business finishes the day with a clear next step.',
+      'Send at least 2 new RFQs today for different machine sizes, air pumps, centrifugal fans, mirrors, lenses, and different laser tube brands and watts.',
+      'Review all open Alibaba chats and input any new quotes into the system.',
     ];
   }
   ?>
