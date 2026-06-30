@@ -175,8 +175,8 @@ render_header('Eve &amp; Patti');
 ?>
 
 <div class="card">
-  <h1 style="margin:0;">Eve &amp; Patti</h1>
-  <p class="muted" style="margin:6px 0 0;">Private conversation between Eve and Patti</p>
+  <h1 style="margin:0;">Messages</h1>
+  <p class="muted" style="margin:6px 0 0;">Conversation with <strong><?= h($other_user['username']) ?></strong></p>
 </div>
 
 <?php if ($errors): ?>
