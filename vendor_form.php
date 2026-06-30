@@ -22,6 +22,7 @@ $fields = [
   'contact_name'  => '',
   'email'         => '',
   'phone'         => '',
+  'port'          => '',
   'website'       => '',
   'alibaba_store' => '',
   'address'       => '',
@@ -75,6 +76,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if (mb_strlen($fields['phone']) > 100) {
       $errors[] = 'Phone must be 100 characters or fewer.';
+    }
+    if (mb_strlen($fields['port']) > 255) {
+      $errors[] = 'Port must be 255 characters or fewer.';
     }
     if (mb_strlen($fields['website']) > 255) {
       $errors[] = 'Website must be 255 characters or fewer.';
@@ -193,14 +197,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->prepare("
           UPDATE vendors SET
             company_name = ?, contact_name = ?, email = ?, phone = ?,
-            website = ?, alibaba_store = ?, address = ?, notes = ?,
+            port = ?, website = ?, alibaba_store = ?, address = ?, notes = ?,
             rating = ?, review = ?,
             logo_path  = COALESCE(?, logo_path),
             logo_thumb = COALESCE(?, logo_thumb)  -- preserve existing logo when no new file uploaded
           WHERE id = ?
         ")->execute([
           $fields['company_name'], $fields['contact_name'], $fields['email'],
-          $fields['phone'], $fields['website'], $fields['alibaba_store'],
+          $fields['phone'], $fields['port'], $fields['website'], $fields['alibaba_store'],
           $fields['address'],
           $fields['notes'] !== '' ? $fields['notes'] : null,
           $fields['rating'] !== '' ? (int)$fields['rating'] : null,
@@ -213,11 +217,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
       } else {
         $pdo->prepare("
-          INSERT INTO vendors (company_name, contact_name, email, phone, website, alibaba_store, address, notes, rating, review, logo_path, logo_thumb)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO vendors (company_name, contact_name, email, phone, port, website, alibaba_store, address, notes, rating, review, logo_path, logo_thumb)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ")->execute([
           $fields['company_name'], $fields['contact_name'], $fields['email'],
-          $fields['phone'], $fields['website'], $fields['alibaba_store'],
+          $fields['phone'], $fields['port'], $fields['website'], $fields['alibaba_store'],
           $fields['address'],
           $fields['notes'] !== '' ? $fields['notes'] : null,
           $fields['rating'] !== '' ? (int)$fields['rating'] : null,
@@ -279,6 +283,11 @@ render_header($page_title);
         <label>Phone</label>
         <input type="text" name="phone" maxlength="100"
                value="<?= h($fields['phone']) ?>" placeholder="e.g. +1 (555) 123-4567" />
+      </div>
+      <div>
+        <label>Port</label>
+        <input type="text" name="port" maxlength="255"
+               value="<?= h($fields['port']) ?>" placeholder="e.g. Port of Los Angeles" />
       </div>
       <div>
         <label>Website</label>

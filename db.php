@@ -988,6 +988,7 @@ $pdo->exec("
     contact_name  VARCHAR(255) NOT NULL DEFAULT '',
     email         VARCHAR(255) NOT NULL DEFAULT '',
     phone         VARCHAR(100) NOT NULL DEFAULT '',
+    port          VARCHAR(255) NOT NULL DEFAULT '',
     website       VARCHAR(255) NOT NULL DEFAULT '',
     address       VARCHAR(500) NOT NULL DEFAULT '',
     notes         TEXT         NULL,
@@ -1096,6 +1097,17 @@ try {
   $pdo->exec("ALTER TABLE vendors ADD COLUMN alibaba_store VARCHAR(255) NOT NULL DEFAULT ''");
 } catch (PDOException $e) {
   // Column already exists
+}
+
+$hasVendorsPort = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'vendors'
+    AND COLUMN_NAME = 'port'
+")->fetchColumn();
+if ($hasVendorsPort === 0) {
+  $pdo->exec("ALTER TABLE vendors ADD COLUMN port VARCHAR(255) NOT NULL DEFAULT '' AFTER phone");
 }
 
 $hasVendorsRating = (int)$pdo->query("
