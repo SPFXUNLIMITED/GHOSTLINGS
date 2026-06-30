@@ -943,11 +943,11 @@ if ($section === 'dashboard') {
 
       SELECT
         'Machine Inquiry' AS kind,
-        CONCAT(TRIM(mi.first_name), ' ', TRIM(mi.last_name)) AS actor,
+        CONCAT_WS(' ', COALESCE(NULLIF(TRIM(mi.first_name), ''), '?'), COALESCE(NULLIF(TRIM(mi.last_name), ''), '?')) AS actor,
         CONCAT(
           'Machine inquiry from ',
-          TRIM(mi.first_name), ' ', TRIM(mi.last_name),
-          ' (', mi.city, ', ', mi.state, ')',
+          CONCAT_WS(' ', COALESCE(NULLIF(TRIM(mi.first_name), ''), '?'), COALESCE(NULLIF(TRIM(mi.last_name), ''), '?')),
+          ' (', COALESCE(NULLIF(TRIM(mi.city), ''), 'unknown city'), ', ', COALESCE(NULLIF(TRIM(mi.state), ''), '??'), ')',
           CASE
             WHEN NULLIF(TRIM(mi.laser_type), '') IS NOT NULL
             THEN CONCAT(' — ', TRIM(mi.laser_type))
