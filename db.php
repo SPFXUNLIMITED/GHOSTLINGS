@@ -385,6 +385,13 @@ try {
   if ($e->getCode() !== '42S21') throw $e;
 }
 
+// Ensure users.role supports system accounts
+$users_role_column = $pdo->query("SHOW COLUMNS FROM users LIKE 'role'");
+$users_role_meta = $users_role_column ? $users_role_column->fetch(PDO::FETCH_ASSOC) : false;
+if ($users_role_meta && stripos((string)($users_role_meta['Type'] ?? ''), "'system'") === false) {
+  $pdo->exec("ALTER TABLE users MODIFY COLUMN role ENUM('admin','moderator','user','system') NOT NULL DEFAULT 'user'");
+}
+
 // Add email_verified column to users if it does not exist yet
 try {
   $pdo->exec("ALTER TABLE users ADD COLUMN email_verified TINYINT(1) NOT NULL DEFAULT 0");
@@ -436,6 +443,18 @@ foreach ([
 try {
   $pdo->exec("UPDATE users SET role='admin' WHERE is_admin=1 AND role='user'");
 } catch (PDOException $e) { /* ignore */ }
+
+// Ensure the Eve system account exists for internal messaging
+$eve_user_stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? LIMIT 1");
+$eve_user_stmt->execute(['Eve']);
+if (!$eve_user_stmt->fetch()) {
+  $eve_password_hash = password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT);
+  $pdo->prepare(
+    "INSERT INTO users (username, password_hash, is_admin, role, email_verified) VALUES (?, ?, 0, 'system', 1)"
+  )->execute(['Eve', $eve_password_hash]);
+} else {
+  $pdo->prepare("UPDATE users SET role = 'system', is_admin = 0 WHERE username = ?")->execute(['Eve']);
+}
 
 // Create laser_entries table if it does not exist yet
 $pdo->exec("

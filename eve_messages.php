@@ -4,13 +4,13 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_login();
 
-const MAX_MESSAGE_LENGTH = 200000;
-const MESSAGES_PER_PAGE = 10;
-const MESSAGES_MAX_SHOW = 500;
+const EVE_MAX_MESSAGE_LENGTH = 200000;
+const EVE_MESSAGES_PER_PAGE = 10;
+const EVE_MESSAGES_MAX_SHOW = 500;
 
-function message_body_to_reply_text(string $html): string {
-  $text = preg_replace('~<br\b[^>]*>|</?(p|div|blockquote)\b[^>]*>|</li>~i', "\n", $html) ?? '';
-  $text = preg_replace('~<li\b[^>]*>~i', '- ', $text) ?? '';
+function eve_message_body_to_reply_text(string $html): string {
+  $text = preg_replace('~<br\\b[^>]*>|</?(p|div|blockquote)\\b[^>]*>|</li>~i', "\n", $html) ?? '';
+  $text = preg_replace('~<li\\b[^>]*>~i', '- ', $text) ?? '';
   $text = strip_tags($text);
   $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
   $text = preg_replace("/\r\n?/", "\n", $text) ?? '';
@@ -19,57 +19,24 @@ function message_body_to_reply_text(string $html): string {
 }
 
 $current_user_id = (int)$_SESSION['user_id'];
-$current_username = (string)($_SESSION['username'] ?? '');
 $is_admin_user = !empty($_SESSION['is_admin']);
-$is_patty_user = strcasecmp($current_username, 'Patty') === 0;
-$requested_user = trim((string)($_GET['with'] ?? ''));
+$conversation_url = 'eve_messages.php';
 
-$conversation_candidates = [];
-if ($is_admin_user) {
-  $conversation_candidates[] = 'Patty';
-} elseif ($is_patty_user) {
-  $conversation_candidates[] = 'Zeke';
-}
+$eve_stmt = $pdo->prepare("SELECT id, username FROM users WHERE username = 'Eve' LIMIT 1");
+$eve_stmt->execute();
+$eve_user = $eve_stmt->fetch();
 
-if ($conversation_candidates) {
-  $selected_username = $conversation_candidates[0];
-  if ($requested_user !== '') {
-    foreach ($conversation_candidates as $candidate) {
-      if (strcasecmp($requested_user, $candidate) === 0) {
-        $selected_username = $candidate;
-        break;
-      }
-    }
-  }
-  $other_user_stmt = $pdo->prepare("SELECT id, username FROM users WHERE username = ? LIMIT 1");
-  $other_user_stmt->execute([$selected_username]);
-  $other_user = $other_user_stmt->fetch();
-} else {
-  $other_user_stmt = $pdo->prepare("
-    SELECT id, username
-    FROM users
-    WHERE id != ?
-      AND role != 'system'
-    ORDER BY id
-    LIMIT 1
-  ");
-  $other_user_stmt->execute([$current_user_id]);
-  $other_user = $other_user_stmt->fetch();
-}
-
-if (!$other_user) {
+if (!$eve_user) {
   render_header('Messages');
-  echo '<div class="card"><p class="muted">No conversation user is available.</p></div>';
+  echo '<div class="card"><p class="muted">Eve system account was not found.</p></div>';
   render_footer();
   exit;
 }
 
-$other_user_id = (int)$other_user['id'];
-$conversation_url = 'messages.php?with=' . rawurlencode((string)$other_user['username']);
+$eve_user_id = (int)$eve_user['id'];
 
-// CSRF
-if (empty($_SESSION['messages_csrf'])) {
-  $_SESSION['messages_csrf'] = bin2hex(random_bytes(24));
+if (empty($_SESSION['eve_messages_csrf'])) {
+  $_SESSION['eve_messages_csrf'] = bin2hex(random_bytes(24));
 }
 
 $errors = [];
@@ -80,7 +47,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $sent = false;
   $deleted = false;
   $csrf = (string)($_POST['csrf_token'] ?? '');
-  if (!hash_equals((string)$_SESSION['messages_csrf'], $csrf)) {
+
+  if (!hash_equals((string)$_SESSION['eve_messages_csrf'], $csrf)) {
     $errors[] = 'Security token mismatch. Please refresh and try again.';
   } else {
     $action = (string)($_POST['action'] ?? 'send_message');
@@ -90,13 +58,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($message_id <= 0) {
         $errors[] = 'Invalid message selected.';
       } else {
-        $del = $pdo->prepare("DELETE FROM messages WHERE id = ? AND sender_id = ?");
-        $del->execute([$message_id, $current_user_id]);
+        if ($is_admin_user) {
+          $del = $pdo->prepare(
+            "DELETE FROM messages
+             WHERE id = ?
+               AND (
+                 (sender_id = ? AND recipient_id = ?)
+                 OR
+                 (sender_id = ? AND recipient_id = ?)
+               )"
+          );
+          $del->execute([$message_id, $current_user_id, $eve_user_id, $eve_user_id, $current_user_id]);
+        } else {
+          $del = $pdo->prepare(
+            "DELETE FROM messages
+             WHERE id = ?
+               AND sender_id = ?
+               AND recipient_id = ?"
+          );
+          $del->execute([$message_id, $current_user_id, $eve_user_id]);
+        }
+
         if ($del->rowCount() < 1) {
           $errors[] = 'Message not found or you do not have permission to delete it.';
         } else {
-          $_SESSION['messages_csrf'] = bin2hex(random_bytes(24));
-          header('Location: ' . $conversation_url . '&deleted=1');
+          $_SESSION['eve_messages_csrf'] = bin2hex(random_bytes(24));
+          header('Location: ' . $conversation_url . '?deleted=1');
           exit;
         }
       }
@@ -104,41 +91,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $body = trim((string)($_POST['body'] ?? ''));
       if (trim(strip_tags($body)) === '') {
         $errors[] = 'Message body cannot be empty.';
-      } elseif (strlen($body) > MAX_MESSAGE_LENGTH) {
+      } elseif (strlen($body) > EVE_MAX_MESSAGE_LENGTH) {
         $errors[] = 'Message is too long.';
       } else {
+        $send_as = (string)($_POST['send_as'] ?? 'self');
+        $sender_id = $current_user_id;
+        $recipient_id = $eve_user_id;
+
+        if ($is_admin_user && $send_as === 'eve') {
+          $sender_id = $eve_user_id;
+          $recipient_id = $current_user_id;
+        }
+
         $ins = $pdo->prepare(
           "INSERT INTO messages (sender_id, recipient_id, body) VALUES (?, ?, ?)"
         );
-        $ins->execute([$current_user_id, $other_user_id, $body]);
-        $_SESSION['messages_csrf'] = bin2hex(random_bytes(24));
-        header('Location: ' . $conversation_url . '&sent=1');
+        $ins->execute([$sender_id, $recipient_id, $body]);
+        $_SESSION['eve_messages_csrf'] = bin2hex(random_bytes(24));
+        header('Location: ' . $conversation_url . '?sent=1');
         exit;
       }
     }
   }
 }
 
-// Mark all unread messages sent to the current user as read
-$pdo->prepare("UPDATE messages SET is_read = 1 WHERE recipient_id = ? AND is_read = 0")
-    ->execute([$current_user_id]);
+$pdo->prepare("UPDATE messages SET is_read = 1 WHERE recipient_id = ? AND sender_id = ? AND is_read = 0")
+    ->execute([$current_user_id, $eve_user_id]);
 
-// How many messages to show (default MESSAGES_PER_PAGE, increments of MESSAGES_PER_PAGE)
-$show = min(MESSAGES_MAX_SHOW, max(MESSAGES_PER_PAGE, (int)($_GET['show'] ?? MESSAGES_PER_PAGE)));
+$show = min(EVE_MESSAGES_MAX_SHOW, max(EVE_MESSAGES_PER_PAGE, (int)($_GET['show'] ?? EVE_MESSAGES_PER_PAGE)));
 
-// Count total messages between both users
 $count_stmt = $pdo->prepare("
   SELECT COUNT(*) FROM messages
   WHERE (sender_id = ? AND recipient_id = ?)
      OR (sender_id = ? AND recipient_id = ?)
 ");
-$count_stmt->execute([$current_user_id, $other_user_id, $other_user_id, $current_user_id]);
+$count_stmt->execute([$current_user_id, $eve_user_id, $eve_user_id, $current_user_id]);
 $total_count = (int)$count_stmt->fetchColumn();
 $has_more = $total_count > $show;
 
-// Load the $show most recent messages, then reverse for chronological display
 $history_stmt = $pdo->prepare("
-  SELECT m.id, m.sender_id, m.body, m.is_read, m.created_at,
+  SELECT m.id, m.sender_id, m.recipient_id, m.body, m.is_read, m.created_at,
          u.username AS sender_username
   FROM messages m
   JOIN users u ON u.id = m.sender_id
@@ -148,8 +140,8 @@ $history_stmt = $pdo->prepare("
   LIMIT ?
 ");
 $history_stmt->bindValue(1, $current_user_id, PDO::PARAM_INT);
-$history_stmt->bindValue(2, $other_user_id,   PDO::PARAM_INT);
-$history_stmt->bindValue(3, $other_user_id,   PDO::PARAM_INT);
+$history_stmt->bindValue(2, $eve_user_id,     PDO::PARAM_INT);
+$history_stmt->bindValue(3, $eve_user_id,     PDO::PARAM_INT);
 $history_stmt->bindValue(4, $current_user_id, PDO::PARAM_INT);
 $history_stmt->bindValue(5, $show,            PDO::PARAM_INT);
 $history_stmt->execute();
@@ -160,7 +152,7 @@ render_header('Messages');
 
 <div class="card">
   <h1 style="margin:0;">Messages</h1>
-  <p class="muted" style="margin:6px 0 0;">Conversation with <strong><?= h($other_user['username']) ?></strong></p>
+  <p class="muted" style="margin:6px 0 0;">Conversation with <strong><?= h($eve_user['username']) ?></strong></p>
 </div>
 
 <?php if ($errors): ?>
@@ -183,27 +175,28 @@ render_header('Messages');
   </div>
 <?php endif; ?>
 
-<!-- Conversation History -->
 <div class="card" id="message-history" style="padding:0; overflow:hidden;">
   <?php if (!$messages): ?>
     <p class="muted" style="padding:20px; text-align:center;">No messages yet. Send the first one below!</p>
   <?php else: ?>
     <?php if ($has_more): ?>
       <div style="padding:12px 16px; border-bottom:1px solid #e5e7eb; text-align:center;">
-        <a href="<?= h($conversation_url) ?>&show=<?= h($show + MESSAGES_PER_PAGE) ?>" class="btn" style="font-size:13px; padding:6px 14px;">Load more</a>
+        <a href="<?= h($conversation_url) ?>?show=<?= h($show + EVE_MESSAGES_PER_PAGE) ?>" class="btn" style="font-size:13px; padding:6px 14px;">Load more</a>
       </div>
     <?php endif; ?>
     <div style="max-height:520px; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px;" id="msg-scroll">
       <?php foreach ($messages as $msg): ?>
         <?php
           $is_mine = (int)$msg['sender_id'] === $current_user_id;
+          $is_eve_sender = (int)$msg['sender_id'] === $eve_user_id;
+          $can_delete = $is_mine || ($is_admin_user && $is_eve_sender && (int)$msg['recipient_id'] === $current_user_id);
           $align   = $is_mine ? 'flex-end' : 'flex-start';
           $bg      = $is_mine ? '#dbeafe' : '#f1f5f9';
           $color   = $is_mine ? '#1e40af' : '#111827';
           $label   = $is_mine ? 'You' : h($msg['sender_username']);
           $dt      = new DateTime($msg['created_at'], new DateTimeZone(APP_TZ));
           $fmt_dt  = $dt->format('m/d/Y g:i A');
-          $reply_text = message_body_to_reply_text((string)$msg['body']);
+          $reply_text = eve_message_body_to_reply_text((string)$msg['body']);
         ?>
         <div style="display:flex; flex-direction:column; align-items:<?= $align ?>; max-width:100%;">
           <div style="font-size:11px; color:#6b7280; margin-bottom:3px;">
@@ -220,7 +213,7 @@ render_header('Messages');
               data-reply-label="<?= h($label) ?>"
               style="font-size:12px; padding:4px 10px;"
             >Reply</button>
-            <?php if ($is_mine): ?>
+            <?php if ($can_delete): ?>
               <button
                 type="button"
                 class="btn js-delete-btn"
@@ -235,12 +228,20 @@ render_header('Messages');
   <?php endif; ?>
 </div>
 
-<!-- Compose New Message -->
 <div class="card" id="compose-section" style="margin-top:0; border-top:none; border-top-left-radius:0; border-top-right-radius:0;">
   <h2 style="margin:0 0 12px;">Send a Message</h2>
   <form method="post" id="msg-form">
-    <input type="hidden" name="csrf_token" value="<?= h($_SESSION['messages_csrf']) ?>" />
+    <input type="hidden" name="csrf_token" value="<?= h($_SESSION['eve_messages_csrf']) ?>" />
     <input type="hidden" name="action" value="send_message" />
+    <?php if ($is_admin_user): ?>
+      <div style="margin-bottom:12px; max-width:220px;">
+        <label for="send-as" style="display:block; margin-bottom:6px;">Send as</label>
+        <select id="send-as" name="send_as">
+          <option value="self">You</option>
+          <option value="eve">Eve</option>
+        </select>
+      </div>
+    <?php endif; ?>
     <div style="margin-bottom:12px;">
       <textarea id="msg-body" name="body" rows="8" style="width:100%;"><?php
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors) {
@@ -253,7 +254,7 @@ render_header('Messages');
 </div>
 
 <form method="post" id="delete-message-form" style="display:none;">
-  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['messages_csrf']) ?>" />
+  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['eve_messages_csrf']) ?>" />
   <input type="hidden" name="action" value="delete_message" />
   <input type="hidden" name="delete_message_id" id="delete_message_id" value="" />
 </form>
@@ -274,7 +275,7 @@ tinymce.init({
   branding: false,
   promotion: false,
   statusbar: false,
-  images_upload_url: '/project/message_image_upload.php?csrf=<?= h($_SESSION['messages_csrf']) ?>',
+  images_upload_url: '/project/message_image_upload.php?csrf=<?= h($_SESSION['eve_messages_csrf']) ?>',
   images_file_types: 'jpeg,jpg,png,gif,webp',
   paste_data_images: false,
   automatic_uploads: true,
@@ -301,7 +302,7 @@ tinymce.init({
           if (!file) return;
           var formData = new FormData();
           formData.append('file', file);
-          fetch('/project/message_image_upload.php?csrf=<?= h($_SESSION['messages_csrf']) ?>', {
+          fetch('/project/message_image_upload.php?csrf=<?= h($_SESSION['eve_messages_csrf']) ?>', {
             method: 'POST',
             body: formData,
             credentials: 'same-origin'
@@ -366,7 +367,6 @@ document.addEventListener('click', function (e) {
   }
 });
 
-// Scroll message history to bottom on page load and after sending (post-redirect reload)
 window.addEventListener('load', function () {
   var el = document.getElementById('msg-scroll');
   if (el) el.scrollTop = el.scrollHeight;
