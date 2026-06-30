@@ -570,41 +570,24 @@ $show_mod_menu = !empty($_SESSION['is_admin']) || !empty($_SESSION['is_moderator
 $show_admin_menu = !empty($_SESSION['is_admin']);
 $is_logged_in = !empty($_SESSION['user_id']);
 $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
-$is_patty_user = $is_logged_in && strcasecmp((string)($username ?? ''), 'Patty') === 0;
-
-$messages_menu_items = null;
-if ($show_admin_menu) {
-  $messages_menu_items = [
-    ['href' => 'messages.php?with=Patty', 'file' => 'messages.php', 'label' => 'Patty', 'query' => ['with' => 'Patty']],
-    ['href' => 'eve_messages.php', 'file' => 'eve_messages.php', 'label' => 'Eve'],
-  ];
-} elseif ($is_patty_user) {
-  $messages_menu_items = [
-    ['href' => 'messages.php?with=Zeke', 'file' => 'messages.php', 'label' => 'Zeke', 'query' => ['with' => 'Zeke']],
-    ['href' => 'eve_messages.php', 'file' => 'eve_messages.php', 'label' => 'Eve'],
-  ];
-} elseif ($show_mod_menu) {
-  $messages_menu_items = [
-    ['href' => 'messages.php', 'file' => 'messages.php', 'label' => 'Messages'],
-    ['href' => 'notifications.php', 'file' => 'notifications.php', 'label' => 'Notifications'],
-  ];
-}
 ?>	
 
 <nav class="menubar card">
   <div class="menubar-inner">
     <?php if ($is_regular_user): ?>
     <?php render_menu_link(['href' => 'user_page.php', 'file' => 'user_page.php', 'label' => 'My Profile'], $current); ?>
-    <?php if ($messages_menu_items): ?>
-    <?php render_menu_dropdown('Messages', $messages_menu_items, $current); ?>
-    <?php endif; ?>
     <?php render_menu_link(['href' => 'machine_inquiry_form.php', 'file' => 'machine_inquiry_form.php', 'label' => 'Machine Inquiry Form'], $current); ?>
     <?php elseif ($show_mod_menu): ?>
     <?php render_menu_link(['href' => 'index.php', 'file' => 'index.php', 'label' => 'Home'], $current); ?>
     <?php render_menu_link(['href' => 'user_page.php', 'file' => 'user_page.php', 'label' => 'My Profile'], $current); ?>
-    <?php if ($messages_menu_items): ?>
-    <?php render_menu_dropdown('Messages', $messages_menu_items, $current); ?>
-    <?php endif; ?>
+
+	<?php render_menu_dropdown('Messages', [
+	  ['href' => 'messages.php', 'file' => 'messages.php', 'label' => 'Messages'],
+	  ['href' => 'eve_messages.php', 'file' => 'eve_messages.php', 'label' => 'System Messages'],
+	  ['href' => 'notifications.php', 'file' => 'notifications.php', 'label' => 'Notifications'],
+	], $current); ?>
+	
+	
     <?php render_menu_link(['href' => 'time_clock.php', 'files' => ['time_clock.php', 'time_report.php'], 'label' => 'Time Clock'], $current); ?>
     <?php render_menu_link(['href' => 'agenda.php', 'file' => 'agenda.php', 'label' => 'Agenda'], $current); ?>
     <?php render_menu_dropdown('Inquiries', [

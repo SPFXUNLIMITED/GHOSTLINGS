@@ -181,7 +181,6 @@ render_header('Eve &amp; Patti');
     <?= $is_admin_user ? 'Patti' : 'Eve' ?>
     </strong>
   </p>
-  
 </div>
 
 <?php if ($errors): ?>
