@@ -185,6 +185,8 @@ render_header('User Management');
               <?php $role = $u['role'] ?? ($u['is_admin'] ? 'admin' : 'user'); ?>
               <?php if ($role === 'admin'): ?>
                 <span class="badge priority-high">Admin</span>
+              <?php elseif ($role === 'system'): ?>
+                <span class="badge" style="background:#ede9fe; color:#5b21b6;">System</span>
               <?php elseif ($role === 'moderator'): ?>
                 <span class="badge priority-medium">Moderator</span>
               <?php else: ?>
@@ -192,15 +194,18 @@ render_header('User Management');
               <?php endif; ?>
             </td>
             <td class="col-actions">
+              <?php $is_system_user = ($role === 'system'); ?>
               <div class="actions">
                 <!-- Change password button triggers inline form -->
-                <button type="button" class="btn"
-                  onclick="togglePasswordForm(<?= (int)$u['id'] ?>)">
-                  Change Password
-                </button>
+                <?php if (!$is_system_user): ?>
+                  <button type="button" class="btn"
+                    onclick="togglePasswordForm(<?= (int)$u['id'] ?>)">
+                    Change Password
+                  </button>
+                <?php endif; ?>
 
                 <!-- Set Role (admin only, not self) -->
-                <?php if ((int)$u['id'] !== current_user_id()): ?>
+                <?php if ((int)$u['id'] !== current_user_id() && !$is_system_user): ?>
                   <form method="post" style="display:inline;">
                     <input type="hidden" name="action" value="set_role">
                     <input type="hidden" name="uid" value="<?= (int)$u['id'] ?>">
@@ -223,6 +228,7 @@ render_header('User Management');
               </div>
 
               <!-- Inline change-password form (hidden by default) -->
+              <?php if (!$is_system_user): ?>
               <div id="pwform-<?= (int)$u['id'] ?>" style="display:none; margin-top:10px;">
                 <form method="post">
                   <input type="hidden" name="action" value="change_password">
@@ -246,6 +252,7 @@ render_header('User Management');
                   </div>
                 </form>
               </div>
+              <?php endif; ?>
             </td>
           </tr>
         <?php endforeach; ?>
