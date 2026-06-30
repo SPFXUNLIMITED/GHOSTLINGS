@@ -1305,6 +1305,10 @@ foreach ($rfqs as $rfq_row) {
   $hero_quotes_total += (int)($rfq_row['quote_count'] ?? 0);
 }
 
+$open_rfq_count_stmt = $pdo->query("SELECT COUNT(*) FROM rfq_requests WHERE request_status != 'closed'");
+$open_rfq_count = (int)$open_rfq_count_stmt->fetchColumn();
+const MAX_OPEN_RFQS = 5;
+
 $selected_rfq = null;
 $quotes = [];
 $editing_quote = null;
@@ -1419,10 +1423,21 @@ render_header('Sourcing RFQ Tracker');
     </div>
   </div>
   <div class="laser-rfq-hero-actions">
-    <a class="btn primary" href="sourcing_rfq_form.php">+ New Machine RFQ</a>
-    <a class="btn" href="sourcing_rfq_form.php?request_category=parts">+ New Parts RFQ</a>
+    <?php if ($open_rfq_count >= MAX_OPEN_RFQS): ?>
+      <button class="btn primary" disabled style="opacity:.45; cursor:not-allowed;" title="Too many open RFQs">+ New Machine RFQ</button>
+      <button class="btn" disabled style="opacity:.45; cursor:not-allowed;" title="Too many open RFQs">+ New Parts RFQ</button>
+    <?php else: ?>
+      <a class="btn primary" href="sourcing_rfq_form.php">+ New Machine RFQ</a>
+      <a class="btn" href="sourcing_rfq_form.php?request_category=parts">+ New Parts RFQ</a>
+    <?php endif; ?>
   </div>
 </div>
+
+<?php if ($open_rfq_count >= MAX_OPEN_RFQS): ?>
+  <div class="alert error">
+    Too many open RFQs. Maximum 5 allowed. Please review and close existing RFQs before creating new ones.
+  </div>
+<?php endif; ?>
 
 <?php render_alibaba_workflow_banner('receive_quotes'); ?>
 
