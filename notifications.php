@@ -137,7 +137,11 @@ render_header('Notifications');
         <td><?= h($msg['sender_username']) ?></td>
         <td><?= h(mb_strimwidth(strip_tags($msg['body']), 0, 80, '…')) ?></td>
         <td><?= h($msg['created_at']) ?></td>
-        <td><a class="btn btn-sm" href="messages.php">View</a></td>
+		<td>
+		  <a class="btn btn-sm" href="<?= ($msg === 'Eve' || $msg === 'eve') ? 'eve_messages.php' : 'messages.php' ?>">
+			View
+		  </a>
+		</td>
       </tr>
       <?php endforeach; ?>
     </tbody>
