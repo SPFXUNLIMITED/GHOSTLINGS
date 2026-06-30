@@ -21,10 +21,10 @@ function eve_message_body_to_reply_text(string $html): string {
 $current_user_id  = (int)$_SESSION['user_id'];
 $current_username = (string)($_SESSION['username'] ?? '');
 $is_admin_user    = !empty($_SESSION['is_admin']);
-$is_patty_user    = strcasecmp($current_username, 'Patti') === 0;
+$is_patti_user    = strcasecmp($current_username, 'Patti') === 0;
 
-if (!$is_admin_user && !$is_patty_user) {
-  render_header('Eve &amp; Patty');
+if (!$is_admin_user && !$is_patti_user) {
+  render_header('Eve &amp; Patti');
   echo '<div class="card"><p class="muted">You do not have permission to view this conversation.</p></div>';
   render_footer();
   exit;
@@ -32,22 +32,22 @@ if (!$is_admin_user && !$is_patty_user) {
 
 $conversation_url = 'eve_messages.php';
 
-$users_stmt = $pdo->prepare("SELECT id, username FROM users WHERE username IN ('Eve', 'Patty') LIMIT 2");
+$users_stmt = $pdo->prepare("SELECT id, username FROM users WHERE username IN ('Eve', 'Patti') LIMIT 2");
 $users_stmt->execute();
 $conversation_users = [];
 foreach ($users_stmt->fetchAll() as $row) {
   $conversation_users[strtolower($row['username'])] = $row;
 }
 
-if (empty($conversation_users['eve']) || empty($conversation_users['patty'])) {
-  render_header('Eve &amp; Patty');
-  echo '<div class="card"><p class="muted">Eve or Patty account was not found.</p></div>';
+if (empty($conversation_users['eve']) || empty($conversation_users['patti'])) {
+  render_header('Eve &amp; Patti');
+  echo '<div class="card"><p class="muted">Eve or Patti account was not found.</p></div>';
   render_footer();
   exit;
 }
 
 $eve_user_id   = (int)$conversation_users['eve']['id'];
-$patty_user_id = (int)$conversation_users['patty']['id'];
+$patti_user_id = (int)$conversation_users['patti']['id'];
 
 if (empty($_SESSION['eve_messages_csrf'])) {
   $_SESSION['eve_messages_csrf'] = bin2hex(random_bytes(24));
@@ -73,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Invalid message selected.';
       } else {
         if ($is_admin_user) {
-          // Admins can delete any message in the Eve–Patty conversation
+          // Admins can delete any message in the Eve–Patti conversation
           $del = $pdo->prepare(
             "DELETE FROM messages
              WHERE id = ?
@@ -83,16 +83,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                  (sender_id = ? AND recipient_id = ?)
                )"
           );
-          $del->execute([$message_id, $eve_user_id, $patty_user_id, $patty_user_id, $eve_user_id]);
+          $del->execute([$message_id, $eve_user_id, $patti_user_id, $patti_user_id, $eve_user_id]);
         } else {
-          // Patty can only delete her own messages
+          // Patti can only delete her own messages
           $del = $pdo->prepare(
             "DELETE FROM messages
              WHERE id = ?
                AND sender_id = ?
                AND recipient_id = ?"
           );
-          $del->execute([$message_id, $patty_user_id, $eve_user_id]);
+          $del->execute([$message_id, $patti_user_id, $eve_user_id]);
         }
 
         if ($del->rowCount() < 1) {
@@ -110,12 +110,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       } elseif (strlen($body) > EVE_MAX_MESSAGE_LENGTH) {
         $errors[] = 'Message is too long.';
       } else {
-        // Admins always send as Eve; Patty sends as herself
+        // Admins always send as Eve; Patti sends as herself
         if ($is_admin_user) {
           $sender_id    = $eve_user_id;
-          $recipient_id = $patty_user_id;
+          $recipient_id = $patti_user_id;
         } else {
-          $sender_id    = $patty_user_id;
+          $sender_id    = $patti_user_id;
           $recipient_id = $eve_user_id;
         }
 
@@ -133,13 +133,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Mark incoming messages as read from the other party's perspective
 if ($is_admin_user) {
-  // Admin manages Eve's side; mark Patty→Eve messages as read
+  // Admin manages Eve's side; mark Patti→Eve messages as read
   $pdo->prepare("UPDATE messages SET is_read = 1 WHERE recipient_id = ? AND sender_id = ? AND is_read = 0")
-      ->execute([$eve_user_id, $patty_user_id]);
+      ->execute([$eve_user_id, $patti_user_id]);
 } else {
-  // Patty sees messages from Eve; mark Eve→Patty messages as read
+  // Patti sees messages from Eve; mark Eve→Patti messages as read
   $pdo->prepare("UPDATE messages SET is_read = 1 WHERE recipient_id = ? AND sender_id = ? AND is_read = 0")
-      ->execute([$patty_user_id, $eve_user_id]);
+      ->execute([$patti_user_id, $eve_user_id]);
 }
 
 $show = min(EVE_MESSAGES_MAX_SHOW, max(EVE_MESSAGES_PER_PAGE, (int)($_GET['show'] ?? EVE_MESSAGES_PER_PAGE)));
@@ -149,7 +149,7 @@ $count_stmt = $pdo->prepare("
   WHERE (sender_id = ? AND recipient_id = ?)
      OR (sender_id = ? AND recipient_id = ?)
 ");
-$count_stmt->execute([$eve_user_id, $patty_user_id, $patty_user_id, $eve_user_id]);
+$count_stmt->execute([$eve_user_id, $patti_user_id, $patti_user_id, $eve_user_id]);
 $total_count = (int)$count_stmt->fetchColumn();
 $has_more = $total_count > $show;
 
@@ -164,19 +164,19 @@ $history_stmt = $pdo->prepare("
   LIMIT ?
 ");
 $history_stmt->bindValue(1, $eve_user_id,   PDO::PARAM_INT);
-$history_stmt->bindValue(2, $patty_user_id, PDO::PARAM_INT);
-$history_stmt->bindValue(3, $patty_user_id, PDO::PARAM_INT);
+$history_stmt->bindValue(2, $patti_user_id, PDO::PARAM_INT);
+$history_stmt->bindValue(3, $patti_user_id, PDO::PARAM_INT);
 $history_stmt->bindValue(4, $eve_user_id,   PDO::PARAM_INT);
 $history_stmt->bindValue(5, $show,          PDO::PARAM_INT);
 $history_stmt->execute();
 $messages = array_reverse($history_stmt->fetchAll());
 
-render_header('Eve &amp; Patty');
+render_header('Eve &amp; Patti');
 ?>
 
 <div class="card">
-  <h1 style="margin:0;">Eve &amp; Patty</h1>
-  <p class="muted" style="margin:6px 0 0;">Private conversation between Eve and Patty</p>
+  <h1 style="margin:0;">Eve &amp; Patti</h1>
+  <p class="muted" style="margin:6px 0 0;">Private conversation between Eve and Patti</p>
 </div>
 
 <?php if ($errors): ?>
@@ -212,10 +212,10 @@ render_header('Eve &amp; Patty');
       <?php foreach ($messages as $msg): ?>
         <?php
           $is_eve_sender   = (int)$msg['sender_id'] === $eve_user_id;
-          $is_patty_sender = (int)$msg['sender_id'] === $patty_user_id;
-          // "mine" from the viewer's perspective: admin views Eve's side, Patty views her own
-          $is_mine = $is_admin_user ? $is_eve_sender : $is_patty_sender;
-          $can_delete = $is_admin_user || $is_patty_sender;
+          $is_patti_sender = (int)$msg['sender_id'] === $patti_user_id;
+          // "mine" from the viewer's perspective: admin views Eve's side, Patti views her own
+          $is_mine = $is_admin_user ? $is_eve_sender : $is_patti_sender;
+          $can_delete = $is_admin_user || $is_patti_sender;
           $align  = $is_mine ? 'flex-end' : 'flex-start';
           $bg     = $is_mine ? '#dbeafe' : '#f1f5f9';
           $color  = $is_mine ? '#1e40af' : '#111827';
