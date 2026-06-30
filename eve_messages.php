@@ -176,7 +176,12 @@ render_header('Eve &amp; Patti');
 
 <div class="card">
   <h1 style="margin:0;">Messages</h1>
-  <p class="muted" style="margin:6px 0 0;">Conversation with <strong><?= h($other_user['username']) ?></strong></p>
+  <p class="muted" style="margin:6px 0 0;">
+    Conversation with <strong>
+    <?= $is_admin_user ? 'Patti' : 'Eve' ?>
+    </strong>
+  </p>
+  
 </div>
 
 <?php if ($errors): ?>
