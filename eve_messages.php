@@ -21,7 +21,7 @@ function eve_message_body_to_reply_text(string $html): string {
 $current_user_id  = (int)$_SESSION['user_id'];
 $current_username = (string)($_SESSION['username'] ?? '');
 $is_admin_user    = !empty($_SESSION['is_admin']);
-$is_patty_user    = strcasecmp($current_username, 'Patty') === 0;
+$is_patty_user    = strcasecmp($current_username, 'Patti') === 0;
 
 if (!$is_admin_user && !$is_patty_user) {
   render_header('Eve &amp; Patty');
