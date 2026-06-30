@@ -616,7 +616,7 @@ $count_app_requests = 0;
 $recent_activity = [];
 $recent_activity_total = 0;
 $recent_activity_page = 1;
-$activity_type_options = ['Attendance', 'Time Entry', 'Quick Order', 'App Request', 'Page View'];
+$activity_type_options = ['Attendance', 'Time Entry', 'Quick Order', 'App Request', 'Page View', 'RFQ', 'RFQ Quote', 'Purchase Order', 'Quote', 'Invoice', 'Freight Quote', 'Message', 'Machine Inquiry', 'Agenda'];
 $activity_type_filter = (string)($_GET['activity_type'] ?? 'all');
 if ($activity_type_filter !== 'all' && !in_array($activity_type_filter, $activity_type_options, true)) {
   $activity_type_filter = 'all';
@@ -720,8 +720,15 @@ if ($section === 'dashboard') {
       SELECT
         'Time Entry' AS kind,
         COALESCE(u.username, CONCAT('User #', te.user_id)) AS actor,
-        COALESCE(NULLIF(TRIM(te.description), ''), 'Clock activity recorded') AS details,
-        te.created_at AS occurred_at
+        CASE
+          WHEN te.clock_out IS NOT NULL THEN
+            CONCAT('Clocked out — shift: ',
+              DATE_FORMAT(te.clock_in, '%b %e %l:%i %p'), ' → ',
+              DATE_FORMAT(te.clock_out, '%l:%i %p'))
+          ELSE
+            CONCAT('Clocked in at ', DATE_FORMAT(te.clock_in, '%b %e %l:%i %p'))
+        END AS details,
+        COALESCE(te.clock_out, te.clock_in) AS occurred_at
       FROM time_entries te
       LEFT JOIN users u ON u.id = te.user_id
 
@@ -787,6 +794,188 @@ if ($section === 'dashboard') {
       FROM page_views pv
       LEFT JOIN users u ON u.id = pv.user_id
       WHERE pv.viewed_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+
+      UNION ALL
+
+      SELECT
+        'RFQ' AS kind,
+        COALESCE(u.username, CONCAT('User #', rr.requested_by)) AS actor,
+        CONCAT('Created RFQ: ', COALESCE(NULLIF(TRIM(rr.request_title), ''), CONCAT('RFQ #', rr.id))) AS details,
+        rr.created_at AS occurred_at
+      FROM rfq_requests rr
+      LEFT JOIN users u ON u.id = rr.requested_by
+
+      UNION ALL
+
+      SELECT
+        'RFQ Quote' AS kind,
+        COALESCE(u.username, CONCAT('User #', rq.created_by)) AS actor,
+        CONCAT(
+          'Added quote from ',
+          COALESCE(NULLIF(TRIM(rq.supplier_name), ''), 'supplier'),
+          ' on RFQ #', rq.rfq_request_id,
+          CASE
+            WHEN rq.quote_amount > 0 THEN CONCAT(' ($', FORMAT(rq.quote_amount, 2), ' ', rq.currency, ')')
+            ELSE ''
+          END
+        ) AS details,
+        rq.created_at AS occurred_at
+      FROM rfq_quotes rq
+      LEFT JOIN users u ON u.id = rq.created_by
+
+      UNION ALL
+
+      SELECT
+        'Purchase Order' AS kind,
+        COALESCE(u.username, CONCAT('User #', ro.created_by)) AS actor,
+        CONCAT(
+          'Created PO for ',
+          COALESCE(NULLIF(TRIM(ro.supplier_name), ''), 'supplier'),
+          CASE
+            WHEN ro.po_number IS NOT NULL AND ro.po_number != '' THEN CONCAT(' (PO# ', ro.po_number, ')')
+            ELSE CONCAT(' (RFQ #', ro.rfq_request_id, ')')
+          END
+        ) AS details,
+        ro.created_at AS occurred_at
+      FROM rfq_orders ro
+      LEFT JOIN users u ON u.id = ro.created_by
+
+      UNION ALL
+
+      SELECT
+        'Purchase Order' AS kind,
+        COALESCE(u.username, CONCAT('User #', sh.changed_by)) AS actor,
+        CONCAT(
+          'Updated PO #', sh.order_id, ' stage: ',
+          REPLACE(COALESCE(sh.from_stage, 'start'), '_', ' '),
+          ' → ',
+          REPLACE(sh.to_stage, '_', ' ')
+        ) AS details,
+        sh.created_at AS occurred_at
+      FROM rfq_order_stage_history sh
+      LEFT JOIN users u ON u.id = sh.changed_by
+
+      UNION ALL
+
+      SELECT
+        'Quote' AS kind,
+        COALESCE(u.username, CONCAT('User #', q.created_by)) AS actor,
+        CONCAT(
+          'Created quote for ',
+          COALESCE(NULLIF(TRIM(q.customer_name), ''), 'customer'),
+          CASE
+            WHEN NULLIF(TRIM(q.company_name), '') IS NOT NULL
+            THEN CONCAT(' (', TRIM(q.company_name), ')')
+            ELSE ''
+          END,
+          CASE
+            WHEN q.subtotal_amount > 0 THEN CONCAT(' — $', FORMAT(q.subtotal_amount, 2))
+            ELSE ''
+          END
+        ) AS details,
+        q.created_at AS occurred_at
+      FROM quotes q
+      LEFT JOIN users u ON u.id = q.created_by
+      WHERE q.status != 'converted'
+
+      UNION ALL
+
+      SELECT
+        'Invoice' AS kind,
+        COALESCE(u.username, CONCAT('User #', q.created_by)) AS actor,
+        CONCAT(
+          'Converted quote to invoice for ',
+          COALESCE(NULLIF(TRIM(q.customer_name), ''), 'customer'),
+          CASE
+            WHEN NULLIF(TRIM(q.company_name), '') IS NOT NULL
+            THEN CONCAT(' (', TRIM(q.company_name), ')')
+            ELSE ''
+          END,
+          CASE
+            WHEN q.subtotal_amount > 0 THEN CONCAT(' — $', FORMAT(q.subtotal_amount, 2))
+            ELSE ''
+          END
+        ) AS details,
+        q.converted_at AS occurred_at
+      FROM quotes q
+      LEFT JOIN users u ON u.id = q.created_by
+      WHERE q.status = 'converted' AND q.converted_at IS NOT NULL
+
+      UNION ALL
+
+      SELECT
+        'Freight Quote' AS kind,
+        COALESCE(u.username, CONCAT('User #', sr.requested_by)) AS actor,
+        CONCAT(
+          'Created freight quote: ',
+          COALESCE(NULLIF(TRIM(sr.request_title), ''), 'Untitled'),
+          CASE
+            WHEN NULLIF(TRIM(sr.machine_model), '') IS NOT NULL
+            THEN CONCAT(' — ', TRIM(sr.machine_model))
+            ELSE ''
+          END
+        ) AS details,
+        sr.created_at AS occurred_at
+      FROM shipping_rfq_requests sr
+      LEFT JOIN users u ON u.id = sr.requested_by
+
+      UNION ALL
+
+      SELECT
+        'Message' AS kind,
+        COALESCE(su.username, CONCAT('User #', m.sender_id)) AS actor,
+        CONCAT(
+          'Sent message to ',
+          COALESCE(ru.username, CONCAT('User #', m.recipient_id)),
+          ': ',
+          CASE
+            WHEN CHAR_LENGTH(m.body) > 80 THEN CONCAT(LEFT(m.body, 80), '…')
+            ELSE m.body
+          END
+        ) AS details,
+        m.created_at AS occurred_at
+      FROM messages m
+      LEFT JOIN users su ON su.id = m.sender_id
+      LEFT JOIN users ru ON ru.id = m.recipient_id
+      WHERE m.created_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)
+
+      UNION ALL
+
+      SELECT
+        'Machine Inquiry' AS kind,
+        CONCAT_WS(' ', COALESCE(NULLIF(TRIM(mi.first_name), ''), '?'), COALESCE(NULLIF(TRIM(mi.last_name), ''), '?')) AS actor,
+        CONCAT(
+          'Machine inquiry from ',
+          CONCAT_WS(' ', COALESCE(NULLIF(TRIM(mi.first_name), ''), '?'), COALESCE(NULLIF(TRIM(mi.last_name), ''), '?')),
+          ' (', COALESCE(NULLIF(TRIM(mi.city), ''), 'unknown city'), ', ', COALESCE(NULLIF(TRIM(mi.state), ''), '??'), ')',
+          CASE
+            WHEN NULLIF(TRIM(mi.laser_type), '') IS NOT NULL
+            THEN CONCAT(' — ', TRIM(mi.laser_type))
+            ELSE ''
+          END
+        ) AS details,
+        mi.created_at AS occurred_at
+      FROM machine_inquiries mi
+
+      UNION ALL
+
+      SELECT
+        'Agenda' AS kind,
+        COALESCE(u.username, 'Unknown user') AS actor,
+        CONCAT(
+          CASE
+            WHEN ai.updated_at > ai.created_at THEN 'Updated agenda item: '
+            ELSE 'Added agenda item: '
+          END,
+          COALESCE(NULLIF(TRIM(ai.title), ''), 'Untitled'),
+          ' (', DATE_FORMAT(ai.agenda_date, '%b %e'), ')'
+        ) AS details,
+        CASE
+          WHEN ai.updated_at > ai.created_at THEN ai.updated_at
+          ELSE ai.created_at
+        END AS occurred_at
+      FROM agenda_items ai
+      LEFT JOIN users u ON u.id = ai.created_by
     ";
     $activity_params = [];
     $activity_where_sql = '';
