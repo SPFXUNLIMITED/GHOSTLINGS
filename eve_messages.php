@@ -18,8 +18,18 @@ function eve_message_body_to_reply_text(string $html): string {
   return trim($text);
 }
 
-$current_user_id = (int)$_SESSION['user_id'];
-$is_admin_user = !empty($_SESSION['is_admin']);
+$current_user_id   = (int)$_SESSION['user_id'];
+$current_username  = (string)($_SESSION['username'] ?? '');
+$is_admin_user     = !empty($_SESSION['is_admin']);
+$is_patty_user     = strcasecmp($current_username, 'Patty') === 0;
+
+if (!$is_admin_user && !$is_patty_user) {
+  render_header('Messages');
+  echo '<div class="card"><p class="muted">You do not have permission to view this conversation.</p></div>';
+  render_footer();
+  exit;
+}
+
 $conversation_url = 'eve_messages.php';
 
 $eve_stmt = $pdo->prepare("SELECT id, username FROM users WHERE username = 'Eve' LIMIT 1");
