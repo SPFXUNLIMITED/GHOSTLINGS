@@ -31,9 +31,11 @@ render_header('Vendors');
 
 <style>
   .vendor-hero {
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f2744 100%);
+    background-image: url('map.jpeg');
+    background-size: cover;
+    background-position: center;
     border-radius: 10px;
-    padding: 56px 40px;
+    padding: 72px 40px;
     margin-bottom: 18px;
     text-align: center;
     position: relative;
@@ -43,31 +45,36 @@ render_header('Vendors');
     content: '';
     position: absolute;
     inset: 0;
-    background-image:
-      radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
-    background-size: 28px 28px;
+    background: linear-gradient(to bottom, rgba(10,18,32,0.62) 0%, rgba(10,18,32,0.72) 100%);
+    border-radius: inherit;
     pointer-events: none;
   }
-  .vendor-hero-title {
-    font-size: 2.4rem;
-    font-weight: 700;
-    color: #f8fafc;
-    letter-spacing: 0.01em;
-    margin: 0 0 12px;
+  .vendor-hero-content {
     position: relative;
+    z-index: 1;
+  }
+  .vendor-hero-title {
+    font-size: 2.6rem;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 0.01em;
+    margin: 0 0 14px;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.55);
   }
   .vendor-hero-route {
-    font-size: 1.05rem;
-    color: #94a3b8;
-    letter-spacing: 0.04em;
+    font-size: 1.1rem;
+    color: #cbd5e1;
+    letter-spacing: 0.06em;
     margin: 0;
-    position: relative;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.5);
   }
 </style>
 
 <div class="vendor-hero">
-  <h2 class="vendor-hero-title">Our Vendor Network</h2>
-  <p class="vendor-hero-route">Qingdao &#8596; Shenzhen &nbsp;&bull;&nbsp; &#8776;&nbsp;1,180 miles</p>
+  <div class="vendor-hero-content">
+    <h2 class="vendor-hero-title">Our Vendor Network</h2>
+    <p class="vendor-hero-route">Qingdao &#8596; Shenzhen &nbsp;&bull;&nbsp; &#8776;&nbsp;1,180 miles</p>
+  </div>
 </div>
 
 <div class="card page-header">
