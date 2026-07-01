@@ -992,6 +992,8 @@ $pdo->exec("
     website       VARCHAR(255) NOT NULL DEFAULT '',
     address       VARCHAR(500) NOT NULL DEFAULT '',
     notes         TEXT         NULL,
+    alibaba_profile_photo_path  VARCHAR(255) NULL DEFAULT NULL,
+    alibaba_profile_photo_thumb VARCHAR(255) NULL DEFAULT NULL,
     created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
@@ -1152,6 +1154,28 @@ $hasVendorsLogoThumb = (int)$pdo->query("
 ")->fetchColumn();
 if ($hasVendorsLogoThumb === 0) {
   $pdo->exec("ALTER TABLE vendors ADD COLUMN logo_thumb VARCHAR(255) NULL DEFAULT NULL");
+}
+
+$hasVendorsAlibabaProfilePhotoPath = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'vendors'
+    AND COLUMN_NAME = 'alibaba_profile_photo_path'
+")->fetchColumn();
+if ($hasVendorsAlibabaProfilePhotoPath === 0) {
+  $pdo->exec("ALTER TABLE vendors ADD COLUMN alibaba_profile_photo_path VARCHAR(255) NULL DEFAULT NULL");
+}
+
+$hasVendorsAlibabaProfilePhotoThumb = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'vendors'
+    AND COLUMN_NAME = 'alibaba_profile_photo_thumb'
+")->fetchColumn();
+if ($hasVendorsAlibabaProfilePhotoThumb === 0) {
+  $pdo->exec("ALTER TABLE vendors ADD COLUMN alibaba_profile_photo_thumb VARCHAR(255) NULL DEFAULT NULL");
 }
 
 // Create freight_forwarders table if it does not exist yet

@@ -63,7 +63,6 @@ render_header('Vendors');
         <th>Alibaba Store</th>
         <th>Website</th>
         <th>Rating</th>
-        <th>Review</th>
         <th>Actions</th>
       </tr>
     </thead>
@@ -78,6 +77,8 @@ render_header('Vendors');
           && in_array(strtolower((string)parse_url($websiteUrl, PHP_URL_SCHEME)), ['http', 'https'], true);
         $logo_thumb = (string)($v['logo_thumb'] ?? '');
         $logo_path  = (string)($v['logo_path']  ?? '');
+        $alibaba_profile_thumb = (string)($v['alibaba_profile_photo_thumb'] ?? '');
+        $alibaba_profile_path  = (string)($v['alibaba_profile_photo_path'] ?? '');
         if ($logo_thumb !== '') {
           $logo_thumb_url = 'uploads/' . rawurlencode($logo_thumb);
         } elseif ($logo_path !== '') {
@@ -92,20 +93,48 @@ render_header('Vendors');
         } else {
           $logo_full_url = '';
         }
+        if ($alibaba_profile_thumb !== '') {
+          $alibaba_profile_thumb_url = 'uploads/' . rawurlencode($alibaba_profile_thumb);
+        } elseif ($alibaba_profile_path !== '') {
+          $alibaba_profile_thumb_url = 'uploads/' . rawurlencode($alibaba_profile_path);
+        } else {
+          $alibaba_profile_thumb_url = '';
+        }
+        if ($alibaba_profile_path !== '') {
+          $alibaba_profile_full_url = 'uploads/' . rawurlencode($alibaba_profile_path);
+        } elseif ($alibaba_profile_thumb !== '') {
+          $alibaba_profile_full_url = 'uploads/' . rawurlencode($alibaba_profile_thumb);
+        } else {
+          $alibaba_profile_full_url = '';
+        }
+        $missing_image_style = 'font-size:0.85em;';
       ?>
       <tr>
         <td>
-          <?php if ($logo_thumb_url !== ''): ?>
-            <a href="<?= h($logo_full_url) ?>" target="_blank" rel="noopener noreferrer" title="View logo">
-              <img src="<?= h($logo_thumb_url) ?>"
-                   alt="<?= h($v['company_name']) ?> logo"
-                   loading="lazy"
-                   decoding="async"
-                   style="max-width:60px; max-height:40px; object-fit:contain; display:block;" />
-            </a>
-          <?php else: ?>
-            <span class="muted">—</span>
-          <?php endif; ?>
+          <div style="display:flex; flex-direction:column; gap:6px; min-width:60px;">
+            <?php if ($alibaba_profile_thumb_url !== ''): ?>
+              <a href="<?= h($alibaba_profile_full_url) ?>" target="_blank" rel="noopener noreferrer" title="View Alibaba profile photo">
+                <img src="<?= h($alibaba_profile_thumb_url) ?>"
+                     alt="<?= h($v['company_name']) ?> Alibaba profile photo"
+                     loading="lazy"
+                     decoding="async"
+                     style="max-width:60px; max-height:40px; object-fit:contain; display:block;" />
+              </a>
+            <?php else: ?>
+              <span class="muted" style="<?= h($missing_image_style) ?>">—</span>
+            <?php endif; ?>
+            <?php if ($logo_thumb_url !== ''): ?>
+              <a href="<?= h($logo_full_url) ?>" target="_blank" rel="noopener noreferrer" title="View logo">
+                <img src="<?= h($logo_thumb_url) ?>"
+                     alt="<?= h($v['company_name']) ?> logo"
+                     loading="lazy"
+                     decoding="async"
+                     style="max-width:60px; max-height:40px; object-fit:contain; display:block;" />
+              </a>
+            <?php else: ?>
+              <span class="muted" style="<?= h($missing_image_style) ?>">—</span>
+            <?php endif; ?>
+          </div>
         </td>
         <td><strong><?= h($v['company_name']) ?></strong></td>
         <td>
@@ -147,17 +176,6 @@ render_header('Vendors');
             <span title="<?= (int)$v['rating'] ?> out of 5" style="color:#f59e0b; font-size:1.1em; letter-spacing:1px;">
               <?= str_repeat('★', (int)$v['rating']) ?><span style="color:#d1d5db;"><?= str_repeat('★', 5 - (int)$v['rating']) ?></span>
             </span>
-          <?php else: ?>
-            <span class="muted">—</span>
-          <?php endif; ?>
-        </td>
-        <td style="max-width:200px;">
-          <?php
-            $reviewText = trim((string)($v['review'] ?? ''));
-            if ($reviewText !== ''):
-              $preview = mb_strlen($reviewText) > 80 ? mb_substr($reviewText, 0, 80) . '…' : $reviewText;
-          ?>
-            <span title="<?= h($reviewText) ?>"><?= h($preview) ?></span>
           <?php else: ?>
             <span class="muted">—</span>
           <?php endif; ?>
