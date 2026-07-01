@@ -107,6 +107,7 @@ render_header('Vendors');
         } else {
           $alibaba_profile_full_url = '';
         }
+        $missing_image_style = 'font-size:0.85em;';
       ?>
       <tr>
         <td>
@@ -120,7 +121,7 @@ render_header('Vendors');
                      style="max-width:60px; max-height:40px; object-fit:contain; display:block;" />
               </a>
             <?php else: ?>
-              <span class="muted" style="font-size:0.85em;">—</span>
+              <span class="muted" style="<?= h($missing_image_style) ?>">—</span>
             <?php endif; ?>
             <?php if ($logo_thumb_url !== ''): ?>
               <a href="<?= h($logo_full_url) ?>" target="_blank" rel="noopener noreferrer" title="View logo">
@@ -131,7 +132,7 @@ render_header('Vendors');
                      style="max-width:60px; max-height:40px; object-fit:contain; display:block;" />
               </a>
             <?php else: ?>
-              <span class="muted" style="font-size:0.85em;">—</span>
+              <span class="muted" style="<?= h($missing_image_style) ?>">—</span>
             <?php endif; ?>
           </div>
         </td>

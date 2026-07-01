@@ -250,6 +250,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $page_title = $is_edit ? 'Edit Vendor' : 'Add Vendor';
+$preview_vendor_id = $is_edit ? $id : 0;
 render_header($page_title);
 ?>
 
@@ -373,10 +374,10 @@ render_header($page_title);
         <?php
           $logo_thumb_url = $fields['logo_thumb'] !== ''
             ? 'uploads/' . rawurlencode($fields['logo_thumb'])
-            : 'vendor_logo.php?id=' . $id . '&type=thumb';
+            : 'vendor_logo.php?id=' . $preview_vendor_id . '&type=thumb';
           $logo_full_url  = $fields['logo_path'] !== ''
             ? 'uploads/' . rawurlencode($fields['logo_path'])
-            : 'vendor_logo.php?id=' . $id . '&type=full';
+            : 'vendor_logo.php?id=' . $preview_vendor_id . '&type=full';
         ?>
         <a href="<?= h($logo_full_url) ?>" target="_blank" rel="noopener noreferrer" title="View full logo">
           <img src="<?= h($logo_thumb_url) ?>"
