@@ -111,7 +111,7 @@ render_header('Vendors');
       ?>
       <tr>
         <td>
-          <div style="display:flex; flex-direction:column; gap:6px; min-width:60px;">
+          <div style="display:flex; flex-direction:column; gap:6px; min-width:60px; align-items:center;">
             <?php if ($alibaba_profile_thumb_url !== ''): ?>
               <a href="<?= h($alibaba_profile_full_url) ?>" target="_blank" rel="noopener noreferrer" title="View Alibaba profile photo">
                 <img src="<?= h($alibaba_profile_thumb_url) ?>"
@@ -123,10 +123,15 @@ render_header('Vendors');
             <?php else: ?>
               <span class="muted" style="<?= h($missing_image_style) ?>">—</span>
             <?php endif; ?>
+            <?php if (trim((string)($v['contact_name'] ?? '')) !== ''): ?>
+              <span style="font-size:0.85em; line-height:1.2; text-align:center;"><?= h($v['contact_name']) ?></span>
+            <?php else: ?>
+              <span class="muted" style="<?= h($missing_image_style) ?>">—</span>
+            <?php endif; ?>
             <?php if ($logo_thumb_url !== ''): ?>
               <a href="<?= h($logo_full_url) ?>" target="_blank" rel="noopener noreferrer" title="View logo">
-                <img src="<?= h($logo_thumb_url) ?>"
-                     alt="<?= h($v['company_name']) ?> logo"
+               <img src="<?= h($logo_thumb_url) ?>"
+                    alt="<?= h($v['company_name']) ?> logo"
                      loading="lazy"
                      decoding="async"
                      style="max-width:60px; max-height:40px; object-fit:contain; display:block;" />
