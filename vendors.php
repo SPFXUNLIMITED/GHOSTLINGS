@@ -29,91 +29,61 @@ $vendors = $stmt->fetchAll();
 render_header('Vendors');
 ?>
 
-<!-- Leaflet.js China map hero banner -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<!-- Static China map hero banner (inline SVG, no external dependencies) -->
 <style>
-  #vendor-map-hero {
-    width: 100%;
-    height: 320px;
-    border-radius: 10px;
-    z-index: 0;
-  }
   .vendor-map-card {
     padding: 0;
     overflow: hidden;
-    position: relative;
     margin-bottom: 18px;
   }
-  .vendor-map-badge {
-    position: absolute;
-    bottom: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(255,255,255,0.93);
-    border: 1px solid #e5e7eb;
-    border-radius: 20px;
-    padding: 6px 18px;
-    font-size: 0.88em;
-    font-weight: 600;
-    color: #374151;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.13);
-    pointer-events: none;
-    white-space: nowrap;
-    z-index: 999;
+  .vendor-map-svg {
+    width: 100%;
+    height: auto;
+    display: block;
   }
 </style>
 
 <div class="card vendor-map-card">
-  <div id="vendor-map-hero"></div>
-  <div class="vendor-map-badge">📍 Qingdao → Shenzhen &nbsp;|&nbsp; ~1,180 miles</div>
+  <svg class="vendor-map-svg" viewBox="0 0 800 320" xmlns="http://www.w3.org/2000/svg"
+       role="img" aria-label="Map of China with route from Qingdao to Shenzhen, approximately 1,180 miles">
+    <defs>
+      <linearGradient id="vMapOcean" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#dbeafe"/>
+        <stop offset="100%" stop-color="#bfdbfe"/>
+      </linearGradient>
+    </defs>
+    <!-- Ocean background -->
+    <rect width="800" height="320" fill="url(#vMapOcean)"/>
+    <!-- China mainland (simplified outline, clockwise from NW Xinjiang) -->
+    <polygon
+      points="178,59 406,51 596,8 787,25 622,135 622,169 622,219 572,270 521,286 470,295 444,295 381,286 305,235 229,227 76,177 13,118 114,67"
+      fill="#e8dcc8" stroke="#b8a88a" stroke-width="1.5" stroke-linejoin="round"/>
+    <!-- Country label -->
+    <text x="370" y="165"
+          font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+          font-size="22" fill="#a09060" fill-opacity="0.45" font-weight="700"
+          text-anchor="middle" letter-spacing="4">CHINA</text>
+    <!-- Route line: Qingdao &#8594; Shenzhen -->
+    <line x1="601" y1="168" x2="521" y2="282"
+          stroke="#2563eb" stroke-width="2.5" stroke-dasharray="7,5" opacity="0.85"/>
+    <!-- Distance badge centred on the line midpoint (~561, 225) -->
+    <rect x="507" y="214" width="108" height="22" rx="11"
+          fill="white" fill-opacity="0.93" stroke="#2563eb" stroke-width="1"/>
+    <text x="561" y="229"
+          font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+          font-size="12" fill="#1e40af" font-weight="600" text-anchor="middle">&#8776; 1,180 miles</text>
+    <!-- Qingdao marker -->
+    <circle cx="601" cy="168" r="7" fill="#2563eb" stroke="white" stroke-width="2.5"/>
+    <text x="601" y="154"
+          font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+          font-size="12" fill="#1e3a8a" font-weight="700" text-anchor="middle">Qingdao</text>
+    <!-- Shenzhen marker -->
+    <circle cx="521" cy="282" r="7" fill="#2563eb" stroke="white" stroke-width="2.5"/>
+    <text x="521" y="307"
+          font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+          font-size="12" fill="#1e3a8a" font-weight="700" text-anchor="middle">Shenzhen</text>
+  </svg>
 </div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN2I/E=" crossorigin=""></script>
-<script>
-(function () {
-  var qingdao   = [36.0671, 120.3826];
-  var shenzhen  = [22.5431, 114.0579];
-  var midLat    = (qingdao[0] + shenzhen[0]) / 2;
-  var midLng    = (qingdao[1] + shenzhen[1]) / 2;
-
-  var map = L.map('vendor-map-hero', {
-    center: [midLat, midLng],
-    zoom: 5,
-    zoomControl: true,
-    scrollWheelZoom: false,
-    attributionControl: true
-  });
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 18
-  }).addTo(map);
-
-  var cityIcon = L.divIcon({
-    className: '',
-    html: '<div style="width:14px;height:14px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>',
-    iconSize: [14, 14],
-    iconAnchor: [7, 7]
-  });
-
-  L.marker(qingdao,  { icon: cityIcon })
-    .addTo(map)
-    .bindTooltip('Qingdao', { permanent: true, direction: 'top', offset: [0, -10], className: '' });
-
-  L.marker(shenzhen, { icon: cityIcon })
-    .addTo(map)
-    .bindTooltip('Shenzhen', { permanent: true, direction: 'bottom', offset: [0, 10], className: '' });
-
-  L.polyline([qingdao, shenzhen], {
-    color: '#2563eb',
-    weight: 2.5,
-    opacity: 0.75,
-    dashArray: '7, 7'
-  }).addTo(map);
-})();
-</script>
 
 <div class="card page-header">
   <div class="page-header-body">
