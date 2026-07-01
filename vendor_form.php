@@ -98,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $errors[] = 'Internal review must be 5000 characters or fewer.';
     }
 
-    $processImageUpload = static function (string $fileKey, string $label, string $basePrefix) use (&$errors): array {
+    $processImageUpload = function (string $fileKey, string $label, string $basePrefix) use (&$errors): array {
       $new_image_path  = null;
       $new_image_thumb = null;
       if (isset($_FILES[$fileKey]) && $_FILES[$fileKey]['error'] !== UPLOAD_ERR_NO_FILE) {
@@ -346,7 +346,7 @@ render_header($page_title);
         <input type="file" name="logo_image" id="logo_image" accept="image/jpeg,image/png,image/gif" />
         <div class="muted" style="margin-top:4px;">Optional. Upload a company logo for this vendor.</div>
       </div>
-      <?php if (($fields['alibaba_profile_photo_thumb'] !== '' || $fields['alibaba_profile_photo_path'] !== '') && $is_edit): ?>
+      <?php if ($is_edit && ($fields['alibaba_profile_photo_thumb'] !== '' || $fields['alibaba_profile_photo_path'] !== '')): ?>
       <div class="full">
         <label>Current Alibaba Profile Photo</label>
         <?php
@@ -367,7 +367,7 @@ render_header($page_title);
         <div class="muted" style="margin-top:4px;">Upload a new file above to replace it.</div>
       </div>
       <?php endif; ?>
-      <?php if (($fields['logo_thumb'] !== '' || $fields['logo_path'] !== '') && $is_edit): ?>
+      <?php if ($is_edit && ($fields['logo_thumb'] !== '' || $fields['logo_path'] !== '')): ?>
       <div class="full">
         <label>Current Logo</label>
         <?php
