@@ -1183,6 +1183,8 @@ $pdo->exec("
   CREATE TABLE IF NOT EXISTS freight_forwarders (
     id                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
     company_name        VARCHAR(255) NOT NULL,
+    logo_path           VARCHAR(255) NULL DEFAULT NULL,
+    logo_thumb          VARCHAR(255) NULL DEFAULT NULL,
     headquarters        VARCHAR(255) NOT NULL DEFAULT '',
     contact_person      VARCHAR(255) NOT NULL DEFAULT '',
     phone               VARCHAR(100) NOT NULL DEFAULT '',
@@ -1198,6 +1200,28 @@ $pdo->exec("
     KEY idx_ff_company_name (company_name(191))
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+$hasFreightForwardersLogoPath = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'freight_forwarders'
+    AND COLUMN_NAME = 'logo_path'
+")->fetchColumn();
+if ($hasFreightForwardersLogoPath === 0) {
+  $pdo->exec("ALTER TABLE freight_forwarders ADD COLUMN logo_path VARCHAR(255) NULL DEFAULT NULL");
+}
+
+$hasFreightForwardersLogoThumb = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'freight_forwarders'
+    AND COLUMN_NAME = 'logo_thumb'
+")->fetchColumn();
+if ($hasFreightForwardersLogoThumb === 0) {
+  $pdo->exec("ALTER TABLE freight_forwarders ADD COLUMN logo_thumb VARCHAR(255) NULL DEFAULT NULL");
+}
 
 // Add profile_notes column to users if it does not exist yet
 try {

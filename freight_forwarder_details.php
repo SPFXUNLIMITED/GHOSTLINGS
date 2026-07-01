@@ -22,6 +22,15 @@ if (!$forwarder) {
   exit;
 }
 
+$logo_thumb = (string)($forwarder['logo_thumb'] ?? '');
+$logo_path  = (string)($forwarder['logo_path'] ?? '');
+$logo_image_url = $logo_thumb !== ''
+  ? 'uploads/' . rawurlencode($logo_thumb)
+  : ($logo_path !== '' ? 'uploads/' . rawurlencode($logo_path) : '');
+$logo_full_url = $logo_path !== ''
+  ? 'uploads/' . rawurlencode($logo_path)
+  : ($logo_thumb !== '' ? 'uploads/' . rawurlencode($logo_thumb) : '');
+
 render_header('Freight Forwarder Details');
 ?>
 
@@ -41,6 +50,22 @@ render_header('Freight Forwarder Details');
       <tr>
         <th style="width:220px;">Company</th>
         <td><strong><?= h($forwarder['company_name']) ?></strong> (ID <?= (int)$forwarder['id'] ?>)</td>
+      </tr>
+      <tr>
+        <th>Company Logo</th>
+        <td>
+          <?php if ($logo_image_url !== ''): ?>
+            <a href="<?= h($logo_full_url) ?>" target="_blank" rel="noopener noreferrer" title="View company logo">
+              <img src="<?= h($logo_image_url) ?>"
+                   alt="<?= h($forwarder['company_name']) ?> logo"
+                   loading="lazy"
+                   decoding="async"
+                   style="max-width:200px; max-height:200px; object-fit:contain; border-radius:6px; border:1px solid rgba(0,0,0,.12); display:block;" />
+            </a>
+          <?php else: ?>
+            <span class="muted">—</span>
+          <?php endif; ?>
+        </td>
       </tr>
       <tr>
         <th>Headquarters</th>
