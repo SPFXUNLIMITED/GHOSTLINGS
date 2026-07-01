@@ -17,10 +17,10 @@ if ($q !== '') {
   $like = '%' . $q . '%';
   $stmt = $pdo->prepare("
     SELECT * FROM vendors
-    WHERE company_name LIKE ? OR contact_name LIKE ? OR email LIKE ? OR phone LIKE ?
+    WHERE company_name LIKE ? OR contact_name LIKE ? OR email LIKE ? OR phone LIKE ? OR port LIKE ?
     ORDER BY company_name ASC
   ");
-  $stmt->execute([$like, $like, $like, $like]);
+  $stmt->execute([$like, $like, $like, $like, $like]);
 } else {
   $stmt = $pdo->query("SELECT * FROM vendors ORDER BY company_name ASC");
 }
@@ -59,6 +59,7 @@ render_header('Vendors');
         <th>Logo</th>
         <th>Company</th>
         <th>Phone</th>
+        <th>Port</th>
         <th>Alibaba Store</th>
         <th>Website</th>
         <th>Rating</th>
@@ -110,6 +111,13 @@ render_header('Vendors');
         <td>
           <?php if ($v['phone'] !== ''): ?>
             <?= h($v['phone']) ?>
+          <?php else: ?>
+            <span class="muted">—</span>
+          <?php endif; ?>
+        </td>
+        <td>
+          <?php if (($v['port'] ?? '') !== ''): ?>
+            <?= h($v['port']) ?>
           <?php else: ?>
             <span class="muted">—</span>
           <?php endif; ?>
