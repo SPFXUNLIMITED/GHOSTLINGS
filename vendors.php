@@ -63,7 +63,7 @@ render_header('Vendors');
           font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
           font-size="22" fill="#a09060" fill-opacity="0.45" font-weight="700"
           text-anchor="middle" letter-spacing="4">CHINA</text>
-    <!-- Route line: Qingdao &#8594; Shenzhen -->
+    <!-- Route line: Qingdao -> Shenzhen -->
     <line x1="601" y1="168" x2="521" y2="282"
           stroke="#2563eb" stroke-width="2.5" stroke-dasharray="7,5" opacity="0.85"/>
     <!-- Distance badge centred on the line midpoint (~561, 225) -->
