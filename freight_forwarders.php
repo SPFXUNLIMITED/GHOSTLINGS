@@ -82,8 +82,41 @@ render_header('Freight Forwarders');
     </thead>
     <tbody>
       <?php foreach ($forwarders as $f): ?>
+      <?php
+        $logo_thumb = (string)($f['logo_thumb'] ?? '');
+        $logo_path  = (string)($f['logo_path'] ?? '');
+        if ($logo_thumb !== '') {
+          $logo_thumb_url = 'uploads/' . rawurlencode($logo_thumb);
+        } elseif ($logo_path !== '') {
+          $logo_thumb_url = 'uploads/' . rawurlencode($logo_path);
+        } else {
+          $logo_thumb_url = '';
+        }
+        if ($logo_path !== '') {
+          $logo_full_url = 'uploads/' . rawurlencode($logo_path);
+        } elseif ($logo_thumb !== '') {
+          $logo_full_url = 'uploads/' . rawurlencode($logo_thumb);
+        } else {
+          $logo_full_url = '';
+        }
+      ?>
       <tr>
-        <td><strong><?= h($f['company_name']) ?></strong></td>
+        <td>
+          <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-start;">
+            <?php if ($logo_thumb_url !== ''): ?>
+              <a href="<?= h($logo_full_url) ?>" target="_blank" rel="noopener noreferrer" title="View logo">
+                <img src="<?= h($logo_thumb_url) ?>"
+                     alt="<?= h($f['company_name']) ?> logo"
+                     loading="lazy"
+                     decoding="async"
+                     style="max-width:60px; max-height:40px; object-fit:contain; display:block;" />
+              </a>
+            <?php else: ?>
+              <span class="muted" style="font-size:0.85em;">—</span>
+            <?php endif; ?>
+            <strong><?= h($f['company_name']) ?></strong>
+          </div>
+        </td>
         <td><?= $f['headquarters'] !== '' ? h($f['headquarters']) : '<span class="muted">—</span>' ?></td>
         <td><?= $f['certifications'] !== '' ? h($f['certifications']) : '<span class="muted">—</span>' ?></td>
         <td><?= $f['primary_routes'] !== '' ? h($f['primary_routes']) : '<span class="muted">—</span>' ?></td>
