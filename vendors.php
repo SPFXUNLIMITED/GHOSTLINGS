@@ -29,6 +29,92 @@ $vendors = $stmt->fetchAll();
 render_header('Vendors');
 ?>
 
+<!-- Leaflet.js China map hero banner -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<style>
+  #vendor-map-hero {
+    width: 100%;
+    height: 320px;
+    border-radius: 10px;
+    z-index: 0;
+  }
+  .vendor-map-card {
+    padding: 0;
+    overflow: hidden;
+    position: relative;
+    margin-bottom: 18px;
+  }
+  .vendor-map-badge {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255,255,255,0.93);
+    border: 1px solid #e5e7eb;
+    border-radius: 20px;
+    padding: 6px 18px;
+    font-size: 0.88em;
+    font-weight: 600;
+    color: #374151;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.13);
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 999;
+  }
+</style>
+
+<div class="card vendor-map-card">
+  <div id="vendor-map-hero"></div>
+  <div class="vendor-map-badge">📍 Qingdao → Shenzhen &nbsp;|&nbsp; ~1,180 miles</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN2I/E=" crossorigin=""></script>
+<script>
+(function () {
+  var qingdao   = [36.0671, 120.3826];
+  var shenzhen  = [22.5431, 114.0579];
+  var midLat    = (qingdao[0] + shenzhen[0]) / 2;
+  var midLng    = (qingdao[1] + shenzhen[1]) / 2;
+
+  var map = L.map('vendor-map-hero', {
+    center: [midLat, midLng],
+    zoom: 5,
+    zoomControl: true,
+    scrollWheelZoom: false,
+    attributionControl: true
+  });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 18
+  }).addTo(map);
+
+  var cityIcon = L.divIcon({
+    className: '',
+    html: '<div style="width:14px;height:14px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>',
+    iconSize: [14, 14],
+    iconAnchor: [7, 7]
+  });
+
+  L.marker(qingdao,  { icon: cityIcon })
+    .addTo(map)
+    .bindTooltip('Qingdao', { permanent: true, direction: 'top', offset: [0, -10], className: '' });
+
+  L.marker(shenzhen, { icon: cityIcon })
+    .addTo(map)
+    .bindTooltip('Shenzhen', { permanent: true, direction: 'bottom', offset: [0, 10], className: '' });
+
+  L.polyline([qingdao, shenzhen], {
+    color: '#2563eb',
+    weight: 2.5,
+    opacity: 0.75,
+    dashArray: '7, 7'
+  }).addTo(map);
+})();
+</script>
+
 <div class="card page-header">
   <div class="page-header-body">
     <h1>Vendors <span class="muted" style="font-size:0.7em; font-weight:400;">(<?= count($vendors) ?>)</span></h1>
