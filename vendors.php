@@ -29,60 +29,45 @@ $vendors = $stmt->fetchAll();
 render_header('Vendors');
 ?>
 
-<!-- Static China map hero banner (inline SVG, no external dependencies) -->
 <style>
-  .vendor-map-card {
-    padding: 0;
-    overflow: hidden;
+  .vendor-hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f2744 100%);
+    border-radius: 10px;
+    padding: 56px 40px;
     margin-bottom: 18px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
   }
-  .vendor-map-svg {
-    width: 100%;
-    height: auto;
-    display: block;
+  .vendor-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 28px 28px;
+    pointer-events: none;
+  }
+  .vendor-hero-title {
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: #f8fafc;
+    letter-spacing: 0.01em;
+    margin: 0 0 12px;
+    position: relative;
+  }
+  .vendor-hero-route {
+    font-size: 1.05rem;
+    color: #94a3b8;
+    letter-spacing: 0.04em;
+    margin: 0;
+    position: relative;
   }
 </style>
 
-<div class="card vendor-map-card">
-  <svg class="vendor-map-svg" viewBox="0 0 800 320" xmlns="http://www.w3.org/2000/svg"
-       role="img" aria-label="Map of China with route from Qingdao to Shenzhen, approximately 1,180 miles">
-    <defs>
-      <linearGradient id="vMapOcean" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="#dbeafe"/>
-        <stop offset="100%" stop-color="#bfdbfe"/>
-      </linearGradient>
-    </defs>
-    <!-- Ocean background -->
-    <rect width="800" height="320" fill="url(#vMapOcean)"/>
-    <!-- China mainland (simplified outline, clockwise from NW Xinjiang) -->
-    <polygon
-      points="178,59 406,51 596,8 787,25 622,135 622,169 622,219 572,270 521,286 470,295 444,295 381,286 305,235 229,227 76,177 13,118 114,67"
-      fill="#e8dcc8" stroke="#b8a88a" stroke-width="1.5" stroke-linejoin="round"/>
-    <!-- Country label -->
-    <text x="370" y="165"
-          font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
-          font-size="22" fill="#a09060" fill-opacity="0.45" font-weight="700"
-          text-anchor="middle" letter-spacing="4">CHINA</text>
-    <!-- Route line: Qingdao -> Shenzhen -->
-    <line x1="601" y1="168" x2="521" y2="282"
-          stroke="#2563eb" stroke-width="2.5" stroke-dasharray="7,5" opacity="0.85"/>
-    <!-- Distance badge centred on the line midpoint (~561, 225) -->
-    <rect x="507" y="214" width="108" height="22" rx="11"
-          fill="white" fill-opacity="0.93" stroke="#2563eb" stroke-width="1"/>
-    <text x="561" y="229"
-          font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
-          font-size="12" fill="#1e40af" font-weight="600" text-anchor="middle">&#8776; 1,180 miles</text>
-    <!-- Qingdao marker -->
-    <circle cx="601" cy="168" r="7" fill="#2563eb" stroke="white" stroke-width="2.5"/>
-    <text x="601" y="154"
-          font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
-          font-size="12" fill="#1e3a8a" font-weight="700" text-anchor="middle">Qingdao</text>
-    <!-- Shenzhen marker -->
-    <circle cx="521" cy="282" r="7" fill="#2563eb" stroke="white" stroke-width="2.5"/>
-    <text x="521" y="307"
-          font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
-          font-size="12" fill="#1e3a8a" font-weight="700" text-anchor="middle">Shenzhen</text>
-  </svg>
+<div class="vendor-hero">
+  <h2 class="vendor-hero-title">Our Vendor Network</h2>
+  <p class="vendor-hero-route">Qingdao &#8596; Shenzhen &nbsp;&bull;&nbsp; &#8776;&nbsp;1,180 miles</p>
 </div>
 
 <div class="card page-header">
