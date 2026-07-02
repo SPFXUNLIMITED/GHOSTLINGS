@@ -637,6 +637,7 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
   <a class="left-quick-access-link <?= in_array($current, ['labor_list.php', 'labor_form.php'], true) ? 'active' : '' ?>" href="labor_list.php">Labor / Services</a>
   <a class="left-quick-access-link <?= $current === 'alibaba_responses.php' ? 'active' : '' ?>" href="alibaba_responses.php">Alibaba Responses</a>
   <a class="left-quick-access-link <?= $current === 'quick_order_list.php' ? 'active' : '' ?>" href="quick_order_list.php">Quick Orders</a>
+  <a class="left-quick-access-link <?= in_array($current, ['machines.php', 'machine_form.php'], true) ? 'active' : '' ?>" href="machines.php">Machines</a>
   <a class="left-quick-access-link <?= in_array($current, ['app_request_form.php', 'app_request_tracker.php'], true) ? 'active' : '' ?>" href="app_request_tracker.php">Bugs</a>
 </aside>
 <?php endif; ?>
