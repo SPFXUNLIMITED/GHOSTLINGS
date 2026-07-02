@@ -1417,7 +1417,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 function invoice_format_money($value): string {
-  return number_format((float)$value, 2);
+  return number_format((float)$value, 2, '.', '');
 }
 
 function invoice_generate_number(int $id): string {
@@ -1478,7 +1478,7 @@ $fields = [
   'invoice_date' => invoice_quote_date_value($quote, $today),
   'enable_online_payment' => $quote && invoice_online_payment_enabled($quote) ? '1' : '0',
   'notes' => (string)($quote['notes'] ?? ''),
-  'tax_rate' => number_format((float)($quote['tax_rate'] ?? 0), 2),
+  'tax_rate' => number_format((float)($quote['tax_rate'] ?? 0), 2, '.', ''),
 ];
 
 $line_items = [];
@@ -1487,7 +1487,7 @@ foreach ($rows as $row) {
     'description' => (string)($row['description'] ?? ''),
     'quantity' => invoice_format_money($row['quantity'] ?? 0),
     'cost' => invoice_format_money($row['cost'] ?? 0),
-    'markup_percent' => number_format((float)($row['markup_percent'] ?? 0), 2),
+    'markup_percent' => number_format((float)($row['markup_percent'] ?? 0), 2, '.', ''),
     'unit_price' => invoice_format_money($row['unit_price'] ?? 0),
     'line_total' => invoice_format_money($row['line_total'] ?? 0),
     'is_taxable' => (int)($row['is_taxable'] ?? 0),
