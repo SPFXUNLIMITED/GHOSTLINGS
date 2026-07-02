@@ -456,9 +456,9 @@ function mmToInches(mm)     { return mm / 25.4; }
 function round2(n) { return Math.round(n * 100) / 100; }
 
 function syncWidthImperialToMm() {
-  var ft  = parseFloat(document.getElementById('width_ft').value)  || 0;
-  var inc = parseFloat(document.getElementById('width_in').value)   || 0;
-  var total_in = ft * 12 + inc;
+  var ft     = parseFloat(document.getElementById('width_ft').value) || 0;
+  var inches = parseFloat(document.getElementById('width_in').value) || 0;
+  var total_in = ft * 12 + inches;
   document.getElementById('width_mm').value = total_in > 0 ? round2(inchesToMm(total_in)) : '';
 }
 
@@ -466,10 +466,10 @@ function syncWidthMmToImperial() {
   var mm = parseFloat(document.getElementById('width_mm').value) || 0;
   if (mm > 0) {
     var total_in = mmToInches(mm);
-    var ft  = Math.floor(total_in / 12);
-    var inc = round2(total_in - ft * 12);
+    var ft     = Math.floor(total_in / 12);
+    var inches = round2(total_in - ft * 12);
     document.getElementById('width_ft').value = ft || '';
-    document.getElementById('width_in').value = inc || '';
+    document.getElementById('width_in').value = inches || '';
   } else {
     document.getElementById('width_ft').value = '';
     document.getElementById('width_in').value = '';
@@ -477,9 +477,9 @@ function syncWidthMmToImperial() {
 }
 
 function syncHeightImperialToMm() {
-  var ft  = parseFloat(document.getElementById('height_ft').value) || 0;
-  var inc = parseFloat(document.getElementById('height_in').value) || 0;
-  var total_in = ft * 12 + inc;
+  var ft     = parseFloat(document.getElementById('height_ft').value) || 0;
+  var inches = parseFloat(document.getElementById('height_in').value) || 0;
+  var total_in = ft * 12 + inches;
   document.getElementById('height_mm').value = total_in > 0 ? round2(inchesToMm(total_in)) : '';
 }
 
@@ -487,10 +487,10 @@ function syncHeightMmToImperial() {
   var mm = parseFloat(document.getElementById('height_mm').value) || 0;
   if (mm > 0) {
     var total_in = mmToInches(mm);
-    var ft  = Math.floor(total_in / 12);
-    var inc = round2(total_in - ft * 12);
+    var ft     = Math.floor(total_in / 12);
+    var inches = round2(total_in - ft * 12);
     document.getElementById('height_ft').value = ft || '';
-    document.getElementById('height_in').value = inc || '';
+    document.getElementById('height_in').value = inches || '';
   } else {
     document.getElementById('height_ft').value = '';
     document.getElementById('height_in').value = '';
