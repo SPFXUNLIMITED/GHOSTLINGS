@@ -77,6 +77,7 @@ render_header('Freight Forwarders');
         <th>Headquarters</th>
         <th>Certifications / Strengths</th>
         <th>Primary Routes</th>
+        <th style="width:1%; white-space:nowrap; text-align:center;">Consol.</th>
         <th>Actions</th>
       </tr>
     </thead>
@@ -120,6 +121,10 @@ render_header('Freight Forwarders');
         <td><?= $f['headquarters'] !== '' ? h($f['headquarters']) : '<span class="muted">—</span>' ?></td>
         <td><?= $f['certifications'] !== '' ? h($f['certifications']) : '<span class="muted">—</span>' ?></td>
         <td><?= $f['primary_routes'] !== '' ? h($f['primary_routes']) : '<span class="muted">—</span>' ?></td>
+        <td style="text-align:center;">
+          <input type="checkbox" disabled aria-label="Does consolidation"
+                 <?= (int)($f['does_consolidation'] ?? 0) === 1 ? 'checked' : '' ?> />
+        </td>
         <td class="actions">
           <a class="btn" href="freight_forwarder_details.php?id=<?= (int)$f['id'] ?>">View</a>
           <a class="btn" href="freight_forwarder_form.php?id=<?= (int)$f['id'] ?>">Edit</a>

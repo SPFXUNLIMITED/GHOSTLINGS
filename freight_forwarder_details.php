@@ -115,6 +115,13 @@ render_header('Freight Forwarder Details');
         <td><?= $forwarder['shipping_modes'] !== '' ? h($forwarder['shipping_modes']) : '<span class="muted">—</span>' ?></td>
       </tr>
       <tr>
+        <th>Does Consolidation</th>
+        <td>
+          <input type="checkbox" disabled aria-label="Does consolidation"
+                 <?= (int)($forwarder['does_consolidation'] ?? 0) === 1 ? 'checked' : '' ?> />
+        </td>
+      </tr>
+      <tr>
         <th>Certifications / Strengths</th>
         <td><?= $forwarder['certifications'] !== '' ? h($forwarder['certifications']) : '<span class="muted">—</span>' ?></td>
       </tr>
