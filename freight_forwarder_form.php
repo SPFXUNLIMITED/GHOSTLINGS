@@ -28,6 +28,7 @@ $fields = [
   'website'        => '',
   'primary_routes' => '',
   'shipping_modes' => '',
+  'does_consolidation' => '0',
   'certifications' => '',
   'notes'          => '',
 ];
@@ -54,9 +55,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $errors[] = 'Security token mismatch. Please refresh and try again.';
   } else {
     foreach ($fields as $k => $_) {
-      if (in_array($k, ['logo_path', 'logo_thumb'], true)) continue;
+      if (in_array($k, ['logo_path', 'logo_thumb', 'does_consolidation'], true)) continue;
       $fields[$k] = trim((string)($_POST[$k] ?? ''));
     }
+    $fields['does_consolidation'] = isset($_POST['does_consolidation']) ? '1' : '0';
 
     if ($fields['company_name'] === '') {
       $errors[] = 'Company name is required.';
@@ -196,13 +198,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->prepare("
           UPDATE freight_forwarders SET
             company_name = ?, logo_path = COALESCE(?, logo_path), logo_thumb = COALESCE(?, logo_thumb), headquarters = ?, contact_person = ?, phone = ?,
-            email = ?, website = ?, primary_routes = ?, shipping_modes = ?,
+            email = ?, website = ?, primary_routes = ?, shipping_modes = ?, does_consolidation = ?,
             certifications = ?, notes = ?
           WHERE id = ?
         ")->execute([
           $fields['company_name'], $new_logo_path, $new_logo_thumb, $fields['headquarters'], $fields['contact_person'],
           $fields['phone'], $fields['email'], $fields['website'],
-          $fields['primary_routes'], $fields['shipping_modes'], $fields['certifications'],
+          $fields['primary_routes'], $fields['shipping_modes'], (int)$fields['does_consolidation'], $fields['certifications'],
           $fields['notes'] !== '' ? $fields['notes'] : null,
           $id,
         ]);
@@ -211,13 +213,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->prepare("
           INSERT INTO freight_forwarders (
             company_name, logo_path, logo_thumb, headquarters, contact_person, phone, email,
-            website, primary_routes, shipping_modes, certifications, notes
+            website, primary_routes, shipping_modes, does_consolidation, certifications, notes
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ")->execute([
           $fields['company_name'], $new_logo_path, $new_logo_thumb, $fields['headquarters'], $fields['contact_person'],
           $fields['phone'], $fields['email'], $fields['website'],
-          $fields['primary_routes'], $fields['shipping_modes'], $fields['certifications'],
+          $fields['primary_routes'], $fields['shipping_modes'], (int)$fields['does_consolidation'], $fields['certifications'],
           $fields['notes'] !== '' ? $fields['notes'] : null,
         ]);
         $id = (int)$pdo->lastInsertId();
@@ -324,6 +326,12 @@ render_header($page_title);
         <label>Shipping Modes</label>
         <input type="text" name="shipping_modes" maxlength="255"
                value="<?= h($fields['shipping_modes']) ?>" placeholder="e.g. Ocean freight, Air freight, Rail" />
+      </div>
+      <div>
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" name="does_consolidation" value="1" <?= $fields['does_consolidation'] === '1' ? 'checked' : '' ?> />
+          Does Consolidation
+        </label>
       </div>
       <div>
         <label>Certifications / Strengths</label>

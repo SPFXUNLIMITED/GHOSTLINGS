@@ -1192,6 +1192,7 @@ $pdo->exec("
     website             VARCHAR(255) NOT NULL DEFAULT '',
     primary_routes      VARCHAR(500) NOT NULL DEFAULT '',
     shipping_modes      VARCHAR(255) NOT NULL DEFAULT '',
+    does_consolidation  TINYINT(1)   NOT NULL DEFAULT 0,
     certifications      VARCHAR(255) NOT NULL DEFAULT '',
     notes               TEXT         NULL,
     created_at          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1221,6 +1222,17 @@ $hasFreightForwardersLogoThumb = (int)$pdo->query("
 ")->fetchColumn();
 if ($hasFreightForwardersLogoThumb === 0) {
   $pdo->exec("ALTER TABLE freight_forwarders ADD COLUMN logo_thumb VARCHAR(255) NULL DEFAULT NULL");
+}
+
+$hasFreightForwardersDoesConsolidation = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'freight_forwarders'
+    AND COLUMN_NAME = 'does_consolidation'
+")->fetchColumn();
+if ($hasFreightForwardersDoesConsolidation === 0) {
+  $pdo->exec("ALTER TABLE freight_forwarders ADD COLUMN does_consolidation TINYINT(1) NOT NULL DEFAULT 0");
 }
 
 // Add profile_notes column to users if it does not exist yet
