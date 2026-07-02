@@ -2154,10 +2154,40 @@ render_header($invoice_heading);
 
   const laborSubtotalNode = document.getElementById('laborSubtotal');
   const partsSubtotalNode = document.getElementById('partsSubtotal');
+  const subtotalDisplayNode = document.getElementById('invoiceSubtotalDisplay');
+  const taxRateInput = document.getElementById('tax_rate');
+  const taxRowNode = document.getElementById('invoiceTaxRow');
+  const taxRateDisplayNode = document.getElementById('invoiceTaxRateDisplay');
+  const taxAmountNode = document.getElementById('invoiceTaxAmount');
   const grandTotalNode    = document.getElementById('invoiceSubtotal');
 
+  function lineTotalForRow(row, selector) {
+    const raw = row?.dataset?.lineTotal;
+    if (raw !== undefined) return parseNum(raw);
+    const text = row?.querySelector(selector)?.textContent ?? '';
+    return parseNum(text.replace(/[^0-9.-]/g, ''));
+  }
+
+  function taxableSubtotal() {
+    let total = 0;
+    document.querySelectorAll('#laborItemsBody tr.labor-row, #inventoryItemsBody tr.inv-row').forEach((row) => {
+      const isTaxable = parseNum(row.querySelector('.taxable-hidden')?.value) === 1;
+      if (!isTaxable) return;
+      const selector = row.classList.contains('labor-row') ? '.labor-line-total' : '.inv-line-total';
+      total += lineTotalForRow(row, selector);
+    });
+    return total;
+  }
+
   function updateGrandTotal() {
-    grandTotalNode.textContent = (parseNum(laborSubtotalNode.textContent) + parseNum(partsSubtotalNode.textContent)).toFixed(2);
+    const subtotal = parseNum(laborSubtotalNode.textContent) + parseNum(partsSubtotalNode.textContent);
+    const taxRate = Math.max(0, Math.min(100, parseNum(taxRateInput?.value)));
+    const taxAmount = taxableSubtotal() * taxRate / 100;
+    if (subtotalDisplayNode) subtotalDisplayNode.textContent = subtotal.toFixed(2);
+    if (taxRateDisplayNode) taxRateDisplayNode.textContent = taxRate.toFixed(2);
+    if (taxAmountNode) taxAmountNode.textContent = taxAmount.toFixed(2);
+    if (taxRowNode) taxRowNode.style.display = taxRate > 0 && taxAmount > 0 ? '' : 'none';
+    grandTotalNode.textContent = (subtotal + taxAmount).toFixed(2);
   }
 
   function makeSuggestDropdown() {
@@ -2193,6 +2223,7 @@ render_header($invoice_heading);
       const qty  = parseNum(row.querySelector('.labor-qty')?.value);
       const cost = parseNum(row.querySelector('.labor-cost')?.value);
       const lineTotal = qty * cost;
+      row.dataset.lineTotal = lineTotal.toFixed(2);
       const ltCell = row.querySelector('.labor-line-total');
       if (ltCell) ltCell.textContent = '$' + lineTotal.toFixed(2);
       const priceHidden = row.querySelector('.labor-price');
@@ -2247,6 +2278,17 @@ render_header($invoice_heading);
     setupLaborSearch(row);
     row.querySelector('.labor-qty')?.addEventListener('input', computeLaborTotals);
     row.querySelector('.labor-cost')?.addEventListener('input', computeLaborTotals);
+    const taxableHidden = row.querySelector('.taxable-hidden');
+    const taxableCheck  = row.querySelector('.taxable-check');
+    if (taxableHidden && taxableCheck) {
+      const syncTaxable = () => {
+        taxableHidden.value = taxableCheck.checked ? '1' : '0';
+        updateGrandTotal();
+      };
+      taxableCheck.checked = parseNum(taxableHidden.value) === 1;
+      taxableCheck.addEventListener('change', syncTaxable);
+      taxableCheck.addEventListener('input', syncTaxable);
+    }
     const removeBtn = row.querySelector('.remove-labor-row');
     if (!removeBtn) return;
     removeBtn.addEventListener('click', () => {
@@ -2274,6 +2316,7 @@ render_header($invoice_heading);
         + '<td><input type="number" step="0.01" min="0.01" class="labor-qty" name="item_qty[]" value="1" /></td>'
         + '<td><input type="number" step="0.01" min="0" class="labor-cost" name="item_cost[]" value="0.00" /></td>'
         + '<td class="labor-line-total" style="white-space:nowrap;">$0.00</td>'
+        + '<td style="text-align:center;"><input type="hidden" class="taxable-hidden" name="item_taxable[]" value="0" /><input type="checkbox" class="taxable-check" style="width:18px;height:18px;cursor:pointer;" /></td>'
         + '<td><button type="button" class="btn remove-labor-row">×</button></td>';
       laborBody.appendChild(tr);
       bindLaborRow(tr);
@@ -2296,6 +2339,7 @@ render_header($invoice_heading);
       const priceInput = row.querySelector('.inv-price');
       if (priceInput) priceInput.value = price.toFixed(2);
       const lineTotal = qty * price;
+      row.dataset.lineTotal = lineTotal.toFixed(2);
       const ltCell = row.querySelector('.inv-line-total');
       if (ltCell) ltCell.textContent = '$' + lineTotal.toFixed(2);
       total += lineTotal;
@@ -2350,6 +2394,17 @@ render_header($invoice_heading);
     row.querySelector('.inv-qty')?.addEventListener('input', computeInvTotals);
     row.querySelector('.inv-cost')?.addEventListener('input', computeInvTotals);
     row.querySelector('.inv-markup')?.addEventListener('input', computeInvTotals);
+    const taxableHidden = row.querySelector('.taxable-hidden');
+    const taxableCheck  = row.querySelector('.taxable-check');
+    if (taxableHidden && taxableCheck) {
+      const syncTaxable = () => {
+        taxableHidden.value = taxableCheck.checked ? '1' : '0';
+        updateGrandTotal();
+      };
+      taxableCheck.checked = parseNum(taxableHidden.value) === 1;
+      taxableCheck.addEventListener('change', syncTaxable);
+      taxableCheck.addEventListener('input', syncTaxable);
+    }
     const removeBtn = row.querySelector('.remove-inv-row');
     if (!removeBtn) return;
     removeBtn.addEventListener('click', () => {
@@ -2379,6 +2434,7 @@ render_header($invoice_heading);
         + '<td><input type="number" step="0.01" min="0" class="inv-markup" name="item_markup[]" value="20.00" /></td>'
         + '<td><input type="number" step="0.01" min="0" class="inv-price" name="item_price[]" value="0.00" readonly style="background:var(--surface,#f8fafc);color:var(--muted,#64748b);" /></td>'
         + '<td class="inv-line-total" style="white-space:nowrap;">$0.00</td>'
+        + '<td style="text-align:center;"><input type="hidden" class="taxable-hidden" name="item_taxable[]" value="0" /><input type="checkbox" class="taxable-check" style="width:18px;height:18px;cursor:pointer;" /></td>'
         + '<td><button type="button" class="btn remove-inv-row">×</button></td>';
       invBody.appendChild(tr);
       bindInvRow(tr);
@@ -2403,6 +2459,8 @@ render_header($invoice_heading);
   // ── Init ─────────────────────────────────────────────────────────
   laborBody.querySelectorAll('tr.labor-row').forEach(bindLaborRow);
   invBody.querySelectorAll('tr.inv-row').forEach(bindInvRow);
+  taxRateInput?.addEventListener('input', updateGrandTotal);
+  taxRateInput?.addEventListener('change', updateGrandTotal);
   computeLaborTotals();
   computeInvTotals();
 })();
@@ -2411,6 +2469,8 @@ render_header($invoice_heading);
 <script>
 (() => {
   // View mode: compute totals from rendered cell text
+  const taxRate = <?= json_encode((float)($quote['tax_rate'] ?? 0)) ?>;
+  const taxAmount = <?= json_encode(round((float)($quote['tax_amount'] ?? 0), 2)) ?>;
   let laborTotal = 0;
   let partsTotal = 0;
   document.querySelectorAll('#laborItemsBody .labor-line-total').forEach((cell) => {
@@ -2423,10 +2483,19 @@ render_header($invoice_heading);
   });
   const laborNode = document.getElementById('laborSubtotal');
   const partsNode = document.getElementById('partsSubtotal');
+  const subtotalNode = document.getElementById('invoiceSubtotalDisplay');
+  const taxRowNode = document.getElementById('invoiceTaxRow');
+  const taxRateNode = document.getElementById('invoiceTaxRateDisplay');
+  const taxAmountNode = document.getElementById('invoiceTaxAmount');
   const grandNode = document.getElementById('invoiceSubtotal');
+  const subtotal = laborTotal + partsTotal;
   if (laborNode) laborNode.textContent = laborTotal.toFixed(2);
   if (partsNode) partsNode.textContent = partsTotal.toFixed(2);
-  if (grandNode) grandNode.textContent = (laborTotal + partsTotal).toFixed(2);
+  if (subtotalNode) subtotalNode.textContent = subtotal.toFixed(2);
+  if (taxRateNode) taxRateNode.textContent = taxRate.toFixed(2);
+  if (taxAmountNode) taxAmountNode.textContent = taxAmount.toFixed(2);
+  if (taxRowNode) taxRowNode.style.display = (taxRate > 0 && taxAmount > 0) ? '' : 'none';
+  if (grandNode) grandNode.textContent = (subtotal + taxAmount).toFixed(2);
 })();
 </script>
 <?php endif; ?>
