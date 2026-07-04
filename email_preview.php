@@ -136,9 +136,7 @@ function preview_logo_html(string $src): string {
     }
 
     $escaped_src = htmlspecialchars($src, ENT_QUOTES, 'UTF-8');
-    return '<div style="margin:0 0 16px;text-align:left;">'
-        . '<img src="' . $escaped_src . '" alt="Company logo" style="display:block;max-width:100%;width:auto;height:auto;max-height:72px;border:0;outline:none;text-decoration:none;">'
-        . '</div>';
+    return '<img src="' . $escaped_src . '" alt="Company logo" style="display:block;max-width:100%;width:auto;height:auto;max-height:72px;border:0;outline:none;text-decoration:none;">';
 }
 
 function preview_stripe_secret_key(PDO $pdo): string {
@@ -432,6 +430,15 @@ try {
     }
     $header_contact_html = implode(' &nbsp;·&nbsp; ', $header_contact_parts);
     $logo_html = preview_logo_html(preview_logo_path() !== '' ? 'logo1.jpg' : '');
+    $header_company_name = 'Laser Cutter Repair';
+    $header_brand_html = '<p style="margin:0 0 6px;font-size:32px;font-weight:800;line-height:1.1;color:#ffffff;letter-spacing:0.4px;">' . $escape_html($header_company_name) . '</p>'
+        . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;font-weight:400;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '');
+    $header_identity_html = $logo_html !== ''
+        ? '<table role="presentation" style="width:100%;border-collapse:collapse;"><tr>'
+            . '<td style="width:1%;padding:0 16px 0 0;vertical-align:middle;white-space:nowrap;">' . $logo_html . '</td>'
+            . '<td style="padding:0;vertical-align:middle;">' . $header_brand_html . '</td>'
+          . '</tr></table>'
+        : $header_brand_html;
 
     $footer_parts = [];
     $footer_address = preview_contact_address_line($sender_address, $sender_company, ', ');
@@ -499,8 +506,7 @@ try {
         . '<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">'
         . '<div style="max-width:680px;margin:32px auto 32px;">'
         . '<div style="background:#1e3a5f;border-radius:8px 8px 0 0;padding:28px 32px 24px;">'
-          . ($logo_html !== '' ? $logo_html : '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $escape_html($sender_company) . '</p>')
-          . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '')
+          . $header_identity_html
         . '</div>'
         . ($is_paid
             ? '<div style="background:#ffffff;padding:6px 32px 0;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
