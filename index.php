@@ -395,12 +395,12 @@ render_header('ERP Dashboard');
     <div class="dashboard-card">
       <div class="kpi-label">Total Quoted This Week</div>
       <div class="kpi-value" style="color:#1d4ed8;"><?= h(dashboard_money((float)$week_kpis['week_quoted'])) ?></div>
-      <div class="kpi-note">All quotes created this week</div>
+      <div class="kpi-note">Quotes dated or created this week</div>
     </div>
     <div class="dashboard-card">
       <div class="kpi-label">Total Invoiced This Week</div>
       <div class="kpi-value" style="color:#0f766e;"><?= h(dashboard_money((float)$week_kpis['week_invoiced'])) ?></div>
-      <div class="kpi-note">Invoices converted this week</div>
+      <div class="kpi-note">Converted invoices dated this week</div>
     </div>
     <div class="dashboard-card">
       <div class="kpi-label">Total Received This Week</div>
