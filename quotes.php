@@ -1220,7 +1220,7 @@ render_header('Quotes');
 
   <div class="card">
     <p>Customer Email Preview — This is exactly what the customer will receive:</p>
-    <iframe src="email_preview.php?id=<?= (int)$detail_quote['id'] ?>&context=quote"
+    <iframe id="quotePreviewFrame" src="email_preview.php?id=<?= (int)$detail_quote['id'] ?>&context=quote"
         style="width:100%; height:1100px; border:1px solid #e2e8f0; border-radius:8px;"
         title="Quote Email Preview"></iframe>
   </div>
@@ -1229,7 +1229,7 @@ render_header('Quotes');
     <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
       <a class="btn" href="quotes.php?view=all">Back to Quotes</a>
       <a class="btn" href="quotes.php?edit=<?= (int)$detail_quote['id'] ?>">Edit Quote</a>
-      <a class="btn" href="email_preview.php?id=<?= (int)$detail_quote['id'] ?>&context=quote" target="_blank" rel="noopener">🖨 Print</a>
+      <button type="button" class="btn" onclick="document.getElementById('quotePreviewFrame').contentWindow.print()">🖨 Print</button>
 
       <form method="post" style="margin:0;" onsubmit="return confirm('Are you sure you want to email this quote to <?= addslashes(h((string)($detail_quote["customer_name"] ?? ""))) ?>? This cannot be undone.');">
         <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
