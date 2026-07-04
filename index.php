@@ -55,6 +55,11 @@ for ($i = 5; $i >= 0; $i--) {
 }
 $months_start = array_key_first($month_series) . '-01';
 
+$cash_series = [];
+foreach ($month_series as $key => $entry) {
+  $cash_series[$key] = ['label' => $entry['label'], 'value' => 0.0];
+}
+
 if (dashboard_table_exists($pdo, 'quotes')) {
   $invoice_condition = dashboard_invoice_condition();
   try {
@@ -95,6 +100,26 @@ if (dashboard_table_exists($pdo, 'quotes')) {
       }
     }
 
+    $cash_stmt = $pdo->prepare("
+      SELECT
+        DATE_FORMAT(COALESCE(converted_at, quote_date, created_at), '%Y-%m') AS month_key,
+        COALESCE(SUM(subtotal_amount), 0) AS month_total
+      FROM quotes
+      WHERE {$invoice_condition}
+        AND payment_status = 'paid'
+        AND COALESCE(converted_at, quote_date, created_at) >= :months_start
+      GROUP BY month_key
+      ORDER BY month_key ASC
+    ");
+    $cash_stmt->execute([':months_start' => $months_start]);
+
+    foreach ($cash_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+      $month_key = trim((string)($row['month_key'] ?? ''));
+      if ($month_key !== '' && isset($cash_series[$month_key])) {
+        $cash_series[$month_key]['value'] = (float)($row['month_total'] ?? 0);
+      }
+    }
+
     $recent_quotes_stmt = $pdo->query("
       SELECT id, customer_name, quote_date, status, subtotal_amount, created_at
       FROM quotes
@@ -123,6 +148,10 @@ $line_chart_values = array_values(array_map(static fn(array $m): float => (float
 
 $conversion_converted = max(0, (int)$kpis['converted_quotes']);
 $conversion_open = max(0, (int)$kpis['total_quotes'] - $conversion_converted);
+
+$cash_chart_values = array_values(array_map(static fn(array $m): float => (float)$m['value'], $cash_series));
+$cash_collected = max(0.0, (float)$kpis['total_received']);
+$cash_outstanding = max(0.0, (float)$kpis['outstanding']);
 
 render_header('ERP Dashboard');
 ?>
@@ -324,6 +353,19 @@ render_header('ERP Dashboard');
     </div>
   </div>
 
+  <div class="charts-grid">
+    <div class="dashboard-card chart-wrap">
+      <h2 class="section-title">Cash Received Trend (Past 6 Months)</h2>
+      <p class="section-subtitle">Actual payments collected per month on paid invoices.</p>
+      <canvas id="cashReceivedChart" aria-label="Cash received trend line chart" role="img"></canvas>
+    </div>
+    <div class="dashboard-card chart-wrap">
+      <h2 class="section-title">Invoice to Cash Conversion</h2>
+      <p class="section-subtitle">Collected versus outstanding invoiced amounts.</p>
+      <canvas id="cashConversionChart" aria-label="Invoice to cash conversion pie chart" role="img"></canvas>
+    </div>
+  </div>
+
   <div class="tables-grid">
     <div class="dashboard-card">
       <h2 class="section-title">Recent Quotes</h2>
@@ -486,6 +528,87 @@ render_header('ERP Dashboard');
                 const value = Number(ctx.parsed || 0);
                 const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
                 return `${ctx.label}: ${value} (${pct}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  const cashReceivedEl = document.getElementById('cashReceivedChart');
+  if (cashReceivedEl && window.Chart) {
+    new Chart(cashReceivedEl, {
+      type: 'line',
+      data: {
+        labels: <?= json_encode($line_chart_labels, $json_safe_flags) ?>,
+        datasets: [{
+          label: 'Cash Received',
+          data: <?= json_encode($cash_chart_values, $json_safe_flags) ?>,
+          borderColor: '#16a34a',
+          backgroundColor: 'rgba(22, 163, 74, 0.12)',
+          borderWidth: 3,
+          fill: true,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          tension: 0.35
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: currencyTooltip
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { color: '#64748b', font: { weight: '600' } }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(148, 163, 184, 0.2)' },
+            ticks: {
+              color: '#64748b',
+              callback(value) {
+                return '$' + Number(value).toLocaleString();
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  const cashConversionEl = document.getElementById('cashConversionChart');
+  if (cashConversionEl && window.Chart) {
+    new Chart(cashConversionEl, {
+      type: 'pie',
+      data: {
+        labels: ['Collected', 'Outstanding'],
+        datasets: [{
+          data: <?= json_encode([$cash_collected, $cash_outstanding], $json_safe_flags) ?>,
+          backgroundColor: ['#16a34a', '#f59e0b'],
+          borderColor: '#ffffff',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { color: '#334155', boxWidth: 12, usePointStyle: true }
+          },
+          tooltip: {
+            callbacks: {
+              label(ctx) {
+                const val = Number(ctx.parsed || 0);
+                const total = (ctx.dataset.data || []).reduce((sum, n) => sum + Number(n || 0), 0);
+                const pct = total > 0 ? ((val / total) * 100).toFixed(1) : '0.0';
+                return `${ctx.label}: $${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${pct}%)`;
               }
             }
           }
