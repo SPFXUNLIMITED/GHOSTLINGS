@@ -299,6 +299,16 @@ render_header('ERP Dashboard');
   letter-spacing: .08em;
 }
 
+.erp-table .erp-row-link {
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+
+.erp-table .erp-row-link:hover td,
+.erp-table .erp-row-link:focus-visible td {
+  background: #f8fafc;
+}
+
 .status-pill {
   display: inline-flex;
   padding: 4px 10px;
@@ -435,7 +445,7 @@ render_header('ERP Dashboard');
               $quote_date = trim((string)($row['quote_date'] ?? ''));
               $display_date = $quote_date !== '' ? $quote_date : substr((string)($row['created_at'] ?? ''), 0, 10);
             ?>
-              <tr>
+              <tr class="erp-row-link" data-href="quotes.php?view=id&id=<?= (int)($row['id'] ?? 0) ?>" tabindex="0">
                 <td>#<?= (int)($row['id'] ?? 0) ?></td>
                 <td><?= h((string)($row['customer_name'] ?? '—')) ?></td>
                 <td><?= h($display_date !== '' ? $display_date : '—') ?></td>
@@ -470,7 +480,7 @@ render_header('ERP Dashboard');
               $invoice_no = trim((string)($row['converted_invoice_no'] ?? ''));
               $invoice_date = substr((string)($row['invoice_date'] ?? ''), 0, 10);
             ?>
-              <tr>
+              <tr class="erp-row-link" data-href="invoice_form.php?id=<?= (int)($row['id'] ?? 0) ?>&mode=view" tabindex="0">
                 <td><?= h($invoice_no !== '' ? $invoice_no : ('INV-' . str_pad((string)((int)($row['id'] ?? 0)), 5, '0', STR_PAD_LEFT))) ?></td>
                 <td><?= h((string)($row['customer_name'] ?? '—')) ?></td>
                 <td><?= h($invoice_date !== '' ? $invoice_date : '—') ?></td>
@@ -489,6 +499,24 @@ render_header('ERP Dashboard');
 
 <script>
 (() => {
+  const interactiveSelector = "a, button, input, select, textarea, label, [role='button'], [role='link']";
+
+  document.querySelectorAll('.erp-row-link[data-href]').forEach((row) => {
+    const href = row.getAttribute('data-href');
+    if (!href) return;
+    row.addEventListener('click', (event) => {
+      if (event.target.closest(interactiveSelector)) return;
+      window.location.href = href;
+    });
+    row.addEventListener('keydown', (event) => {
+      const isEnter = event.key === 'Enter';
+      const isSpace = event.key === ' ' || event.code === 'Space';
+      if (!isEnter && !isSpace) return;
+      event.preventDefault();
+      window.location.href = href;
+    });
+  });
+
   const revenueLabels = <?= json_encode($line_chart_labels, $json_safe_flags) ?>;
   const revenueValues = <?= json_encode($line_chart_values, $json_safe_flags) ?>;
   const conversionValues = <?= json_encode([$conversion_converted, $conversion_open], $json_safe_flags) ?>;
