@@ -66,7 +66,7 @@ if (isset($_GET['email_preview']) && isset($_GET['id'])) {
     exit;
 }
 
-function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, bool $require_payment_link = true, ?string &$error_message = null): ?array {
+function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, bool $require_payment_link = true, ?string &$error_message = null, ?string $logo_src = null): ?array {
   $error_message = null;
   $created_by    = isset($quote['created_by']) && $quote['created_by'] !== null ? (int)$quote['created_by'] : null;
   $sender        = invoice_sender_profile($pdo, $created_by);
@@ -153,6 +153,11 @@ function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, 
     $header_parts[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($sender_email) . '</a>';
   }
   $header_contact_html = implode(' &nbsp;·&nbsp; ', $header_parts);
+  $logo_path = invoice_logo_path();
+  if ($logo_src === null && $logo_path !== '') {
+    $logo_src = 'logo1.jpg';
+  }
+  $logo_html = $logo_path !== '' && $logo_src !== null && $logo_src !== '' ? invoice_logo_html($logo_src) : '';
 
   $prepared_by_html = '';
   if ($sender_name !== '') {
@@ -206,7 +211,8 @@ function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, 
 
     // ── Header banner ──
     . '<div style="background:#1e3a5f;border-radius:8px 8px 0 0;padding:28px 32px 24px;">'
-      . '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $h($sender_company) . '</p>'
+      . ($logo_html !== '' ? $logo_html : '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $h($sender_company) . '</p>')
+      . ($logo_html !== '' ? '<p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#dbeafe;">' . $h($sender_company) . '</p>' : '')
       . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '')
     . '</div>'
     . ($is_paid
@@ -510,6 +516,22 @@ function invoice_public_url(string $path, array $params = []): string {
   return $url;
 }
 
+function invoice_logo_path(): string {
+  $path = __DIR__ . '/logo1.jpg';
+  return is_file($path) && is_readable($path) ? $path : '';
+}
+
+function invoice_logo_html(string $src): string {
+  if ($src === '' || invoice_logo_path() === '') {
+    return '';
+  }
+
+  $escaped_src = htmlspecialchars($src, ENT_QUOTES, 'UTF-8');
+  return '<div style="margin:0 0 16px;text-align:left;">'
+    . '<img src="' . $escaped_src . '" alt="Company logo" style="display:block;max-width:100%;width:auto;height:auto;max-height:72px;border:0;outline:none;text-decoration:none;">'
+    . '</div>';
+}
+
 function invoice_sender_profile(PDO $pdo, ?int $created_by): array {
   $profile = ['sender_name' => '', 'company_name' => '', 'address' => '', 'phone' => '', 'email' => ''];
 
@@ -797,7 +819,9 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
     return false;
   }
 
-  $email_payload = invoice_build_email_message_data($pdo, $quote, $items, true, $error_message);
+  $logo_path = invoice_logo_path();
+  $logo_cid = 'invoice-email-logo';
+  $email_payload = invoice_build_email_message_data($pdo, $quote, $items, true, $error_message, $logo_path !== '' ? 'cid:' . $logo_cid : null);
   if ($email_payload === null) {
     error_log('Invoice email send failed for quote #' . (int)($quote['id'] ?? 0) . ' — ' . ($error_message ?? 'invoice_build_email_message_data returned null'));
     return false;
@@ -821,6 +845,9 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
     }
     $mailer->CharSet = 'UTF-8';
     $mailer->setFrom($smtp_from_email, $smtp_from_name);
+    if ($logo_path !== '') {
+      $mailer->addEmbeddedImage($logo_path, $logo_cid, basename($logo_path));
+    }
     $mailer->addAddress($to);
     $mailer->Subject  = (string)$email_payload['subject'];
     $mailer->isHTML(true);
