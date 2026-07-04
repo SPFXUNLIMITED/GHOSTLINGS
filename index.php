@@ -445,7 +445,7 @@ render_header('ERP Dashboard');
               $quote_date = trim((string)($row['quote_date'] ?? ''));
               $display_date = $quote_date !== '' ? $quote_date : substr((string)($row['created_at'] ?? ''), 0, 10);
             ?>
-              <tr class="erp-row-link" data-href="quotes.php?view=id&id=<?= (int)($row['id'] ?? 0) ?>" tabindex="0">
+              <tr class="erp-row-link" data-href="quotes.php?view=id&id=<?= (int)($row['id'] ?? 0) ?>">
                 <td>#<?= (int)($row['id'] ?? 0) ?></td>
                 <td><?= h((string)($row['customer_name'] ?? '—')) ?></td>
                 <td><?= h($display_date !== '' ? $display_date : '—') ?></td>
@@ -480,7 +480,7 @@ render_header('ERP Dashboard');
               $invoice_no = trim((string)($row['converted_invoice_no'] ?? ''));
               $invoice_date = substr((string)($row['invoice_date'] ?? ''), 0, 10);
             ?>
-              <tr class="erp-row-link" data-href="invoice_form.php?id=<?= (int)($row['id'] ?? 0) ?>&mode=view" tabindex="0">
+              <tr class="erp-row-link" data-href="invoice_form.php?id=<?= (int)($row['id'] ?? 0) ?>&mode=view">
                 <td><?= h($invoice_no !== '' ? $invoice_no : ('INV-' . str_pad((string)((int)($row['id'] ?? 0)), 5, '0', STR_PAD_LEFT))) ?></td>
                 <td><?= h((string)($row['customer_name'] ?? '—')) ?></td>
                 <td><?= h($invoice_date !== '' ? $invoice_date : '—') ?></td>
@@ -501,14 +501,8 @@ render_header('ERP Dashboard');
 (() => {
   document.querySelectorAll('.erp-row-link[data-href]').forEach((row) => {
     const href = row.getAttribute('data-href');
-    if (!href) return;
     row.addEventListener('click', (event) => {
       if (event.target.closest('a, button, input, select, textarea, label')) return;
-      window.location.href = href;
-    });
-    row.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter') return;
-      event.preventDefault();
       window.location.href = href;
     });
   });
