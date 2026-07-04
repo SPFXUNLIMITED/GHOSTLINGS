@@ -222,8 +222,13 @@ function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, 
 
     // ── Header banner ──
     . '<div style="background:#1e3a5f;border-radius:8px 8px 0 0;padding:28px 32px 24px;">'
-      . ($logo_html !== '' ? $logo_html : '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $h($sender_company) . '</p>')
-      . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '')
+      . '<div style="display:flex;align-items:center;gap:16px;">'
+        . ($logo_html !== '' ? '<div style="flex:0 0 auto;">' . $logo_html . '</div>' : '')
+        . '<div style="flex:1 1 auto;">'
+          . '<p style="margin:0 0 6px;font-size:32px;font-weight:800;line-height:1.1;color:#ffffff;letter-spacing:0.4px;">Laser Cutter Repair</p>'
+          . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '')
+        . '</div>'
+      . '</div>'
     . '</div>'
     . ($is_paid
         ? '<div style="background:#ffffff;padding:6px 32px 0;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'

@@ -434,10 +434,10 @@ try {
     $header_brand_html = '<p style="margin:0 0 6px;font-size:32px;font-weight:800;line-height:1.1;color:#ffffff;letter-spacing:0.4px;">' . $escape_html($header_company_name) . '</p>'
         . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;font-weight:400;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '');
     $header_identity_html = $logo_html !== ''
-        ? '<table role="presentation" style="width:100%;border-collapse:collapse;"><tr>'
-            . '<td style="width:1%;padding:0 16px 0 0;vertical-align:middle;white-space:nowrap;">' . $logo_html . '</td>'
-            . '<td style="padding:0;vertical-align:middle;">' . $header_brand_html . '</td>'
-          . '</tr></table>'
+        ? '<div style="display:flex;align-items:center;gap:16px;">'
+            . '<div style="flex:0 0 auto;">' . $logo_html . '</div>'
+            . '<div style="flex:1 1 auto;">' . $header_brand_html . '</div>'
+          . '</div>'
         : $header_brand_html;
 
     $footer_parts = [];
