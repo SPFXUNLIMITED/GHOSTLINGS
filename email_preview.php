@@ -14,6 +14,17 @@ function preview_single_line(string $value, string $separator): string {
     return trim((string)preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], $separator, $value)));
 }
 
+function preview_contact_address_line(string $address, string $company, string $separator): string {
+    $line = preview_single_line($address, $separator);
+    if ($line === '' || $company === '') {
+        return $line;
+    }
+
+    $pattern = '/^' . preg_quote($company, '/') . '(?:\s*(?:,|·|-)\s*)?/i';
+    $line = trim((string)preg_replace($pattern, '', $line));
+    return $line;
+}
+
 function preview_format_quantity($value): string {
     $quantity = (float)$value;
     if (abs($quantity - round($quantity)) < 0.00001) {
@@ -409,8 +420,9 @@ try {
     }
 
     $header_contact_parts = [];
-    if ($sender_address !== '') {
-        $header_contact_parts[] = $escape_html(preview_single_line($sender_address, ' · '));
+    $header_address = preview_contact_address_line($sender_address, $sender_company, ' · ');
+    if ($header_address !== '') {
+        $header_contact_parts[] = $escape_html($header_address);
     }
     if ($sender_phone !== '') {
         $header_contact_parts[] = $escape_html($sender_phone);
@@ -422,8 +434,9 @@ try {
     $logo_html = preview_logo_html(preview_logo_path() !== '' ? 'logo1.jpg' : '');
 
     $footer_parts = [];
-    if ($sender_address !== '') {
-        $footer_parts[] = $escape_html(preview_single_line($sender_address, ', '));
+    $footer_address = preview_contact_address_line($sender_address, $sender_company, ', ');
+    if ($footer_address !== '') {
+        $footer_parts[] = $escape_html($footer_address);
     }
     if ($sender_phone !== '') {
         $footer_parts[] = $escape_html($sender_phone);
@@ -487,7 +500,6 @@ try {
         . '<div style="max-width:680px;margin:32px auto 32px;">'
         . '<div style="background:#1e3a5f;border-radius:8px 8px 0 0;padding:28px 32px 24px;">'
           . ($logo_html !== '' ? $logo_html : '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $escape_html($sender_company) . '</p>')
-          . ($logo_html !== '' ? '<p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#dbeafe;">' . $escape_html($sender_company) . '</p>' : '')
           . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '')
         . '</div>'
         . ($is_paid
