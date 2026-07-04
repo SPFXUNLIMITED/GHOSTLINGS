@@ -368,11 +368,11 @@ function quote_sender_profile(PDO $pdo, array $quote): array {
   return $profile;
 }
 
-function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_message = null): bool {
+function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_message = null, ?string $override_to = null): bool {
   $error_message = null;
-  $to = trim((string)($quote['email'] ?? ''));
+  $to = $override_to !== null ? trim($override_to) : trim((string)($quote['email'] ?? ''));
   if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
-    $error_message = 'Quote email address is missing or invalid.';
+    $error_message = $override_to !== null ? 'Override email address is missing or invalid.' : 'Quote email address is missing or invalid.';
     return false;
   }
 
@@ -1070,6 +1070,8 @@ $saved = isset($_GET['saved']) && $_GET['saved'] === '1';
 $updated = isset($_GET['updated']) && $_GET['updated'] === '1';
 $invoice_converted = isset($_GET['invoice_converted']) && $_GET['invoice_converted'] === '1';
 $email_sent = isset($_GET['email_sent']) && $_GET['email_sent'] === '1';
+$email_sent_myself = isset($_GET['email_sent_myself']) && $_GET['email_sent_myself'] === '1';
+$email_sent_admin = isset($_GET['email_sent_admin']) && $_GET['email_sent_admin'] === '1';
 $deleted = isset($_GET['deleted']) && $_GET['deleted'] === '1';
 $status_updated = isset($_GET['status_updated']) && $_GET['status_updated'] === '1';
 $approval_sent = isset($_GET['approval_sent']) && $_GET['approval_sent'] === '1';
@@ -1244,6 +1246,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['quotes_csrf'] = bin2hex(random_bytes(24));
             header('Location: quotes.php?view=id&id=' . $row_id . '&email_sent=1');
             exit;
+          }
+        }
+      }
+    } elseif ($action === 'send_email_myself') {
+      $row_id = (int)($_POST['row_id'] ?? 0);
+      $stmt = $pdo->prepare("SELECT * FROM quotes WHERE id = ? LIMIT 1");
+      $stmt->execute([$row_id]);
+      $quote = $stmt->fetch();
+      if (!$quote) {
+        $errors[] = 'Quote not found.';
+      } else {
+        $me_stmt = $pdo->prepare("SELECT email FROM users WHERE id = ? LIMIT 1");
+        $me_stmt->execute([current_user_id()]);
+        $me = $me_stmt->fetch();
+        $my_email = trim((string)($me['email'] ?? ''));
+        if ($my_email === '' || !filter_var($my_email, FILTER_VALIDATE_EMAIL)) {
+          $errors[] = 'Your account does not have a valid email address configured.';
+        } else {
+          $item_stmt = $pdo->prepare("SELECT description, quantity, unit_price, line_total FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC");
+          $item_stmt->execute([$row_id]);
+          $items = $item_stmt->fetchAll();
+          if (!$items) {
+            $errors[] = 'Cannot send email: quote has no line items.';
+          } else {
+            $email_error = null;
+            if (!quote_send_email($pdo, $quote, $items, $email_error, $my_email)) {
+              $errors[] = $email_error !== null && $email_error !== '' ? $email_error : 'Email was not sent.';
+            } else {
+              $_SESSION['quotes_csrf'] = bin2hex(random_bytes(24));
+              header('Location: quotes.php?view=id&id=' . $row_id . '&email_sent_myself=1');
+              exit;
+            }
+          }
+        }
+      }
+    } elseif ($action === 'send_email_admin') {
+      $row_id = (int)($_POST['row_id'] ?? 0);
+      $stmt = $pdo->prepare("SELECT * FROM quotes WHERE id = ? LIMIT 1");
+      $stmt->execute([$row_id]);
+      $quote = $stmt->fetch();
+      if (!$quote) {
+        $errors[] = 'Quote not found.';
+      } else {
+        $zeke_stmt = $pdo->prepare("SELECT email FROM users WHERE username = 'Zeke' LIMIT 1");
+        $zeke_stmt->execute();
+        $zeke = $zeke_stmt->fetch();
+        $zeke_email = trim((string)($zeke['email'] ?? ''));
+        if ($zeke_email === '' || !filter_var($zeke_email, FILTER_VALIDATE_EMAIL)) {
+          $errors[] = 'Admin (Zeke) does not have a valid email address configured.';
+        } else {
+          $item_stmt = $pdo->prepare("SELECT description, quantity, unit_price, line_total FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC");
+          $item_stmt->execute([$row_id]);
+          $items = $item_stmt->fetchAll();
+          if (!$items) {
+            $errors[] = 'Cannot send email: quote has no line items.';
+          } else {
+            $email_error = null;
+            if (!quote_send_email($pdo, $quote, $items, $email_error, $zeke_email)) {
+              $errors[] = $email_error !== null && $email_error !== '' ? $email_error : 'Email was not sent.';
+            } else {
+              $_SESSION['quotes_csrf'] = bin2hex(random_bytes(24));
+              header('Location: quotes.php?view=id&id=' . $row_id . '&email_sent_admin=1');
+              exit;
+            }
           }
         }
       }
@@ -1546,6 +1612,12 @@ render_header('Quotes');
 <?php if ($email_sent): ?>
   <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Quote email sent successfully.</div>
 <?php endif; ?>
+<?php if ($email_sent_myself): ?>
+  <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Quote emailed to yourself successfully.</div>
+<?php endif; ?>
+<?php if ($email_sent_admin): ?>
+  <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Quote emailed to admin (Zeke) successfully.</div>
+<?php endif; ?>
 <?php if ($deleted): ?>
   <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Quote deleted successfully.</div>
 <?php endif; ?>
@@ -1613,7 +1685,21 @@ render_header('Quotes');
         <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
         <input type="hidden" name="action" value="send_email" />
         <input type="hidden" name="row_id" value="<?= (int)$detail_quote['id'] ?>" />
-        <button type="submit" class="btn">Email Quote</button>
+        <button type="submit" class="btn">Email Quote to Customer</button>
+      </form>
+
+      <form method="post" style="margin:0;" onsubmit="return confirm('Send a copy of this quote to yourself?');">
+        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
+        <input type="hidden" name="action" value="send_email_myself" />
+        <input type="hidden" name="row_id" value="<?= (int)$detail_quote['id'] ?>" />
+        <button type="submit" class="btn">Email Quote to Myself</button>
+      </form>
+
+      <form method="post" style="margin:0;" onsubmit="return confirm('Send a copy of this quote to admin (Zeke)?');">
+        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
+        <input type="hidden" name="action" value="send_email_admin" />
+        <input type="hidden" name="row_id" value="<?= (int)$detail_quote['id'] ?>" />
+        <button type="submit" class="btn">Email Quote to Admin</button>
       </form>
 
       <form method="post" style="margin:0;">
