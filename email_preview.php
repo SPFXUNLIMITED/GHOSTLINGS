@@ -566,10 +566,7 @@ try {
                 . '<p style="margin:0;font-size:13px;color:#64748b;">' . $prepared_by_html . '</p>'
               . '</div>'
             : '')
-        . '<div style="background:#1e3a5f;border-radius:0 0 8px 8px;padding:18px 32px;">'
-          . '<p style="margin:0;font-size:12px;color:#93c5fd;line-height:1.6;">'
-            . $escape_html($sender_company)
-          . '</p>'
+        . '<div style="background:#1e3a5f;border-radius:0 0 8px 8px;padding:10px 32px;">'
         . '</div>'
         . '</div>'
         . '</body></html>';
