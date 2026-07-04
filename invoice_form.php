@@ -1114,7 +1114,7 @@ function invoice_quote_date_value(?array $quote, string $fallback): string {
 }
 
 $today = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Y-m-d');
-$is_view_mode = $view_mode_requested && $quote !== null;
+$is_view_mode = $view_mode_requested;
 $invoice_heading = $is_view_mode ? 'View Invoice' : ($quote ? 'Edit Invoice' : 'New Invoice');
 $invoice_subtitle = $quote
   ? ($is_view_mode
@@ -1252,7 +1252,7 @@ render_header($invoice_heading);
   <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b;"><?= h($invoice_credit_error) ?></div>
 <?php endif; ?>
 
-<?php if ($is_view_mode && $quote): ?>
+<?php if ($is_view_mode): ?>
   <?php
     $inv_paid_bg    = $invoice_is_paid ? '#dcfce7' : '#f1f5f9';
     $inv_paid_color = $invoice_is_paid ? '#166534' : '#475569';
