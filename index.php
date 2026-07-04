@@ -24,6 +24,10 @@ function dashboard_money(float $value): string {
   return '$' . number_format($value, 2);
 }
 
+function dashboard_invoice_condition(): string {
+  return "(status = 'converted' OR (converted_invoice_no IS NOT NULL AND converted_invoice_no <> ''))";
+}
+
 $tz = new DateTimeZone(defined('APP_TZ') ? APP_TZ : date_default_timezone_get());
 $today = new DateTimeImmutable('now', $tz);
 $json_safe_flags = JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
@@ -52,13 +56,14 @@ for ($i = 5; $i >= 0; $i--) {
 $months_start = array_key_first($month_series) . '-01';
 
 if (dashboard_table_exists($pdo, 'quotes')) {
+  $invoice_condition = dashboard_invoice_condition();
   try {
     $kpi_stmt = $pdo->query("
       SELECT
         COALESCE(SUM(subtotal_amount), 0) AS total_quoted,
-        COALESCE(SUM(CASE WHEN status = 'converted' OR (converted_invoice_no IS NOT NULL AND converted_invoice_no <> '') THEN subtotal_amount ELSE 0 END), 0) AS total_invoiced,
-        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN subtotal_amount ELSE 0 END), 0) AS total_received,
-        COALESCE(SUM(CASE WHEN status = 'converted' OR (converted_invoice_no IS NOT NULL AND converted_invoice_no <> '') THEN 1 ELSE 0 END), 0) AS converted_quotes,
+        COALESCE(SUM(CASE WHEN {$invoice_condition} THEN subtotal_amount ELSE 0 END), 0) AS total_invoiced,
+        COALESCE(SUM(CASE WHEN {$invoice_condition} AND payment_status = 'paid' THEN subtotal_amount ELSE 0 END), 0) AS total_received,
+        COALESCE(SUM(CASE WHEN {$invoice_condition} THEN 1 ELSE 0 END), 0) AS converted_quotes,
         COUNT(*) AS total_quotes
       FROM quotes
     ");
@@ -76,7 +81,7 @@ if (dashboard_table_exists($pdo, 'quotes')) {
         DATE_FORMAT(COALESCE(converted_at, quote_date, created_at), '%Y-%m') AS month_key,
         COALESCE(SUM(subtotal_amount), 0) AS month_total
       FROM quotes
-      WHERE (status = 'converted' OR (converted_invoice_no IS NOT NULL AND converted_invoice_no <> ''))
+      WHERE {$invoice_condition}
         AND COALESCE(converted_at, quote_date, created_at) >= :months_start
       GROUP BY month_key
       ORDER BY month_key ASC
@@ -103,7 +108,7 @@ if (dashboard_table_exists($pdo, 'quotes')) {
              COALESCE(converted_at, quote_date, created_at) AS invoice_date,
              payment_status, subtotal_amount
       FROM quotes
-      WHERE status = 'converted' OR (converted_invoice_no IS NOT NULL AND converted_invoice_no <> '')
+      WHERE {$invoice_condition}
       ORDER BY COALESCE(converted_at, quote_date, created_at) DESC, id DESC
       LIMIT 8
     ");
@@ -401,7 +406,8 @@ render_header('ERP Dashboard');
   const currencyTooltip = {
     callbacks: {
       label(ctx) {
-        const val = Number(ctx.parsed.y ?? ctx.parsed ?? 0);
+        const parsed = ctx.parsed;
+        const val = Number(parsed && typeof parsed === 'object' ? (parsed.y ?? 0) : (parsed ?? 0));
         return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       }
     }
