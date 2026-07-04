@@ -499,10 +499,13 @@ render_header('ERP Dashboard');
 
 <script>
 (() => {
+  const interactiveSelector = "a, button, input, select, textarea, label, [role='button'], [role='link']";
+
   document.querySelectorAll('.erp-row-link[data-href]').forEach((row) => {
     const href = row.getAttribute('data-href');
+    if (!href) return;
     row.addEventListener('click', (event) => {
-      if (event.target.closest("a, button, input, select, textarea, label, [role='button'], [role='link']")) return;
+      if (event.target.closest(interactiveSelector)) return;
       window.location.href = href;
     });
     row.addEventListener('keydown', (event) => {
