@@ -1838,6 +1838,7 @@ render_header($invoice_heading);
         <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
       <?php endif; ?>
       <a class="btn primary" href="invoice_form.php?id=<?= (int)$quote_id ?>">Edit Invoice</a>
+      <button type="button" class="btn" id="inv-view-print-btn">🖨 Print</button>
       <?php if (trim((string)($quote['email'] ?? '')) !== ''): ?>
         <form method="post" style="margin:0;" action="" onsubmit="return confirm('Are you sure you want to email this invoice to <?= addslashes(h((string)($quote["customer_name"] ?? ""))) ?>? This cannot be undone.');">
           <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
@@ -2632,6 +2633,23 @@ render_header($invoice_heading);
   if (taxRowNode) taxRowNode.style.display = (taxRate > 0 && taxAmount > 0) ? '' : 'none';
   if (grandNode) grandNode.textContent = (subtotal + taxAmount).toFixed(2);
 })();
+</script>
+<?php endif; ?>
+<?php if ($is_view_mode && $quote): ?>
+<script>
+(function () {
+  var printBtn = document.getElementById('inv-view-print-btn');
+  if (!printBtn) return;
+  printBtn.addEventListener('click', function () {
+    var iframe = document.querySelector('iframe[src*="email_preview.php"]');
+    if (!iframe || !iframe.contentWindow) {
+      window.print();
+      return;
+    }
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+  });
+}());
 </script>
 <?php endif; ?>
 <?php render_footer(); ?>
