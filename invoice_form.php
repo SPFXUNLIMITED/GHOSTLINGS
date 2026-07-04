@@ -66,6 +66,16 @@ if (isset($_GET['email_preview']) && isset($_GET['id'])) {
     exit;
 }
 
+function invoice_contact_address_line(string $address, string $company, string $separator): string {
+  $line = trim((string)preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], $separator, $address)));
+  if ($line === '' || $company === '') {
+    return $line;
+  }
+
+  $pattern = '/^' . preg_quote($company, '/') . '(?:\s*(?:,|·|-)\s*)?/i';
+  return trim((string)preg_replace($pattern, '', $line));
+}
+
 function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, bool $require_payment_link = true, ?string &$error_message = null, ?string $logo_src = null): ?array {
   $error_message = null;
   $created_by    = isset($quote['created_by']) && $quote['created_by'] !== null ? (int)$quote['created_by'] : null;
@@ -143,9 +153,9 @@ function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, 
   $h = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 
   $header_parts = [];
-  if ($sender_address !== '') {
-    $addr_oneline = str_replace(["\r\n", "\r", "\n"], ' · ', $sender_address);
-    $addr_oneline = preg_replace('/\s+/', ' ', $addr_oneline);
+  $header_address = invoice_contact_address_line($sender_address, $sender_company, ' · ');
+  if ($header_address !== '') {
+    $addr_oneline = $header_address;
     $header_parts[] = $h($addr_oneline);
   }
   if ($sender_phone !== '') $header_parts[] = $h($sender_phone);
@@ -169,8 +179,9 @@ function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, 
   }
 
   $footer_parts = [];
-  if ($sender_address !== '') {
-    $footer_parts[] = $h(preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ', ', $sender_address)));
+  $footer_address = invoice_contact_address_line($sender_address, $sender_company, ', ');
+  if ($footer_address !== '') {
+    $footer_parts[] = $h($footer_address);
   }
   if ($sender_phone !== '') $footer_parts[] = $h($sender_phone);
   if ($sender_email !== '') {
@@ -212,7 +223,6 @@ function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, 
     // ── Header banner ──
     . '<div style="background:#1e3a5f;border-radius:8px 8px 0 0;padding:28px 32px 24px;">'
       . ($logo_html !== '' ? $logo_html : '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $h($sender_company) . '</p>')
-      . ($logo_html !== '' ? '<p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#dbeafe;">' . $h($sender_company) . '</p>' : '')
       . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '')
     . '</div>'
     . ($is_paid
