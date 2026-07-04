@@ -1371,7 +1371,7 @@ render_header($invoice_heading);
 
   <div class="card">
     <p>Customer Email Preview — This is exactly what the customer will receive:</p>
-    <iframe src="email_preview.php?id=<?= (int)$quote_id ?>&context=invoice"
+    <iframe id="invoicePreviewFrame" src="email_preview.php?id=<?= (int)$quote_id ?>&context=invoice"
         style="width:100%; height:1100px; border:1px solid #e2e8f0; border-radius:8px;"
         title="Invoice Email Preview"></iframe>
   </div>
@@ -1383,7 +1383,7 @@ render_header($invoice_heading);
         <a class="btn" href="quotes.php?view=id&id=<?= (int)$quote_id ?>">Back to Quote</a>
       <?php endif; ?>
       <a class="btn primary" href="invoice_form.php?id=<?= (int)$quote_id ?>">Edit Invoice</a>
-      <a class="btn" href="email_preview.php?id=<?= (int)$quote_id ?>&context=invoice" target="_blank" rel="noopener">🖨 Print</a>
+      <button type="button" class="btn" onclick="document.getElementById('invoicePreviewFrame').contentWindow.print()">🖨 Print</button>
       <?php if (trim((string)($quote['email'] ?? '')) !== ''): ?>
         <form method="post" style="margin:0;" action="" onsubmit="return confirm('Are you sure you want to email this invoice to <?= addslashes(h((string)($quote["customer_name"] ?? ""))) ?>? This cannot be undone.');">
           <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
