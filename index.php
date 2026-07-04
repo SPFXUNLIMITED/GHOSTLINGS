@@ -5,885 +5,486 @@ require __DIR__ . '/auth.php';
 
 require_login();
 
-function dashboard_validate_identifier(string $name): string {
-  if (!preg_match('/^[A-Za-z0-9_]+$/', $name)) {
-    throw new InvalidArgumentException('Invalid SQL identifier: only letters, numbers, and underscores are allowed.');
-  }
-  return "`{$name}`";
-}
-
-
-function dashboard_sql_fragment(string $key): string {
-  static $allowed = [
-    'created_at' => 'created_at',
-    'received_on' => 'received_on',
-    'rfq_quote_received' => 'COALESCE(received_on, DATE(created_at))',
-    'rfq_order_created' => 'COALESCE(order_date, DATE(created_at))',
-    'shipping_quote_received' => 'COALESCE(received_on, DATE(created_at))',
-    'shipped_at' => 'shipped_at',
-    'count_all' => 'COUNT(*)',
-    'sum_quantity' => 'SUM(COALESCE(quantity, 1))',
-  ];
-
-  if (!isset($allowed[$key])) {
-    throw new InvalidArgumentException('Invalid dashboard SQL fragment key.');
-  }
-
-  return $allowed[$key];
-}
-
 function dashboard_table_exists(PDO $pdo, string $table): bool {
   static $cache = [];
   if (array_key_exists($table, $cache)) {
     return $cache[$table];
   }
 
-  $validated_table = trim(dashboard_validate_identifier($table), '`');
-  $stmt = $pdo->query("SHOW TABLES LIKE " . $pdo->quote($validated_table));
-  return $cache[$table] = (bool)$stmt->fetchColumn();
-}
-
-function dashboard_safe_count(PDO $pdo, string $sql, array $params = []): int {
   try {
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    return (int)$stmt->fetchColumn();
+    $stmt = $pdo->query('SHOW TABLES LIKE ' . $pdo->quote($table));
+    return $cache[$table] = (bool)$stmt->fetchColumn();
   } catch (Throwable $e) {
-    error_log('Dashboard count query failed: ' . $e->getMessage());
-    return 0;
+    error_log('Dashboard table check failed: ' . $e->getMessage());
+    return $cache[$table] = false;
   }
 }
 
-function dashboard_weekly_count(PDO $pdo, string $table, string $date_expression_key, string $start_date, string $end_date): int {
-  if (!dashboard_table_exists($pdo, $table)) {
-    return 0;
-  }
-
-  $date_expression = dashboard_sql_fragment($date_expression_key);
-  $sql = "
-    SELECT COUNT(*)
-    FROM " . dashboard_validate_identifier($table) . "
-    WHERE {$date_expression} IS NOT NULL
-      AND DATE({$date_expression}) >= :start_date
-      AND DATE({$date_expression}) < :end_date
-  ";
-
-  return dashboard_safe_count($pdo, $sql, [
-    ':start_date' => $start_date,
-    ':end_date' => $end_date,
-  ]);
-}
-
-function dashboard_weekly_total(PDO $pdo, string $table, string $date_expression_key, string $value_expression_key, string $start_date, string $end_date): int {
-  if (!dashboard_table_exists($pdo, $table)) {
-    return 0;
-  }
-
-  $date_expression = dashboard_sql_fragment($date_expression_key);
-  $value_expression = dashboard_sql_fragment($value_expression_key);
-  $sql = "
-    SELECT COALESCE({$value_expression}, 0)
-    FROM " . dashboard_validate_identifier($table) . "
-    WHERE {$date_expression} IS NOT NULL
-      AND DATE({$date_expression}) >= :start_date
-      AND DATE({$date_expression}) < :end_date
-  ";
-
-  return dashboard_safe_count($pdo, $sql, [
-    ':start_date' => $start_date,
-    ':end_date' => $end_date,
-  ]);
-}
-
-function dashboard_goal_state(int $value, int $target, float $expected_ratio): array {
-  $expected_ratio = max(0.0, min(1.0, $expected_ratio));
-  $expected_total = $target > 0 ? ($target * $expected_ratio) : 0.0;
-  $pace_ratio = $expected_total > 0 ? ($value / $expected_total) : ($value > 0 ? 1.0 : 0.0);
-
-  if ($value >= $target || $pace_ratio >= 1) {
-    return [
-      'label'   => 'On Track',
-      'tone'    => 'green',
-      'message' => 'You\'re hitting your target — keep the momentum going.',
-    ];
-  }
-
-  if ($pace_ratio >= 0.65) {
-    return [
-      'label'   => 'Push Today',
-      'tone'    => 'yellow',
-      'message' => 'You\'re close — a focused effort today should close the gap.',
-    ];
-  }
-
-  return [
-    'label'   => 'Needs Attention',
-    'tone'    => 'red',
-    'message' => 'You\'re running behind pace. Catch up today to hit the weekly target.',
-  ];
-}
-
-function dashboard_daily_series(PDO $pdo, string $table, string $date_expression_key, string $value_expression_key, DateTimeImmutable $start_date, DateTimeImmutable $end_date): array {
-  $days = [];
-  $cursor = $start_date;
-  while ($cursor <= $end_date) {
-    $key = $cursor->format('Y-m-d');
-    $days[$key] = [
-      'label' => $cursor->format('M j'),
-      'total' => 0,
-    ];
-    $cursor = $cursor->modify('+1 day');
-  }
-
-  if (!dashboard_table_exists($pdo, $table)) {
-    return [
-      'labels' => array_column($days, 'label'),
-      'values' => array_column($days, 'total'),
-    ];
-  }
-
-  $date_expression = dashboard_sql_fragment($date_expression_key);
-  $value_expression = dashboard_sql_fragment($value_expression_key);
-
-  try {
-    $stmt = $pdo->prepare("
-      SELECT DATE({$date_expression}) AS activity_date, {$value_expression} AS total
-      FROM " . dashboard_validate_identifier($table) . "
-      WHERE {$date_expression} IS NOT NULL
-        AND DATE({$date_expression}) >= :start_date
-        AND DATE({$date_expression}) <= :end_date
-      GROUP BY DATE({$date_expression})
-      ORDER BY activity_date ASC
-    ");
-    $stmt->execute([
-      ':start_date' => $start_date->format('Y-m-d'),
-      ':end_date'   => $end_date->format('Y-m-d'),
-    ]);
-
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-      $activity_date = trim((string)($row['activity_date'] ?? ''));
-      if ($activity_date === '' || !isset($days[$activity_date])) {
-        continue;
-      }
-      $days[$activity_date]['total'] += (int)round((float)($row['total'] ?? 0));
-    }
-  } catch (Throwable $e) {
-    error_log('Dashboard series query failed: ' . $e->getMessage());
-  }
-
-  return [
-    'labels' => array_column($days, 'label'),
-    'values' => array_column($days, 'total'),
-  ];
+function dashboard_money(float $value): string {
+  return '$' . number_format($value, 2);
 }
 
 $tz = new DateTimeZone(defined('APP_TZ') ? APP_TZ : date_default_timezone_get());
-$today = new DateTimeImmutable('today', $tz);
-// Compute Monday of the active work week (current Monday–Sunday week).
-$days_since_monday = ((int)$today->format('N')) - 1;
-$week_start = $today->modify("-{$days_since_monday} days");
-$next_week_start = $week_start->modify('+1 week');
-$thirty_days_out = $today->modify('+30 days');
-$week_progress_ratio = ((int)$today->format('N')) / 7;
-$current_hour = (int)(new DateTimeImmutable('now', $tz))->format('G');
-$time_greeting = $current_hour < 12 ? 'Good morning' : ($current_hour < 17 ? 'Good afternoon' : 'Good evening');
-
-$user_display_name = trim((string)(current_username() ?? ''));
-if (($current_user_id = current_user_id()) !== null) {
-  try {
-    $user_stmt = $pdo->prepare("SELECT contact_name, username FROM users WHERE id = ? LIMIT 1");
-    $user_stmt->execute([$current_user_id]);
-    $user_row = $user_stmt->fetch(PDO::FETCH_ASSOC);
-    if ($user_row) {
-      $profile_name = trim((string)($user_row['contact_name'] ?? ''));
-      $username_name = trim((string)($user_row['username'] ?? ''));
-      $user_display_name = $profile_name !== '' ? $profile_name : ($username_name !== '' ? $username_name : $user_display_name);
-    }
-  } catch (Throwable $e) {
-    error_log('Dashboard user lookup failed: ' . $e->getMessage());
-  }
-}
-if ($user_display_name === '') {
-  $user_display_name = 'there';
-}
-
-$daily_motivation_messages = [
-  'Hope you crush it today and keep the deals moving.',
-  'Let’s stack a few strong wins and build real sourcing momentum.',
-  'You’re set up for a focused day—keep the pipeline flowing.',
-  'Stay sharp, close the next best deal, and keep progress steady.',
-  'One consistent push today can create a huge week.',
-  'Make today count with clear decisions and fast follow-through.',
-  'Keep your standards high and your execution even higher.',
-  'You’ve got this—move the right priorities forward today.',
-  'Turn today’s outreach into tomorrow’s results.',
-  'Keep the momentum alive; every solid action compounds.',
-  'Dial in, stay proactive, and keep the wins coming.',
-  'Strong focus today sets up an even stronger finish this week.',
-];
-$daily_message = $daily_motivation_messages[((int)$today->format('z')) % count($daily_motivation_messages)];
-$personalized_motivation = "{$time_greeting}, {$user_display_name}. {$daily_message}";
-
-$weekly_goals = [
-  [
-    'title' => 'RFQs Sent',
-    'label' => 'RFQs Sent This Week',
-    'desc'  => 'Reach out to enough suppliers to keep pricing competitive and your sourcing options open.',
-    'value' => dashboard_weekly_count($pdo, 'rfq_requests', 'created_at', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
-    'accent_key' => 'sky',
-    'target' => 10,
-  ],
-  [
-    'title' => 'Quotes Received',
-    'label' => 'Quotes Received This Week',
-    'desc'  => 'Collect supplier responses so you can compare pricing, lead times, and terms before committing.',
-    'value' => dashboard_weekly_count($pdo, 'rfq_quotes', 'received_on', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
-    'accent_key' => 'violet',
-    'target' => 10,
-  ],
-  [
-    'title' => 'Purchase Orders Sent',
-    'label' => 'Purchase Orders Sent This Week',
-    'desc'  => 'Convert approved quotes into purchase orders to lock in pricing and move stock toward fulfillment.',
-    'value' => dashboard_weekly_count($pdo, 'rfq_orders', 'rfq_order_created', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
-    'accent_key' => 'emerald',
-    'target' => 4,
-  ],
-  [
-    'title' => 'Items Shipped',
-    'label' => 'Items Shipped This Week',
-    'desc'  => 'Verify shipments are on their way and that quantities match what was ordered.',
-    'value' => dashboard_weekly_total($pdo, 'rfq_orders', 'shipped_at', 'sum_quantity', $week_start->format('Y-m-d'), $next_week_start->format('Y-m-d')),
-    'accent_key' => 'amber',
-    'target' => 3,
-  ],
-];
-
-foreach ($weekly_goals as &$goal) {
-  $goal['pace_target'] = min((int)$goal['target'], (int)ceil($goal['target'] * $week_progress_ratio));
-  $goal['remaining'] = max(0, (int)$goal['target'] - (int)$goal['value']);
-  $goal['progress_percent'] = $goal['target'] > 0 ? min(100, ((int)$goal['value'] / (int)$goal['target']) * 100) : 0;
-  $goal['state'] = dashboard_goal_state((int)$goal['value'], (int)$goal['target'], $week_progress_ratio);
-}
-unset($goal);
-
-$weekly_activity_total = (int)array_sum(array_column($weekly_goals, 'value'));
-$goals_on_track = count(array_filter($weekly_goals, static fn(array $goal): bool => ($goal['state']['tone'] ?? '') === 'green'));
-$today_priorities = [
-  'Send out new RFQs for various machine sizes, air pumps, centrifugal fans, mirrors, lenses, and different wattage laser tubes',
-  'Review all Alibaba chats for quotes that have not been input into the system yet and add them to the current RFQs',
-  'Review all quotes to ensure they include crate costs, crate weights, crate dimensions, lead time, and preferred shipping port so we can calculate accurate price per unit',
-  'Once you have 3–5 quotes, decide on the best quote and submit it for purchase approval',
-];
-
-$items_in_production = dashboard_table_exists($pdo, 'rfq_orders')
-  ? dashboard_safe_count(
-      $pdo,
-      "
-        SELECT COUNT(*)
-        FROM rfq_orders
-        WHERE order_status <> 'cancelled'
-          AND (
-            (production_started_at IS NOT NULL AND shipped_at IS NULL)
-            OR order_status IN ('vendor_produces_machine', 'in_production', 'ready_to_ship')
-          )
-      "
-    )
-  : 0;
-
-$shipments_in_transit = dashboard_table_exists($pdo, 'incoming_shipments')
-  ? dashboard_safe_count(
-      $pdo,
-      "
-        SELECT COUNT(*)
-        FROM incoming_shipments
-        WHERE status = 'In Transit'
-      "
-    )
-  : 0;
-
-$expected_arrivals = dashboard_table_exists($pdo, 'incoming_shipments')
-  ? dashboard_safe_count(
-      $pdo,
-      "
-        SELECT COUNT(*)
-        FROM incoming_shipments
-        WHERE expected_arrival >= :today
-          AND expected_arrival <= :thirty_days_out
-          AND status <> 'Received'
-      ",
-      [
-        ':today' => $today->format('Y-m-d'),
-        ':thirty_days_out' => $thirty_days_out->format('Y-m-d'),
-      ]
-    )
-  : 0;
-
-$chart_start = $today->modify('-59 days');
-$rfq_chart = dashboard_daily_series($pdo, 'rfq_requests', 'created_at', 'count_all', $chart_start, $today);
-$shipped_chart = dashboard_daily_series($pdo, 'rfq_orders', 'shipped_at', 'sum_quantity', $chart_start, $today);
-$last_updated = (new DateTimeImmutable('now', $tz))->format('M j, Y g:i A T');
+$today = new DateTimeImmutable('now', $tz);
 $json_safe_flags = JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 
-render_header('Alibaba Sourcing Dashboard - Weekly Goals');
+$kpis = [
+  'total_quoted' => 0.0,
+  'total_invoiced' => 0.0,
+  'total_received' => 0.0,
+  'outstanding' => 0.0,
+  'converted_quotes' => 0,
+  'total_quotes' => 0,
+];
+
+$recent_quotes = [];
+$recent_invoices = [];
+
+$month_series = [];
+for ($i = 5; $i >= 0; $i--) {
+  $month_date = $today->modify("first day of -{$i} month");
+  $month_key = $month_date->format('Y-m');
+  $month_series[$month_key] = [
+    'label' => $month_date->format('M Y'),
+    'value' => 0.0,
+  ];
+}
+$months_start = array_key_first($month_series) . '-01';
+
+if (dashboard_table_exists($pdo, 'quotes')) {
+  try {
+    $kpi_stmt = $pdo->query("
+      SELECT
+        COALESCE(SUM(subtotal_amount), 0) AS total_quoted,
+        COALESCE(SUM(CASE WHEN status = 'converted' OR (converted_invoice_no IS NOT NULL AND converted_invoice_no <> '') THEN subtotal_amount ELSE 0 END), 0) AS total_invoiced,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN subtotal_amount ELSE 0 END), 0) AS total_received,
+        COALESCE(SUM(CASE WHEN status = 'converted' OR (converted_invoice_no IS NOT NULL AND converted_invoice_no <> '') THEN 1 ELSE 0 END), 0) AS converted_quotes,
+        COUNT(*) AS total_quotes
+      FROM quotes
+    ");
+    $kpi_row = $kpi_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+    $kpis['total_quoted'] = (float)($kpi_row['total_quoted'] ?? 0);
+    $kpis['total_invoiced'] = (float)($kpi_row['total_invoiced'] ?? 0);
+    $kpis['total_received'] = (float)($kpi_row['total_received'] ?? 0);
+    $kpis['converted_quotes'] = (int)($kpi_row['converted_quotes'] ?? 0);
+    $kpis['total_quotes'] = (int)($kpi_row['total_quotes'] ?? 0);
+    $kpis['outstanding'] = max(0, $kpis['total_invoiced'] - $kpis['total_received']);
+
+    $revenue_stmt = $pdo->prepare("
+      SELECT
+        DATE_FORMAT(COALESCE(converted_at, quote_date, created_at), '%Y-%m') AS month_key,
+        COALESCE(SUM(subtotal_amount), 0) AS month_total
+      FROM quotes
+      WHERE (status = 'converted' OR (converted_invoice_no IS NOT NULL AND converted_invoice_no <> ''))
+        AND COALESCE(converted_at, quote_date, created_at) >= :months_start
+      GROUP BY month_key
+      ORDER BY month_key ASC
+    ");
+    $revenue_stmt->execute([':months_start' => $months_start]);
+
+    foreach ($revenue_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+      $month_key = trim((string)($row['month_key'] ?? ''));
+      if ($month_key !== '' && isset($month_series[$month_key])) {
+        $month_series[$month_key]['value'] = (float)($row['month_total'] ?? 0);
+      }
+    }
+
+    $recent_quotes_stmt = $pdo->query("
+      SELECT id, customer_name, quote_date, status, subtotal_amount, created_at
+      FROM quotes
+      ORDER BY created_at DESC, id DESC
+      LIMIT 8
+    ");
+    $recent_quotes = $recent_quotes_stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    $recent_invoices_stmt = $pdo->query("
+      SELECT id, customer_name, COALESCE(converted_invoice_no, '') AS converted_invoice_no,
+             COALESCE(converted_at, quote_date, created_at) AS invoice_date,
+             payment_status, subtotal_amount
+      FROM quotes
+      WHERE status = 'converted' OR (converted_invoice_no IS NOT NULL AND converted_invoice_no <> '')
+      ORDER BY COALESCE(converted_at, quote_date, created_at) DESC, id DESC
+      LIMIT 8
+    ");
+    $recent_invoices = $recent_invoices_stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+  } catch (Throwable $e) {
+    error_log('Dashboard data load failed: ' . $e->getMessage());
+  }
+}
+
+$line_chart_labels = array_values(array_map(static fn(array $m): string => (string)$m['label'], $month_series));
+$line_chart_values = array_values(array_map(static fn(array $m): float => (float)$m['value'], $month_series));
+
+$conversion_converted = max(0, (int)$kpis['converted_quotes']);
+$conversion_open = max(0, (int)$kpis['total_quotes'] - $conversion_converted);
+
+render_header('ERP Dashboard');
 ?>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 
 <style>
-/* ── Dashboard shell variables ─────────────────────────────────── */
-.dash-shell {
-  --dash-text:   #0f172a;
-  --dash-muted:  #475569;
-  --dash-border: #d8e1ee;
-  --dash-shadow: 0 4px 16px rgba(15,23,42,0.08);
-  --dash-shadow-hover: 0 8px 24px rgba(15,23,42,0.13);
-  --dash-blue:   #1d4ed8;
-  color: var(--dash-text);
+.dashboard {
+  max-width: 1320px;
+  margin: 0 auto;
+  display: grid;
+  gap: 20px;
+  color: #0f172a;
 }
 
-/* Page background */
-.dash-shell::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background: #f1f5fb;
+.dashboard-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  padding: 20px;
 }
 
-/* Base card reset */
-.dash-shell .card {
-  background: #ffffff !important;
-  border: 1px solid var(--dash-border) !important;
-  border-radius: 14px !important;
-  box-shadow: var(--dash-shadow) !important;
-  padding: 20px !important;
-  margin: 0 !important;
-  color: var(--dash-text);
-}
-.dash-shell .card:hover {
-  box-shadow: var(--dash-shadow-hover) !important;
-}
-.dash-shell .muted { color: var(--dash-muted) !important; }
-.dash-shell .badge {
-  border-radius: 999px;
-  border-width: 1px;
-  font-weight: 700;
+.dashboard-hero {
+  background: linear-gradient(120deg, #0f172a, #1d4ed8 60%, #0f766e);
+  color: #f8fafc;
+  border: 0;
+  padding: 28px;
 }
 
-/* ── Hero banner ────────────────────────────────────────────────── */
-.dash-shell .card.dash-hero {
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(135deg, #0b1220 0%, #1e3a8a 55%, #0f766e 100%) !important;
-  border: 1px solid #1f3b7d !important;
-  padding: 28px 28px 24px !important;
-  color: #f8fafc !important;
-}
-/* Subtle sheen overlay – stays behind content */
-.dash-hero::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background: linear-gradient(110deg, rgba(255,255,255,0.08) 0%, transparent 60%);
-}
-/* Every direct text element in the hero must sit above the sheen */
-.dash-hero > * { position: relative; z-index: 1; }
-
-.dash-hero-tag {
-  display: inline-block;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #bfdbfe !important;
-  margin-bottom: 10px;
-  padding: 4px 12px;
-  border: 1px solid rgba(191,219,254,0.45);
-  border-radius: 999px;
-  background: rgba(15,23,42,0.35);
-}
-.dash-hero h1 {
-  margin: 0 0 10px;
+.dashboard-hero h1 {
+  margin: 0 0 8px;
   font-size: 2rem;
-  font-weight: 700;
   letter-spacing: -0.02em;
-  color: #f8fafc !important;
-  line-height: 1.2;
 }
-.dash-hero > p {
+
+.dashboard-hero p {
   margin: 0;
-  max-width: 820px;
-  color: #cbd5e1 !important;
-  font-size: 0.97rem;
-  line-height: 1.55;
+  color: #dbeafe;
 }
-.dash-hero .dash-pill {
-  display: inline-block;
-  padding: 5px 12px;
-  border-radius: 999px;
-  background: rgba(15,23,42,0.4);
-  border: 1px solid rgba(191,219,254,0.4);
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.kpi-label {
   font-size: 12px;
-  font-weight: 600;
-  color: #e2e8f0 !important;
-  margin: 10px 8px 0 0;
-}
-.dash-hero-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
-  gap: 10px;
-  margin-top: 20px;
-}
-.dash-hero-stat {
-  background: rgba(15,23,42,0.38) !important;
-  border: 1px solid rgba(191,219,254,0.35) !important;
-  border-radius: 12px !important;
-  padding: 12px 14px !important;
-  box-shadow: none !important;
-}
-.dash-hero-stat-label {
-  font-size: 11px;
-  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #94a3b8 !important;
-}
-.dash-hero-stat-value {
-  font-size: 1.15rem;
+  letter-spacing: .08em;
+  color: #64748b;
   font-weight: 700;
-  margin-top: 4px;
-  color: #f1f5f9 !important;
 }
 
-.dash-shell .card.dash-motivation {
-  margin-top: 14px !important;
-  background: #f8fbff !important;
-  border-left: 4px solid #2563eb !important;
-}
-.dash-motivation-text {
-  margin: 0;
-  color: #0f172a;
-  font-size: 1.02rem;
-  font-weight: 600;
-  line-height: 1.5;
-}
-
-/* ── Layout grids ───────────────────────────────────────────────── */
-.dash-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-.dash-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
-.dash-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
-
-/* ── Section headers ────────────────────────────────────────────── */
-.dash-section-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin: 30px 0 16px;
-}
-.dash-section-header h2 {
-  margin: 0 0 4px;
-  color: var(--dash-text);
-  font-size: 1.25rem;
-  letter-spacing: -0.01em;
-}
-.dash-section-header p { margin: 0; max-width: 720px; }
-
-/* ── Progress bar ───────────────────────────────────────────────── */
-.dash-progress {
-  height: 8px;
-  border-radius: 999px;
-  background: #e2eaf5;
-  overflow: hidden;
+.kpi-value {
   margin-top: 10px;
-}
-.dash-progress-bar { height: 100%; border-radius: 999px; }
-
-/* ── Goal tone colours ──────────────────────────────────────────── */
-.dash-shell .goal-badge-green  { background: #dcfce7 !important; color: #166534 !important; border-color: #86efac !important; }
-.dash-shell .goal-badge-yellow { background: #fef3c7 !important; color: #92400e !important; border-color: #fcd34d !important; }
-.dash-shell .goal-badge-red    { background: #fee2e2 !important; color: #991b1b !important; border-color: #fca5a5 !important; }
-.goal-bar-green    { background: linear-gradient(90deg,#10b981,#0d9488); }
-.goal-bar-yellow   { background: linear-gradient(90deg,#f59e0b,#ea580c); }
-.goal-bar-red      { background: linear-gradient(90deg,#ef4444,#dc2626); }
-.goal-card-green   { border-left: 4px solid #10b981 !important; }
-.goal-card-yellow  { border-left: 4px solid #f59e0b !important; }
-.goal-card-red     { border-left: 4px solid #ef4444 !important; }
-
-.dash-big-num {
-  font-size: 2.8rem;
-  font-weight: 700;
-  line-height: 1.06;
-  margin: 8px 0 6px;
-  letter-spacing: -0.02em;
-  color: #0f172a;
+  font-size: 2rem;
+  line-height: 1.1;
+  font-weight: 800;
 }
 
-/* ── KPI / metric cards ─────────────────────────────────────────── */
-.dash-kpi-card,
-.dash-metric-card,
-.dash-mini-metric {
-  background: #f8fbff !important;
+.kpi-note {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #64748b;
 }
-.dash-chart-total {
-  margin: 0 !important;
-  padding: 8px 14px !important;
-  text-align: right;
-  border-radius: 12px !important;
-}
-.dash-chart-total-rfq  { background: #edf4ff !important; border-color: #c7dbff !important; }
-.dash-chart-total-ship { background: #ecfeff !important; border-color: #99f6e4 !important; }
 
-/* ── Today's Priorities checklist ───────────────────────────────── */
-.priority-list {
+.charts-grid {
   display: grid;
-  gap: 10px;
-  margin-top: 14px;
-}
-label.priority-item {
-  display: flex !important;
-  align-items: flex-start;
-  gap: 12px;
-  cursor: pointer;
-  padding: 14px 16px !important;
-  background: #ffffff !important;
-  border: 1px solid #d1ddf0 !important;
-  border-radius: 12px !important;
-  box-shadow: 0 2px 8px rgba(15,23,42,0.06) !important;
-  margin: 0 !important;
-  transition: border-color 0.15s, background 0.15s;
-}
-label.priority-item:hover {
-  border-color: #93c5fd !important;
-  background: #f5f9ff !important;
-}
-label.priority-item input[type=checkbox] {
-  margin-top: 3px;
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  accent-color: var(--dash-blue);
-}
-label.priority-item span {
-  color: #1e293b;
-  font-weight: 500;
-  font-size: 0.95rem;
-  line-height: 1.5;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
 }
 
-/* ── Chart panel ────────────────────────────────────────────────── */
-/* min-height accounts for the 260px canvas plus ~50px header content */
-.chart-panel { min-height: 310px; }
-.chart-panel canvas { width: 100% !important; height: 260px !important; display: block; }
-.chart-panel-title {
-  margin: 0 0 2px;
-  font-size: 1.5rem;
-  line-height: 1.25;
-  font-weight: 900;
-  color: #020617;
-  letter-spacing: -0.01em;
+.chart-wrap {
+  min-height: 320px;
 }
 
-/* ── Responsive ─────────────────────────────────────────────────── */
-@media (max-width: 860px) {
-  .dash-grid-4 { grid-template-columns: 1fr 1fr; }
+.chart-wrap canvas {
+  width: 100% !important;
+  height: 260px !important;
+  display: block;
 }
+
+.section-title {
+  margin: 0 0 4px;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.section-subtitle {
+  margin: 0 0 16px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.tables-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.erp-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.erp-table th,
+.erp-table td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 13px;
+}
+
+.erp-table th {
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.status-pill {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.status-pill.converted,
+.status-pill.paid {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-pill.sent {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-pill.draft,
+.status-pill.unpaid {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+@media (max-width: 1080px) {
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .charts-grid,
+  .tables-grid { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 640px) {
-  .dash-grid-2,
-  .dash-grid-3,
-  .dash-grid-4 { grid-template-columns: 1fr; }
-  .dash-hero h1 { font-size: 1.5rem; }
+  .kpi-grid { grid-template-columns: 1fr; }
+  .dashboard-hero h1 { font-size: 1.5rem; }
 }
 </style>
 
-
-<div class="container dash-shell">
-
-  <!-- Hero banner -->
-  <div class="card dash-hero">
-    <div class="dash-hero-tag">Alibaba Sourcing Dashboard</div>
-    <h1>Keep Your Weekly Procurement Goals Charging Forward</h1>
-    <p>Stay locked on the Alibaba sourcing workflow: send more RFQs, pull in more quotes, release more purchase orders, and keep shipments moving.</p>
-    <div>
-      <span class="dash-pill">Goal-Driven Sourcing</span>
-      <span class="dash-pill">Supplier Momentum Focus</span>
-    </div>
-    <div class="dash-hero-stats">
-      <div class="dash-hero-stat">
-        <div class="dash-hero-stat-label">This Week Starts</div>
-        <div class="dash-hero-stat-value"><?= h($week_start->format('M j, Y')) ?></div>
-      </div>
-      <div class="dash-hero-stat">
-        <div class="dash-hero-stat-label">Weekly Activity</div>
-        <div class="dash-hero-stat-value"><?= number_format($weekly_activity_total) ?></div>
-      </div>
-      <div class="dash-hero-stat">
-        <div class="dash-hero-stat-label">Last Updated</div>
-        <div class="dash-hero-stat-value" style="font-size:0.9rem;"><?= h($last_updated) ?></div>
-      </div>
-    </div>
+<div class="dashboard">
+  <div class="dashboard-card dashboard-hero">
+    <h1>Executive ERP Dashboard</h1>
+    <p>Live financial and sales visibility across quoting, invoicing, and collections.</p>
   </div>
 
-  <div class="card dash-motivation">
-    <p class="dash-motivation-text"><?= h($personalized_motivation) ?></p>
-  </div>
-
-  <!-- Weekly Goals header -->
-  <div class="dash-section-header">
-    <div>
-      <h2>Weekly Goals</h2>
-      <p class="muted">Track weekly targets and see exactly where to focus next.</p>
+  <div class="kpi-grid">
+    <div class="dashboard-card">
+      <div class="kpi-label">Total Quoted</div>
+      <div class="kpi-value" style="color:#1d4ed8;"><?= h(dashboard_money((float)$kpis['total_quoted'])) ?></div>
+      <div class="kpi-note">All quotes in system</div>
     </div>
-    <div class="card dash-mini-metric" style="margin:0;text-align:right;">
-      <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;">Goals On Track</div>
-      <div style="font-size:2rem;font-weight:700;color:#0d9488;line-height:1.1;">
-        <?= number_format($goals_on_track) ?><span style="font-size:1.1rem;font-weight:600;color:#94a3b8;"> / <?= number_format(count($weekly_goals)) ?></span>
-      </div>
+    <div class="dashboard-card">
+      <div class="kpi-label">Total Invoiced</div>
+      <div class="kpi-value" style="color:#0f766e;"><?= h(dashboard_money((float)$kpis['total_invoiced'])) ?></div>
+      <div class="kpi-note">Converted from quotes</div>
+    </div>
+    <div class="dashboard-card">
+      <div class="kpi-label">Total Received</div>
+      <div class="kpi-value" style="color:#16a34a;"><?= h(dashboard_money((float)$kpis['total_received'])) ?></div>
+      <div class="kpi-note">Marked paid invoices</div>
+    </div>
+    <div class="dashboard-card">
+      <div class="kpi-label">Outstanding</div>
+      <div class="kpi-value" style="color:#b45309;"><?= h(dashboard_money((float)$kpis['outstanding'])) ?></div>
+      <div class="kpi-note">Invoiced minus received</div>
     </div>
   </div>
 
-  <!-- Weekly Goal cards -->
-  <div class="dash-grid-2">
-    <?php foreach ($weekly_goals as $goal): ?>
-      <div class="card <?= h('goal-card-' . $goal['state']['tone']) ?>">
-        <div class="topbar" style="align-items:flex-start;margin-bottom:0;">
-          <div>
-            <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;"><?= h((string)$goal['title']) ?></div>
-            <div class="dash-big-num">
-              <?= number_format((int)$goal['value']) ?>
-              <span style="font-size:1.3rem;font-weight:500;color:#94a3b8;"> / <?= number_format((int)$goal['target']) ?></span>
-            </div>
-          </div>
-          <span class="badge <?= h('goal-badge-' . $goal['state']['tone']) ?>"><?= h((string)$goal['state']['label']) ?></span>
-        </div>
-        <div style="margin-top:12px;">
-          <div class="topbar" style="margin-bottom:4px;">
-            <span style="font-size:13px;font-weight:600;"><?= number_format((int)round((float)$goal['progress_percent'])) ?>% complete</span>
-            <span class="muted" style="font-size:13px;">Pace target today: <?= number_format((int)$goal['pace_target']) ?></span>
-          </div>
-          <div class="dash-progress">
-            <div class="dash-progress-bar <?= h('goal-bar-' . $goal['state']['tone']) ?>" style="width:<?= number_format((float)$goal['progress_percent'], 2, '.', '') ?>%;"></div>
-          </div>
-        </div>
-        <div class="topbar" style="margin-top:10px;margin-bottom:0;align-items:flex-start;">
-          <span class="muted" style="font-size:13px;flex:1;margin-right:12px;"><?= h((string)$goal['desc']) ?></span>
-          <span style="font-size:13px;font-weight:600;white-space:nowrap;">
-            <?= $goal['remaining'] > 0 ? number_format((int)$goal['remaining']) . ' more to goal' : 'Goal reached &#10003;' ?>
-          </span>
-        </div>
-      </div>
-    <?php endforeach; ?>
-  </div>
-
-  <!-- Weekly Execution KPI Cards -->
-  <div class="dash-section-header" style="margin-top:24px;">
-    <div>
-      <h2>Weekly Execution Snapshot</h2>
-      <p class="muted">Action-oriented scorecards for the Alibaba sourcing and procurement workflow.</p>
+  <div class="charts-grid">
+    <div class="dashboard-card chart-wrap">
+      <h2 class="section-title">Revenue Trend (Past 6 Months)</h2>
+      <p class="section-subtitle">Monthly invoiced revenue from converted quotes.</p>
+      <canvas id="revenueChart" aria-label="Revenue trend line chart" role="img"></canvas>
+    </div>
+    <div class="dashboard-card chart-wrap">
+      <h2 class="section-title">Quote-to-Invoice Conversion</h2>
+      <p class="section-subtitle">Converted quotes versus open quotes.</p>
+      <canvas id="conversionChart" aria-label="Quote conversion pie chart" role="img"></canvas>
     </div>
   </div>
 
-  <?php
-  $kpi_colors = [
-    'sky'     => ['accent' => '#1d4ed8', 'light' => '#eaf2ff', 'border' => '#c7dbff'],
-    'violet'  => ['accent' => '#4338ca', 'light' => '#eeedff', 'border' => '#c9c5ff'],
-    'emerald' => ['accent' => '#0f766e', 'light' => '#ebfffb', 'border' => '#99f6e4'],
-    'amber'   => ['accent' => '#b45309', 'light' => '#fff8eb', 'border' => '#fcd34d'],
-  ];
-  ?>
-  <div class="dash-grid-4">
-    <?php foreach ($weekly_goals as $card):
-      $kc = $kpi_colors[$card['accent_key']] ?? ['accent' => '#2563eb', 'light' => '#eff6ff', 'border' => '#93c5fd'];
-    ?>
-      <div class="card dash-kpi-card">
-        <span class="badge" style="background:<?= h($kc['light']) ?>;color:<?= h($kc['accent']) ?>;border-color:<?= h($kc['border']) ?>;font-size:11px;text-transform:uppercase;letter-spacing:0.07em;">This Week</span>
-        <div class="muted" style="font-size:13px;margin-top:8px;"><?= h($card['label']) ?></div>
-        <div style="font-size:3rem;font-weight:700;line-height:1.1;color:<?= h($kc['accent']) ?>;margin:8px 0 4px;"><?= number_format((int)$card['value']) ?></div>
-        <div class="muted" style="font-size:13px;">Goal: <strong><?= number_format((int)$card['target']) ?></strong></div>
-        <div class="dash-progress">
-          <div class="dash-progress-bar" style="width:<?= number_format(min(100, (float)$card['progress_percent']), 2, '.', '') ?>%;background:<?= h($kc['accent']) ?>;"></div>
-        </div>
-      </div>
-    <?php endforeach; ?>
-  </div>
+  <div class="tables-grid">
+    <div class="dashboard-card">
+      <h2 class="section-title">Recent Quotes</h2>
+      <p class="section-subtitle">Latest quote activity.</p>
+      <table class="erp-table">
+        <thead>
+          <tr>
+            <th>Quote #</th>
+            <th>Customer</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php if ($recent_quotes): ?>
+            <?php foreach ($recent_quotes as $row):
+              $status = strtolower(trim((string)($row['status'] ?? 'draft')));
+              $quote_date = trim((string)($row['quote_date'] ?? ''));
+              $display_date = $quote_date !== '' ? $quote_date : substr((string)($row['created_at'] ?? ''), 0, 10);
+            ?>
+              <tr>
+                <td>#<?= (int)($row['id'] ?? 0) ?></td>
+                <td><?= h((string)($row['customer_name'] ?? '—')) ?></td>
+                <td><?= h($display_date !== '' ? $display_date : '—') ?></td>
+                <td><span class="status-pill <?= h($status) ?>"><?= h(ucfirst($status)) ?></span></td>
+                <td><?= h(dashboard_money((float)($row['subtotal_amount'] ?? 0))) ?></td>
+              </tr>
+            <?php endforeach; ?>
+          <?php else: ?>
+            <tr><td colspan="5" style="color:#64748b;">No quotes available.</td></tr>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
 
-  <!-- Today's Priorities -->
-  <div class="dash-section-header" style="margin-top:24px;">
-    <div>
-      <h2>Today's Priorities</h2>
-      <p class="muted">Two focused actions to keep sourcing and shipping progress moving today.</p>
+    <div class="dashboard-card">
+      <h2 class="section-title">Recent Invoices</h2>
+      <p class="section-subtitle">Latest converted invoice activity.</p>
+      <table class="erp-table">
+        <thead>
+          <tr>
+            <th>Invoice #</th>
+            <th>Customer</th>
+            <th>Date</th>
+            <th>Payment</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php if ($recent_invoices): ?>
+            <?php foreach ($recent_invoices as $row):
+              $payment = strtolower(trim((string)($row['payment_status'] ?? 'unpaid')));
+              $invoice_no = trim((string)($row['converted_invoice_no'] ?? ''));
+              $invoice_date = substr((string)($row['invoice_date'] ?? ''), 0, 10);
+            ?>
+              <tr>
+                <td><?= h($invoice_no !== '' ? $invoice_no : ('INV-' . str_pad((string)((int)($row['id'] ?? 0)), 5, '0', STR_PAD_LEFT))) ?></td>
+                <td><?= h((string)($row['customer_name'] ?? '—')) ?></td>
+                <td><?= h($invoice_date !== '' ? $invoice_date : '—') ?></td>
+                <td><span class="status-pill <?= h($payment) ?>"><?= h(ucfirst($payment)) ?></span></td>
+                <td><?= h(dashboard_money((float)($row['subtotal_amount'] ?? 0))) ?></td>
+              </tr>
+            <?php endforeach; ?>
+          <?php else: ?>
+            <tr><td colspan="5" style="color:#64748b;">No converted invoices available.</td></tr>
+          <?php endif; ?>
+        </tbody>
+      </table>
     </div>
   </div>
-  <?php
-  $today_priority_items = $today_priorities ?? [];
-  if (!is_array($today_priority_items) || empty($today_priority_items)) {
-    $today_priority_items = [
-      'Send at least 2 new RFQs today for different machine sizes, air pumps, centrifugal fans, mirrors, lenses, and different laser tube brands and watts.',
-      'Review all open Alibaba chats and input any new quotes into the system.',
-    ];
-  }
-  ?>
-  <div class="priority-list">
-    <?php foreach ($today_priority_items as $priority_index => $priority): ?>
-      <?php $priority_id = 'today-priority-' . ((int)$priority_index + 1); ?>
-      <label class="priority-item" for="<?= h($priority_id) ?>">
-        <input id="<?= h($priority_id) ?>" type="checkbox" name="today_priorities[]" value="priority_<?= (int)$priority_index + 1 ?>">
-        <span><?= h($priority) ?></span>
-      </label>
-    <?php endforeach; ?>
-  </div>
-
-  <!-- Procurement Pipeline Snapshot -->
-  <div class="dash-section-header" style="margin-top:24px;">
-    <div>
-      <h2>Procurement Pipeline Snapshot</h2>
-      <p class="muted">Stay close to production and shipment movement so today&rsquo;s sourcing work turns into delivered machines.</p>
-    </div>
-  </div>
-  <div class="dash-grid-3">
-    <div class="card dash-metric-card">
-      <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;">Items In Production</div>
-      <div class="dash-big-num" style="color:#2563eb;"><?= number_format($items_in_production) ?></div>
-      <p class="muted" style="font-size:13px;margin:4px 0 0;">Orders with production underway that have not shipped yet.</p>
-    </div>
-    <div class="card dash-metric-card">
-      <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;">Shipments In Transit</div>
-      <div class="dash-big-num" style="color:#0d9488;"><?= number_format($shipments_in_transit) ?></div>
-      <p class="muted" style="font-size:13px;margin:4px 0 0;">Incoming shipments currently marked In Transit.</p>
-    </div>
-    <div class="card dash-metric-card">
-      <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;">Expected Arrivals (30 Days)</div>
-      <div class="dash-big-num" style="color:#0284c7;"><?= number_format($expected_arrivals) ?></div>
-      <p class="muted" style="font-size:13px;margin:4px 0 0;">Open incoming shipments scheduled to arrive within the next month.</p>
-    </div>
-  </div>
-
-  <!-- Momentum Trend Charts -->
-  <div class="dash-section-header" style="margin-top:24px;">
-    <div>
-      <h2>Momentum Trends</h2>
-      <p class="muted">Use the last 60 days of sourcing and shipping activity to keep momentum building.</p>
-    </div>
-  </div>
-  <div class="dash-grid-2">
-    <div class="card chart-panel">
-      <div class="topbar" style="margin-bottom:12px;align-items:flex-start;">
-        <div>
-          <h3 class="chart-panel-title">RFQs Sent — Last 60 Days</h3>
-          <p class="muted" style="font-size:13px;margin:0;">Line chart &middot; last 60 days</p>
-        </div>
-        <div class="card dash-chart-total dash-chart-total-rfq">
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:#2563eb;font-weight:600;">60-Day Total</div>
-          <div style="font-size:1.5rem;font-weight:700;color:#1d4ed8;"><?= number_format(array_sum($rfq_chart['values'])) ?></div>
-        </div>
-      </div>
-      <canvas id="rfqWeeklyChart" aria-label="RFQs sent last 60 days line chart" role="img"></canvas>
-    </div>
-    <div class="card chart-panel">
-      <div class="topbar" style="margin-bottom:12px;align-items:flex-start;">
-        <div>
-          <h3 class="chart-panel-title">Items Shipped — Last 60 Days</h3>
-          <p class="muted" style="font-size:13px;margin:0;">Bar chart &middot; last 60 days</p>
-        </div>
-        <div class="card dash-chart-total dash-chart-total-ship">
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:#0d9488;font-weight:600;">60-Day Total</div>
-          <div style="font-size:1.5rem;font-weight:700;color:#0f766e;"><?= number_format(array_sum($shipped_chart['values'])) ?></div>
-        </div>
-      </div>
-      <canvas id="shippedWeeklyChart" aria-label="Items shipped last 60 days bar chart" role="img"></canvas>
-    </div>
-  </div>
-
 </div>
-
 
 <script>
 (() => {
-  const labels = <?= json_encode($rfq_chart['labels'], $json_safe_flags) ?>;
-  const rfqValues = <?= json_encode($rfq_chart['values'], $json_safe_flags) ?>;
-  const shippedValues = <?= json_encode($shipped_chart['values'], $json_safe_flags) ?>;
+  const revenueLabels = <?= json_encode($line_chart_labels, $json_safe_flags) ?>;
+  const revenueValues = <?= json_encode($line_chart_values, $json_safe_flags) ?>;
+  const conversionValues = <?= json_encode([$conversion_converted, $conversion_open], $json_safe_flags) ?>;
 
-  const baseOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        backgroundColor: '#1e293b',
-        titleColor: '#f8fafc',
-        bodyColor: '#cbd5e1',
-        padding: 12,
-        cornerRadius: 8
-      }
-    },
-    scales: {
-      x: {
-        grid: { color: 'rgba(148, 163, 184, 0.15)' },
-        ticks: {
-          color: '#64748b',
-          font: { size: 11, weight: '600' },
-          maxTicksLimit: 12,
-          maxRotation: 45,
-          minRotation: 0
-        }
-      },
-      y: {
-        beginAtZero: true,
-        grid: { color: 'rgba(148, 163, 184, 0.2)' },
-        ticks: {
-          precision: 0,
-          color: '#64748b',
-          font: { size: 12, weight: '600' }
-        }
+  const currencyTooltip = {
+    callbacks: {
+      label(ctx) {
+        const val = Number(ctx.parsed.y ?? ctx.parsed ?? 0);
+        return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       }
     }
   };
 
-  const rfqCtx = document.getElementById('rfqWeeklyChart');
-  if (rfqCtx && window.Chart) {
-    new Chart(rfqCtx, {
+  const revenueEl = document.getElementById('revenueChart');
+  if (revenueEl && window.Chart) {
+    new Chart(revenueEl, {
       type: 'line',
       data: {
-        labels,
+        labels: revenueLabels,
         datasets: [{
-          data: rfqValues,
+          label: 'Revenue',
+          data: revenueValues,
           borderColor: '#2563eb',
-          backgroundColor: 'rgba(37, 99, 235, 0.08)',
+          backgroundColor: 'rgba(37, 99, 235, 0.12)',
+          borderWidth: 3,
           fill: true,
-          tension: 0.35,
-          borderWidth: 2.5,
           pointRadius: 4,
           pointHoverRadius: 6,
-          pointBackgroundColor: '#2563eb',
-          pointBorderColor: '#ffffff',
-          pointBorderWidth: 2
+          tension: 0.35
         }]
       },
-      options: baseOptions
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: currencyTooltip
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { color: '#64748b', font: { weight: '600' } }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(148, 163, 184, 0.2)' },
+            ticks: {
+              color: '#64748b',
+              callback(value) {
+                return '$' + Number(value).toLocaleString();
+              }
+            }
+          }
+        }
+      }
     });
   }
 
-  const shippedCtx = document.getElementById('shippedWeeklyChart');
-  if (shippedCtx && window.Chart) {
-    new Chart(shippedCtx, {
-      type: 'bar',
+  const conversionEl = document.getElementById('conversionChart');
+  if (conversionEl && window.Chart) {
+    new Chart(conversionEl, {
+      type: 'pie',
       data: {
-        labels,
+        labels: ['Converted', 'Open'],
         datasets: [{
-          data: shippedValues,
-          backgroundColor: 'rgba(20, 184, 166, 0.75)',
-          borderColor: '#0d9488',
-          borderWidth: 1,
-          borderRadius: 8,
-          maxBarThickness: 44
+          data: conversionValues,
+          backgroundColor: ['#0f766e', '#cbd5e1'],
+          borderColor: '#ffffff',
+          borderWidth: 2
         }]
       },
-      options: baseOptions
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { color: '#334155', boxWidth: 12, usePointStyle: true }
+          },
+          tooltip: {
+            callbacks: {
+              label(ctx) {
+                const total = (ctx.dataset.data || []).reduce((sum, n) => sum + Number(n || 0), 0);
+                const value = Number(ctx.parsed || 0);
+                const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+                return `${ctx.label}: ${value} (${pct}%)`;
+              }
+            }
+          }
+        }
+      }
     });
   }
 })();
