@@ -461,16 +461,6 @@ render_header('Invoice Tracker');
                 <?php else: ?>
                   <a class="btn" href="invoice_form.php?id=<?= $inv_id ?>">Edit</a>
                 <?php endif; ?>
-                <button type="button" class="btn it-print-btn" data-inv-id="<?= $inv_id ?>">🖨 Print</button>
-
-                <!-- Email Invoice: POST to invoice_form.php using shared CSRF -->
-                <form method="post" action="invoice_form.php" style="display:contents;" onsubmit="return confirm('Are you sure you want to email this invoice to <?= addslashes(h($customer_name)) ?>? This cannot be undone.');">
-                  <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
-                  <input type="hidden" name="action" value="send_email" />
-                  <input type="hidden" name="row_id" value="<?= $inv_id ?>" />
-                  <input type="hidden" name="return_to" value="tracker" />
-                  <button type="submit" class="btn">Email Invoice</button>
-                </form>
                 <form method="post" action="invoice_tracker.php" style="display:contents;">
                   <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_tracker_csrf']) ?>" />
                   <input type="hidden" name="action" value="send_for_approval" />
