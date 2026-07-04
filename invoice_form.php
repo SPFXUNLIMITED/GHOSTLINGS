@@ -838,6 +838,46 @@ function invoice_send_email_msg(PDO $pdo, array $quote, array $items, ?string &$
   }
 }
 
+/**
+ * Fetch invoice + items, send to the given email address, then redirect or append to $errors.
+ */
+function invoice_send_email_to_address(
+  PDO $pdo,
+  int $row_id,
+  string $recipient_email,
+  string $bad_email_error,
+  string $redirect_param,
+  array &$errors
+): bool {
+  if ($recipient_email === '' || !filter_var($recipient_email, FILTER_VALIDATE_EMAIL)) {
+    $errors[] = $bad_email_error;
+    return false;
+  }
+  $stmt = $pdo->prepare("SELECT * FROM quotes WHERE id = ? LIMIT 1");
+  $stmt->execute([$row_id]);
+  $eq_quote = $stmt->fetch(PDO::FETCH_ASSOC);
+  if (!$eq_quote) {
+    $errors[] = 'Invoice not found.';
+    return false;
+  }
+  $item_stmt = $pdo->prepare("SELECT description, quantity, unit_price, line_total FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC");
+  $item_stmt->execute([$row_id]);
+  $eq_items = $item_stmt->fetchAll(PDO::FETCH_ASSOC);
+  if (!$eq_items) {
+    $errors[] = 'Cannot send email: invoice has no line items.';
+    return false;
+  }
+  $eq_quote['email'] = $recipient_email;
+  $eq_error = null;
+  if (!invoice_send_email_msg($pdo, $eq_quote, $eq_items, $eq_error)) {
+    $errors[] = $eq_error !== null && $eq_error !== '' ? $eq_error : 'Email was not sent.';
+    return false;
+  }
+  $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
+  header('Location: invoice_form.php?id=' . $row_id . '&mode=view&' . $redirect_param . '=1');
+  exit;
+}
+
 function invoice_email_preview_content(string $html): string {
   $html = trim($html);
   if ($html === '' || !class_exists('DOMDocument')) {
@@ -1055,6 +1095,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       header('Location: invoice_tracker.php');
     }
     exit;
+  }
+
+  if (trim((string)($_POST['action'] ?? '')) === 'send_email_myself') {
+    $row_id = (int)($_POST['row_id'] ?? 0);
+    $me_stmt = $pdo->prepare("SELECT email FROM users WHERE id = ? LIMIT 1");
+    $me_stmt->execute([current_user_id()]);
+    $me = $me_stmt->fetch();
+    $my_email = trim((string)($me['email'] ?? ''));
+    $errors = [];
+    invoice_send_email_to_address($pdo, $row_id, $my_email, 'Your account does not have a valid email address configured.', 'email_sent_myself', $errors);
+    if ($errors) {
+      $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
+      header('Location: invoice_form.php?id=' . $row_id . '&mode=view&email_error=' . urlencode($errors[0]));
+      exit;
+    }
+  }
+
+  if (trim((string)($_POST['action'] ?? '')) === 'send_email_admin') {
+    $row_id = (int)($_POST['row_id'] ?? 0);
+    $zeke_stmt = $pdo->prepare("SELECT email FROM users WHERE username = 'Zeke' LIMIT 1");
+    $zeke_stmt->execute();
+    $zeke = $zeke_stmt->fetch();
+    $zeke_email = trim((string)($zeke['email'] ?? ''));
+    $errors = [];
+    invoice_send_email_to_address($pdo, $row_id, $zeke_email, 'Admin (Zeke) does not have a valid email address configured.', 'email_sent_admin', $errors);
+    if ($errors) {
+      $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
+      header('Location: invoice_form.php?id=' . $row_id . '&mode=view&email_error=' . urlencode($errors[0]));
+      exit;
+    }
   }
 
   if (trim((string)($_POST['action'] ?? '')) === 'approve_invoice') {
@@ -1507,6 +1577,8 @@ if (!$line_items) {
 
 $invoice_converted = isset($_GET['invoice_converted']) && $_GET['invoice_converted'] === '1';
 $invoice_email_sent  = isset($_GET['email_sent'])  && $_GET['email_sent']  === '1';
+$invoice_email_sent_myself = isset($_GET['email_sent_myself']) && $_GET['email_sent_myself'] === '1';
+$invoice_email_sent_admin  = isset($_GET['email_sent_admin'])  && $_GET['email_sent_admin']  === '1';
 $invoice_email_error = isset($_GET['email_error']) && $_GET['email_error'] !== '' ? trim((string)$_GET['email_error']) : '';
 $invoice_approval_approved = isset($_GET['approval_approved']) && $_GET['approval_approved'] === '1';
 $invoice_payment_marked = isset($_GET['payment_marked']) && $_GET['payment_marked'] === '1';
@@ -1564,6 +1636,12 @@ render_header($invoice_heading);
 <?php endif; ?>
 <?php if ($invoice_email_sent): ?>
   <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Invoice email sent successfully.</div>
+<?php endif; ?>
+<?php if ($invoice_email_sent_myself): ?>
+  <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Invoice emailed to yourself successfully.</div>
+<?php endif; ?>
+<?php if ($invoice_email_sent_admin): ?>
+  <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Invoice emailed to admin (Zeke) successfully.</div>
 <?php endif; ?>
 <?php if ($invoice_email_error !== ''): ?>
   <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b;">Failed to send invoice email: <?= h($invoice_email_error) ?></div>
@@ -1723,9 +1801,24 @@ render_header($invoice_heading);
           <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
           <input type="hidden" name="action" value="send_email" />
           <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
-          <button type="submit" class="btn">Email Invoice</button>
+          <button type="submit" class="btn">Email Invoice to Customer</button>
         </form>
       <?php endif; ?>
+
+      <form method="post" style="margin:0;" action="" onsubmit="return confirm('Send a copy of this invoice to yourself?');">
+        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
+        <input type="hidden" name="action" value="send_email_myself" />
+        <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
+        <button type="submit" class="btn">Email Invoice to Myself</button>
+      </form>
+
+      <form method="post" style="margin:0;" action="" onsubmit="return confirm('Send a copy of this invoice to admin (Zeke)?');">
+        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
+        <input type="hidden" name="action" value="send_email_admin" />
+        <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
+        <button type="submit" class="btn">Email Invoice to Admin</button>
+      </form>
+
       <?php if (!$invoice_is_paid): ?>
         <form method="post" style="margin:0;" action="">
           <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
