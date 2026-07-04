@@ -356,12 +356,12 @@ render_header('ERP Dashboard');
   <div class="charts-grid">
     <div class="dashboard-card chart-wrap">
       <h2 class="section-title">Cash Received Trend (Past 6 Months)</h2>
-      <p class="section-subtitle">Actual payments collected per month on paid invoices.</p>
+      <p class="section-subtitle">Invoice amounts for paid-status invoices, grouped by invoice date.</p>
       <canvas id="cashReceivedChart" aria-label="Cash received trend line chart" role="img"></canvas>
     </div>
     <div class="dashboard-card chart-wrap">
       <h2 class="section-title">Invoice to Cash Conversion</h2>
-      <p class="section-subtitle">Collected versus outstanding invoiced amounts.</p>
+      <p class="section-subtitle">All-time collected versus outstanding invoiced amounts.</p>
       <canvas id="cashConversionChart" aria-label="Invoice to cash conversion pie chart" role="img"></canvas>
     </div>
   </div>
