@@ -1113,6 +1113,24 @@ function invoice_quote_date_value(?array $quote, string $fallback): string {
   return $quote_date !== '' ? $quote_date : $fallback;
 }
 
+$quote_id = (int)(filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 0);
+$quote = null;
+$rows = [];
+
+if ($quote_id > 0) {
+  $quote_stmt = $pdo->prepare("SELECT * FROM quotes WHERE id = ? LIMIT 1");
+  $quote_stmt->execute([$quote_id]);
+  $loaded_quote = $quote_stmt->fetch(PDO::FETCH_ASSOC);
+
+  if (is_array($loaded_quote)) {
+    $quote = $loaded_quote;
+
+    $rows_stmt = $pdo->prepare("SELECT * FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC");
+    $rows_stmt->execute([$quote_id]);
+    $rows = $rows_stmt->fetchAll(PDO::FETCH_ASSOC);
+  }
+}
+
 $today = (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Y-m-d');
 $is_view_mode = $view_mode_requested && $quote !== null;
 $invoice_heading = $is_view_mode ? 'View Invoice' : ($quote ? 'Edit Invoice' : 'New Invoice');
