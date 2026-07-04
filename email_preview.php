@@ -1,6 +1,6 @@
 <?php
-require __DIR__ . '/db.php';
-require __DIR__ . '/auth.php';
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/lib/PHPMailer/src/Exception.php';
 require_once __DIR__ . '/lib/PHPMailer/src/PHPMailer.php';
 require_once __DIR__ . '/lib/PHPMailer/src/SMTP.php';
@@ -308,9 +308,23 @@ function preview_checkout_session_url(PDO $pdo, array &$quote): string {
     return $checkout_url;
 }
 
-try {
-    $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-    if (!$id) {
+function preview_is_invoice_context(array $quote, string $context = ''): bool {
+    $context = strtolower(trim($context));
+    if ($context === 'quote') {
+        return false;
+    }
+    if ($context === 'invoice') {
+        return true;
+    }
+
+    $quote_status = strtolower(trim((string)($quote['status'] ?? '')));
+    $invoice_number = trim((string)($quote['converted_invoice_no'] ?? ''));
+    $converted_at = trim((string)($quote['converted_at'] ?? ''));
+    return $quote_status === 'converted' || $invoice_number !== '' || $converted_at !== '';
+}
+
+function preview_load_document_data(PDO $pdo, int $id): array {
+    if ($id <= 0) {
         throw new RuntimeException('Missing or invalid record ID.');
     }
 
@@ -325,11 +339,24 @@ try {
     $stmt->execute([$id]);
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    return [$quote, $items];
+}
+
+function preview_build_document_payload(PDO $pdo, array $quote, array $items, array $options = []): array {
+    $context = strtolower(trim((string)($options['context'] ?? '')));
+    if (!in_array($context, ['quote', 'invoice'], true)) {
+        $context = '';
+    }
+    $logo_src = array_key_exists('logo_src', $options)
+        ? (string)$options['logo_src']
+        : (preview_logo_path() !== '' ? 'logo1.jpg' : '');
+    $require_payment_link = !empty($options['require_payment_link']);
+
     $sender = preview_sender_profile($pdo, $quote);
     $sender_name = $sender['sender_name'];
     $sender_company = trim((string)($sender['company_name'] ?? ''));
     if ($sender_company === '') {
-        $sender_company = trim((string)(getenv('SMTP_FROM_NAME') ?: ''));
+        $sender_company = preview_env_value('SMTP_FROM_NAME');
     }
     if ($sender_company === '') {
         $sender_company = 'Our Company';
@@ -338,30 +365,14 @@ try {
     $sender_phone = $sender['phone'];
     $sender_email = $sender['email'];
     if ($sender_email === '') {
-        $sender_email = trim((string)(getenv('SMTP_FROM_EMAIL') ?: ''));
+        $sender_email = preview_env_value('SMTP_FROM_EMAIL');
     }
 
     $escape_html = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 
     $quote_id = (int)($quote['id'] ?? 0);
-    $quote_status = strtolower(trim((string)($quote['status'] ?? '')));
     $invoice_number = trim((string)($quote['converted_invoice_no'] ?? ''));
-    $converted_at = trim((string)($quote['converted_at'] ?? ''));
-    // Older records may rely on invoice number or converted_at even if status was not backfilled.
-    $has_invoice_markers = $quote_status === 'converted' || $invoice_number !== '' || $converted_at !== '';
-
-    // Allow callers to explicitly set context via ?context=quote|invoice so that
-    // a converted quote can still be previewed as a quote (e.g. from quotes.php).
-    $context_raw = strtolower(trim((string)filter_input(INPUT_GET, 'context', FILTER_DEFAULT)));
-    $context_param = in_array($context_raw, ['quote', 'invoice'], true) ? $context_raw : '';
-    if ($context_param === 'quote') {
-        $is_invoice = false;
-    } elseif ($context_param === 'invoice') {
-        $is_invoice = true;
-    } else {
-        $is_invoice = $has_invoice_markers;
-    }
-
+    $is_invoice = preview_is_invoice_context($quote, $context);
     $document_noun = $is_invoice ? 'invoice' : 'quote';
     $document_heading = $is_invoice
         ? 'Invoice ' . ($invoice_number !== '' ? $escape_html($invoice_number) : $escape_html('#' . $quote_id))
@@ -372,7 +383,6 @@ try {
     $document_closing = $is_invoice
         ? 'If you have any questions regarding this invoice, please do not hesitate to contact us.'
         : 'Thank you for considering our services. Please do not hesitate to reach out if you have any questions.';
-    $prepared_by_html = '';
     $document_noun_html = $escape_html($document_noun);
 
     $document_date = trim((string)($quote['quote_date'] ?? ''));
@@ -382,7 +392,6 @@ try {
     $tax_rate = (float)($quote['tax_rate'] ?? 0);
     $tax_amount = preview_format_money($quote['tax_amount'] ?? 0);
     $grand_total = preview_format_money((float)($quote['subtotal_amount'] ?? 0) + (float)($quote['tax_amount'] ?? 0));
-    // Quotes and invoices share the same table, but paid state only applies after invoice conversion.
     $is_paid = $is_invoice && strtolower(trim((string)($quote['payment_status'] ?? ''))) === 'paid';
     $enable_online_payment = (int)($quote['enable_online_payment'] ?? 0) === 1;
     $stripe_checkout_url = trim((string)($quote['stripe_checkout_url'] ?? ''));
@@ -390,6 +399,9 @@ try {
         $generated_url = preview_checkout_session_url($pdo, $quote);
         if ($generated_url !== '') {
             $stripe_checkout_url = $generated_url;
+        }
+        if ($stripe_checkout_url === '' && $require_payment_link) {
+            throw new RuntimeException('Unable to create Stripe checkout link for this invoice.');
         }
     }
 
@@ -399,6 +411,7 @@ try {
     $bill_zip = trim((string)($quote['billing_zip'] ?? ''));
 
     $rows_html = [];
+    $rows_text = [];
     $row_index = 0;
     foreach ($items as $item) {
         $description = trim((string)($item['description'] ?? ''));
@@ -412,12 +425,14 @@ try {
             . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . $escape_html($unit_price) . '</td>'
             . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . $escape_html($line_total) . '</td>'
             . '</tr>';
+        $rows_text[] = '- ' . $description . ' | Qty: ' . $quantity . ' | Price: $' . $unit_price . ' | Total: $' . $line_total;
     }
     if (!$rows_html) {
         $rows_html[] = '<tr><td colspan="4" style="padding:10px 12px;text-align:center;color:#6b7280;">No line items.</td></tr>';
+        $rows_text[] = '- No line items.';
     }
 
-    $logo_html = preview_logo_html(preview_logo_path() !== '' ? 'logo1.jpg' : '');
+    $logo_html = preview_logo_html($logo_src);
     $header_company_name = 'Laser Cutter Repair';
     $header_brand_html = '<p style="margin:0;font-size:32px;font-weight:800;line-height:1.1;color:#ffffff;letter-spacing:0.4px;">' . $escape_html($header_company_name) . '</p>';
     $header_identity_html = $logo_html !== ''
@@ -467,6 +482,7 @@ try {
     }
     $from_html = implode('<br>', $from_lines);
 
+    $prepared_by_html = '';
     if ($sender_name !== '') {
         $prepared_by_html = 'This ' . $document_noun_html . ' was prepared by <strong style="color:#1e293b;">' . $escape_html($sender_name) . '</strong>';
         if ($sender_company !== 'Our Company') {
@@ -571,15 +587,87 @@ try {
         . '</div>'
         . '</body></html>';
 
+    $subject = $sender_company . ' - ' . ($is_invoice
+        ? 'Invoice ' . ($invoice_number !== '' ? $invoice_number : '#' . $quote_id)
+        : 'Quote #' . $quote_id);
+
+    $text_body = $sender_company . "\r\n";
+    if ($sender_address !== '') {
+        $text_body .= preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ', ', $sender_address)) . "\r\n";
+    }
+    if ($sender_phone !== '') {
+        $text_body .= $sender_phone . "\r\n";
+    }
+    if ($sender_email !== '') {
+        $text_body .= $sender_email . "\r\n";
+    }
+    $text_body .= "\r\n" . ($is_invoice ? 'Invoice ' : 'Quote ') . ($is_invoice && $invoice_number !== '' ? $invoice_number : '#' . $quote_id) . "  |  Date: {$document_date}\r\n";
+    $text_body .= str_repeat('-', 40) . "\r\n";
+    $text_body .= 'Bill To: ' . ($customer_company !== '' ? $customer_company . ' / ' : '') . $customer_name . "\r\n";
+    if ($bill_street !== '') {
+        $text_body .= $bill_street . "\r\n";
+    }
+    if ($city_state_zip !== '') {
+        $text_body .= $city_state_zip . "\r\n";
+    }
+    $text_body .= str_repeat('-', 40) . "\r\n\r\n";
+    if ($is_paid) {
+        $text_body .= "PAID\r\n\r\n";
+    }
+    $text_body .= 'Hello' . ($customer_name !== '' ? ", {$customer_name}" : '') . ",\r\n\r\n";
+    $text_body .= $document_intro . "\r\n\r\n";
+    if ($stripe_checkout_url !== '') {
+        $text_body .= "Pay online with Stripe: {$stripe_checkout_url}\r\n";
+        $text_body .= "Card details are entered directly on Stripe's secure checkout page.\r\n\r\n";
+    }
+    $text_body .= "Line Items:\r\n" . implode("\r\n", $rows_text) . "\r\n\r\n";
+    $text_body .= "Subtotal: \${$subtotal}\r\n";
+    if ($tax_rate > 0) {
+        $text_body .= 'Tax (' . number_format($tax_rate, 2) . "%): \${$tax_amount}\r\n";
+    }
+    $text_body .= "Grand Total: \${$grand_total}\r\n\r\n";
+    $text_body .= $document_closing . "\r\n";
+    if ($sender_name !== '') {
+        $text_body .= "\r\nPrepared by: {$sender_name}" . ($sender_company !== 'Our Company' ? " at {$sender_company}" : '') . "\r\n";
+    }
+
+    return [
+        'subject' => $subject,
+        'html_body' => $html,
+        'text_body' => $text_body,
+        'is_invoice' => $is_invoice,
+    ];
+}
+
+function preview_build_document_payload_by_id(PDO $pdo, int $id, array $options = []): array {
+    [$quote, $items] = preview_load_document_data($pdo, $id);
+    return preview_build_document_payload($pdo, $quote, $items, $options);
+}
+
+function preview_handle_request(PDO $pdo): void {
+    $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    if (!$id) {
+        throw new RuntimeException('Missing or invalid record ID.');
+    }
+
+    $context = strtolower(trim((string)filter_input(INPUT_GET, 'context', FILTER_DEFAULT)));
+    $payload = preview_build_document_payload_by_id($pdo, (int)$id, ['context' => $context]);
+
     header('Content-Type: text/html; charset=utf-8');
-    echo $html;
-    exit;
-} catch (Throwable $e) {
-    http_response_code(500);
-    header('Content-Type: text/html; charset=utf-8');
-    echo '<!doctype html><html><body style="margin:0;padding:16px;font-family:Arial,sans-serif;">'
-        . '<div style="padding:14px 16px;border:1px solid #fecaca;background:#fef2f2;color:#991b1b;border-radius:6px;line-height:1.5;">'
-        . '<strong>Error:</strong><br>'
-        . nl2br(htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'))
-        . '</div></body></html>';
+    echo $payload['html_body'];
+}
+
+if (realpath((string)($_SERVER['SCRIPT_FILENAME'] ?? '')) === realpath(__FILE__)) {
+    try {
+        preview_handle_request($pdo);
+        exit;
+    } catch (Throwable $e) {
+        http_response_code(500);
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!doctype html><html><body style="margin:0;padding:16px;font-family:Arial,sans-serif;">'
+            . '<div style="padding:14px 16px;border:1px solid #fecaca;background:#fef2f2;color:#991b1b;border-radius:6px;line-height:1.5;">'
+            . '<strong>Error:</strong><br>'
+            . nl2br(htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'))
+            . '</div></body></html>';
+    }
 }
