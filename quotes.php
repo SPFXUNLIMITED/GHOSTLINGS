@@ -1229,7 +1229,7 @@ render_header('Quotes');
     <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
       <a class="btn" href="quotes.php?view=all">Back to Quotes</a>
       <a class="btn" href="quotes.php?edit=<?= (int)$detail_quote['id'] ?>">Edit Quote</a>
-      <button type="button" class="btn" id="qt-view-print-btn">🖨 Print</button>
+      <a class="btn" href="email_preview.php?id=<?= (int)$detail_quote['id'] ?>&context=quote" target="_blank" rel="noopener">🖨 Print</a>
 
       <form method="post" style="margin:0;" onsubmit="return confirm('Are you sure you want to email this quote to <?= addslashes(h((string)($detail_quote["customer_name"] ?? ""))) ?>? This cannot be undone.');">
         <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
@@ -1928,24 +1928,6 @@ render_header('Quotes');
       computeInvTotals();
     })();
   </script>
-<?php endif; ?>
-
-<?php if ($show_detail): ?>
-<script>
-(function () {
-  var printBtn = document.getElementById('qt-view-print-btn');
-  if (!printBtn) return;
-  printBtn.addEventListener('click', function () {
-    var iframe = document.querySelector('iframe[src*="email_preview.php"]');
-    if (!iframe || !iframe.contentWindow) {
-      window.print();
-      return;
-    }
-    iframe.contentWindow.focus();
-    iframe.contentWindow.print();
-  });
-}());
-</script>
 <?php endif; ?>
 
 <?php render_footer(); ?>
