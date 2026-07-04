@@ -378,19 +378,6 @@ render_header('ERP Dashboard');
     </div>
   </div>
 
-  <div class="charts-grid">
-    <div class="dashboard-card chart-wrap">
-      <h2 class="section-title">Cash Received Trend (Past 6 Months)</h2>
-      <p class="section-subtitle">Invoice amounts for paid-status invoices, grouped by invoice date.</p>
-      <canvas id="cashReceivedChart" aria-label="Cash received trend line chart" role="img"></canvas>
-    </div>
-    <div class="dashboard-card chart-wrap">
-      <h2 class="section-title">Invoice to Cash Conversion</h2>
-      <p class="section-subtitle">All-time collected versus outstanding invoiced amounts.</p>
-      <canvas id="cashConversionChart" aria-label="Invoice to cash conversion pie chart" role="img"></canvas>
-    </div>
-  </div>
-
   <div class="kpi-grid">
     <div class="dashboard-card">
       <div class="kpi-label">Total Quoted This Week</div>
@@ -411,6 +398,20 @@ render_header('ERP Dashboard');
       <div class="kpi-label">Outstanding This Week</div>
       <div class="kpi-value" style="color:#b45309;"><?= h(dashboard_money((float)$week_kpis['week_outstanding'])) ?></div>
       <div class="kpi-note">Invoiced minus received this week</div>
+    </div>
+  </div>
+  
+  
+  <div class="charts-grid">
+    <div class="dashboard-card chart-wrap">
+      <h2 class="section-title">Cash Received Trend (Past 6 Months)</h2>
+      <p class="section-subtitle">Invoice amounts for paid-status invoices, grouped by invoice date.</p>
+      <canvas id="cashReceivedChart" aria-label="Cash received trend line chart" role="img"></canvas>
+    </div>
+    <div class="dashboard-card chart-wrap">
+      <h2 class="section-title">Invoice to Cash Conversion</h2>
+      <p class="section-subtitle">All-time collected versus outstanding invoiced amounts.</p>
+      <canvas id="cashConversionChart" aria-label="Invoice to cash conversion pie chart" role="img"></canvas>
     </div>
   </div>
 
