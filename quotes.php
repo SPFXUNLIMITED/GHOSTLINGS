@@ -1845,303 +1845,6 @@ render_header('Quotes');
     </table>
   </div>
 
-<!-- ===== Quote Print Modal ===== -->
-<div id="qt-print-modal" role="dialog" aria-modal="true" aria-labelledby="qt-print-modal-title" style="display:none;">
-  <div class="qt-modal-backdrop"></div>
-  <div class="qt-modal-shell">
-    <!-- Close button -->
-    <button type="button" class="qt-modal-close" aria-label="Close preview">&times;</button>
-
-    <!-- Modal header -->
-    <div class="qt-modal-header">
-      <div class="qt-modal-header-icon" aria-hidden="true">🧾</div>
-      <div>
-        <h2 id="qt-print-modal-title" class="qt-modal-title">Quote Preview</h2>
-        <p class="qt-modal-subtitle">Review your quote before printing</p>
-      </div>
-    </div>
-
-    <!-- Quote content area (populated via JS) -->
-    <div class="qt-modal-body">
-      <div id="qt-print-modal-loading" class="qt-modal-loading" aria-live="polite">
-        <span class="qt-spinner" aria-hidden="true"></span>
-        Loading quote&hellip;
-      </div>
-      <div id="qt-print-modal-content" style="display:none;"></div>
-      <div id="qt-print-modal-error" class="qt-modal-error" style="display:none;" role="alert"></div>
-    </div>
-
-    <!-- Footer actions -->
-    <div class="qt-modal-footer">
-      <button type="button" class="qt-modal-cancel-btn" id="qt-modal-cancel">Cancel</button>
-      <button type="button" class="qt-modal-print-btn" id="qt-modal-print-btn" disabled>
-        <span class="qt-modal-print-icon" aria-hidden="true">🖨</span>
-        Print Quote
-      </button>
-    </div>
-  </div>
-</div>
-
-<style>
-/* ---- Quote Print Modal ---- */
-#qt-print-modal {
-  position:fixed; inset:0; z-index:9000;
-}
-.qt-modal-backdrop {
-  position:absolute; inset:0;
-  background:rgba(15,23,42,0.72);
-  backdrop-filter:blur(4px);
-  -webkit-backdrop-filter:blur(4px);
-  animation:qt-fade-in .18s ease;
-}
-@keyframes qt-fade-in { from { opacity:0; } to { opacity:1; } }
-.qt-modal-shell {
-  position:absolute;
-  top:50%; left:50%;
-  transform:translate(-50%,-50%);
-  width:min(760px, calc(100vw - 32px));
-  max-height:calc(100vh - 48px);
-  display:flex;
-  flex-direction:column;
-  background:#fff;
-  border-radius:16px;
-  box-shadow:0 32px 80px rgba(0,0,0,.4), 0 0 0 1px rgba(0,0,0,.08);
-  animation:qt-slide-up .22s cubic-bezier(.34,1.26,.64,1);
-  overflow:hidden;
-}
-@keyframes qt-slide-up {
-  from { opacity:0; transform:translate(-50%,calc(-50% + 24px)); }
-  to   { opacity:1; transform:translate(-50%,-50%); }
-}
-.qt-modal-close {
-  position:absolute; top:14px; right:16px;
-  width:32px; height:32px;
-  border:none; border-radius:50%;
-  background:rgba(255,255,255,.15);
-  color:#fff;
-  font-size:20px; line-height:1;
-  cursor:pointer;
-  display:flex; align-items:center; justify-content:center;
-  transition:background .15s;
-  z-index:1;
-}
-.qt-modal-close:hover { background:rgba(255,255,255,.3); }
-.qt-modal-header {
-  display:flex; align-items:center; gap:16px;
-  padding:22px 28px 20px;
-  background:linear-gradient(135deg,#1e3a5f 0%,#1d4ed8 100%);
-  flex-shrink:0;
-}
-.qt-modal-header-icon {
-  font-size:32px; line-height:1;
-  filter:drop-shadow(0 2px 6px rgba(0,0,0,.25));
-}
-.qt-modal-title {
-  margin:0 0 2px;
-  font-size:20px; font-weight:700; color:#fff;
-  letter-spacing:0.2px;
-}
-.qt-modal-subtitle {
-  margin:0;
-  font-size:13px; color:#93c5fd;
-}
-.qt-modal-body {
-  flex:1 1 auto;
-  overflow-y:auto;
-  padding:28px 28px 16px;
-  background:#f1f5f9;
-}
-.qt-modal-loading {
-  display:flex; align-items:center; gap:12px;
-  justify-content:center;
-  padding:48px 0;
-  font-size:15px; color:#64748b;
-}
-.qt-spinner {
-  display:inline-block;
-  width:22px; height:22px;
-  border:3px solid #e2e8f0;
-  border-top-color:#1d4ed8;
-  border-radius:50%;
-  animation:qt-spin .7s linear infinite;
-}
-@keyframes qt-spin { to { transform:rotate(360deg); } }
-.qt-modal-error {
-  padding:14px 18px;
-  background:#fef2f2;
-  border:1px solid #fecaca;
-  border-radius:8px;
-  color:#991b1b;
-  font-size:14px;
-}
-.qt-modal-footer {
-  display:flex; align-items:center; justify-content:flex-end;
-  gap:12px;
-  padding:16px 28px;
-  background:#fff;
-  border-top:1px solid #e2e8f0;
-  flex-shrink:0;
-}
-.qt-modal-cancel-btn {
-  padding:10px 20px;
-  background:#fff;
-  color:#475569;
-  border:1px solid #cbd5e1;
-  border-radius:8px;
-  font-size:14px; font-weight:600;
-  cursor:pointer;
-  transition:background .15s, border-color .15s;
-}
-.qt-modal-cancel-btn:hover { background:#f8fafc; border-color:#94a3b8; }
-.qt-modal-print-btn {
-  display:flex; align-items:center; gap:8px;
-  padding:12px 28px;
-  background:linear-gradient(135deg,#1d4ed8,#1e3a5f);
-  color:#fff;
-  border:none;
-  border-radius:10px;
-  font-size:15px; font-weight:700;
-  cursor:pointer;
-  box-shadow:0 4px 14px rgba(29,78,216,.45);
-  transition:opacity .15s, box-shadow .15s, transform .1s;
-  letter-spacing:0.2px;
-}
-.qt-modal-print-btn:hover:not(:disabled) { opacity:.92; box-shadow:0 6px 20px rgba(29,78,216,.55); transform:translateY(-1px); }
-.qt-modal-print-btn:active:not(:disabled) { transform:translateY(0); }
-.qt-modal-print-btn:disabled { opacity:.5; cursor:not-allowed; box-shadow:none; }
-.qt-modal-print-icon { font-size:18px; }
-
-/* ---- @media print: suppress the main page entirely when printing from popup ---- */
-@media print {
-  body { display:none !important; }
-}
-</style>
-
-<script>
-(function () {
-  'use strict';
-
-  var modal      = document.getElementById('qt-print-modal');
-  var loadingEl  = document.getElementById('qt-print-modal-loading');
-  var contentEl  = document.getElementById('qt-print-modal-content');
-  var errorEl    = document.getElementById('qt-print-modal-error');
-  var printBtn   = document.getElementById('qt-modal-print-btn');
-  var cancelBtns = [
-    document.getElementById('qt-modal-cancel'),
-    modal.querySelector('.qt-modal-close')
-  ];
-
-  function openModal() {
-    modal.style.display = 'block';
-    document.body.style.overflow = 'hidden';
-    modal.querySelector('.qt-modal-close').focus();
-  }
-
-  function closeModal() {
-    modal.style.display = 'none';
-    document.body.style.overflow = '';
-    contentEl.innerHTML = '';
-    contentEl.style.display = 'none';
-    loadingEl.style.display = 'flex';
-    errorEl.style.display = 'none';
-    errorEl.textContent = '';
-    printBtn.disabled = true;
-  }
-
-  cancelBtns.forEach(function (btn) {
-    if (btn) btn.addEventListener('click', closeModal);
-  });
-
-  // Close on backdrop click
-  modal.querySelector('.qt-modal-backdrop').addEventListener('click', closeModal);
-
-  // Close on Escape
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && modal.style.display !== 'none') closeModal();
-  });
-
-  // Print button — open a clean popup window containing only the quote HTML
-  printBtn.addEventListener('click', function () {
-    var html = contentEl.innerHTML;
-    if (!html) return;
-
-    var popup = window.open('', '_blank', 'width=800,height=700,scrollbars=yes,resizable=yes');
-    if (!popup) {
-      alert('A pop-up was blocked. Please allow pop-ups for this site in your browser settings and try again.');
-      return;
-    }
-
-    popup.document.open();
-    popup.document.write(
-      '<!DOCTYPE html>' +
-      '<html lang="en">' +
-      '<head>' +
-        '<meta charset="UTF-8">' +
-        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-        '<title>Quote</title>' +
-        '<style>' +
-          '*, *::before, *::after { box-sizing: border-box; }' +
-          'html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #1e293b; }' +
-          '@media screen { body { padding: 24px; } }' +
-          '@page { margin: 15mm 12mm; }' +
-          '@media print {' +
-            'html, body { margin: 0; padding: 0; background: #fff; }' +
-            'a { color: inherit !important; text-decoration: none !important; }' +
-          '}' +
-        '</style>' +
-      '</head>' +
-      '<body>' + html + '</body>' +
-      '</html>'
-    );
-    popup.document.close();
-
-    // onload may not fire after document.write(); use a short timeout as fallback
-    var printed = false;
-    function doPrint() {
-      if (printed) return;
-      printed = true;
-      popup.focus();
-      popup.print();
-    }
-    popup.onload = doPrint;
-    setTimeout(doPrint, 400);
-  });
-
-  // Print buttons in table rows
-  document.querySelectorAll('.qt-print-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var quoteId = btn.getAttribute('data-quote-id');
-      openModal();
-
-      fetch('quotes.php?action=print_preview&quote_id=' + encodeURIComponent(quoteId), {
-        credentials: 'same-origin'
-      })
-        .then(function (res) {
-          if (!res.ok) throw new Error('Server returned ' + res.status);
-          return res.json();
-        })
-        .then(function (data) {
-          if (!data.ok) {
-            loadingEl.style.display = 'none';
-            errorEl.textContent = data.error || 'Failed to load quote.';
-            errorEl.style.display = 'block';
-            return;
-          }
-          contentEl.innerHTML = data.html;
-          loadingEl.style.display = 'none';
-          contentEl.style.display = 'block';
-          printBtn.disabled = false;
-        })
-        .catch(function (err) {
-          loadingEl.style.display = 'none';
-          errorEl.textContent = 'Could not load quote preview: ' + err.message;
-          errorEl.style.display = 'block';
-        });
-    });
-  });
-}());
-</script>
-
 <?php elseif ($show_form): ?>
   <form method="post" class="card" style="max-width:1280px; position:relative;">
     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['quotes_csrf']) ?>" />
@@ -2703,6 +2406,305 @@ render_header('Quotes');
       computeInvTotals();
     })();
   </script>
+<?php endif; ?>
+
+<?php if ($show_detail || $show_all): ?>
+<!-- ===== Quote Print Modal ===== -->
+<div id="qt-print-modal" role="dialog" aria-modal="true" aria-labelledby="qt-print-modal-title" style="display:none;">
+  <div class="qt-modal-backdrop"></div>
+  <div class="qt-modal-shell">
+    <!-- Close button -->
+    <button type="button" class="qt-modal-close" aria-label="Close preview">&times;</button>
+
+    <!-- Modal header -->
+    <div class="qt-modal-header">
+      <div class="qt-modal-header-icon" aria-hidden="true">🧾</div>
+      <div>
+        <h2 id="qt-print-modal-title" class="qt-modal-title">Quote Preview</h2>
+        <p class="qt-modal-subtitle">Review your quote before printing</p>
+      </div>
+    </div>
+
+    <!-- Quote content area (populated via JS) -->
+    <div class="qt-modal-body">
+      <div id="qt-print-modal-loading" class="qt-modal-loading" aria-live="polite">
+        <span class="qt-spinner" aria-hidden="true"></span>
+        Loading quote&hellip;
+      </div>
+      <div id="qt-print-modal-content" style="display:none;"></div>
+      <div id="qt-print-modal-error" class="qt-modal-error" style="display:none;" role="alert"></div>
+    </div>
+
+    <!-- Footer actions -->
+    <div class="qt-modal-footer">
+      <button type="button" class="qt-modal-cancel-btn" id="qt-modal-cancel">Cancel</button>
+      <button type="button" class="qt-modal-print-btn" id="qt-modal-print-btn" disabled>
+        <span class="qt-modal-print-icon" aria-hidden="true">🖨</span>
+        Print Quote
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+/* ---- Quote Print Modal ---- */
+#qt-print-modal {
+  position:fixed; inset:0; z-index:9000;
+}
+.qt-modal-backdrop {
+  position:absolute; inset:0;
+  background:rgba(15,23,42,0.72);
+  backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px);
+  animation:qt-fade-in .18s ease;
+}
+@keyframes qt-fade-in { from { opacity:0; } to { opacity:1; } }
+.qt-modal-shell {
+  position:absolute;
+  top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  width:min(760px, calc(100vw - 32px));
+  max-height:calc(100vh - 48px);
+  display:flex;
+  flex-direction:column;
+  background:#fff;
+  border-radius:16px;
+  box-shadow:0 32px 80px rgba(0,0,0,.4), 0 0 0 1px rgba(0,0,0,.08);
+  animation:qt-slide-up .22s cubic-bezier(.34,1.26,.64,1);
+  overflow:hidden;
+}
+@keyframes qt-slide-up {
+  from { opacity:0; transform:translate(-50%,calc(-50% + 24px)); }
+  to   { opacity:1; transform:translate(-50%,-50%); }
+}
+.qt-modal-close {
+  position:absolute; top:14px; right:16px;
+  width:32px; height:32px;
+  border:none; border-radius:50%;
+  background:rgba(255,255,255,.15);
+  color:#fff;
+  font-size:20px; line-height:1;
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .15s;
+  z-index:1;
+}
+.qt-modal-close:hover { background:rgba(255,255,255,.3); }
+.qt-modal-header {
+  display:flex; align-items:center; gap:16px;
+  padding:22px 28px 20px;
+  background:linear-gradient(135deg,#1e3a5f 0%,#1d4ed8 100%);
+  flex-shrink:0;
+}
+.qt-modal-header-icon {
+  font-size:32px; line-height:1;
+  filter:drop-shadow(0 2px 6px rgba(0,0,0,.25));
+}
+.qt-modal-title {
+  margin:0 0 2px;
+  font-size:20px; font-weight:700; color:#fff;
+  letter-spacing:0.2px;
+}
+.qt-modal-subtitle {
+  margin:0;
+  font-size:13px; color:#93c5fd;
+}
+.qt-modal-body {
+  flex:1 1 auto;
+  overflow-y:auto;
+  padding:28px 28px 16px;
+  background:#f1f5f9;
+}
+.qt-modal-loading {
+  display:flex; align-items:center; gap:12px;
+  justify-content:center;
+  padding:48px 0;
+  font-size:15px; color:#64748b;
+}
+.qt-spinner {
+  display:inline-block;
+  width:22px; height:22px;
+  border:3px solid #e2e8f0;
+  border-top-color:#1d4ed8;
+  border-radius:50%;
+  animation:qt-spin .7s linear infinite;
+}
+@keyframes qt-spin { to { transform:rotate(360deg); } }
+.qt-modal-error {
+  padding:14px 18px;
+  background:#fef2f2;
+  border:1px solid #fecaca;
+  border-radius:8px;
+  color:#991b1b;
+  font-size:14px;
+}
+.qt-modal-footer {
+  display:flex; align-items:center; justify-content:flex-end;
+  gap:12px;
+  padding:16px 28px;
+  background:#fff;
+  border-top:1px solid #e2e8f0;
+  flex-shrink:0;
+}
+.qt-modal-cancel-btn {
+  padding:10px 20px;
+  background:#fff;
+  color:#475569;
+  border:1px solid #cbd5e1;
+  border-radius:8px;
+  font-size:14px; font-weight:600;
+  cursor:pointer;
+  transition:background .15s, border-color .15s;
+}
+.qt-modal-cancel-btn:hover { background:#f8fafc; border-color:#94a3b8; }
+.qt-modal-print-btn {
+  display:flex; align-items:center; gap:8px;
+  padding:12px 28px;
+  background:linear-gradient(135deg,#1d4ed8,#1e3a5f);
+  color:#fff;
+  border:none;
+  border-radius:10px;
+  font-size:15px; font-weight:700;
+  cursor:pointer;
+  box-shadow:0 4px 14px rgba(29,78,216,.45);
+  transition:opacity .15s, box-shadow .15s, transform .1s;
+  letter-spacing:0.2px;
+}
+.qt-modal-print-btn:hover:not(:disabled) { opacity:.92; box-shadow:0 6px 20px rgba(29,78,216,.55); transform:translateY(-1px); }
+.qt-modal-print-btn:active:not(:disabled) { transform:translateY(0); }
+.qt-modal-print-btn:disabled { opacity:.5; cursor:not-allowed; box-shadow:none; }
+.qt-modal-print-icon { font-size:18px; }
+
+/* ---- @media print: suppress the main page entirely when printing from popup ---- */
+@media print {
+  body { display:none !important; }
+}
+</style>
+
+<script>
+(function () {
+  'use strict';
+
+  var modal      = document.getElementById('qt-print-modal');
+  var loadingEl  = document.getElementById('qt-print-modal-loading');
+  var contentEl  = document.getElementById('qt-print-modal-content');
+  var errorEl    = document.getElementById('qt-print-modal-error');
+  var printBtn   = document.getElementById('qt-modal-print-btn');
+  var cancelBtns = [
+    document.getElementById('qt-modal-cancel'),
+    modal.querySelector('.qt-modal-close')
+  ];
+
+  function openModal() {
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    modal.querySelector('.qt-modal-close').focus();
+  }
+
+  function closeModal() {
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+    contentEl.innerHTML = '';
+    contentEl.style.display = 'none';
+    loadingEl.style.display = 'flex';
+    errorEl.style.display = 'none';
+    errorEl.textContent = '';
+    printBtn.disabled = true;
+  }
+
+  cancelBtns.forEach(function (btn) {
+    if (btn) btn.addEventListener('click', closeModal);
+  });
+
+  // Close on backdrop click
+  modal.querySelector('.qt-modal-backdrop').addEventListener('click', closeModal);
+
+  // Close on Escape
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && modal.style.display !== 'none') closeModal();
+  });
+
+  // Print button — open a clean popup window containing only the quote HTML
+  printBtn.addEventListener('click', function () {
+    var html = contentEl.innerHTML;
+    if (!html) return;
+
+    var popup = window.open('', '_blank', 'width=800,height=700,scrollbars=yes,resizable=yes');
+    if (!popup) {
+      alert('A pop-up was blocked. Please allow pop-ups for this site in your browser settings and try again.');
+      return;
+    }
+
+    popup.document.open();
+    popup.document.write(
+      '<!DOCTYPE html>' +
+      '<html lang="en">' +
+      '<head>' +
+        '<meta charset="UTF-8">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+        '<title>Quote</title>' +
+        '<style>' +
+          '*, *::before, *::after { box-sizing: border-box; }' +
+          'html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #1e293b; }' +
+          '@media screen { body { padding: 24px; } }' +
+          '@page { margin: 15mm 12mm; }' +
+          '@media print {' +
+            'html, body { margin: 0; padding: 0; background: #fff; }' +
+            'a { color: inherit !important; text-decoration: none !important; }' +
+          '}' +
+        '</style>' +
+      '</head>' +
+      '<body>' + html + '</body>' +
+      '</html>'
+    );
+    popup.document.close();
+
+    // onload may not fire after document.write(); use a short timeout as fallback
+    var printed = false;
+    function doPrint() {
+      if (printed) return;
+      printed = true;
+      popup.focus();
+      popup.print();
+    }
+    popup.onload = doPrint;
+    setTimeout(doPrint, 400);
+  });
+
+  // Print buttons in list and detail views
+  document.querySelectorAll('.qt-print-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var quoteId = btn.getAttribute('data-quote-id');
+      openModal();
+
+      fetch('quotes.php?action=print_preview&quote_id=' + encodeURIComponent(quoteId), {
+        credentials: 'same-origin'
+      })
+        .then(function (res) {
+          if (!res.ok) throw new Error('Server returned ' + res.status);
+          return res.json();
+        })
+        .then(function (data) {
+          if (!data.ok) {
+            loadingEl.style.display = 'none';
+            errorEl.textContent = data.error || 'Failed to load quote.';
+            errorEl.style.display = 'block';
+            return;
+          }
+          contentEl.innerHTML = data.html;
+          loadingEl.style.display = 'none';
+          contentEl.style.display = 'block';
+          printBtn.disabled = false;
+        })
+        .catch(function (err) {
+          loadingEl.style.display = 'none';
+          errorEl.textContent = 'Could not load quote preview: ' + err.message;
+          errorEl.style.display = 'block';
+        });
+    });
+  });
+}());
+</script>
 <?php endif; ?>
 
 <?php render_footer(); ?>
