@@ -692,6 +692,46 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
   }
 }
 
+/**
+ * Fetch quote + items, send to the given email address, then redirect or append to $errors.
+ * Returns true and exits on success; returns false and populates $errors on failure.
+ */
+function quote_send_email_to_address(
+  PDO $pdo,
+  int $row_id,
+  string $recipient_email,
+  string $bad_email_error,
+  string $redirect_param,
+  array &$errors
+): bool {
+  if ($recipient_email === '' || !filter_var($recipient_email, FILTER_VALIDATE_EMAIL)) {
+    $errors[] = $bad_email_error;
+    return false;
+  }
+  $stmt = $pdo->prepare("SELECT * FROM quotes WHERE id = ? LIMIT 1");
+  $stmt->execute([$row_id]);
+  $quote = $stmt->fetch();
+  if (!$quote) {
+    $errors[] = 'Quote not found.';
+    return false;
+  }
+  $item_stmt = $pdo->prepare("SELECT description, quantity, unit_price, line_total FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC");
+  $item_stmt->execute([$row_id]);
+  $items = $item_stmt->fetchAll();
+  if (!$items) {
+    $errors[] = 'Cannot send email: quote has no line items.';
+    return false;
+  }
+  $email_error = null;
+  if (!quote_send_email($pdo, $quote, $items, $email_error, $recipient_email)) {
+    $errors[] = $email_error !== null && $email_error !== '' ? $email_error : 'Email was not sent.';
+    return false;
+  }
+  $_SESSION['quotes_csrf'] = bin2hex(random_bytes(24));
+  header('Location: quotes.php?view=id&id=' . $row_id . '&' . $redirect_param . '=1');
+  exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
   header('Content-Type: application/json; charset=utf-8');
 
@@ -1251,68 +1291,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
     } elseif ($action === 'send_email_myself') {
       $row_id = (int)($_POST['row_id'] ?? 0);
-      $stmt = $pdo->prepare("SELECT * FROM quotes WHERE id = ? LIMIT 1");
-      $stmt->execute([$row_id]);
-      $quote = $stmt->fetch();
-      if (!$quote) {
-        $errors[] = 'Quote not found.';
-      } else {
-        $me_stmt = $pdo->prepare("SELECT email FROM users WHERE id = ? LIMIT 1");
-        $me_stmt->execute([current_user_id()]);
-        $me = $me_stmt->fetch();
-        $my_email = trim((string)($me['email'] ?? ''));
-        if ($my_email === '' || !filter_var($my_email, FILTER_VALIDATE_EMAIL)) {
-          $errors[] = 'Your account does not have a valid email address configured.';
-        } else {
-          $item_stmt = $pdo->prepare("SELECT description, quantity, unit_price, line_total FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC");
-          $item_stmt->execute([$row_id]);
-          $items = $item_stmt->fetchAll();
-          if (!$items) {
-            $errors[] = 'Cannot send email: quote has no line items.';
-          } else {
-            $email_error = null;
-            if (!quote_send_email($pdo, $quote, $items, $email_error, $my_email)) {
-              $errors[] = $email_error !== null && $email_error !== '' ? $email_error : 'Email was not sent.';
-            } else {
-              $_SESSION['quotes_csrf'] = bin2hex(random_bytes(24));
-              header('Location: quotes.php?view=id&id=' . $row_id . '&email_sent_myself=1');
-              exit;
-            }
-          }
-        }
-      }
+      $me_stmt = $pdo->prepare("SELECT email FROM users WHERE id = ? LIMIT 1");
+      $me_stmt->execute([current_user_id()]);
+      $me = $me_stmt->fetch();
+      $my_email = trim((string)($me['email'] ?? ''));
+      quote_send_email_to_address($pdo, $row_id, $my_email, 'Your account does not have a valid email address configured.', 'email_sent_myself', $errors);
     } elseif ($action === 'send_email_admin') {
       $row_id = (int)($_POST['row_id'] ?? 0);
-      $stmt = $pdo->prepare("SELECT * FROM quotes WHERE id = ? LIMIT 1");
-      $stmt->execute([$row_id]);
-      $quote = $stmt->fetch();
-      if (!$quote) {
-        $errors[] = 'Quote not found.';
-      } else {
-        $zeke_stmt = $pdo->prepare("SELECT email FROM users WHERE username = 'Zeke' LIMIT 1");
-        $zeke_stmt->execute();
-        $zeke = $zeke_stmt->fetch();
-        $zeke_email = trim((string)($zeke['email'] ?? ''));
-        if ($zeke_email === '' || !filter_var($zeke_email, FILTER_VALIDATE_EMAIL)) {
-          $errors[] = 'Admin (Zeke) does not have a valid email address configured.';
-        } else {
-          $item_stmt = $pdo->prepare("SELECT description, quantity, unit_price, line_total FROM quote_items WHERE quote_id = ? ORDER BY line_position ASC, id ASC");
-          $item_stmt->execute([$row_id]);
-          $items = $item_stmt->fetchAll();
-          if (!$items) {
-            $errors[] = 'Cannot send email: quote has no line items.';
-          } else {
-            $email_error = null;
-            if (!quote_send_email($pdo, $quote, $items, $email_error, $zeke_email)) {
-              $errors[] = $email_error !== null && $email_error !== '' ? $email_error : 'Email was not sent.';
-            } else {
-              $_SESSION['quotes_csrf'] = bin2hex(random_bytes(24));
-              header('Location: quotes.php?view=id&id=' . $row_id . '&email_sent_admin=1');
-              exit;
-            }
-          }
-        }
-      }
+      // Send to the admin user named Zeke
+      $zeke_stmt = $pdo->prepare("SELECT email FROM users WHERE username = 'Zeke' LIMIT 1");
+      $zeke_stmt->execute();
+      $zeke = $zeke_stmt->fetch();
+      $zeke_email = trim((string)($zeke['email'] ?? ''));
+      quote_send_email_to_address($pdo, $row_id, $zeke_email, 'Admin (Zeke) does not have a valid email address configured.', 'email_sent_admin', $errors);
     } else {
       foreach (array_keys($fields) as $key) {
         $fields[$key] = trim((string)($_POST[$key] ?? ''));
