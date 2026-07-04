@@ -154,10 +154,12 @@ function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, 
   }
   $header_contact_html = implode(' &nbsp;·&nbsp; ', $header_parts);
   $logo_path = invoice_logo_path();
-  if ($logo_src === null && $logo_path !== '') {
+  if ($logo_path === '') {
+    $logo_src = '';
+  } elseif ($logo_src === null) {
     $logo_src = 'logo1.jpg';
   }
-  $logo_html = $logo_path !== '' && $logo_src !== null && $logo_src !== '' ? invoice_logo_html($logo_src) : '';
+  $logo_html = invoice_logo_html((string)$logo_src);
 
   $prepared_by_html = '';
   if ($sender_name !== '') {
