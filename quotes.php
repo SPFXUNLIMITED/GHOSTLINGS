@@ -24,6 +24,16 @@ function quote_format_money($value): string {
   return number_format((float)$value, 2);
 }
 
+function quote_contact_address_line(string $address, string $company, string $separator): string {
+  $line = trim((string)preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], $separator, $address)));
+  if ($line === '' || $company === '') {
+    return $line;
+  }
+
+  $pattern = '/^' . preg_quote($company, '/') . '(?:\s*(?:,|·|-)\s*)?/i';
+  return trim((string)preg_replace($pattern, '', $line));
+}
+
 function quote_approval_label(string $status): string {
   return match ($status) {
     'pending_approval' => 'Pending Approval',
@@ -179,6 +189,22 @@ function quote_env_value(string $key): string {
   }
 
   return '';
+}
+
+function quote_logo_path(): string {
+  $path = __DIR__ . '/logo1.jpg';
+  return is_file($path) && is_readable($path) ? $path : '';
+}
+
+function quote_logo_html(string $src): string {
+  if ($src === '') {
+    return '';
+  }
+
+  $escaped_src = htmlspecialchars($src, ENT_QUOTES, 'UTF-8');
+  return '<div style="margin:0 0 16px;text-align:left;">'
+    . '<img src="' . $escaped_src . '" alt="Company logo" style="display:block;max-width:100%;width:auto;height:auto;max-height:72px;border:0;outline:none;text-decoration:none;">'
+    . '</div>';
 }
 
 function quote_escape_like(string $value, string $escape = '\\'): string {
@@ -450,9 +476,9 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
 
   // ---- Build company header contact line ----
   $header_contact_parts = [];
-  if ($sender_address !== '') {
-    $addr_oneline = str_replace(["\r\n", "\r", "\n"], ' · ', $sender_address);
-    $addr_oneline = preg_replace('/\s+/', ' ', $addr_oneline);
+  $header_address = quote_contact_address_line($sender_address, $sender_company, ' · ');
+  if ($header_address !== '') {
+    $addr_oneline = $header_address;
     $header_contact_parts[] = htmlspecialchars($addr_oneline, ENT_QUOTES, 'UTF-8');
   }
   if ($sender_phone !== '') {
@@ -462,6 +488,9 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
     $header_contact_parts[] = '<a href="mailto:' . htmlspecialchars($sender_email, ENT_QUOTES, 'UTF-8') . '" style="color:#93c5fd;text-decoration:none;">' . htmlspecialchars($sender_email, ENT_QUOTES, 'UTF-8') . '</a>';
   }
   $header_contact_html = implode(' &nbsp;·&nbsp; ', $header_contact_parts);
+  $logo_path = quote_logo_path();
+  $logo_cid = 'quote-email-logo';
+  $logo_html = $logo_path !== '' ? quote_logo_html('cid:' . $logo_cid) : '';
 
   // ---- "Prepared by" line ----
   $prepared_by_html = '';
@@ -475,8 +504,9 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
 
   // ---- Footer contact line (plain) ----
   $footer_parts = [];
-  if ($sender_address !== '') {
-    $footer_parts[] = htmlspecialchars(preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ', ', $sender_address)), ENT_QUOTES, 'UTF-8');
+  $footer_address = quote_contact_address_line($sender_address, $sender_company, ', ');
+  if ($footer_address !== '') {
+    $footer_parts[] = htmlspecialchars($footer_address, ENT_QUOTES, 'UTF-8');
   }
   if ($sender_phone !== '') {
     $footer_parts[] = htmlspecialchars($sender_phone, ENT_QUOTES, 'UTF-8');
@@ -521,7 +551,7 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
 
     // ── Header banner ──
     . '<div style="background:#1e3a5f;border-radius:8px 8px 0 0;padding:28px 32px 24px;">'
-      . '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $h($sender_company) . '</p>'
+      . ($logo_html !== '' ? $logo_html : '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $h($sender_company) . '</p>')
       . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '')
     . '</div>'
 
@@ -671,6 +701,9 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
     }
     $mailer->CharSet = 'UTF-8';
     $mailer->setFrom($smtp_from_email, $smtp_from_name);
+    if ($logo_path !== '') {
+      $mailer->addEmbeddedImage($logo_path, $logo_cid, basename($logo_path));
+    }
     $mailer->addAddress($to);
     $mailer->Subject = $subject;
     $mailer->isHTML(true);
@@ -914,13 +947,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_p
 
   // Header contact line
   $pv_header_parts = [];
-  if ($pv_sender_address !== '') {
-    $pv_addr_oneline = (string)preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ' · ', $pv_sender_address));
+  $pv_header_address = quote_contact_address_line($pv_sender_address, $pv_sender_company, ' · ');
+  if ($pv_header_address !== '') {
+    $pv_addr_oneline = $pv_header_address;
     $pv_header_parts[] = $h($pv_addr_oneline);
   }
   if ($pv_sender_phone !== '') $pv_header_parts[] = $h($pv_sender_phone);
   if ($pv_sender_email !== '') $pv_header_parts[] = '<a href="mailto:' . $h($pv_sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($pv_sender_email) . '</a>';
   $pv_header_contact_html = implode(' &nbsp;·&nbsp; ', $pv_header_parts);
+  $pv_logo_html = quote_logo_html(quote_logo_path() !== '' ? 'logo1.jpg' : '');
 
   // Prepared-by
   $pv_prepared_by_html = '';
@@ -934,8 +969,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_p
 
   // Footer contact line
   $pv_footer_parts = [];
-  if ($pv_sender_address !== '') {
-    $pv_footer_parts[] = $h((string)preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ', ', $pv_sender_address)));
+  $pv_footer_address = quote_contact_address_line($pv_sender_address, $pv_sender_company, ', ');
+  if ($pv_footer_address !== '') {
+    $pv_footer_parts[] = $h($pv_footer_address);
   }
   if ($pv_sender_phone !== '') $pv_footer_parts[] = $h($pv_sender_phone);
   if ($pv_sender_email !== '') $pv_footer_parts[] = '<a href="mailto:' . $h($pv_sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($pv_sender_email) . '</a>';
@@ -973,7 +1009,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_p
 
     // ── Header banner ──
     . '<div style="background:#1e3a5f;border-radius:8px 8px 0 0;padding:28px 32px 24px;">'
-      . '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $h($pv_sender_company) . '</p>'
+      . ($pv_logo_html !== '' ? $pv_logo_html : '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $h($pv_sender_company) . '</p>')
       . ($pv_header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $pv_header_contact_html . '</p>' : '')
     . '</div>'
 

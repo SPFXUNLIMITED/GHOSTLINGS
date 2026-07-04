@@ -14,6 +14,17 @@ function preview_single_line(string $value, string $separator): string {
     return trim((string)preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], $separator, $value)));
 }
 
+function preview_contact_address_line(string $address, string $company, string $separator): string {
+    $line = preview_single_line($address, $separator);
+    if ($line === '' || $company === '') {
+        return $line;
+    }
+
+    $pattern = '/^' . preg_quote($company, '/') . '(?:\s*(?:,|·|-)\s*)?/i';
+    $line = trim((string)preg_replace($pattern, '', $line));
+    return $line;
+}
+
 function preview_format_quantity($value): string {
     $quantity = (float)$value;
     if (abs($quantity - round($quantity)) < 0.00001) {
@@ -112,6 +123,22 @@ function preview_env_value(string $key): string {
         if ($v !== '') return $v;
     }
     return '';
+}
+
+function preview_logo_path(): string {
+    $path = __DIR__ . '/logo1.jpg';
+    return is_file($path) && is_readable($path) ? $path : '';
+}
+
+function preview_logo_html(string $src): string {
+    if ($src === '') {
+        return '';
+    }
+
+    $escaped_src = htmlspecialchars($src, ENT_QUOTES, 'UTF-8');
+    return '<div style="margin:0 0 16px;text-align:left;">'
+        . '<img src="' . $escaped_src . '" alt="Company logo" style="display:block;max-width:100%;width:auto;height:auto;max-height:72px;border:0;outline:none;text-decoration:none;">'
+        . '</div>';
 }
 
 function preview_stripe_secret_key(PDO $pdo): string {
@@ -393,8 +420,9 @@ try {
     }
 
     $header_contact_parts = [];
-    if ($sender_address !== '') {
-        $header_contact_parts[] = $escape_html(preview_single_line($sender_address, ' · '));
+    $header_address = preview_contact_address_line($sender_address, $sender_company, ' · ');
+    if ($header_address !== '') {
+        $header_contact_parts[] = $escape_html($header_address);
     }
     if ($sender_phone !== '') {
         $header_contact_parts[] = $escape_html($sender_phone);
@@ -403,10 +431,12 @@ try {
         $header_contact_parts[] = '<a href="mailto:' . $escape_html($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $escape_html($sender_email) . '</a>';
     }
     $header_contact_html = implode(' &nbsp;·&nbsp; ', $header_contact_parts);
+    $logo_html = preview_logo_html(preview_logo_path() !== '' ? 'logo1.jpg' : '');
 
     $footer_parts = [];
-    if ($sender_address !== '') {
-        $footer_parts[] = $escape_html(preview_single_line($sender_address, ', '));
+    $footer_address = preview_contact_address_line($sender_address, $sender_company, ', ');
+    if ($footer_address !== '') {
+        $footer_parts[] = $escape_html($footer_address);
     }
     if ($sender_phone !== '') {
         $footer_parts[] = $escape_html($sender_phone);
@@ -469,7 +499,7 @@ try {
         . '<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">'
         . '<div style="max-width:680px;margin:32px auto 32px;">'
         . '<div style="background:#1e3a5f;border-radius:8px 8px 0 0;padding:28px 32px 24px;">'
-          . '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $escape_html($sender_company) . '</p>'
+          . ($logo_html !== '' ? $logo_html : '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $escape_html($sender_company) . '</p>')
           . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '')
         . '</div>'
         . ($is_paid
