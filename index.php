@@ -41,6 +41,13 @@ $kpis = [
   'total_quotes' => 0,
 ];
 
+$week_kpis = [
+  'week_quoted' => 0.0,
+  'week_invoiced' => 0.0,
+  'week_received' => 0.0,
+  'week_outstanding' => 0.0,
+];
+
 $recent_quotes = [];
 $recent_invoices = [];
 
@@ -80,6 +87,24 @@ if (dashboard_table_exists($pdo, 'quotes')) {
     $kpis['converted_quotes'] = (int)($kpi_row['converted_quotes'] ?? 0);
     $kpis['total_quotes'] = (int)($kpi_row['total_quotes'] ?? 0);
     $kpis['outstanding'] = max(0, $kpis['total_invoiced'] - $kpis['total_received']);
+
+    $week_stmt = $pdo->query("
+      SELECT
+        COALESCE(SUM(CASE WHEN YEARWEEK(COALESCE(quote_date, created_at), 1) = YEARWEEK(CURDATE(), 1)
+                          THEN subtotal_amount ELSE 0 END), 0) AS week_quoted,
+        COALESCE(SUM(CASE WHEN {$invoice_condition}
+                          AND YEARWEEK(COALESCE(converted_at, quote_date, created_at), 1) = YEARWEEK(CURDATE(), 1)
+                          THEN subtotal_amount ELSE 0 END), 0) AS week_invoiced,
+        COALESCE(SUM(CASE WHEN {$invoice_condition} AND payment_status = 'paid'
+                          AND YEARWEEK(COALESCE(converted_at, quote_date, created_at), 1) = YEARWEEK(CURDATE(), 1)
+                          THEN subtotal_amount ELSE 0 END), 0) AS week_received
+      FROM quotes
+    ");
+    $week_row = $week_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    $week_kpis['week_quoted'] = (float)($week_row['week_quoted'] ?? 0);
+    $week_kpis['week_invoiced'] = (float)($week_row['week_invoiced'] ?? 0);
+    $week_kpis['week_received'] = (float)($week_row['week_received'] ?? 0);
+    $week_kpis['week_outstanding'] = max(0, $week_kpis['week_invoiced'] - $week_kpis['week_received']);
 
     $revenue_stmt = $pdo->prepare("
       SELECT
@@ -363,6 +388,29 @@ render_header('ERP Dashboard');
       <h2 class="section-title">Invoice to Cash Conversion</h2>
       <p class="section-subtitle">All-time collected versus outstanding invoiced amounts.</p>
       <canvas id="cashConversionChart" aria-label="Invoice to cash conversion pie chart" role="img"></canvas>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="dashboard-card">
+      <div class="kpi-label">Total Quoted This Week</div>
+      <div class="kpi-value" style="color:#1d4ed8;"><?= h(dashboard_money((float)$week_kpis['week_quoted'])) ?></div>
+      <div class="kpi-note">All quotes created this week</div>
+    </div>
+    <div class="dashboard-card">
+      <div class="kpi-label">Total Invoiced This Week</div>
+      <div class="kpi-value" style="color:#0f766e;"><?= h(dashboard_money((float)$week_kpis['week_invoiced'])) ?></div>
+      <div class="kpi-note">Invoices converted this week</div>
+    </div>
+    <div class="dashboard-card">
+      <div class="kpi-label">Total Received This Week</div>
+      <div class="kpi-value" style="color:#16a34a;"><?= h(dashboard_money((float)$week_kpis['week_received'])) ?></div>
+      <div class="kpi-note">Paid invoices this week</div>
+    </div>
+    <div class="dashboard-card">
+      <div class="kpi-label">Outstanding This Week</div>
+      <div class="kpi-value" style="color:#b45309;"><?= h(dashboard_money((float)$week_kpis['week_outstanding'])) ?></div>
+      <div class="kpi-note">Invoiced minus received this week</div>
     </div>
   </div>
 
