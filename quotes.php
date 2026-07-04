@@ -5,6 +5,7 @@ require __DIR__ . '/auth.php';
 require_once __DIR__ . '/lib/PHPMailer/src/Exception.php';
 require_once __DIR__ . '/lib/PHPMailer/src/PHPMailer.php';
 require_once __DIR__ . '/lib/PHPMailer/src/SMTP.php';
+require_once __DIR__ . '/email_preview.php';
 require_admin_or_moderator();
 
 const QUOTE_MAX_NOTES_LENGTH = 10000;
@@ -422,259 +423,18 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
     return false;
   }
 
-  $sender_profile = quote_sender_profile($pdo, $quote);
-  $sender_name    = $sender_profile['sender_name'];
-  $sender_company = $sender_profile['company_name'] !== '' ? $sender_profile['company_name'] : $smtp_from_name;
-  if ($sender_company === '') {
-    $sender_company = 'Our Company';
-  }
-  $sender_address = $sender_profile['address'];
-  $sender_phone   = $sender_profile['phone'];
-  $sender_email   = $sender_profile['email'] !== '' ? $sender_profile['email'] : $smtp_from_email;
-
-  $quote_id      = (int)($quote['id'] ?? 0);
-  $customer_name = trim((string)($quote['customer_name'] ?? ''));
-  $customer_company = trim((string)($quote['company_name'] ?? ''));
-  $quote_date    = trim((string)($quote['quote_date'] ?? ''));
-  $subtotal      = quote_format_money($quote['subtotal_amount'] ?? 0);
-  $tax_rate_val  = (float)($quote['tax_rate'] ?? 0);
-  $tax_amount    = quote_format_money($quote['tax_amount'] ?? 0);
-  $grand_total   = quote_format_money((float)($quote['subtotal_amount'] ?? 0) + (float)($quote['tax_amount'] ?? 0));
-
-  // Bill To address
-  $bill_street = trim((string)($quote['billing_street'] ?? ''));
-  $bill_city   = trim((string)($quote['billing_city']   ?? ''));
-  $bill_state  = trim((string)($quote['billing_state']  ?? ''));
-  $bill_zip    = trim((string)($quote['billing_zip']    ?? ''));
-
-  $subject = $sender_company . ' - Quote #' . $quote_id;
-
-  // ---- Build HTML rows ----
-  $rows_html = [];
-  $rows_text = [];
-  $row_index = 0;
-  foreach ($items as $item) {
-    $description = trim((string)($item['description'] ?? ''));
-    $quantity    = quote_format_money($item['quantity']   ?? 0);
-    $unit_price  = quote_format_money($item['unit_price'] ?? 0);
-    $line_total  = quote_format_money($item['line_total'] ?? 0);
-    $row_bg      = ($row_index % 2 === 0) ? '#ffffff' : '#f9fafb';
-    $rows_html[] = '<tr style="background:' . $row_bg . ';">'
-      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">' . htmlspecialchars($description, ENT_QUOTES, 'UTF-8') . '</td>'
-      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">' . htmlspecialchars($quantity, ENT_QUOTES, 'UTF-8') . '</td>'
-      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . htmlspecialchars($unit_price, ENT_QUOTES, 'UTF-8') . '</td>'
-      . '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#374151;">$' . htmlspecialchars($line_total, ENT_QUOTES, 'UTF-8') . '</td>'
-      . '</tr>';
-    $rows_text[] = '- ' . $description . ' | Qty: ' . $quantity . ' | Price: $' . $unit_price . ' | Total: $' . $line_total;
-    $row_index++;
-  }
-
-  if (!$rows_html) {
-    $rows_html[] = '<tr><td colspan="4" style="padding:10px 12px;text-align:center;color:#6b7280;">No line items.</td></tr>';
-    $rows_text[] = '- No line items.';
-  }
-
-  // ---- Build company header contact line ----
-  $header_contact_parts = [];
-  $header_address = quote_contact_address_line($sender_address, $sender_company, ' · ');
-  if ($header_address !== '') {
-    $addr_oneline = $header_address;
-    $header_contact_parts[] = htmlspecialchars($addr_oneline, ENT_QUOTES, 'UTF-8');
-  }
-  if ($sender_phone !== '') {
-    $header_contact_parts[] = htmlspecialchars($sender_phone, ENT_QUOTES, 'UTF-8');
-  }
-  if ($sender_email !== '') {
-    $header_contact_parts[] = '<a href="mailto:' . htmlspecialchars($sender_email, ENT_QUOTES, 'UTF-8') . '" style="color:#93c5fd;text-decoration:none;">' . htmlspecialchars($sender_email, ENT_QUOTES, 'UTF-8') . '</a>';
-  }
-  $header_contact_html = implode(' &nbsp;·&nbsp; ', $header_contact_parts);
   $logo_path = quote_logo_path();
   $logo_cid = 'quote-email-logo';
-  $logo_html = $logo_path !== '' ? quote_logo_html('cid:' . $logo_cid) : '';
 
-  // ---- "Prepared by" line ----
-  $prepared_by_html = '';
-  if ($sender_name !== '') {
-    $prepared_by_html = 'This quote was prepared by <strong style="color:#1e293b;">' . htmlspecialchars($sender_name, ENT_QUOTES, 'UTF-8') . '</strong>';
-    if ($sender_company !== 'Our Company') {
-      $prepared_by_html .= ' at <strong style="color:#1e293b;">' . htmlspecialchars($sender_company, ENT_QUOTES, 'UTF-8') . '</strong>';
-    }
-    $prepared_by_html .= '.';
-  }
-
-  // ---- Footer contact line (plain) ----
-  $footer_parts = [];
-  $footer_address = quote_contact_address_line($sender_address, $sender_company, ', ');
-  if ($footer_address !== '') {
-    $footer_parts[] = htmlspecialchars($footer_address, ENT_QUOTES, 'UTF-8');
-  }
-  if ($sender_phone !== '') {
-    $footer_parts[] = htmlspecialchars($sender_phone, ENT_QUOTES, 'UTF-8');
-  }
-  if ($sender_email !== '') {
-    $footer_parts[] = '<a href="mailto:' . htmlspecialchars($sender_email, ENT_QUOTES, 'UTF-8') . '" style="color:#93c5fd;text-decoration:none;">' . htmlspecialchars($sender_email, ENT_QUOTES, 'UTF-8') . '</a>';
-  }
-  $footer_contact_html = implode(' &nbsp;·&nbsp; ', $footer_parts);
-
-  // ---- Assemble HTML email ----
-  $h = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
-
-  // Build Bill To address block HTML
-  $bill_to_lines = [];
-  if ($customer_company !== '') $bill_to_lines[] = '<strong style="color:#0f172a;">' . $h($customer_company) . '</strong>';
-  if ($customer_name !== '')    $bill_to_lines[] = $h($customer_name);
-  if ($bill_street !== '')      $bill_to_lines[] = $h($bill_street);
-  $city_state_zip_parts = array_filter([$bill_city, $bill_state . ($bill_zip !== '' ? ' ' . $bill_zip : '')]);
-  $city_state_zip = implode(', ', $city_state_zip_parts);
-  if ($city_state_zip !== '')   $bill_to_lines[] = $h($city_state_zip);
-  if (trim((string)($quote['phone_number'] ?? '')) !== '') $bill_to_lines[] = $h(trim((string)($quote['phone_number'] ?? '')));
-  if (trim((string)($quote['email'] ?? '')) !== '') $bill_to_lines[] = '<a href="mailto:' . $h(trim((string)($quote['email'] ?? ''))) . '" style="color:#1d4ed8;text-decoration:none;">' . $h(trim((string)($quote['email'] ?? ''))) . '</a>';
-  $bill_to_html = implode('<br>', $bill_to_lines);
-
-  // Build From address block HTML
-  $from_lines = [];
-  $from_lines[] = '<strong style="color:#0f172a;">' . $h($sender_company) . '</strong>';
-  if ($sender_name !== '' && $sender_name !== $sender_company) $from_lines[] = $h($sender_name);
-  foreach (array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $sender_address))) as $addr_line) {
-    $from_lines[] = $h($addr_line);
-  }
-  if ($sender_phone !== '') $from_lines[] = $h($sender_phone);
-  if ($sender_email !== '') $from_lines[] = '<a href="mailto:' . $h($sender_email) . '" style="color:#1d4ed8;text-decoration:none;">' . $h($sender_email) . '</a>';
-  $from_html = implode('<br>', $from_lines);
-
-  $html_body = '<!doctype html>'
-    . '<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
-    . '<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">'
-
-    // Outer wrapper
-    . '<div style="max-width:680px;margin:32px auto 32px;">'
-
-    // ── Header banner ──
-    . '<div style="background:#1e3a5f;border-radius:8px 8px 0 0;padding:28px 32px 24px;">'
-      . ($logo_html !== '' ? $logo_html : '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">' . $h($sender_company) . '</p>')
-      . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '')
-    . '</div>'
-
-    // ── Document title strip ──
-    . '<div style="background:#ffffff;padding:20px 32px 0;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
-      . '<table style="width:100%;border-collapse:collapse;">'
-        . '<tr>'
-          . '<td style="padding:0 0 16px;">'
-            . '<p style="margin:0;font-size:18px;font-weight:700;color:#0f172a;">Quote #' . $h((string)$quote_id) . '</p>'
-          . '</td>'
-          . '<td style="padding:0 0 16px;text-align:right;">'
-            . '<p style="margin:0;font-size:13px;color:#64748b;">Date: ' . $h($quote_date) . '</p>'
-          . '</td>'
-        . '</tr>'
-      . '</table>'
-      . '<hr style="margin:0;border:none;border-top:2px solid #e2e8f0;">'
-    . '</div>'
-
-    // ── Bill To / From boxes ──
-    . '<div style="background:#ffffff;padding:20px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:0;">'
-      . '<table style="width:100%;border-collapse:collapse;">'
-        . '<tr>'
-          . '<td style="width:50%;padding:0 8px 0 0;vertical-align:top;">'
-            . '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;background:#f8fafc;">'
-              . '<p style="margin:0 0 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;">Bill To</p>'
-              . '<p style="margin:0;font-size:13px;color:#374151;line-height:1.7;">' . $bill_to_html . '</p>'
-            . '</div>'
-          . '</td>'
-          . '<td style="width:50%;padding:0 0 0 8px;vertical-align:top;">'
-            . '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;background:#f8fafc;">'
-              . '<p style="margin:0 0 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;">From</p>'
-              . '<p style="margin:0;font-size:13px;color:#374151;line-height:1.7;">' . $from_html . '</p>'
-            . '</div>'
-          . '</td>'
-        . '</tr>'
-      . '</table>'
-    . '</div>'
-
-    // ── Body ──
-    . '<div style="background:#ffffff;padding:24px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">'
-
-      // Greeting
-      . '<p style="margin:0 0 8px;font-size:15px;color:#1e293b;">Hello' . ($customer_name !== '' ? ', ' . $h($customer_name) : '') . ',</p>'
-      . '<p style="margin:0 0 24px;font-size:14px;color:#475569;">Please find your quote details below. We appreciate the opportunity to earn your business.</p>'
-
-      // Line items table
-      . '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">'
-        . '<thead>'
-          . '<tr style="background:#f8fafc;">'
-            . '<th style="padding:10px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Description</th>'
-            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Qty</th>'
-            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Unit Price</th>'
-            . '<th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e2e8f0;">Total</th>'
-          . '</tr>'
-        . '</thead>'
-        . '<tbody>'
-          . implode('', $rows_html)
-        . '</tbody>'
-        . '<tfoot>'
-          . '<tr>'
-            . '<td colspan="3" style="padding:10px 12px;text-align:right;font-weight:600;font-size:13px;color:#1e293b;border-top:2px solid #e2e8f0;">Subtotal:</td>'
-            . '<td style="padding:10px 12px;text-align:right;font-weight:600;font-size:14px;color:#1e3a5f;border-top:2px solid #e2e8f0;">$' . $h($subtotal) . '</td>'
-          . '</tr>'
-          . ($tax_rate_val > 0
-              ? '<tr>'
-                  . '<td colspan="3" style="padding:4px 12px;text-align:right;font-weight:600;font-size:13px;color:#1e293b;">Tax (' . $h(number_format($tax_rate_val, 2)) . '%):</td>'
-                  . '<td style="padding:4px 12px;text-align:right;font-weight:600;font-size:14px;color:#1e3a5f;">$' . $h($tax_amount) . '</td>'
-                . '</tr>'
-              : '')
-          . '<tr>'
-            . '<td colspan="3" style="padding:10px 12px;text-align:right;font-weight:700;font-size:14px;color:#1e293b;">Grand Total:</td>'
-            . '<td style="padding:10px 12px;text-align:right;font-weight:700;font-size:16px;color:#1e3a5f;">$' . $h($grand_total) . '</td>'
-          . '</tr>'
-        . '</tfoot>'
-      . '</table>'
-
-      . '<p style="margin:0;font-size:14px;color:#475569;">Thank you for considering our services. Please do not hesitate to reach out if you have any questions.</p>'
-    . '</div>'
-
-    // ── Prepared-by strip ──
-    . ($prepared_by_html !== ''
-        ? '<div style="background:#f8fafc;padding:14px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:1px solid #e2e8f0;">'
-            . '<p style="margin:0;font-size:13px;color:#64748b;">' . $prepared_by_html . '</p>'
-          . '</div>'
-        : '')
-
-    // ── Footer ──
-    . '<div style="background:#1e3a5f;border-radius:0 0 8px 8px;padding:18px 32px;">'
-      . '<p style="margin:0;font-size:12px;color:#93c5fd;line-height:1.6;">'
-        . $h($sender_company)
-        . ($footer_contact_html !== '' ? ' &nbsp;·&nbsp; ' . $footer_contact_html : '')
-      . '</p>'
-    . '</div>'
-
-    . '</div>' // end outer wrapper
-    . '</body></html>';
-
-  // ---- Plain-text fallback ----
-  $text_body = $sender_company . "\r\n";
-  if ($sender_address !== '') {
-    $text_body .= preg_replace('/\s+/', ' ', str_replace(["\r\n", "\r", "\n"], ', ', $sender_address)) . "\r\n";
-  }
-  if ($sender_phone !== '') $text_body .= $sender_phone . "\r\n";
-  if ($sender_email !== '') $text_body .= $sender_email . "\r\n";
-  $text_body .= "\r\n";
-  $text_body .= "Quote #{$quote_id}  |  Date: {$quote_date}\r\n";
-  $text_body .= str_repeat('-', 40) . "\r\n";
-  $text_body .= "Bill To: " . ($customer_company !== '' ? $customer_company . ' / ' : '') . $customer_name . "\r\n";
-  if ($bill_street !== '') $text_body .= $bill_street . "\r\n";
-  if ($city_state_zip !== '') $text_body .= $city_state_zip . "\r\n";
-  $text_body .= str_repeat('-', 40) . "\r\n\r\n";
-  $text_body .= "Hello" . ($customer_name !== '' ? ", {$customer_name}" : '') . ",\r\n\r\n";
-  $text_body .= "Please find your quote details below.\r\n\r\n";
-  $text_body .= "Line Items:\r\n";
-  $text_body .= implode("\r\n", $rows_text) . "\r\n\r\n";
-  $text_body .= "Subtotal: \${$subtotal}\r\n";
-  if ($tax_rate_val > 0) {
-    $text_body .= "Tax (" . number_format($tax_rate_val, 2) . "%): \${$tax_amount}\r\n";
-  }
-  $text_body .= "Grand Total: \${$grand_total}\r\n\r\n";
-  $text_body .= "Thank you for considering our services.\r\n";
-  if ($sender_name !== '') {
-    $text_body .= "\r\nPrepared by: {$sender_name}" . ($sender_company !== 'Our Company' ? " at {$sender_company}" : '') . "\r\n";
+  try {
+    $email_payload = preview_build_document_payload($pdo, $quote, $items, [
+      'context' => 'quote',
+      'logo_src' => $logo_path !== '' ? 'cid:' . $logo_cid : null,
+    ]);
+  } catch (Throwable $e) {
+    $error_message = trim($e->getMessage()) !== '' ? trim($e->getMessage()) : 'Unable to generate quote email preview.';
+    error_log('Quote email preview generation failed for quote #' . (int)($quote['id'] ?? 0) . ': ' . $e->getMessage());
+    return false;
   }
 
   try {
@@ -705,10 +465,10 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
       $mailer->addEmbeddedImage($logo_path, $logo_cid, basename($logo_path));
     }
     $mailer->addAddress($to);
-    $mailer->Subject = $subject;
+    $mailer->Subject = (string)$email_payload['subject'];
     $mailer->isHTML(true);
-    $mailer->Body = $html_body;
-    $mailer->AltBody = $text_body;
+    $mailer->Body = (string)$email_payload['html_body'];
+    $mailer->AltBody = (string)$email_payload['text_body'];
     if (!$mailer->send()) {
       $error_message = trim((string)$mailer->ErrorInfo);
       return false;
@@ -717,7 +477,7 @@ function quote_send_email(PDO $pdo, array $quote, array $items, ?string &$error_
   } catch (Throwable $e) {
     $error_message = $e->getMessage();
     error_log(
-      'Quote email send failed for quote #' . $quote_id
+      'Quote email send failed for quote #' . (int)($quote['id'] ?? 0)
       . ' to ' . $to
       . ': ' . $e->getMessage()
     );
