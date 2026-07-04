@@ -187,7 +187,7 @@ function quote_logo_path(): string {
 }
 
 function quote_logo_html(string $src): string {
-  if ($src === '' || quote_logo_path() === '') {
+  if ($src === '') {
     return '';
   }
 
@@ -944,7 +944,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'print_p
   if ($pv_sender_phone !== '') $pv_header_parts[] = $h($pv_sender_phone);
   if ($pv_sender_email !== '') $pv_header_parts[] = '<a href="mailto:' . $h($pv_sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $h($pv_sender_email) . '</a>';
   $pv_header_contact_html = implode(' &nbsp;·&nbsp; ', $pv_header_parts);
-  $pv_logo_html = quote_logo_html('logo1.jpg');
+  $pv_logo_html = quote_logo_html(quote_logo_path() !== '' ? 'logo1.jpg' : '');
 
   // Prepared-by
   $pv_prepared_by_html = '';

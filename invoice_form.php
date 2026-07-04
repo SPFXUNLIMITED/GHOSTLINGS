@@ -522,7 +522,7 @@ function invoice_logo_path(): string {
 }
 
 function invoice_logo_html(string $src): string {
-  if ($src === '' || invoice_logo_path() === '') {
+  if ($src === '') {
     return '';
   }
 

@@ -120,7 +120,7 @@ function preview_logo_path(): string {
 }
 
 function preview_logo_html(string $src): string {
-    if ($src === '' || preview_logo_path() === '') {
+    if ($src === '') {
         return '';
     }
 
@@ -419,7 +419,7 @@ try {
         $header_contact_parts[] = '<a href="mailto:' . $escape_html($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $escape_html($sender_email) . '</a>';
     }
     $header_contact_html = implode(' &nbsp;·&nbsp; ', $header_contact_parts);
-    $logo_html = preview_logo_html('logo1.jpg');
+    $logo_html = preview_logo_html(preview_logo_path() !== '' ? 'logo1.jpg' : '');
 
     $footer_parts = [];
     if ($sender_address !== '') {
