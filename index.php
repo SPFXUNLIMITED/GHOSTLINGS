@@ -502,11 +502,13 @@ render_header('ERP Dashboard');
   document.querySelectorAll('.erp-row-link[data-href]').forEach((row) => {
     const href = row.getAttribute('data-href');
     row.addEventListener('click', (event) => {
-      if (event.target.closest('a, button, input, select, textarea, label')) return;
+      if (event.target.closest("a, button, input, select, textarea, label, [role='button'], [role='link']")) return;
       window.location.href = href;
     });
     row.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const isEnter = event.key === 'Enter';
+      const isSpace = event.key === ' ' || event.code === 'Space';
+      if (!isEnter && !isSpace) return;
       event.preventDefault();
       window.location.href = href;
     });
