@@ -569,7 +569,7 @@ function preview_build_document_payload(PDO $pdo, array $quote, array $items, ar
           . ($is_invoice && $enable_online_payment
               ? '<div style="margin:0 0 20px;padding:16px 18px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;">'
                   . '<p style="margin:0 0 10px;font-size:14px;font-weight:600;color:#1d4ed8;">Pay this invoice online</p>'
-                  . '<p style="margin:0 0 14px;font-size:13px;color:#334155;">Use Stripe's secure checkout page to pay this invoice online. Card details are entered directly on Stripe and are not collected on our site.</p>'
+                  . '<p style="margin:0 0 14px;font-size:13px;color:#334155;">Use Stripe\'s secure checkout page to pay this invoice online. Card details are entered directly on Stripe and are not collected on our site.</p>'
                   . ($stripe_checkout_url !== ''
                       ? '<p style="margin:0;"><a href="' . $escape_html($stripe_checkout_url) . '" style="display:inline-block;padding:11px 18px;background:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:999px;font-weight:700;">Pay Invoice on Stripe</a></p>'
                       : '<p style="margin:0;font-size:13px;color:#64748b;font-style:italic;">Payment link will be included when this invoice is emailed.</p>')
