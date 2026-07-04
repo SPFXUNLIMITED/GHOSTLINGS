@@ -417,41 +417,15 @@ try {
         $rows_html[] = '<tr><td colspan="4" style="padding:10px 12px;text-align:center;color:#6b7280;">No line items.</td></tr>';
     }
 
-    $header_contact_parts = [];
-    $header_address = preview_contact_address_line($sender_address, $sender_company, ' · ');
-    if ($header_address !== '') {
-        $header_contact_parts[] = $escape_html($header_address);
-    }
-    if ($sender_phone !== '') {
-        $header_contact_parts[] = $escape_html($sender_phone);
-    }
-    if ($sender_email !== '') {
-        $header_contact_parts[] = '<a href="mailto:' . $escape_html($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $escape_html($sender_email) . '</a>';
-    }
-    $header_contact_html = implode(' &nbsp;·&nbsp; ', $header_contact_parts);
     $logo_html = preview_logo_html(preview_logo_path() !== '' ? 'logo1.jpg' : '');
     $header_company_name = 'Laser Cutter Repair';
-    $header_brand_html = '<p style="margin:0 0 6px;font-size:32px;font-weight:800;line-height:1.1;color:#ffffff;letter-spacing:0.4px;">' . $escape_html($header_company_name) . '</p>'
-        . ($header_contact_html !== '' ? '<p style="margin:0;font-size:13px;font-weight:400;color:#93c5fd;line-height:1.6;">' . $header_contact_html . '</p>' : '');
+    $header_brand_html = '<p style="margin:0;font-size:32px;font-weight:800;line-height:1.1;color:#ffffff;letter-spacing:0.4px;">' . $escape_html($header_company_name) . '</p>';
     $header_identity_html = $logo_html !== ''
         ? '<div style="display:flex;align-items:center;gap:16px;">'
             . '<div style="flex:0 0 auto;">' . $logo_html . '</div>'
             . '<div style="flex:1 1 auto;">' . $header_brand_html . '</div>'
           . '</div>'
         : $header_brand_html;
-
-    $footer_parts = [];
-    $footer_address = preview_contact_address_line($sender_address, $sender_company, ', ');
-    if ($footer_address !== '') {
-        $footer_parts[] = $escape_html($footer_address);
-    }
-    if ($sender_phone !== '') {
-        $footer_parts[] = $escape_html($sender_phone);
-    }
-    if ($sender_email !== '') {
-        $footer_parts[] = '<a href="mailto:' . $escape_html($sender_email) . '" style="color:#93c5fd;text-decoration:none;">' . $escape_html($sender_email) . '</a>';
-    }
-    $footer_contact_html = implode(' &nbsp;·&nbsp; ', $footer_parts);
 
     $bill_to_lines = [];
     if ($customer_company !== '') {
@@ -595,7 +569,6 @@ try {
         . '<div style="background:#1e3a5f;border-radius:0 0 8px 8px;padding:18px 32px;">'
           . '<p style="margin:0;font-size:12px;color:#93c5fd;line-height:1.6;">'
             . $escape_html($sender_company)
-            . ($footer_contact_html !== '' ? ' &nbsp;·&nbsp; ' . $footer_contact_html : '')
           . '</p>'
         . '</div>'
         . '</div>'
