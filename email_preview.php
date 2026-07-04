@@ -657,7 +657,7 @@ function preview_handle_request(PDO $pdo): void {
     echo $payload['html_body'];
 }
 
-if (realpath((string)($_SERVER['SCRIPT_FILENAME'] ?? '')) === __FILE__) {
+if (realpath((string)($_SERVER['SCRIPT_FILENAME'] ?? '')) === realpath(__FILE__)) {
     try {
         preview_handle_request($pdo);
         exit;
