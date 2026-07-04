@@ -1113,7 +1113,7 @@ function invoice_quote_date_value(?array $quote, string $fallback): string {
   return $quote_date !== '' ? $quote_date : $fallback;
 }
 
-$quote_id = isset($_GET['id']) ? max(0, (int)$_GET['id']) : 0;
+$quote_id = (int)(filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 0);
 $quote = null;
 $rows = [];
 
