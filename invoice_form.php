@@ -142,6 +142,10 @@ function invoice_online_payment_enabled(array $quote): bool {
   return (int)($quote['enable_online_payment'] ?? 0) === 1;
 }
 
+function invoice_is_paid(array $quote): bool {
+  return strtolower(trim((string)($quote['payment_status'] ?? ''))) === 'paid';
+}
+
 function invoice_checkout_session_url(PDO $pdo, array &$quote, ?string &$error_message = null): string {
   $error_message = null;
   $log_empty_result = static function (string $reason, int $quote_id, array $context = [], bool $failed = false): void {
