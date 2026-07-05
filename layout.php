@@ -604,7 +604,9 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
     <?php render_menu_dropdown('Purchasing', [
       ['href' => 'sourcing_rfq_tracker.php', 'files' => ['sourcing_rfq_tracker.php', 'sourcing_rfq_submitted.php', 'sourcing_rfq_image.php'], 'label' => 'RFQs'],
       ['href' => 'order_tracker.php', 'file' => 'order_tracker.php', 'label' => 'POs'],
+      ['href' => 'freight_forwarders.php', 'files' => ['freight_forwarders.php', 'freight_forwarder_form.php', 'freight_forwarder_details.php'], 'label' => 'Freight Forwarders'],
       ['href' => 'freight_quote_tracker.php', 'file' => 'freight_quote_tracker.php', 'label' => 'Freight Quotes'],
+      ['href' => 'incoming_shipments.php', 'file' => 'incoming_shipments.php', 'label' => 'Incoming Shipments'],
     ], $current); ?>
 	
     <?php render_menu_dropdown('Selling', [
@@ -637,8 +639,6 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
   <a class="left-quick-access-link <?= $current === 'customers.php' ? 'active' : '' ?>" href="customers.php">Customers</a>
   <a class="left-quick-access-link <?= in_array($current, ['vendors.php', 'vendor_form.php', 'vendor_details.php'], true) ? 'active' : '' ?>" href="vendors.php">Vendors</a>
   <a class="left-quick-access-link <?= in_array($current, ['inventory_list.php', 'inventory_form.php'], true) ? 'active' : '' ?>" href="inventory_list.php">Inventory</a>
-  <a class="left-quick-access-link <?= $current === 'incoming_shipments.php' ? 'active' : '' ?>" href="incoming_shipments.php">Incoming Shipments</a>
-  <a class="left-quick-access-link <?= in_array($current, ['freight_forwarders.php', 'freight_forwarder_form.php', 'freight_forwarder_details.php'], true) ? 'active' : '' ?>" href="freight_forwarders.php">Freight Forwarders</a>
   <a class="left-quick-access-link <?= in_array($current, ['labor_list.php', 'labor_form.php'], true) ? 'active' : '' ?>" href="labor_list.php">Labor / Services</a>
   <a class="left-quick-access-link <?= $current === 'alibaba_responses.php' ? 'active' : '' ?>" href="alibaba_responses.php">Alibaba Responses</a>
   <a class="left-quick-access-link <?= $current === 'quick_order_list.php' ? 'active' : '' ?>" href="quick_order_list.php">Quick Orders</a>
