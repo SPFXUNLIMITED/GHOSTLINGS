@@ -1843,6 +1843,44 @@ if (!$_te_cleanup_done) {
 }
 unset($_te_cleanup_done);
 
+// Create bank_transactions table for imported bank activity
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS bank_transactions (
+    id                     INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    transaction_date       DATE NOT NULL,
+    description            TEXT NOT NULL,
+    normalized_description VARCHAR(500) NOT NULL,
+    amount                 DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    running_balance        DECIMAL(12,2) NULL,
+    transaction_type       ENUM('credit','debit','transfer','other') NOT NULL DEFAULT 'credit',
+    source                 VARCHAR(100) NOT NULL DEFAULT 'bank_of_america_csv',
+    reference              VARCHAR(191) NULL,
+    customer_name          VARCHAR(255) NULL,
+    transaction_hash       CHAR(64) NOT NULL,
+    source_filename        VARCHAR(255) NULL,
+    source_line_number     INT UNSIGNED NULL,
+    raw_row_json           LONGTEXT NULL,
+    linked_payment_id      INT UNSIGNED NULL,
+    matched_customer_id    INT UNSIGNED NULL,
+    matched_invoice_id     INT UNSIGNED NULL,
+    match_status           ENUM('unmatched','matched','ignored') NOT NULL DEFAULT 'unmatched',
+    imported_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uniq_bank_transactions_hash (transaction_hash),
+    UNIQUE KEY uniq_bank_transactions_linked_payment_id (linked_payment_id),
+    KEY idx_bank_transactions_date (transaction_date),
+    KEY idx_bank_transactions_type (transaction_type),
+    KEY idx_bank_transactions_source (source),
+    KEY idx_bank_transactions_reference (reference),
+    KEY idx_bank_transactions_match_status (match_status),
+    KEY idx_bank_transactions_matched_customer_id (matched_customer_id),
+    KEY idx_bank_transactions_matched_invoice_id (matched_invoice_id),
+    CONSTRAINT fk_bank_transactions_customer FOREIGN KEY (matched_customer_id) REFERENCES customers (id) ON DELETE SET NULL,
+    CONSTRAINT fk_bank_transactions_invoice FOREIGN KEY (matched_invoice_id) REFERENCES quotes (id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 // Create customer_payments table for recording payments received from customers
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS customer_payments (
@@ -1907,5 +1945,134 @@ if (!function_exists('log_admin_activity')) {
       $safe_details !== '' ? mb_substr($safe_details, 0, 5000) : null,
       $now_pt,
     ]);
+  }
+}
+
+if (!function_exists('bank_tx_normalize_description')) {
+  function bank_tx_normalize_description(string $description): string {
+    $description = preg_replace('/\s+/u', ' ', trim($description));
+    return mb_strtolower((string)$description);
+  }
+}
+
+if (!function_exists('bank_tx_parse_money')) {
+  function bank_tx_parse_money(?string $raw): ?float {
+    $raw = trim((string)$raw);
+    // Bank of America exports sometimes use "..." in Running Bal. as a placeholder when no balance is shown.
+    if ($raw === '' || $raw === '...') {
+      return null;
+    }
+
+    $negative = false;
+    if (preg_match('/^\(.*\)$/', $raw)) {
+      $negative = true;
+      $raw = substr($raw, 1, -1);
+    }
+
+    $normalized = str_replace(['$', ',', ' '], '', $raw);
+    if ($normalized === '' || !is_numeric($normalized)) {
+      return null;
+    }
+
+    $amount = (float)$normalized;
+    return $negative ? ($amount * -1) : $amount;
+  }
+}
+
+if (!function_exists('bank_tx_amount_string')) {
+  function bank_tx_amount_string(float $amount): string {
+    return number_format($amount, 2, '.', '');
+  }
+}
+
+if (!function_exists('bank_tx_hash')) {
+  function bank_tx_hash(string $date_ymd, string $description, float $amount): string {
+    return hash('sha256', $date_ymd . '|' . bank_tx_normalize_description($description) . '|' . bank_tx_amount_string($amount));
+  }
+}
+
+if (!function_exists('bank_tx_detect_type')) {
+  function bank_tx_detect_type(string $description, float $amount): string {
+    $desc = mb_strtolower($description);
+    if (str_contains($desc, 'transfer')) {
+      return 'transfer';
+    }
+    if ($amount > 0) {
+      return 'credit';
+    }
+    if ($amount < 0) {
+      return 'debit';
+    }
+    return 'other';
+  }
+}
+
+if (!function_exists('bank_tx_classify_source')) {
+  function bank_tx_classify_source(string $description): string {
+    $desc = mb_strtolower($description);
+    return match (true) {
+      str_contains($desc, 'zelle') => 'zelle',
+      str_contains($desc, 'stripe') => 'stripe',
+      str_contains($desc, 'atm') => 'atm',
+      str_contains($desc, 'ach'), str_contains($desc, 'wire') => 'ach',
+      str_contains($desc, 'deposit') => 'deposit',
+      default => 'bank_of_america_csv',
+    };
+  }
+}
+
+if (!function_exists('bank_tx_extract_reference')) {
+  function bank_tx_extract_reference(string $description): ?string {
+    $patterns = [
+      '/\bConf#\s*([A-Z0-9-]+)/i',
+      '/\bID:([A-Z0-9-]+)/i',
+      '/#([A-Z0-9]{4,})\b/i',
+    ];
+    foreach ($patterns as $pattern) {
+      if (preg_match($pattern, $description, $matches)) {
+        return strtoupper(trim((string)$matches[1]));
+      }
+    }
+    return null;
+  }
+}
+
+if (!function_exists('bank_tx_extract_customer_name')) {
+  function bank_tx_extract_customer_name(string $description): ?string {
+    if (preg_match('/zelle payment from\s+(.+?)(?:\s+conf#|\s*$)/i', $description, $matches)) {
+      return trim((string)$matches[1]);
+    }
+    if (preg_match('/zelle payment to\s+(.+?)(?:\s+conf#|\s*$)/i', $description, $matches)) {
+      return trim((string)$matches[1]);
+    }
+    return null;
+  }
+}
+
+if (!function_exists('bank_tx_suggest_payment_method')) {
+  function bank_tx_suggest_payment_method(string $source, string $description): string {
+    return match ($source) {
+      'zelle', 'stripe', 'ach' => 'ach_wire',
+      'atm' => str_contains(mb_strtolower($description), 'ckcd') ? 'check' : 'cash',
+      default => str_contains(mb_strtolower($description), 'check') ? 'check' : 'other',
+    };
+  }
+}
+
+if (!function_exists('bank_tx_invoice_search_term')) {
+  function bank_tx_invoice_search_term(?string $customer_name, ?string $reference, string $description): string {
+    $candidate = trim((string)$customer_name);
+    if ($candidate !== '') {
+      return $candidate;
+    }
+    $candidate = trim((string)$reference);
+    if ($candidate !== '') {
+      return $candidate;
+    }
+    $description = trim($description);
+    if ($description === '') {
+      return '';
+    }
+    return mb_substr($description, 0, 60);
   }
 }
