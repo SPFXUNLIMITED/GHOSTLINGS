@@ -136,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Amount must be greater than zero.';
       }
       if ($bank_transaction_id > 0) {
-        $bank_tx_stmt = $pdo->prepare("SELECT id, linked_payment_id, matched_invoice_id FROM bank_transactions WHERE id = ? LIMIT 1");
+        $bank_tx_stmt = $pdo->prepare("SELECT id, linked_payment_id FROM bank_transactions WHERE id = ? LIMIT 1");
         $bank_tx_stmt->execute([$bank_transaction_id]);
         $bank_tx_row = $bank_tx_stmt->fetch(PDO::FETCH_ASSOC);
         if (!$bank_tx_row) {

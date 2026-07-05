@@ -283,7 +283,13 @@ render_header('Bank Transactions');
               <?php endif; ?>
             </td>
             <td><?= h((string)$tx['source']) ?></td>
-            <td><?= trim((string)($tx['reference'] ?? '')) !== '' ? h((string)$tx['reference']) : '<span class="muted">—</span>' ?></td>
+            <td>
+              <?php if (trim((string)($tx['reference'] ?? '')) !== ''): ?>
+                <?= h((string)$tx['reference']) ?>
+              <?php else: ?>
+                <span class="muted">—</span>
+              <?php endif; ?>
+            </td>
             <td><strong>$<?= h(number_format((float)$tx['amount'], 2)) ?></strong></td>
             <td>
               <?= $tx['running_balance'] !== null

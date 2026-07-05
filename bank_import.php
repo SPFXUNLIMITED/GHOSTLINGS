@@ -4,6 +4,8 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_admin_or_moderator();
 
+const BANK_IMPORT_DUPLICATE_SQLSTATE = '23000';
+
 if (empty($_SESSION['bank_import_csrf'])) {
   $_SESSION['bank_import_csrf'] = bin2hex(random_bytes(24));
 }
@@ -56,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $invalid = 0;
             $processed = 0;
             $previewRows = [];
+            $invalidRows = [];
 
             $insertStmt = $pdo->prepare(
               "INSERT INTO bank_transactions (
@@ -99,6 +102,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
               if (!$date || $description === '' || $amount === null) {
                 $invalid++;
+                if (count($invalidRows) < 5) {
+                  $invalidRows[] = 'Line ' . $lineNumber . ': invalid date, description, or amount.';
+                }
                 continue;
               }
 
@@ -142,7 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   ];
                 }
               } catch (PDOException $e) {
-                if ($e->getCode() === '23000') {
+                if ($e->getCode() === BANK_IMPORT_DUPLICATE_SQLSTATE) {
                   $duplicates++;
                   continue;
                 }
@@ -156,6 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               'inserted' => $inserted,
               'duplicates' => $duplicates,
               'invalid' => $invalid,
+              'invalid_rows' => $invalidRows,
               'preview_rows' => $previewRows,
             ];
           }
@@ -186,6 +193,11 @@ render_header('Bank Import');
     Imported <?= (int)$summary['inserted'] ?> new transactions from <?= h((string)$summary['file_name']) ?>.
     Skipped <?= (int)$summary['duplicates'] ?> duplicates and <?= (int)$summary['invalid'] ?> invalid row(s).
   </div>
+  <?php if (!empty($summary['invalid_rows'])): ?>
+    <div class="alert" style="border-color:#fde68a;background:#fffbeb;color:#92400e;">
+      <?= h(implode(' ', $summary['invalid_rows'])) ?>
+    </div>
+  <?php endif; ?>
 <?php endif; ?>
 
 <div class="card laser-rfq-hero page-header">
