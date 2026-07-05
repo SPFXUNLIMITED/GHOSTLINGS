@@ -77,6 +77,89 @@ function invoice_contact_address_line(string $address, string $company, string $
   return trim((string)preg_replace($pattern, '', $line));
 }
 
+function invoice_env_value(string $key): string {
+  static $dotenv_values = null;
+
+  if ($dotenv_values === null) {
+    $dotenv_values = [];
+    $dotenv_path = __DIR__ . '/.env';
+    if (is_file($dotenv_path) && is_readable($dotenv_path)) {
+      $lines = file($dotenv_path, FILE_IGNORE_NEW_LINES);
+      if (is_array($lines)) {
+        foreach ($lines as $line) {
+          $line = trim((string)$line);
+          if ($line === '' || str_starts_with($line, '#')) {
+            continue;
+          }
+
+          $separator_pos = strpos($line, '=');
+          if ($separator_pos === false) {
+            continue;
+          }
+
+          $name = trim(substr($line, 0, $separator_pos));
+          if ($name === '' || !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $name)) {
+            continue;
+          }
+
+          $value = trim(substr($line, $separator_pos + 1));
+          if (strlen($value) >= 2) {
+            $first = $value[0];
+            $last = $value[strlen($value) - 1];
+            if ($first === '"' && $last === '"') {
+              $value = substr($value, 1, -1);
+              $value = strtr($value, [
+                '\\\\' => '\\',
+                '\\"' => '"',
+                '\\n' => "\n",
+                '\\r' => "\r",
+                '\\t' => "\t",
+              ]);
+            } elseif ($first === "'" && $last === "'") {
+              $value = substr($value, 1, -1);
+              $value = strtr($value, [
+                '\\\\' => '\\',
+                "\\'" => "'",
+              ]);
+            }
+          } else {
+            $value = preg_replace('/\s+#.*$/', '', $value) ?? $value;
+            $value = rtrim($value);
+          }
+
+          $dotenv_values[$name] = $value;
+        }
+      }
+    }
+  }
+
+  $env_value = getenv($key);
+  if ($env_value === false) {
+    $env_value = null;
+  }
+
+  $candidates = [
+    $env_value,
+    $_ENV[$key] ?? null,
+    $_SERVER[$key] ?? null,
+    $dotenv_values[$key] ?? null,
+  ];
+
+  foreach ($candidates as $candidate) {
+    $value = trim((string)$candidate);
+    if ($value !== '') {
+      return $value;
+    }
+  }
+
+  return '';
+}
+
+function invoice_logo_path(): string {
+  $path = __DIR__ . '/logo1.jpg';
+  return is_file($path) && is_readable($path) ? $path : '';
+}
+
 function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, bool $require_payment_link = true, ?string &$error_message = null, ?string $logo_src = null): ?array {
   $error_message = null;
 
