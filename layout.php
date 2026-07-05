@@ -609,6 +609,7 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
     <?php render_menu_dropdown('Quotes & Invoices', [
       ['href' => 'quotes.php', 'files' => ['quotes.php'], 'label' => 'Quotes'],
       ['href' => 'invoice_tracker.php', 'files' => ['invoice_tracker.php'], 'label' => 'Invoices'],
+      ['type' => 'separator'],
       ['href' => 'customer_payments.php', 'files' => ['customer_payments.php'], 'label' => 'Customer Payments'],
       ['href' => 'transactions.php', 'files' => ['transactions.php'], 'label' => 'Bank Transactions'],
       ['href' => 'bank_import.php', 'files' => ['bank_import.php'], 'label' => 'Import Bank CSV'],
