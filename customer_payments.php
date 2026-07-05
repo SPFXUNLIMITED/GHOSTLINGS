@@ -592,7 +592,7 @@ render_header('Customer Payments');
               'customer_id'    => $cid,
               'customer_name'  => $cname . ($ccompany !== '' ? ' — ' . $ccompany : ''),
               'payment_date'   => $pdate,
-              'amount'         => number_format((float)$amount, 2, '.', ''),
+              'amount'         => number_format(abs((float)$amount), 2, '.', ''),
               'payment_method' => $method,
               'reference_no'   => $ref_no,
               'notes'          => $pay_notes,
