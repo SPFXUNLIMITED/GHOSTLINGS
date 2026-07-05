@@ -606,6 +606,7 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
       ['href' => 'order_tracker.php', 'file' => 'order_tracker.php', 'label' => 'POs'],
       ['href' => 'freight_quote_tracker.php', 'file' => 'freight_quote_tracker.php', 'label' => 'Freight Quotes'],
     ], $current); ?>
+	
     <?php render_menu_dropdown('Quotes & Invoices', [
       ['href' => 'quotes.php', 'files' => ['quotes.php'], 'label' => 'Quotes'],
       ['href' => 'invoice_tracker.php', 'files' => ['invoice_tracker.php'], 'label' => 'Invoices'],
@@ -614,6 +615,7 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
       ['href' => 'transactions.php', 'files' => ['transactions.php'], 'label' => 'Bank Transactions'],
       ['href' => 'bank_import.php', 'files' => ['bank_import.php'], 'label' => 'Import Bank CSV'],
     ], $current); ?>
+	
     <?php if ($show_admin_menu): ?>
     <?php render_menu_link(['href' => 'admin_backend.php', 'files' => ['admin_backend.php', 'users.php', 'user_profiles.php', 'form_admin.php'], 'label' => 'Admin Backend'], $current); ?>
     <?php endif; ?>
