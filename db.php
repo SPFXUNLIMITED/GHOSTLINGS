@@ -1843,7 +1843,7 @@ if (!$_te_cleanup_done) {
 }
 unset($_te_cleanup_done);
 
-// Create customer_payments table for recording payments received from customers
+// Create bank_transactions table for imported bank activity
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS bank_transactions (
     id                     INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -1881,6 +1881,7 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Create customer_payments table for recording payments received from customers
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS customer_payments (
     id              INT UNSIGNED NOT NULL AUTO_INCREMENT,

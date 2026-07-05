@@ -610,6 +610,8 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
       ['href' => 'quotes.php', 'files' => ['quotes.php'], 'label' => 'Quotes'],
       ['href' => 'invoice_tracker.php', 'files' => ['invoice_tracker.php'], 'label' => 'Invoices'],
       ['href' => 'customer_payments.php', 'files' => ['customer_payments.php'], 'label' => 'Customer Payments'],
+      ['href' => 'transactions.php', 'files' => ['transactions.php'], 'label' => 'Bank Transactions'],
+      ['href' => 'bank_import.php', 'files' => ['bank_import.php'], 'label' => 'Import Bank CSV'],
     ], $current); ?>
     <?php if ($show_admin_menu): ?>
     <?php render_menu_link(['href' => 'admin_backend.php', 'files' => ['admin_backend.php', 'users.php', 'user_profiles.php', 'form_admin.php'], 'label' => 'Admin Backend'], $current); ?>

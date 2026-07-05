@@ -286,7 +286,7 @@ if ($method_filter !== '' && isset($payment_methods[$method_filter])) {
 
 $list_stmt = $pdo->prepare(
   "SELECT cp.id, cp.customer_id, cp.payment_date, cp.amount, cp.payment_method,
-          cp.reference_no, cp.notes, cp.created_at,
+          cp.reference_no, cp.notes, cp.created_at, bt.id AS bank_transaction_id,
           COALESCE(
             NULLIF(TRIM(CONCAT_WS(' ', NULLIF(c.first_name,''), NULLIF(c.last_name,''))), ''),
             c.company, c.email, 'Unknown'
