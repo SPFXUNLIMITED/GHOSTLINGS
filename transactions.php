@@ -54,7 +54,6 @@ $sortMap = [
   'customer' => 'bt.customer_name',
   'source' => 'bt.source',
   'amount' => 'bt.amount',
-  'balance' => 'bt.running_balance',
   'status' => 'bt.match_status',
 ];
 if (!isset($sortMap[$sort])) {
@@ -244,14 +243,13 @@ render_header('Bank Transactions');
           <th><?= tx_sort_link('source', 'Source', $sort, $dir) ?></th>
           <th>Reference</th>
           <th><?= tx_sort_link('amount', 'Amount', $sort, $dir) ?></th>
-          <th><?= tx_sort_link('balance', 'Running Balance', $sort, $dir) ?></th>
           <th><?= tx_sort_link('status', 'Status', $sort, $dir) ?></th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody>
         <?php if (!$transactions): ?>
-          <tr><td colspan="9" class="muted">No bank transactions found for the current filters.</td></tr>
+          <tr><td colspan="8" class="muted">No bank transactions found for the current filters.</td></tr>
         <?php endif; ?>
         <?php foreach ($transactions as $tx): ?>
           <?php
@@ -291,11 +289,6 @@ render_header('Bank Transactions');
               <?php endif; ?>
             </td>
             <td><strong>$<?= h(number_format((float)$tx['amount'], 2)) ?></strong></td>
-            <td>
-              <?= $tx['running_balance'] !== null
-                ? '$' . h(number_format((float)$tx['running_balance'], 2))
-                : '<span class="muted">—</span>' ?>
-            </td>
             <td>
               <span class="tx-status-badge" style="background:<?= h($statusBg) ?>;color:<?= h($statusFg) ?>;"><?= h($statusLabel) ?></span>
               <?php if ((int)($tx['payment_id'] ?? 0) > 0): ?>
