@@ -1876,7 +1876,6 @@ $pdo->exec("
     KEY idx_bank_transactions_match_status (match_status),
     KEY idx_bank_transactions_matched_customer_id (matched_customer_id),
     KEY idx_bank_transactions_matched_invoice_id (matched_invoice_id),
-    CONSTRAINT fk_bank_transactions_linked_payment FOREIGN KEY (linked_payment_id) REFERENCES customer_payments (id) ON DELETE SET NULL,
     CONSTRAINT fk_bank_transactions_customer FOREIGN KEY (matched_customer_id) REFERENCES customers (id) ON DELETE SET NULL,
     CONSTRAINT fk_bank_transactions_invoice FOREIGN KEY (matched_invoice_id) REFERENCES quotes (id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4

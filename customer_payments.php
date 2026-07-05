@@ -28,6 +28,33 @@ function cp_format_money($value): string {
   return number_format((float)$value, 2);
 }
 
+function cp_find_matching_customer(PDO $pdo, string $customer_name): ?array {
+  $customer_name = trim($customer_name);
+  if ($customer_name === '') {
+    return null;
+  }
+
+  $stmt = $pdo->prepare(
+    "SELECT id,
+            COALESCE(
+              NULLIF(TRIM(CONCAT_WS(' ', NULLIF(first_name,''), NULLIF(last_name,''))), ''),
+              NULLIF(company, ''),
+              NULLIF(email, ''),
+              ''
+            ) AS customer_name,
+            company
+     FROM customers
+     WHERE TRIM(CONCAT_WS(' ', NULLIF(first_name,''), NULLIF(last_name,''))) = ?
+        OR company = ?
+     ORDER BY id DESC
+     LIMIT 2"
+  );
+  $stmt->execute([$customer_name, $customer_name]);
+  $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  return count($rows) === 1 ? $rows[0] : null;
+}
+
 // ── Customer search AJAX ────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search'])) {
   header('Content-Type: application/json; charset=utf-8');
@@ -80,6 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'add_payment' || $action === 'edit_payment') {
       $customer_id    = (int)($_POST['customer_id'] ?? 0);
+      $bank_transaction_id = (int)($_POST['bank_transaction_id'] ?? 0);
       $payment_date   = trim((string)($_POST['payment_date'] ?? ''));
       $amount_raw     = trim((string)($_POST['amount'] ?? ''));
       $payment_method = trim((string)($_POST['payment_method'] ?? ''));
@@ -107,6 +135,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($amount <= 0) {
         $errors[] = 'Amount must be greater than zero.';
       }
+      if ($bank_transaction_id > 0) {
+        $bank_tx_stmt = $pdo->prepare("SELECT id, linked_payment_id, matched_invoice_id FROM bank_transactions WHERE id = ? LIMIT 1");
+        $bank_tx_stmt->execute([$bank_transaction_id]);
+        $bank_tx_row = $bank_tx_stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$bank_tx_row) {
+          $errors[] = 'Imported bank transaction not found.';
+        } elseif ($action === 'add_payment' && (int)($bank_tx_row['linked_payment_id'] ?? 0) > 0) {
+          $errors[] = 'This imported bank transaction is already linked to a customer payment.';
+        }
+      } else {
+        $bank_tx_row = null;
+      }
 
       if (empty($errors)) {
         $created_by = ((int)($_SESSION['user_id'] ?? 0)) ?: null;
@@ -118,6 +158,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             "INSERT INTO customer_payments (customer_id, payment_date, amount, payment_method, reference_no, notes, created_by)
              VALUES (?, ?, ?, ?, ?, ?, ?)"
           )->execute([$customer_id, $payment_date, $amount, $payment_method, $ref, $note, $created_by]);
+          $payment_id = (int)$pdo->lastInsertId();
+          if ($bank_transaction_id > 0 && $payment_id > 0) {
+            $pdo->prepare(
+              "UPDATE bank_transactions
+               SET linked_payment_id = ?, matched_customer_id = ?, match_status = 'matched'
+               WHERE id = ?"
+            )->execute([$payment_id, $customer_id, $bank_transaction_id]);
+          }
           header('Location: customer_payments.php?saved=added');
           exit;
         } else {
@@ -130,6 +178,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                SET customer_id=?, payment_date=?, amount=?, payment_method=?, reference_no=?, notes=?
                WHERE id=?"
             )->execute([$customer_id, $payment_date, $amount, $payment_method, $ref, $note, $payment_id]);
+            $linked_bank_tx_id = $bank_transaction_id;
+            if ($linked_bank_tx_id <= 0) {
+              $linked_stmt = $pdo->prepare("SELECT id FROM bank_transactions WHERE linked_payment_id = ? LIMIT 1");
+              $linked_stmt->execute([$payment_id]);
+              $linked_bank_tx_id = (int)($linked_stmt->fetchColumn() ?: 0);
+            }
+            if ($linked_bank_tx_id > 0) {
+              $pdo->prepare(
+                "UPDATE bank_transactions
+                 SET matched_customer_id = ?, match_status = 'matched'
+                 WHERE id = ?"
+              )->execute([$customer_id, $linked_bank_tx_id]);
+            }
             header('Location: customer_payments.php?saved=updated');
             exit;
           }
@@ -141,7 +202,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($payment_id <= 0) {
         $errors[] = 'Invalid payment.';
       } else {
+        $linked_stmt = $pdo->prepare("SELECT id FROM bank_transactions WHERE linked_payment_id = ? LIMIT 1");
+        $linked_stmt->execute([$payment_id]);
+        $linked_bank_tx_id = (int)($linked_stmt->fetchColumn() ?: 0);
         $pdo->prepare("DELETE FROM customer_payments WHERE id = ?")->execute([$payment_id]);
+        if ($linked_bank_tx_id > 0) {
+          $pdo->prepare(
+            "UPDATE bank_transactions
+             SET linked_payment_id = NULL, matched_customer_id = NULL, matched_invoice_id = NULL, match_status = 'unmatched'
+             WHERE id = ?"
+          )->execute([$linked_bank_tx_id]);
+        }
         header('Location: customer_payments.php?deleted=1');
         exit;
       }
@@ -160,6 +231,42 @@ $payment_methods = [
   'credit_card' => 'Credit Card',
   'other'       => 'Other',
 ];
+
+$bank_import_prefill = null;
+$bank_import_notice = '';
+$import_bank_transaction_id = (int)($_GET['bank_transaction_id'] ?? 0);
+if ($import_bank_transaction_id > 0) {
+  $prefill_stmt = $pdo->prepare(
+    "SELECT bt.id, bt.transaction_date, bt.description, bt.amount, bt.source, bt.reference, bt.customer_name,
+            bt.linked_payment_id,
+            cp.id AS payment_id
+     FROM bank_transactions bt
+     LEFT JOIN customer_payments cp ON cp.id = bt.linked_payment_id
+     WHERE bt.id = ?
+     LIMIT 1"
+  );
+  $prefill_stmt->execute([$import_bank_transaction_id]);
+  $prefill_row = $prefill_stmt->fetch(PDO::FETCH_ASSOC);
+  if (!$prefill_row) {
+    $errors[] = 'Imported bank transaction not found.';
+  } elseif ((int)($prefill_row['linked_payment_id'] ?? 0) > 0) {
+    $bank_import_notice = 'This imported bank transaction is already linked to payment #' . (int)$prefill_row['linked_payment_id'] . '.';
+  } else {
+    $matched_customer = cp_find_matching_customer($pdo, (string)($prefill_row['customer_name'] ?? ''));
+    $bank_import_prefill = [
+      'bank_transaction_id' => (int)$prefill_row['id'],
+      'customer_id' => (int)($matched_customer['id'] ?? 0),
+      'customer_name' => $matched_customer
+        ? trim((string)($matched_customer['customer_name'] ?? ''))
+        : trim((string)($prefill_row['customer_name'] ?? '')),
+      'payment_date' => (string)($prefill_row['transaction_date'] ?? ''),
+      'amount' => cp_format_money((float)($prefill_row['amount'] ?? 0)),
+      'payment_method' => bank_tx_suggest_payment_method((string)($prefill_row['source'] ?? ''), (string)($prefill_row['description'] ?? '')),
+      'reference_no' => trim((string)($prefill_row['reference'] ?? '')),
+      'notes' => trim((string)($prefill_row['description'] ?? '')),
+    ];
+  }
+}
 
 $where_parts = ['1=1'];
 $params      = [];
@@ -187,6 +294,7 @@ $list_stmt = $pdo->prepare(
           c.company AS customer_company
    FROM customer_payments cp
    JOIN customers c ON c.id = cp.customer_id
+   LEFT JOIN bank_transactions bt ON bt.linked_payment_id = cp.id
    WHERE " . implode(' AND ', $where_parts) . "
    ORDER BY cp.payment_date DESC, cp.id DESC
    LIMIT 300"
@@ -262,6 +370,9 @@ render_header('Customer Payments');
 <?php endif; ?>
 <?php if (($_GET['deleted'] ?? '') === '1'): ?>
   <div class="alert" style="border-color:#fecaca;background:#fef2f2;color:#991b1b;">Payment deleted.</div>
+<?php endif; ?>
+<?php if ($bank_import_notice !== ''): ?>
+  <div class="alert" style="border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8;"><?= h($bank_import_notice) ?></div>
 <?php endif; ?>
 <?php foreach ($errors as $err): ?>
   <div class="alert" style="border-color:#fecaca;background:#fef2f2;color:#991b1b;"><?= h($err) ?></div>
@@ -472,6 +583,7 @@ render_header('Customer Payments');
             // JSON for edit modal pre-fill
             $edit_data = json_encode([
               'id'             => $pid,
+              'bank_transaction_id' => (int)($pay['bank_transaction_id'] ?? 0),
               'customer_id'    => $cid,
               'customer_name'  => $cname . ($ccompany !== '' ? ' — ' . $ccompany : ''),
               'payment_date'   => $pdate,
@@ -551,6 +663,7 @@ render_header('Customer Payments');
         <input type="hidden" name="csrf_token" value="<?= h($_SESSION['cp_csrf']) ?>" />
         <input type="hidden" name="action" value="add_payment" id="cp-action-input" />
         <input type="hidden" name="payment_id" value="" id="cp-payment-id" />
+        <input type="hidden" name="bank_transaction_id" value="" id="cp-bank-transaction-id" />
         <input type="hidden" name="customer_id" value="" id="cp-customer-id" />
 
         <div class="form-grid">
@@ -624,6 +737,7 @@ render_header('Customer Payments');
   var titleEl   = document.getElementById('cp-modal-title');
   var actionIn  = document.getElementById('cp-action-input');
   var paymentId = document.getElementById('cp-payment-id');
+  var bankTransactionId = document.getElementById('cp-bank-transaction-id');
   var customerId = document.getElementById('cp-customer-id');
   var customerInput = document.getElementById('cp-customer-input');
   var suggestions  = document.getElementById('cp-customer-suggestions');
@@ -635,6 +749,7 @@ render_header('Customer Payments');
   var submitBtn    = document.getElementById('cp-submit-btn');
 
   var todayYmd  = <?= json_encode($today_ymd) ?>;
+  var importPrefill = <?= json_encode($bank_import_prefill, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
 
   // ── Modal open / close ──────────────────────────────────────────────────
   function openModal(isEdit) {
@@ -658,6 +773,7 @@ render_header('Customer Payments');
 
   function resetForm() {
     paymentId.value   = '';
+    bankTransactionId.value = '';
     customerId.value  = '';
     customerInput.value = '';
     dateInput.value   = '';
@@ -688,6 +804,7 @@ render_header('Customer Payments');
       var d = JSON.parse(btn.dataset.payment);
       resetForm();
       paymentId.value      = d.id;
+      bankTransactionId.value = d.bank_transaction_id || '';
       customerId.value     = d.customer_id;
       customerInput.value  = d.customer_name;
       dateInput.value      = d.payment_date;
@@ -760,6 +877,19 @@ render_header('Customer Payments');
       customerInput.focus();
     }
   });
+
+  if (importPrefill) {
+    resetForm();
+    bankTransactionId.value = importPrefill.bank_transaction_id || '';
+    customerId.value = importPrefill.customer_id || '';
+    customerInput.value = importPrefill.customer_name || '';
+    dateInput.value = importPrefill.payment_date || '';
+    amountInput.value = importPrefill.amount || '';
+    methodSelect.value = importPrefill.payment_method || 'other';
+    refInput.value = importPrefill.reference_no || '';
+    notesInput.value = importPrefill.notes || '';
+    openModal(false);
+  }
 
   // ── Utility ──────────────────────────────────────────────────────────────
   function escHtml(s) {
