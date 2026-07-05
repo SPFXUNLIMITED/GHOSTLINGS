@@ -601,13 +601,13 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
       ['href' => 'playbooks.php', 'files' => ['playbooks.php', 'playbook_form.php', 'playbook_task_form.php', 'playbook_tasks.php'], 'label' => 'Playbooks'],
       ['href' => 'archives.php', 'file' => 'archives.php', 'label' => 'Archives'],
     ], $current); ?>
-    <?php render_menu_dropdown('Sourcing', [
+    <?php render_menu_dropdown('Purchasing', [
       ['href' => 'sourcing_rfq_tracker.php', 'files' => ['sourcing_rfq_tracker.php', 'sourcing_rfq_submitted.php', 'sourcing_rfq_image.php'], 'label' => 'RFQs'],
       ['href' => 'order_tracker.php', 'file' => 'order_tracker.php', 'label' => 'POs'],
       ['href' => 'freight_quote_tracker.php', 'file' => 'freight_quote_tracker.php', 'label' => 'Freight Quotes'],
     ], $current); ?>
 	
-    <?php render_menu_dropdown('Quotes & Invoices', [
+    <?php render_menu_dropdown('Selling', [
       ['href' => 'quotes.php', 'files' => ['quotes.php'], 'label' => 'Quotes'],
       ['href' => 'invoice_tracker.php', 'files' => ['invoice_tracker.php'], 'label' => 'Invoices'],
       ['type' => 'separator'],
