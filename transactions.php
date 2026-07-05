@@ -64,8 +64,12 @@ $where = ['1=1'];
 $params = [];
 
 if ($typeFilter !== 'all') {
-  $where[] = 'bt.transaction_type = :type';
-  $params[':type'] = $typeFilter;
+  if ($typeFilter === 'credit') {
+    $where[] = 'bt.amount > 0';
+  } else {
+    $where[] = 'bt.transaction_type = :type';
+    $params[':type'] = $typeFilter;
+  }
 }
 if ($search !== '') {
   $where[] = "(bt.description LIKE :q ESCAPE '\\\\'
