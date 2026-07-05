@@ -6,6 +6,16 @@ require_admin_or_moderator();
 
 const BANK_IMPORT_DUPLICATE_SQLSTATE = '23000';
 
+function bank_find_col(array $row, string $needle): ?int {
+  $needle = strtolower($needle);
+  foreach ($row as $index => $column) {
+    if (str_contains(strtolower(trim((string)$column)), $needle)) {
+      return $index;
+    }
+  }
+  return null;
+}
+
 if (empty($_SESSION['bank_import_csrf'])) {
   $_SESSION['bank_import_csrf'] = bin2hex(random_bytes(24));
 }
@@ -33,26 +43,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($handle === false) {
         $errors[] = 'Could not read the uploaded file.';
       } else {
-        $header = fgetcsv($handle);
-        if (!is_array($header)) {
-          $errors[] = 'The CSV file is empty.';
-        } else {
-          $headerMap = [];
-          foreach ($header as $index => $column) {
-            $normalized = strtolower(trim((string)$column));
-            if ($normalized !== '') {
-              $headerMap[$normalized] = $index;
-            }
+        // Scan past any summary/metadata rows to find the real header row.
+        // Accept the first row that contains columns matching Date, Description, and Amount
+        // via case-insensitive substring matching so variations like "Running Bal." still work.
+        $dateIndex = null;
+        $descriptionIndex = null;
+        $amountIndex = null;
+        $runningBalanceIndex = null;
+        $foundHeader = false;
+
+        while (($headerRow = fgetcsv($handle)) !== false) {
+          if (!is_array($headerRow)) {
+            continue;
           }
+          $d    = bank_find_col($headerRow, 'date');
+          $desc = bank_find_col($headerRow, 'description');
+          $amt  = bank_find_col($headerRow, 'amount');
+          if ($d !== null && $desc !== null && $amt !== null) {
+            $dateIndex          = $d;
+            $descriptionIndex   = $desc;
+            $amountIndex        = $amt;
+            $runningBalanceIndex = bank_find_col($headerRow, 'running bal');
+            $foundHeader        = true;
+            break;
+          }
+        }
 
-          $dateIndex = $headerMap['date'] ?? null;
-          $descriptionIndex = $headerMap['description'] ?? null;
-          $amountIndex = $headerMap['amount'] ?? null;
-          $runningBalanceIndex = $headerMap['running bal.'] ?? $headerMap['running bal'] ?? null;
-
-          if ($dateIndex === null || $descriptionIndex === null || $amountIndex === null) {
-            $errors[] = 'The CSV must include Date, Description, and Amount columns.';
-          } else {
+        if (!$foundHeader) {
+          $errors[] = 'The CSV must include Date, Description, and Amount columns.';
+        } else {
             $inserted = 0;
             $duplicates = 0;
             $invalid = 0;
@@ -166,7 +185,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               'preview_rows' => $previewRows,
             ];
           }
-        }
         fclose($handle);
       }
     }
