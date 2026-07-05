@@ -261,7 +261,7 @@ if ($import_bank_transaction_id > 0) {
         ? trim((string)($matched_customer['customer_name'] ?? ''))
         : trim((string)($prefill_row['customer_name'] ?? '')),
       'payment_date' => (string)($prefill_row['transaction_date'] ?? ''),
-      'amount' => cp_format_money((float)($prefill_row['amount'] ?? 0)),
+      'amount' => number_format(abs((float)($prefill_row['amount'] ?? 0)), 2, '.', ''),
       'payment_method' => bank_tx_suggest_payment_method((string)($prefill_row['source'] ?? ''), (string)($prefill_row['description'] ?? '')),
       'reference_no' => trim((string)($prefill_row['reference'] ?? '')),
       'notes' => trim((string)($prefill_row['description'] ?? '')),
@@ -592,7 +592,7 @@ render_header('Customer Payments');
               'customer_id'    => $cid,
               'customer_name'  => $cname . ($ccompany !== '' ? ' — ' . $ccompany : ''),
               'payment_date'   => $pdate,
-              'amount'         => cp_format_money($amount),
+              'amount'         => number_format(abs((float)$amount), 2, '.', ''),
               'payment_method' => $method,
               'reference_no'   => $ref_no,
               'notes'          => $pay_notes,
