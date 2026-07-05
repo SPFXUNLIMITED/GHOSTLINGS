@@ -149,7 +149,7 @@ render_header('Bank Transactions');
   <div class="page-header-body laser-rfq-hero-body">
     <span class="laser-rfq-hero-tag">💵 Imported Ledger</span>
     <h1>Bank Transactions <span class="laser-rfq-hero-count">(<?= (int)$heroTotal ?>)</span></h1>
-    <p class="muted">Review imported deposits, search Zelle and Stripe activity, and jump into payment and invoice matching.</p>
+    <p class="muted">Review imported deposits, search Zelle and Stripe activity, and link into payment and invoice matching.</p>
     <ul class="laser-rfq-hero-pills" aria-label="Bank transaction highlights">
       <li class="laser-rfq-hero-pill"><span aria-hidden="true">🔎</span> Search & filter</li>
       <li class="laser-rfq-hero-pill"><span aria-hidden="true">↕️</span> Sortable columns</li>
@@ -302,7 +302,7 @@ render_header('Bank Transactions');
             <td class="col-actions">
               <div class="tx-actions">
                 <?php if ((int)($tx['payment_id'] ?? 0) > 0): ?>
-                  <a class="btn" href="customer_payments.php">View Payment</a>
+                  <a class="btn" href="customer_payments.php?payment_id=<?= (int)$tx['payment_id'] ?>">View Payment</a>
                 <?php else: ?>
                   <a class="btn primary" href="customer_payments.php?bank_transaction_id=<?= (int)$tx['id'] ?>">Record Payment</a>
                 <?php endif; ?>

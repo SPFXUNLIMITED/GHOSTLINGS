@@ -142,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$bank_tx_row) {
           $errors[] = 'Imported bank transaction not found.';
         } elseif ($action === 'add_payment' && (int)($bank_tx_row['linked_payment_id'] ?? 0) > 0) {
-          $errors[] = 'This imported bank transaction is already linked to a customer payment.';
+          $errors[] = 'This imported bank transaction is already linked to customer payment #' . (int)$bank_tx_row['linked_payment_id'] . '.';
         }
       } else {
         $bank_tx_row = null;
@@ -223,6 +223,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // ── Search / filter ─────────────────────────────────────────────────────────
 $search        = trim((string)($_GET['q'] ?? ''));
 $method_filter = trim((string)($_GET['method'] ?? ''));
+$payment_id_filter = (int)($_GET['payment_id'] ?? 0);
 
 $payment_methods = [
   'check'       => 'Check',
@@ -282,6 +283,10 @@ if ($search !== '') {
 if ($method_filter !== '' && isset($payment_methods[$method_filter])) {
   $where_parts[] = 'cp.payment_method = :method';
   $params[':method'] = $method_filter;
+}
+if ($payment_id_filter > 0) {
+  $where_parts[] = 'cp.id = :payment_id';
+  $params[':payment_id'] = $payment_id_filter;
 }
 
 $list_stmt = $pdo->prepare(

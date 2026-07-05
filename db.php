@@ -1958,6 +1958,7 @@ if (!function_exists('bank_tx_normalize_description')) {
 if (!function_exists('bank_tx_parse_money')) {
   function bank_tx_parse_money(?string $raw): ?float {
     $raw = trim((string)$raw);
+    // Bank of America exports sometimes use "..." in Running Bal. as a placeholder when no balance is shown.
     if ($raw === '' || $raw === '...') {
       return null;
     }
