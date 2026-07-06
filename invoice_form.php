@@ -824,26 +824,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
   }
   
-  if (trim((string)($_POST['action'] ?? '')) === 'mark_as_paid') {
+  $payment_toggle_action = trim((string)($_POST['action'] ?? ''));
+  if (in_array($payment_toggle_action, ['mark_as_paid', 'mark_as_unpaid'], true)) {
     $row_id = (int)($_POST['row_id'] ?? 0);
     $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
     if ($row_id <= 0) {
       header('Location: invoice_tracker.php');
       exit;
     }
-    $check = $pdo->prepare("SELECT id FROM quotes WHERE id = ? LIMIT 1");
+    $check = $pdo->prepare("SELECT id, payment_status FROM quotes WHERE id = ? LIMIT 1");
     $check->execute([$row_id]);
-    if (!$check->fetch()) {
+    $quote_for_payment_update = $check->fetch(PDO::FETCH_ASSOC);
+    if (!$quote_for_payment_update) {
       header('Location: invoice_tracker.php');
       exit;
     }
-    $mark_paid_stmt = $pdo->prepare("UPDATE quotes SET payment_status = ?, paid_at = NOW() WHERE id = ? AND payment_status <> ?");
-    $mark_paid_stmt->execute([
-      INVOICE_PAYMENT_STATUS_PAID,
-      $row_id,
-      INVOICE_PAYMENT_STATUS_PAID,
-    ]);
-    $payment_query_flag = $mark_paid_stmt->rowCount() > 0 ? 'payment_marked=1' : 'already_paid=1';
+    $current_payment_status = strtolower(trim((string)($quote_for_payment_update['payment_status'] ?? '')));
+    $paid_status = strtolower(INVOICE_PAYMENT_STATUS_PAID);
+    $unpaid_status = strtolower(INVOICE_PAYMENT_STATUS_UNPAID);
+
+    if ($payment_toggle_action === 'mark_as_unpaid') {
+      if ($current_payment_status !== $paid_status) {
+        $payment_query_flag = 'already_unpaid=1';
+      } else {
+        $mark_unpaid_stmt = $pdo->prepare("UPDATE quotes SET payment_status = ?, paid_at = NULL WHERE id = ? AND payment_status = ?");
+        $mark_unpaid_stmt->execute([
+          INVOICE_PAYMENT_STATUS_UNPAID,
+          $row_id,
+          INVOICE_PAYMENT_STATUS_PAID,
+        ]);
+        $payment_query_flag = $mark_unpaid_stmt->rowCount() > 0 ? 'payment_marked_unpaid=1' : 'already_unpaid=1';
+      }
+    } else {
+      if ($current_payment_status !== $unpaid_status) {
+        $payment_query_flag = 'already_paid=1';
+      } else {
+        $mark_paid_stmt = $pdo->prepare("UPDATE quotes SET payment_status = ?, paid_at = NOW() WHERE id = ? AND payment_status = ?");
+        $mark_paid_stmt->execute([
+          INVOICE_PAYMENT_STATUS_PAID,
+          $row_id,
+          INVOICE_PAYMENT_STATUS_UNPAID,
+        ]);
+        $payment_query_flag = $mark_paid_stmt->rowCount() > 0 ? 'payment_marked=1' : 'already_paid=1';
+      }
+    }
     header('Location: invoice_form.php?id=' . $row_id . '&mode=view&' . $payment_query_flag);
     exit;
   }
@@ -1279,11 +1303,15 @@ $invoice_email_error = isset($_GET['email_error']) && $_GET['email_error'] !== '
 $invoice_approval_approved = isset($_GET['approval_approved']) && $_GET['approval_approved'] === '1';
 $invoice_payment_marked = isset($_GET['payment_marked']) && $_GET['payment_marked'] === '1';
 $invoice_already_paid = isset($_GET['already_paid']) && $_GET['already_paid'] === '1';
+$invoice_payment_marked_unpaid = isset($_GET['payment_marked_unpaid']) && $_GET['payment_marked_unpaid'] === '1';
+$invoice_already_unpaid = isset($_GET['already_unpaid']) && $_GET['already_unpaid'] === '1';
 $invoice_credit_applied = isset($_GET['credit_applied']) && $_GET['credit_applied'] === '1';
 $invoice_credit_removed = isset($_GET['credit_removed']) && $_GET['credit_removed'] === '1';
 $invoice_credit_error = isset($_GET['credit_error']) && $_GET['credit_error'] !== '' ? trim((string)$_GET['credit_error']) : '';
 $invoice_approval_status = is_array($quote) ? (string)($quote['approval_status'] ?? 'none') : 'none';
 $invoice_is_paid = is_array($quote) && invoice_is_paid($quote);
+$invoice_payment_toggle_action = $invoice_is_paid ? 'mark_as_unpaid' : 'mark_as_paid';
+$invoice_payment_toggle_label = $invoice_is_paid ? 'Mark as Unpaid' : 'Mark as Paid';
 [$invoice_approval_bg, $invoice_approval_color] = invoice_form_approval_colors($invoice_approval_status);
 $invoice_approval_label = invoice_form_approval_label($invoice_approval_status);
 render_header($invoice_heading);
@@ -1350,6 +1378,12 @@ render_header($invoice_heading);
 <?php endif; ?>
 <?php if ($invoice_already_paid): ?>
   <div class="alert" style="border-color:#fecaca; background:#fff1f2; color:#9f1239;">Invoice is already marked as paid.</div>
+<?php endif; ?>
+<?php if ($invoice_payment_marked_unpaid): ?>
+  <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Invoice marked as unpaid.</div>
+<?php endif; ?>
+<?php if ($invoice_already_unpaid): ?>
+  <div class="alert" style="border-color:#fecaca; background:#fff1f2; color:#9f1239;">Invoice is already marked as unpaid.</div>
 <?php endif; ?>
 <?php if ($invoice_credit_applied): ?>
   <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Credit applied to invoice successfully.</div>
@@ -1516,14 +1550,12 @@ render_header($invoice_heading);
         <button type="submit" class="btn">Email Invoice to Admin</button>
       </form>
 
-      <?php if (!$invoice_is_paid): ?>
-        <form method="post" style="margin:0;" action="">
-          <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
-          <input type="hidden" name="action" value="mark_as_paid" />
-          <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
-          <button type="submit" class="btn invoice-mark-paid-btn">Mark as Paid</button>
-        </form>
-      <?php endif; ?>
+      <form method="post" style="margin:0;" action="">
+        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
+        <input type="hidden" name="action" value="<?= h($invoice_payment_toggle_action) ?>" />
+        <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
+        <button type="submit" class="btn invoice-mark-paid-btn"><?= h($invoice_payment_toggle_label) ?></button>
+      </form>
       <?php if (is_admin() && $invoice_approval_status !== 'approved'): ?>
         <form method="post" style="margin:0;" action="">
           <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
