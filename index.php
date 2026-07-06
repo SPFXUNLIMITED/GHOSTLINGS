@@ -164,12 +164,9 @@ if (dashboard_table_exists($pdo, 'quotes')) {
       ");
       $cp_row = $cp_totals_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-      $kpis['total_received']          = (float)($cp_row['total_received'] ?? 0);
-      $week_kpis['week_received']      = (float)($cp_row['week_received'] ?? 0);
-      $month_kpis['month_received']    = (float)($cp_row['month_received'] ?? 0);
-      $kpis['outstanding']             = max(0, $kpis['total_invoiced'] - $kpis['total_received']);
-      $week_kpis['week_outstanding']   = max(0, $week_kpis['week_invoiced'] - $week_kpis['week_received']);
-      $month_kpis['month_outstanding'] = max(0, $month_kpis['month_invoiced'] - $month_kpis['month_received']);
+      $kpis['total_received']       = (float)($cp_row['total_received'] ?? 0);
+      $week_kpis['week_received']   = (float)($cp_row['week_received'] ?? 0);
+      $month_kpis['month_received'] = (float)($cp_row['month_received'] ?? 0);
 
       $cash_stmt = $pdo->prepare("
         SELECT
@@ -188,6 +185,11 @@ if (dashboard_table_exists($pdo, 'quotes')) {
         }
       }
     }
+
+    // Derive outstanding from invoiced minus received (received defaults to 0 if table unavailable)
+    $kpis['outstanding']             = max(0, $kpis['total_invoiced'] - $kpis['total_received']);
+    $week_kpis['week_outstanding']   = max(0, $week_kpis['week_invoiced'] - $week_kpis['week_received']);
+    $month_kpis['month_outstanding'] = max(0, $month_kpis['month_invoiced'] - $month_kpis['month_received']);
 
     $recent_quotes_stmt = $pdo->query("
       SELECT id, customer_name, quote_date, status, subtotal_amount, created_at
