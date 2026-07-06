@@ -53,6 +53,8 @@ $month_kpis = [
   'month_invoiced' => 0.0,
   'month_received' => 0.0,
   'month_outstanding' => 0.0,
+  'month_converted_quotes' => 0,
+  'month_total_quotes' => 0,
 ];
 
 $recent_quotes = [];
@@ -125,7 +127,14 @@ if (dashboard_table_exists($pdo, 'quotes')) {
         COALESCE(SUM(CASE WHEN {$invoice_condition} AND payment_status = 'paid'
                           AND YEAR(COALESCE(converted_at, quote_date, created_at)) = YEAR(CURDATE())
                           AND MONTH(COALESCE(converted_at, quote_date, created_at)) = MONTH(CURDATE())
-                          THEN subtotal_amount ELSE 0 END), 0) AS month_received
+                          THEN subtotal_amount ELSE 0 END), 0) AS month_received,
+        COALESCE(SUM(CASE WHEN {$invoice_condition}
+                          AND YEAR(COALESCE(converted_at, quote_date, created_at)) = YEAR(CURDATE())
+                          AND MONTH(COALESCE(converted_at, quote_date, created_at)) = MONTH(CURDATE())
+                          THEN 1 ELSE 0 END), 0) AS month_converted_quotes,
+        COALESCE(SUM(CASE WHEN YEAR(COALESCE(quote_date, created_at)) = YEAR(CURDATE())
+                          AND MONTH(COALESCE(quote_date, created_at)) = MONTH(CURDATE())
+                          THEN 1 ELSE 0 END), 0) AS month_total_quotes
       FROM quotes
     ");
     $month_row = $month_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
@@ -133,6 +142,8 @@ if (dashboard_table_exists($pdo, 'quotes')) {
     $month_kpis['month_invoiced'] = (float)($month_row['month_invoiced'] ?? 0);
     $month_kpis['month_received'] = (float)($month_row['month_received'] ?? 0);
     $month_kpis['month_outstanding'] = max(0, $month_kpis['month_invoiced'] - $month_kpis['month_received']);
+    $month_kpis['month_converted_quotes'] = (int)($month_row['month_converted_quotes'] ?? 0);
+    $month_kpis['month_total_quotes'] = (int)($month_row['month_total_quotes'] ?? 0);
 
     $revenue_stmt = $pdo->prepare("
       SELECT
@@ -196,11 +207,12 @@ if (dashboard_table_exists($pdo, 'quotes')) {
   }
 }
 
-$line_chart_labels = array_values(array_map(static fn(array $m): string => (string)$m['label'], $month_series));
-$line_chart_values = array_values(array_map(static fn(array $m): float => (float)$m['value'], $month_series));
+$revenue_series = array_slice($month_series, -3, 3, true);
+$line_chart_labels = array_values(array_map(static fn(array $m): string => (string)$m['label'], $revenue_series));
+$line_chart_values = array_values(array_map(static fn(array $m): float => (float)$m['value'], $revenue_series));
 
-$conversion_converted = max(0, (int)$kpis['converted_quotes']);
-$conversion_open = max(0, (int)$kpis['total_quotes'] - $conversion_converted);
+$conversion_converted = max(0, (int)$month_kpis['month_converted_quotes']);
+$conversion_open = max(0, (int)$month_kpis['month_total_quotes'] - $conversion_converted);
 
 $cash_chart_values = array_values(array_map(static fn(array $m): float => (float)$m['value'], $cash_series));
 $cash_collected = max(0.0, (float)$kpis['total_received']);
@@ -382,22 +394,22 @@ render_header('ERP Dashboard');
 
   <?php if (is_admin()): ?>
   <div class="kpi-grid">
-    <div class="dashboard-card">
+    <div class="dashboard-card admin-only-stat">
       <div class="kpi-label">Total Quoted</div>
       <div class="kpi-value" style="color:#1d4ed8;"><?= h(dashboard_money((float)$kpis['total_quoted'])) ?></div>
       <div class="kpi-note">All quotes in system</div>
     </div>
-    <div class="dashboard-card">
+    <div class="dashboard-card admin-only-stat">
       <div class="kpi-label">Total Invoiced</div>
       <div class="kpi-value" style="color:#0f766e;"><?= h(dashboard_money((float)$kpis['total_invoiced'])) ?></div>
       <div class="kpi-note">Converted from quotes</div>
     </div>
-    <div class="dashboard-card">
+    <div class="dashboard-card admin-only-stat">
       <div class="kpi-label">Total Received</div>
       <div class="kpi-value" style="color:#16a34a;"><?= h(dashboard_money((float)$kpis['total_received'])) ?></div>
       <div class="kpi-note">Marked paid invoices</div>
     </div>
-    <div class="dashboard-card">
+    <div class="dashboard-card admin-only-stat">
       <div class="kpi-label">Outstanding</div>
       <div class="kpi-value" style="color:#b45309;"><?= h(dashboard_money((float)$kpis['outstanding'])) ?></div>
       <div class="kpi-note">Invoiced minus received</div>
@@ -431,13 +443,13 @@ render_header('ERP Dashboard');
 
   <div class="charts-grid">
     <div class="dashboard-card chart-wrap">
-      <h2 class="section-title">Revenue Trend (Past 6 Months)</h2>
+      <h2 class="section-title">Revenue Trend (Past 3 Months)</h2>
       <p class="section-subtitle">Monthly invoiced revenue from converted quotes.</p>
       <canvas id="revenueChart" aria-label="Revenue trend line chart" role="img"></canvas>
     </div>
     <div class="dashboard-card chart-wrap">
       <h2 class="section-title">Quote-to-Invoice Conversion</h2>
-      <p class="section-subtitle">Converted quotes versus open quotes.</p>
+      <p class="section-subtitle">This Month: converted vs. open quotes.</p>
       <canvas id="conversionChart" aria-label="Quote conversion pie chart" role="img"></canvas>
     </div>
   </div>
