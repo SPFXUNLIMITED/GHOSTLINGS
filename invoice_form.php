@@ -839,8 +839,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       header('Location: invoice_tracker.php');
       exit;
     }
-    $current_payment_status = strtolower(trim((string)($quote_for_payment_update['payment_status'] ?? '')));
-
     if ($payment_toggle_action === 'mark_as_unpaid') {
       $mark_unpaid_stmt = $pdo->prepare("UPDATE quotes SET payment_status = ?, paid_at = NULL WHERE id = ? AND payment_status = ?");
       $mark_unpaid_stmt->execute([
@@ -848,9 +846,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $row_id,
         INVOICE_PAYMENT_STATUS_PAID,
       ]);
-      $payment_query_flag = $mark_unpaid_stmt->rowCount() > 0 || $current_payment_status === INVOICE_PAYMENT_STATUS_PAID
-        ? 'payment_marked_unpaid=1'
-        : 'already_unpaid=1';
+      $payment_query_flag = $mark_unpaid_stmt->rowCount() > 0 ? 'payment_marked_unpaid=1' : 'already_unpaid=1';
     } else {
       $mark_paid_stmt = $pdo->prepare("UPDATE quotes SET payment_status = ?, paid_at = NOW() WHERE id = ? AND payment_status <> ?");
       $mark_paid_stmt->execute([
@@ -858,9 +854,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $row_id,
         INVOICE_PAYMENT_STATUS_PAID,
       ]);
-      $payment_query_flag = $mark_paid_stmt->rowCount() > 0 || $current_payment_status !== INVOICE_PAYMENT_STATUS_PAID
-        ? 'payment_marked=1'
-        : 'already_paid=1';
+      $payment_query_flag = $mark_paid_stmt->rowCount() > 0 ? 'payment_marked=1' : 'already_paid=1';
     }
     header('Location: invoice_form.php?id=' . $row_id . '&mode=view&' . $payment_query_flag);
     exit;
