@@ -409,10 +409,12 @@ render_header('Customer Payments');
         <strong><?= (int)$hero_this_month ?></strong>
         <span>This Month</span>
       </div>
-      <div class="laser-rfq-hero-stat">
+      <?php if (is_admin()): ?>
+      <div class="laser-rfq-hero-stat admin-only-stat">
         <strong>$<?= h(cp_format_money($hero_total_amt)) ?></strong>
         <span>Total Received</span>
       </div>
+      <?php endif; ?>
       <div class="laser-rfq-hero-stat">
         <strong><?= (int)$hero_customers ?></strong>
         <span>Customers</span>

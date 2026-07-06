@@ -1335,3 +1335,13 @@ tbody tr:hover td {
     justify-content: center;
   }
 }
+
+
+/* ── Admin-only stat highlight ──────────────────────────────────────────────── */
+.admin-only-stat {
+  background: linear-gradient(135deg, #b8860b22, #d4af3733);
+  border: 1.5px solid #d4af37;
+  border-radius: 10px;
+  padding: 10px 16px;
+  position: relative;
+}

@@ -168,10 +168,12 @@ render_header('Bank Transactions');
         <strong><?= (int)$heroCredits ?></strong>
         <span>Credits</span>
       </div>
-      <div class="laser-rfq-hero-stat">
+      <?php if (is_admin()): ?>
+      <div class="laser-rfq-hero-stat admin-only-stat">
         <strong>$<?= h(number_format($heroAmount, 2)) ?></strong>
         <span>Total Amount</span>
       </div>
+      <?php endif; ?>
       <div class="laser-rfq-hero-stat">
         <strong><?= (int)$heroUnmatched ?></strong>
         <span>Need Matching</span>
