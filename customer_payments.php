@@ -467,8 +467,6 @@ render_header('Customer Payments');
 .cp-actions .btn-danger:hover { background:#fee2e2; }
 .cp-balance-pos { color:#991b1b; font-weight:600; }
 .cp-balance-zero { color:#166534; font-weight:600; }
-.admin-only-stat{background:linear-gradient(135deg,#b8860b22,#d4af3733);border:1.5px solid #d4af37;border-radius:10px;padding:10px 16px;position:relative;}
-.admin-only-badge{display:block;font-size:10px;font-weight:700;letter-spacing:.08em;color:#92700a;text-transform:uppercase;margin-top:4px;}
 
 /* ── Add / Edit modal ─────────────────────────────────────────────────────── */
 #cp-modal {
