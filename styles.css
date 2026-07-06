@@ -1345,3 +1345,9 @@ tbody tr:hover td {
   padding: 10px 16px;
   position: relative;
 }
+
+/* Override dashboard-card defaults when also marked admin-only */
+.dashboard-card.admin-only-stat {
+  background: linear-gradient(135deg, #b8860b22, #d4af3733);
+  border: 1.5px solid #d4af37;
+}

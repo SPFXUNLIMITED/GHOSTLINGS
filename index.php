@@ -384,11 +384,6 @@ render_header('ERP Dashboard');
   .kpi-grid { grid-template-columns: 1fr; }
   .dashboard-hero h1 { font-size: 1.5rem; }
 }
-
-.dashboard-card.admin-only-stat {
-  background: linear-gradient(135deg, #b8860b22, #d4af3733);
-  border: 1.5px solid #d4af37;
-}
 </style>
 
 <div class="dashboard">
