@@ -221,7 +221,8 @@ $line_chart_values = array_values(array_map(static fn(array $m): float => (float
 $conversion_converted = max(0, (int)$month_kpis['month_converted_quotes']);
 $conversion_open = max(0, (int)$month_kpis['month_total_quotes'] - $conversion_converted);
 
-$cash_chart_values = array_values(array_map(static fn(array $m): float => (float)$m['value'], $cash_series));
+$cash_series_slice = array_slice($cash_series, -3, 3, true);
+$cash_chart_values = array_values(array_map(static fn(array $m): float => (float)$m['value'], $cash_series_slice));
 $cash_collected = max(0.0, (float)$month_kpis['month_received']);
 $cash_outstanding = max(0.0, (float)$month_kpis['month_outstanding']);
 
@@ -488,7 +489,7 @@ render_header('ERP Dashboard');
   <div class="charts-grid">
     <div class="dashboard-card chart-wrap">
       <h2 class="section-title">Cash Received Trend (Past 3 Months)</h2>
-      <p class="section-subtitle">Invoice amounts for paid-status invoices, grouped by invoice date.</p>
+      <p class="section-subtitle">Payments received, grouped by payment date.</p>
       <canvas id="cashReceivedChart" aria-label="Cash received trend line chart" role="img"></canvas>
     </div>
     <div class="dashboard-card chart-wrap">
