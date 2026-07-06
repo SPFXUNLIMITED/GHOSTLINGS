@@ -480,7 +480,7 @@ render_header('ERP Dashboard');
   
   <div class="charts-grid">
     <div class="dashboard-card chart-wrap">
-      <h2 class="section-title">Cash Received Trend (Past 6 Months)</h2>
+      <h2 class="section-title">Cash Received Trend (Past 3 Months)</h2>
       <p class="section-subtitle">Invoice amounts for paid-status invoices, grouped by invoice date.</p>
       <canvas id="cashReceivedChart" aria-label="Cash received trend line chart" role="img"></canvas>
     </div>
