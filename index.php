@@ -83,7 +83,6 @@ if (dashboard_table_exists($pdo, 'quotes')) {
       SELECT
         COALESCE(SUM(subtotal_amount), 0) AS total_quoted,
         COALESCE(SUM(CASE WHEN {$invoice_condition} THEN subtotal_amount ELSE 0 END), 0) AS total_invoiced,
-        COALESCE(SUM(CASE WHEN {$invoice_condition} AND payment_status = 'paid' THEN subtotal_amount ELSE 0 END), 0) AS total_received,
         COALESCE(SUM(CASE WHEN {$invoice_condition} THEN 1 ELSE 0 END), 0) AS converted_quotes,
         COUNT(*) AS total_quotes
       FROM quotes
@@ -92,10 +91,8 @@ if (dashboard_table_exists($pdo, 'quotes')) {
 
     $kpis['total_quoted'] = (float)($kpi_row['total_quoted'] ?? 0);
     $kpis['total_invoiced'] = (float)($kpi_row['total_invoiced'] ?? 0);
-    $kpis['total_received'] = (float)($kpi_row['total_received'] ?? 0);
     $kpis['converted_quotes'] = (int)($kpi_row['converted_quotes'] ?? 0);
     $kpis['total_quotes'] = (int)($kpi_row['total_quotes'] ?? 0);
-    $kpis['outstanding'] = max(0, $kpis['total_invoiced'] - $kpis['total_received']);
 
     $week_stmt = $pdo->query("
       SELECT
@@ -103,17 +100,12 @@ if (dashboard_table_exists($pdo, 'quotes')) {
                           THEN subtotal_amount ELSE 0 END), 0) AS week_quoted,
         COALESCE(SUM(CASE WHEN {$invoice_condition}
                           AND YEARWEEK(COALESCE(converted_at, quote_date, created_at), 1) = YEARWEEK(CURDATE(), 1)
-                          THEN subtotal_amount ELSE 0 END), 0) AS week_invoiced,
-        COALESCE(SUM(CASE WHEN {$invoice_condition} AND payment_status = 'paid'
-                          AND YEARWEEK(COALESCE(converted_at, quote_date, created_at), 1) = YEARWEEK(CURDATE(), 1)
-                          THEN subtotal_amount ELSE 0 END), 0) AS week_received
+                          THEN subtotal_amount ELSE 0 END), 0) AS week_invoiced
       FROM quotes
     ");
     $week_row = $week_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     $week_kpis['week_quoted'] = (float)($week_row['week_quoted'] ?? 0);
     $week_kpis['week_invoiced'] = (float)($week_row['week_invoiced'] ?? 0);
-    $week_kpis['week_received'] = (float)($week_row['week_received'] ?? 0);
-    $week_kpis['week_outstanding'] = max(0, $week_kpis['week_invoiced'] - $week_kpis['week_received']);
 
     $month_stmt = $pdo->query("
       SELECT
@@ -124,10 +116,6 @@ if (dashboard_table_exists($pdo, 'quotes')) {
                           AND YEAR(COALESCE(converted_at, quote_date, created_at)) = YEAR(CURDATE())
                           AND MONTH(COALESCE(converted_at, quote_date, created_at)) = MONTH(CURDATE())
                           THEN subtotal_amount ELSE 0 END), 0) AS month_invoiced,
-        COALESCE(SUM(CASE WHEN {$invoice_condition} AND payment_status = 'paid'
-                          AND YEAR(COALESCE(converted_at, quote_date, created_at)) = YEAR(CURDATE())
-                          AND MONTH(COALESCE(converted_at, quote_date, created_at)) = MONTH(CURDATE())
-                          THEN subtotal_amount ELSE 0 END), 0) AS month_received,
         COALESCE(SUM(CASE WHEN {$invoice_condition}
                           AND YEAR(COALESCE(converted_at, quote_date, created_at)) = YEAR(CURDATE())
                           AND MONTH(COALESCE(converted_at, quote_date, created_at)) = MONTH(CURDATE())
@@ -140,8 +128,6 @@ if (dashboard_table_exists($pdo, 'quotes')) {
     $month_row = $month_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     $month_kpis['month_quoted'] = (float)($month_row['month_quoted'] ?? 0);
     $month_kpis['month_invoiced'] = (float)($month_row['month_invoiced'] ?? 0);
-    $month_kpis['month_received'] = (float)($month_row['month_received'] ?? 0);
-    $month_kpis['month_outstanding'] = max(0, $month_kpis['month_invoiced'] - $month_kpis['month_received']);
     $month_kpis['month_converted_quotes'] = (int)($month_row['month_converted_quotes'] ?? 0);
     $month_kpis['month_total_quotes'] = (int)($month_row['month_total_quotes'] ?? 0);
 
@@ -164,25 +150,46 @@ if (dashboard_table_exists($pdo, 'quotes')) {
       }
     }
 
-    $cash_stmt = $pdo->prepare("
-      SELECT
-        DATE_FORMAT(COALESCE(converted_at, quote_date, created_at), '%Y-%m') AS month_key,
-        COALESCE(SUM(subtotal_amount), 0) AS month_total
-      FROM quotes
-      WHERE {$invoice_condition}
-        AND payment_status = 'paid'
-        AND COALESCE(converted_at, quote_date, created_at) >= :months_start
-      GROUP BY month_key
-      ORDER BY month_key ASC
-    ");
-    $cash_stmt->execute([':months_start' => $months_start]);
+    // Pull received totals and cash trend from actual customer payment records
+    if (dashboard_table_exists($pdo, 'customer_payments')) {
+      $cp_totals_stmt = $pdo->query("
+        SELECT
+          COALESCE(SUM(amount), 0) AS total_received,
+          COALESCE(SUM(CASE WHEN YEARWEEK(payment_date, 1) = YEARWEEK(CURDATE(), 1)
+                            THEN amount ELSE 0 END), 0) AS week_received,
+          COALESCE(SUM(CASE WHEN YEAR(payment_date) = YEAR(CURDATE())
+                            AND MONTH(payment_date) = MONTH(CURDATE())
+                            THEN amount ELSE 0 END), 0) AS month_received
+        FROM customer_payments
+      ");
+      $cp_row = $cp_totals_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-    foreach ($cash_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-      $month_key = trim((string)($row['month_key'] ?? ''));
-      if ($month_key !== '' && isset($cash_series[$month_key])) {
-        $cash_series[$month_key]['value'] = (float)($row['month_total'] ?? 0);
+      $kpis['total_received']       = (float)($cp_row['total_received'] ?? 0);
+      $week_kpis['week_received']   = (float)($cp_row['week_received'] ?? 0);
+      $month_kpis['month_received'] = (float)($cp_row['month_received'] ?? 0);
+
+      $cash_stmt = $pdo->prepare("
+        SELECT
+          DATE_FORMAT(payment_date, '%Y-%m') AS month_key,
+          COALESCE(SUM(amount), 0) AS month_total
+        FROM customer_payments
+        WHERE payment_date >= :months_start
+        GROUP BY month_key
+        ORDER BY month_key ASC
+      ");
+      $cash_stmt->execute([':months_start' => $months_start]);
+      foreach ($cash_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $month_key = trim((string)($row['month_key'] ?? ''));
+        if ($month_key !== '' && isset($cash_series[$month_key])) {
+          $cash_series[$month_key]['value'] = (float)($row['month_total'] ?? 0);
+        }
       }
     }
+
+    // Derive outstanding from invoiced minus received (received defaults to 0 if table unavailable)
+    $kpis['outstanding']             = max(0, $kpis['total_invoiced'] - $kpis['total_received']);
+    $week_kpis['week_outstanding']   = max(0, $week_kpis['week_invoiced'] - $week_kpis['week_received']);
+    $month_kpis['month_outstanding'] = max(0, $month_kpis['month_invoiced'] - $month_kpis['month_received']);
 
     $recent_quotes_stmt = $pdo->query("
       SELECT id, customer_name, quote_date, status, subtotal_amount, created_at
@@ -407,7 +414,7 @@ render_header('ERP Dashboard');
     <div class="dashboard-card admin-only-stat">
       <div class="kpi-label">Total Received</div>
       <div class="kpi-value" style="color:#16a34a;"><?= h(dashboard_money((float)$kpis['total_received'])) ?></div>
-      <div class="kpi-note">Marked paid invoices</div>
+      <div class="kpi-note">Actual recorded payments</div>
     </div>
     <div class="dashboard-card admin-only-stat">
       <div class="kpi-label">Outstanding</div>
