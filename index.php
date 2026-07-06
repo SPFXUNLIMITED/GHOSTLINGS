@@ -215,8 +215,8 @@ $conversion_converted = max(0, (int)$month_kpis['month_converted_quotes']);
 $conversion_open = max(0, (int)$month_kpis['month_total_quotes'] - $conversion_converted);
 
 $cash_chart_values = array_values(array_map(static fn(array $m): float => (float)$m['value'], $cash_series));
-$cash_collected = max(0.0, (float)$kpis['total_received']);
-$cash_outstanding = max(0.0, (float)$kpis['outstanding']);
+$cash_collected = max(0.0, (float)$month_kpis['month_received']);
+$cash_outstanding = max(0.0, (float)$month_kpis['month_outstanding']);
 
 render_header('ERP Dashboard');
 ?>
@@ -486,7 +486,7 @@ render_header('ERP Dashboard');
     </div>
     <div class="dashboard-card chart-wrap">
       <h2 class="section-title">Invoice to Cash Conversion</h2>
-      <p class="section-subtitle">All-time collected versus outstanding invoiced amounts.</p>
+      <p class="section-subtitle">This Month: collected versus outstanding</p>
       <canvas id="cashConversionChart" aria-label="Invoice to cash conversion pie chart" role="img"></canvas>
     </div>
   </div>
