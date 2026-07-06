@@ -169,10 +169,9 @@ render_header('Bank Transactions');
         <span>Credits</span>
       </div>
       <?php if (is_admin()): ?>
-      <div class="laser-rfq-hero-stat admin-only-stat" title="Visible to admins only">
+      <div class="laser-rfq-hero-stat admin-only-stat">
         <strong>$<?= h(number_format($heroAmount, 2)) ?></strong>
         <span>Total Amount</span>
-        <span class="admin-only-badge">Admin</span>
       </div>
       <?php endif; ?>
       <div class="laser-rfq-hero-stat">

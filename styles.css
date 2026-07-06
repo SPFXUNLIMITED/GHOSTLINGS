@@ -1345,12 +1345,3 @@ tbody tr:hover td {
   padding: 10px 16px;
   position: relative;
 }
-.admin-only-badge {
-  display: block;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .08em;
-  color: #92700a;
-  text-transform: uppercase;
-  margin-top: 4px;
-}

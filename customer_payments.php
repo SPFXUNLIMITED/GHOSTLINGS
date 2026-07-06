@@ -410,10 +410,9 @@ render_header('Customer Payments');
         <span>This Month</span>
       </div>
       <?php if (is_admin()): ?>
-      <div class="laser-rfq-hero-stat admin-only-stat" title="Visible to admins only">
+      <div class="laser-rfq-hero-stat admin-only-stat">
         <strong>$<?= h(cp_format_money($hero_total_amt)) ?></strong>
         <span>Total Received</span>
-        <span class="admin-only-badge">Admin</span>
       </div>
       <?php endif; ?>
       <div class="laser-rfq-hero-stat">
