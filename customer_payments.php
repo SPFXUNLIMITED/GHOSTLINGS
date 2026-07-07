@@ -320,6 +320,8 @@ foreach ($payments as $p) {
 }
 $all_customer_ids = array_values($all_customer_ids);
 
+$customer_applied_totals = [];
+
 // Compute per-customer balance in a single query:
 // total invoiced (converted invoices) − total payments for each customer.
 // The converted-invoice condition matches INVOICE_TRACKER_BASE_FILTER in invoice_tracker.php.
@@ -348,6 +350,39 @@ if ($all_customer_ids) {
   foreach ($balance_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
     $cid = (int)$row['customer_id'];
     $customer_balances[$cid] = (float)$row['total_invoiced'] - (float)$row['total_paid'];
+  }
+
+  $applied_totals_stmt = $pdo->prepare(
+    "SELECT customer_id, COALESCE(SUM(applied_amount), 0) AS total_applied
+     FROM invoice_credit_applications
+     WHERE customer_id IN ($ph)
+     GROUP BY customer_id"
+  );
+  $applied_totals_stmt->execute($all_customer_ids);
+  foreach ($applied_totals_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    $customer_applied_totals[(int)$row['customer_id']] = round((float)($row['total_applied'] ?? 0), 2);
+  }
+}
+
+$payment_remaining_amounts = [];
+if ($all_customer_ids) {
+  $payment_allocation_stmt = $pdo->prepare(
+    "SELECT id, customer_id, payment_date, amount
+     FROM customer_payments
+     WHERE customer_id IN ($ph)
+     ORDER BY customer_id ASC, payment_date ASC, id ASC"
+  );
+  $payment_allocation_stmt->execute($all_customer_ids);
+  $remaining_applied_by_customer = $customer_applied_totals;
+
+  foreach ($payment_allocation_stmt->fetchAll(PDO::FETCH_ASSOC) as $payment_row) {
+    $payment_id = (int)($payment_row['id'] ?? 0);
+    $customer_id = (int)($payment_row['customer_id'] ?? 0);
+    $payment_amount = round((float)($payment_row['amount'] ?? 0), 2);
+    $customer_applied_remaining = round((float)($remaining_applied_by_customer[$customer_id] ?? 0), 2);
+    $applied_to_payment = min($payment_amount, max($customer_applied_remaining, 0));
+    $payment_remaining_amounts[$payment_id] = round(max($payment_amount - $applied_to_payment, 0), 2);
+    $remaining_applied_by_customer[$customer_id] = round(max($customer_applied_remaining - $applied_to_payment, 0), 2);
   }
 }
 
@@ -466,6 +501,9 @@ render_header('Customer Payments');
 .cp-actions .btn-danger:hover { background:#fee2e2; }
 .cp-balance-pos { color:#991b1b; font-weight:600; }
 .cp-balance-zero { color:#166534; font-weight:600; }
+.cp-amount-available { display:block; font-size:0.82em; font-weight:600; margin-top:4px; }
+.cp-amount-available-pos { color:#166534; }
+.cp-amount-available-zero { color:#991b1b; }
 
 /* ── Add / Edit modal ─────────────────────────────────────────────────────── */
 #cp-modal {
@@ -577,6 +615,7 @@ render_header('Customer Payments');
             $ref_no       = trim((string)($pay['reference_no'] ?? ''));
             $pay_notes    = trim((string)($pay['notes'] ?? ''));
             $balance      = $customer_balances[$cid] ?? null;
+            $available_amount = round((float)($payment_remaining_amounts[$pid] ?? max($amount, 0)), 2);
 
             // Method badge colours
             [$mbg, $mfg] = match ($method) {
@@ -609,7 +648,12 @@ render_header('Customer Payments');
               <?php endif; ?>
             </td>
             <td><?= h($pdate !== '' ? fmt_date_mdY($pdate) : '—') ?></td>
-            <td><strong>$<?= h(cp_format_money($amount)) ?></strong></td>
+            <td>
+              <strong>$<?= h(cp_format_money($amount)) ?></strong>
+              <span class="cp-amount-available <?= $available_amount > 0 ? 'cp-amount-available-pos' : 'cp-amount-available-zero' ?>">
+                $<?= h(cp_format_money($available_amount)) ?> available
+              </span>
+            </td>
             <td>
               <span class="cp-badge" style="background:<?= h($mbg) ?>;color:<?= h($mfg) ?>;">
                 <?= h(cp_payment_method_label($method)) ?>
