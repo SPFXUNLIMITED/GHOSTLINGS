@@ -7,7 +7,7 @@ require_admin_or_moderator();
 const INVOICE_TRACKER_TABLE_COLUMN_COUNT = 7;
 const INVOICE_TRACKER_BASE_FILTER = "((converted_invoice_no IS NOT NULL AND converted_invoice_no <> '') OR status = 'converted')";
 // One cent tolerance for float rounding when comparing money values.
-const INVOICE_TRACKER_PAYMENT_EPSILON = 0.009;
+const INVOICE_TRACKER_PAYMENT_EPSILON = 0.01;
 
 // ---------- CSRF ----------
 if (empty($_SESSION['invoice_tracker_csrf'])) {
@@ -235,10 +235,7 @@ if ($invoices) {
   );
   $payment_totals_stmt->execute($inv_id_list);
   foreach ($payment_totals_stmt->fetchAll(PDO::FETCH_ASSOC) as $payment_row) {
-    $quote_id = (int)($payment_row['quote_id'] ?? 0);
-    if ($quote_id <= 0) {
-      continue;
-    }
+    $quote_id = (int)$payment_row['quote_id'];
     $applied_payment_amounts[$quote_id] = round((float)($payment_row['total_applied'] ?? 0), 2);
   }
 }
@@ -443,7 +440,7 @@ render_header('Invoice Tracker');
               error_log('invoice_tracker.php detected negative applied payment total for quote #' . $inv_id . ': ' . $invoice_paid_amount);
               $invoice_paid_amount = 0.0;
             }
-            if ($invoice_total_due <= INVOICE_TRACKER_PAYMENT_EPSILON || $invoice_paid_amount >= ($invoice_total_due - INVOICE_TRACKER_PAYMENT_EPSILON)) {
+            if ($invoice_total_due > INVOICE_TRACKER_PAYMENT_EPSILON && $invoice_paid_amount >= ($invoice_total_due - INVOICE_TRACKER_PAYMENT_EPSILON)) {
               $payment_status = 'paid';
             } elseif (
               $invoice_paid_amount > INVOICE_TRACKER_PAYMENT_EPSILON
