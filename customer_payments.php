@@ -615,7 +615,7 @@ render_header('Customer Payments');
             $ref_no       = trim((string)($pay['reference_no'] ?? ''));
             $pay_notes    = trim((string)($pay['notes'] ?? ''));
             $balance      = $customer_balances[$cid] ?? null;
-            $remaining_amount = (float)($payment_remaining_amounts[$pid] ?? 0);
+            $payment_remaining_amount = (float)($payment_remaining_amounts[$pid] ?? 0);
 
             // Method badge colours
             [$mbg, $mfg] = match ($method) {
@@ -650,8 +650,8 @@ render_header('Customer Payments');
             <td><?= h($pdate !== '' ? fmt_date_mdY($pdate) : '—') ?></td>
             <td>
               <strong>$<?= h(cp_format_money($amount)) ?></strong>
-              <span class="cp-amount-available <?= $remaining_amount > 0 ? 'cp-amount-available-active' : 'cp-amount-available-empty' ?>">
-                $<?= h(cp_format_money($remaining_amount)) ?> available
+              <span class="cp-amount-available <?= $payment_remaining_amount > 0 ? 'cp-amount-available-active' : 'cp-amount-available-empty' ?>">
+                $<?= h(cp_format_money($payment_remaining_amount)) ?> available
               </span>
             </td>
             <td>
