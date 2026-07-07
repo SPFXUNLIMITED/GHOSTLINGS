@@ -4,8 +4,9 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_admin_or_moderator();
 
-const INVOICE_TRACKER_TABLE_COLUMN_COUNT = 6;
+const INVOICE_TRACKER_TABLE_COLUMN_COUNT = 7;
 const INVOICE_TRACKER_BASE_FILTER = "((converted_invoice_no IS NOT NULL AND converted_invoice_no <> '') OR status = 'converted')";
+const INVOICE_TRACKER_PAYMENT_EPSILON = 0.009;
 
 // ---------- CSRF ----------
 if (empty($_SESSION['invoice_tracker_csrf'])) {
@@ -182,7 +183,7 @@ if ($status_filter !== '' && isset($invoice_statuses[$status_filter])) {
 }
 
 $stmt = $pdo->prepare(
-  "SELECT id, customer_name, company_name, quote_date, subtotal_amount, status, approval_status, converted_invoice_no,
+  "SELECT id, customer_name, company_name, quote_date, subtotal_amount, tax_amount, status, approval_status, converted_invoice_no,
           enable_online_payment, invoice_emailed, created_at
    FROM quotes
    WHERE " . implode(' AND ', $where_parts) . "
@@ -204,6 +205,27 @@ if ($invoices) {
   $applied_stmt->execute($inv_id_list);
   foreach ($applied_stmt->fetchAll(PDO::FETCH_COLUMN) as $qid) {
     $applied_invoice_ids[(int)$qid] = true;
+  }
+}
+
+$applied_payment_amounts = [];
+if ($invoices) {
+  $inv_id_list = array_map('intval', array_column($invoices, 'id'));
+  $placeholders = implode(',', array_fill(0, count($inv_id_list), '?'));
+  $payment_totals_stmt = $pdo->prepare(
+    "SELECT ica.quote_id, COALESCE(SUM(ica.applied_amount), 0) AS total_applied
+     FROM invoice_credit_applications ica
+     WHERE ica.quote_id IN ($placeholders)
+       AND EXISTS (
+         SELECT 1
+         FROM customer_payments cp
+         WHERE cp.customer_id = ica.customer_id
+       )
+     GROUP BY ica.quote_id"
+  );
+  $payment_totals_stmt->execute($inv_id_list);
+  foreach ($payment_totals_stmt->fetchAll(PDO::FETCH_ASSOC) as $payment_row) {
+    $applied_payment_amounts[(int)($payment_row['quote_id'] ?? 0)] = round((float)($payment_row['total_applied'] ?? 0), 2);
   }
 }
 
@@ -374,6 +396,7 @@ render_header('Invoice Tracker');
           <th class="col-status">Email Status</th>
           <th>Approval Status</th>
           <th>Online Payment</th>
+          <th>Payment Status</th>
           <th class="col-actions">Actions</th>
         </tr>
       </thead>
@@ -394,6 +417,24 @@ render_header('Invoice Tracker');
             $approval_status = (string)($invoice['approval_status'] ?? 'none');
             [$approval_bg, $approval_color] = invoice_approval_badge_colors($approval_status);
             $has_applied_payment = isset($applied_invoice_ids[$inv_id]);
+            $invoice_total_due = round((float)($invoice['subtotal_amount'] ?? 0) + (float)($invoice['tax_amount'] ?? 0), 2);
+            $invoice_paid_amount = round((float)($applied_payment_amounts[$inv_id] ?? 0), 2);
+            if ($invoice_paid_amount < 0) {
+              $invoice_paid_amount = 0.0;
+            }
+            if ($invoice_total_due <= INVOICE_TRACKER_PAYMENT_EPSILON || $invoice_paid_amount >= ($invoice_total_due - INVOICE_TRACKER_PAYMENT_EPSILON)) {
+              $payment_label = 'Paid';
+              $payment_bg = '#dcfce7';
+              $payment_color = '#166534';
+            } elseif ($invoice_paid_amount > INVOICE_TRACKER_PAYMENT_EPSILON) {
+              $payment_label = 'Partially Paid';
+              $payment_bg = '#ffedd5';
+              $payment_color = '#c2410c';
+            } else {
+              $payment_label = 'Unpaid';
+              $payment_bg = '#f1f5f9';
+              $payment_color = '#475569';
+            }
             $applied_tooltip = 'This payment has been applied to an invoice and cannot be modified';
           ?>
           <tr>
@@ -450,6 +491,12 @@ render_header('Invoice Tracker');
                   <span class="it-toggle-label"><?= $online_payment ? 'Enabled' : 'Disabled' ?></span>
                 </div>
               </form>
+            </td>
+
+            <td>
+              <span style="display:inline-flex;align-items:center;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;background:<?= h($payment_bg) ?>;color:<?= h($payment_color) ?>;">
+                <?= h($payment_label) ?>
+              </span>
             </td>
 
             <!-- Actions -->
