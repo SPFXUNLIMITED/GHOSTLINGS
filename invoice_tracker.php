@@ -111,20 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $_SESSION['invoice_tracker_csrf'] = bin2hex(random_bytes(24));
     $action = trim((string)($_POST['action'] ?? ''));
 
-    if ($action === 'save_email_status') {
-      $inv_id       = (int)($_POST['invoice_id'] ?? 0);
-      $email_status = trim((string)($_POST['email_status'] ?? ''));
-      if ($inv_id <= 0) {
-        $tracker_errors[] = 'Invalid invoice.';
-      } elseif (!in_array($email_status, ['emailed', 'not_emailed'], true)) {
-        $tracker_errors[] = 'Invalid email status.';
-      } else {
-        $emailed_val = $email_status === 'emailed' ? 1 : 0;
-        $pdo->prepare("UPDATE quotes SET invoice_emailed = ? WHERE id = ?")->execute([$emailed_val, $inv_id]);
-        $tracker_success = 'Email status updated.';
-      }
-
-    } elseif ($action === 'toggle_online_payment') {
+    if ($action === 'toggle_online_payment') {
       $inv_id      = (int)($_POST['invoice_id'] ?? 0);
       $new_val_str = trim((string)($_POST['online_payment'] ?? ''));
       $new_val     = $new_val_str === '1' ? 1 : 0;
@@ -398,9 +385,22 @@ render_header('Invoice Tracker');
 .it-actions .btn-danger:disabled { opacity:0.45; cursor:not-allowed; }
 
 /* Email status cell */
-.it-email-cell { display:flex; align-items:center; gap:6px; flex-wrap:nowrap; }
-.it-email-cell select { font-size:0.82em; padding:3px 6px; width:auto; min-width:110px; }
-.it-email-cell .btn { font-size:0.78em; padding:3px 8px; white-space:nowrap; }
+.it-email-status {
+  display:inline-flex;
+  align-items:center;
+  border-radius:999px;
+  padding:3px 10px;
+  font-size:12px;
+  font-weight:600;
+}
+.it-email-status.emailed {
+  background:#dcfce7;
+  color:#166534;
+}
+.it-email-status.not-emailed {
+  background:#f1f5f9;
+  color:#475569;
+}
 </style>
 
 <div class="card">
@@ -464,18 +464,11 @@ render_header('Invoice Tracker');
               </span>
             </td>
 
-            <!-- Email Status: dropdown + Save -->
+            <!-- Email Status: view-only -->
             <td class="col-status">
-              <form method="post" action="invoice_tracker.php" class="it-email-cell">
-                <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_tracker_csrf']) ?>" />
-                <input type="hidden" name="action" value="save_email_status" />
-                <input type="hidden" name="invoice_id" value="<?= $inv_id ?>" />
-                <select name="email_status" aria-label="Email status for invoice <?= $inv_id ?>">
-                  <option value="emailed"     <?= $is_emailed ? 'selected' : '' ?>>Emailed</option>
-                  <option value="not_emailed" <?= !$is_emailed ? 'selected' : '' ?>>Not Emailed</option>
-                </select>
-                <button type="submit" class="btn">Save</button>
-              </form>
+              <span class="it-email-status <?= $is_emailed ? 'emailed' : 'not-emailed' ?>">
+                <?= $is_emailed ? 'Emailed' : 'Not Emailed' ?>
+              </span>
             </td>
 
             <td>
