@@ -379,8 +379,8 @@ if ($all_customer_ids) {
     $payment_id = (int)($payment_row['id'] ?? 0);
     $customer_id = (int)($payment_row['customer_id'] ?? 0);
     $payment_amount = round((float)($payment_row['amount'] ?? 0), 2);
-    $customer_applied_remaining = round((float)($remaining_applied_by_customer[$customer_id] ?? 0), 2);
-    $applied_to_payment = min($payment_amount, max($customer_applied_remaining, 0));
+    $customer_applied_remaining = max(round((float)($remaining_applied_by_customer[$customer_id] ?? 0), 2), 0);
+    $applied_to_payment = min($payment_amount, $customer_applied_remaining);
     $payment_remaining_amounts[$payment_id] = round(max($payment_amount - $applied_to_payment, 0), 2);
     $remaining_applied_by_customer[$customer_id] = round(max($customer_applied_remaining - $applied_to_payment, 0), 2);
   }
@@ -615,7 +615,7 @@ render_header('Customer Payments');
             $ref_no       = trim((string)($pay['reference_no'] ?? ''));
             $pay_notes    = trim((string)($pay['notes'] ?? ''));
             $balance      = $customer_balances[$cid] ?? null;
-            $available_amount = round((float)($payment_remaining_amounts[$pid] ?? max($amount, 0)), 2);
+            $available_amount = round((float)($payment_remaining_amounts[$pid] ?? $amount), 2);
 
             // Method badge colours
             [$mbg, $mfg] = match ($method) {
