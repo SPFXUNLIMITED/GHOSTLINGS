@@ -292,6 +292,9 @@ if ($payment_id_filter > 0) {
 $list_stmt = $pdo->prepare(
   "SELECT cp.id, cp.customer_id, cp.payment_date, cp.amount, cp.payment_method,
           cp.reference_no, cp.notes, cp.created_at, bt.id AS bank_transaction_id,
+          bt.matched_invoice_id,
+          inv_q.converted_invoice_no AS matched_invoice_no,
+          inv_q.id AS matched_invoice_quote_id,
           COALESCE(
             NULLIF(TRIM(CONCAT_WS(' ', NULLIF(c.first_name,''), NULLIF(c.last_name,''))), ''),
             c.company, c.email, 'Unknown'
@@ -300,6 +303,7 @@ $list_stmt = $pdo->prepare(
    FROM customer_payments cp
    JOIN customers c ON c.id = cp.customer_id
    LEFT JOIN bank_transactions bt ON bt.linked_payment_id = cp.id
+   LEFT JOIN quotes inv_q ON inv_q.id = bt.matched_invoice_id
    WHERE " . implode(' AND ', $where_parts) . "
    ORDER BY cp.payment_date DESC, cp.id DESC
    LIMIT 300"
@@ -348,6 +352,22 @@ if ($all_customer_ids) {
   foreach ($balance_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
     $cid = (int)$row['customer_id'];
     $customer_balances[$cid] = (float)$row['total_invoiced'] - (float)$row['total_paid'];
+  }
+}
+
+// Per-customer total applied from invoice_credit_applications (for "Unapplied" vs "Partially Applied" fallback)
+$customer_applied = [];
+if ($all_customer_ids) {
+  $ph = implode(',', array_fill(0, count($all_customer_ids), '?'));
+  $applied_stmt = $pdo->prepare(
+    "SELECT customer_id, COALESCE(SUM(applied_amount), 0) AS total_applied
+     FROM invoice_credit_applications
+     WHERE customer_id IN ($ph)
+     GROUP BY customer_id"
+  );
+  $applied_stmt->execute($all_customer_ids);
+  foreach ($applied_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    $customer_applied[(int)$row['customer_id']] = (float)$row['total_applied'];
   }
 }
 
@@ -578,6 +598,12 @@ render_header('Customer Payments');
             $pay_notes    = trim((string)($pay['notes'] ?? ''));
             $balance      = $customer_balances[$cid] ?? null;
 
+            // Determine application status for this payment
+            $matched_inv_id    = (int)($pay['matched_invoice_id'] ?? 0);
+            $matched_inv_no    = trim((string)($pay['matched_invoice_no'] ?? ''));
+            $matched_inv_qid   = (int)($pay['matched_invoice_quote_id'] ?? 0);
+            $cust_total_applied = $customer_applied[$cid] ?? 0.0;
+
             // Method badge colours
             [$mbg, $mfg] = match ($method) {
               'check'       => ['#eff6ff', '#1d4ed8'],
@@ -609,7 +635,17 @@ render_header('Customer Payments');
               <?php endif; ?>
             </td>
             <td><?= h($pdate !== '' ? fmt_date_mdY($pdate) : '—') ?></td>
-            <td><strong>$<?= h(cp_format_money($amount)) ?></strong></td>
+            <td>
+              <strong>$<?= h(cp_format_money($amount)) ?></strong>
+              <br>
+              <?php if ($matched_inv_id > 0 && $matched_inv_no !== ''): ?>
+                <span style="font-size:0.8em;color:#166534;">Applied to <a href="invoice_form.php?id=<?= $matched_inv_qid ?>&amp;mode=view" style="color:inherit;font-weight:600;"><?= h($matched_inv_no) ?></a></span>
+              <?php elseif ($cust_total_applied > 0.00): ?>
+                <span style="font-size:0.8em;color:#92400e;">Partially Applied</span>
+              <?php else: ?>
+                <span style="font-size:0.8em;color:#b45309;">Unapplied</span>
+              <?php endif; ?>
+            </td>
             <td>
               <span class="cp-badge" style="background:<?= h($mbg) ?>;color:<?= h($mfg) ?>;">
                 <?= h(cp_payment_method_label($method)) ?>
