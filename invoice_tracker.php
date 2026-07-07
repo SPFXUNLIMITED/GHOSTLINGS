@@ -63,9 +63,9 @@ function invoice_approval_badge_colors(string $status): array {
 
 function invoice_payment_badge_config(string $status): array {
   return match ($status) {
-    'paid' => ['Paid', '#dcfce7', '#166534'],
-    'partially_paid' => ['Partially Paid', '#ffedd5', '#c2410c'],
-    default => ['Unpaid', '#f1f5f9', '#475569'],
+    'paid' => ['Paid', '#dcfce7', '#166534', 'transparent'],
+    'partially_paid' => ['Partially Paid', '#ffedd5', '#c2410c', 'transparent'],
+    default => ['Unpaid', '#ef4444', '#ffffff', '#991b1b'],
   };
 }
 
@@ -447,7 +447,7 @@ render_header('Invoice Tracker');
               $invoice_paid_amount = 0.0;
             }
             $payment_status = invoice_payment_status_key($invoice_total_due, $invoice_paid_amount);
-            [$payment_label, $payment_bg, $payment_color] = invoice_payment_badge_config($payment_status);
+            [$payment_label, $payment_bg, $payment_color, $payment_border] = invoice_payment_badge_config($payment_status);
             $applied_tooltip = 'This payment has been applied to an invoice and cannot be modified';
           ?>
           <tr>
@@ -507,9 +507,7 @@ render_header('Invoice Tracker');
             </td>
 
             <td>
-              <span style="display:inline-flex;align-items:center;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;background:<?= h($payment_bg) ?>;color:<?= h($payment_color) ?>;">
-                <?= h($payment_label) ?>
-              </span>
+              <span style="display:inline-flex;align-items:center;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;background:<?= h($payment_bg) ?>;color:<?= h($payment_color) ?>;border:1.5px solid <?= h($payment_border) ?>;"><?= h($payment_label) ?></span>
             </td>
 
             <!-- Actions -->

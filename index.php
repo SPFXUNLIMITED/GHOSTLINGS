@@ -376,10 +376,15 @@ render_header('ERP Dashboard');
   color: #1d4ed8;
 }
 
-.status-pill.draft,
-.status-pill.unpaid {
+.status-pill.draft {
   background: #f1f5f9;
   color: #475569;
+}
+
+.status-pill.unpaid {
+  background: #ef4444;
+  border-color: #991b1b;
+  color: #ffffff;
 }
 
 @media (max-width: 1080px) {
