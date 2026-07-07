@@ -601,6 +601,10 @@ render_header('Customer Payments');
             $ref_no       = trim((string)($pay['reference_no'] ?? ''));
             $pay_notes    = trim((string)($pay['notes'] ?? ''));
             $balance      = $customer_balances[$cid] ?? null;
+            $linked_apps  = $payment_credit_apps[$pid] ?? [];
+            $total_applied = round(array_sum(array_column($linked_apps, 'applied_amount')), 2);
+            $remaining_bal = round(max(0.0, $amount - $total_applied), 2);
+            $available_color = $remaining_bal > 0.005 ? '#166534' : '#dc2626';
 
             // Method badge colours
             [$mbg, $mfg] = match ($method) {
@@ -633,7 +637,12 @@ render_header('Customer Payments');
               <?php endif; ?>
             </td>
             <td><?= h($pdate !== '' ? fmt_date_mdY($pdate) : '—') ?></td>
-            <td><strong>$<?= h(cp_format_money($amount)) ?></strong></td>
+            <td>
+              <strong>$<?= h(cp_format_money($amount)) ?></strong><br>
+              <span style="font-size:0.85em; font-weight:600; color:<?= h($available_color) ?>;">
+                $<?= h(number_format($remaining_bal, 2)) ?> available
+              </span>
+            </td>
             <td>
               <span class="cp-badge" style="background:<?= h($mbg) ?>;color:<?= h($mfg) ?>;">
                 <?= h(cp_payment_method_label($method)) ?>
@@ -673,11 +682,6 @@ render_header('Customer Payments');
               <?php endif; ?>
             </td>
           </tr>
-          <?php
-            $linked_apps    = $payment_credit_apps[$pid] ?? [];
-            $total_applied  = round(array_sum(array_column($linked_apps, 'applied_amount')), 2);
-            $remaining_bal  = round($amount - $total_applied, 2);
-          ?>
           <?php if ($linked_apps): ?>
           <tr>
             <td colspan="<?= CP_TABLE_COLUMNS ?>" style="padding:0 10px 8px 28px; background:#f8fafc; border-top:none; border-bottom:1px solid #e2e8f0;">
@@ -696,9 +700,6 @@ render_header('Customer Payments');
                 <?php endforeach; ?>
                 <span style="margin-left:auto; white-space:nowrap;">
                   <span class="muted">Total applied:</span> <strong>$<?= h(number_format($total_applied, 2)) ?></strong>
-                  &nbsp;·&nbsp;
-                  <span class="muted">Remaining:</span>
-                  <strong style="color:<?= $remaining_bal > 0.005 ? '#166534' : '#64748b' ?>;">$<?= h(number_format(max(0.0, $remaining_bal), 2)) ?></strong>
                 </span>
               </div>
             </td>
