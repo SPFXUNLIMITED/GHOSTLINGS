@@ -360,7 +360,7 @@ if ($all_customer_ids) {
   );
   $applied_totals_stmt->execute($all_customer_ids);
   foreach ($applied_totals_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-    $customer_applied_totals[(int)$row['customer_id']] = round((float)($row['total_applied'] ?? 0), 2);
+    $customer_applied_totals[(int)$row['customer_id']] = round((float)$row['total_applied'], 2);
   }
 }
 
@@ -376,13 +376,13 @@ if ($all_customer_ids) {
   $credits_to_allocate_by_customer = $customer_applied_totals;
 
   foreach ($payment_allocation_stmt->fetchAll(PDO::FETCH_ASSOC) as $payment_row) {
-    $payment_id = (int)($payment_row['id'] ?? 0);
-    $customer_id = (int)($payment_row['customer_id'] ?? 0);
+    $payment_id = (int)$payment_row['id'];
+    $customer_id = (int)$payment_row['customer_id'];
     if (!isset($credits_to_allocate_by_customer[$customer_id])) {
       $credits_to_allocate_by_customer[$customer_id] = 0.0;
     }
 
-    $payment_amount = (float)($payment_row['amount'] ?? 0);
+    $payment_amount = (float)$payment_row['amount'];
     $customer_applied_remaining = (float)$credits_to_allocate_by_customer[$customer_id];
     $applied_to_payment = min($payment_amount, $customer_applied_remaining);
     $payment_remaining_amounts[$payment_id] = round(max($payment_amount - $applied_to_payment, 0), 2);
