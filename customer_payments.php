@@ -378,12 +378,8 @@ if ($all_customer_ids) {
   foreach ($payment_allocation_stmt->fetchAll(PDO::FETCH_ASSOC) as $payment_row) {
     $payment_id = (int)$payment_row['id'];
     $customer_id = (int)$payment_row['customer_id'];
-    if (!isset($credits_to_allocate_by_customer[$customer_id])) {
-      $credits_to_allocate_by_customer[$customer_id] = 0.0;
-    }
-
     $payment_amount = (float)$payment_row['amount'];
-    $customer_applied_remaining = (float)$credits_to_allocate_by_customer[$customer_id];
+    $customer_applied_remaining = (float)($credits_to_allocate_by_customer[$customer_id] ?? 0.0);
     $applied_to_payment = min($payment_amount, $customer_applied_remaining);
     $payment_remaining_amounts[$payment_id] = round(max($payment_amount - $applied_to_payment, 0), 2);
     $credits_to_allocate_by_customer[$customer_id] = round(max($customer_applied_remaining - $applied_to_payment, 0), 2);
@@ -619,7 +615,7 @@ render_header('Customer Payments');
             $ref_no       = trim((string)($pay['reference_no'] ?? ''));
             $pay_notes    = trim((string)($pay['notes'] ?? ''));
             $balance      = $customer_balances[$cid] ?? null;
-            $available_amount = round((float)($payment_remaining_amounts[$pid] ?? 0), 2);
+            $available_amount = (float)($payment_remaining_amounts[$pid] ?? 0);
 
             // Method badge colours
             [$mbg, $mfg] = match ($method) {
