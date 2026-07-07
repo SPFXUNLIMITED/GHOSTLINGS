@@ -6,6 +6,7 @@ require_admin_or_moderator();
 
 const INVOICE_TRACKER_TABLE_COLUMN_COUNT = 7;
 const INVOICE_TRACKER_BASE_FILTER = "((converted_invoice_no IS NOT NULL AND converted_invoice_no <> '') OR status = 'converted')";
+// One cent tolerance for float rounding when comparing money values.
 const INVOICE_TRACKER_PAYMENT_EPSILON = 0.009;
 
 // ---------- CSRF ----------
@@ -215,12 +216,12 @@ if ($invoices) {
   $payment_totals_stmt = $pdo->prepare(
     "SELECT ica.quote_id, COALESCE(SUM(ica.applied_amount), 0) AS total_applied
      FROM invoice_credit_applications ica
-     INNER JOIN (
-       SELECT customer_id, COALESCE(SUM(amount), 0) AS total_paid
-       FROM customer_payments
-       GROUP BY customer_id
-     ) cp_totals ON cp_totals.customer_id = ica.customer_id AND cp_totals.total_paid > 0
      WHERE ica.quote_id IN ($placeholders)
+       AND EXISTS (
+         SELECT 1
+         FROM customer_payments cp
+         WHERE cp.customer_id = ica.customer_id
+       )
      GROUP BY ica.quote_id"
   );
   $payment_totals_stmt->execute($inv_id_list);
@@ -421,7 +422,13 @@ render_header('Invoice Tracker');
             $approval_status = (string)($invoice['approval_status'] ?? 'none');
             [$approval_bg, $approval_color] = invoice_approval_badge_colors($approval_status);
             $has_applied_payment = isset($applied_invoice_ids[$inv_id]);
-            $invoice_total_due = round((float)($invoice['subtotal_amount'] ?? 0) + (float)($invoice['tax_amount'] ?? 0), 2);
+            $invoice_subtotal_amount = round((float)($invoice['subtotal_amount'] ?? 0), 2);
+            $invoice_tax_amount = round((float)($invoice['tax_amount'] ?? 0), 2);
+            if ($invoice_tax_amount < 0) {
+              error_log('invoice_tracker.php detected negative tax amount for quote #' . $inv_id . ': ' . $invoice_tax_amount);
+              $invoice_tax_amount = 0.0;
+            }
+            $invoice_total_due = round($invoice_subtotal_amount + $invoice_tax_amount, 2);
             $invoice_paid_amount = round((float)($applied_payment_amounts[$inv_id] ?? 0), 2);
             if ($invoice_paid_amount < 0) {
               error_log('invoice_tracker.php detected negative applied payment total for quote #' . $inv_id . ': ' . $invoice_paid_amount);
