@@ -292,9 +292,6 @@ if ($payment_id_filter > 0) {
 $list_stmt = $pdo->prepare(
   "SELECT cp.id, cp.customer_id, cp.payment_date, cp.amount, cp.payment_method,
           cp.reference_no, cp.notes, cp.created_at, bt.id AS bank_transaction_id,
-          bt.matched_invoice_id,
-          inv_q.converted_invoice_no AS matched_invoice_no,
-          inv_q.id AS matched_invoice_quote_id,
           COALESCE(
             NULLIF(TRIM(CONCAT_WS(' ', NULLIF(c.first_name,''), NULLIF(c.last_name,''))), ''),
             c.company, c.email, 'Unknown'
@@ -303,7 +300,6 @@ $list_stmt = $pdo->prepare(
    FROM customer_payments cp
    JOIN customers c ON c.id = cp.customer_id
    LEFT JOIN bank_transactions bt ON bt.linked_payment_id = cp.id
-   LEFT JOIN quotes inv_q ON inv_q.id = bt.matched_invoice_id
    WHERE " . implode(' AND ', $where_parts) . "
    ORDER BY cp.payment_date DESC, cp.id DESC
    LIMIT 300"
