@@ -952,6 +952,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($apply_amount <= 0) {
       $credit_errors[] = 'Amount must be greater than zero.';
     }
+    if ($apply_payment_id <= 0) {
+      $credit_errors[] = 'A payment must be selected.';
+    }
     if ($apply_payment_id > 0 && !$payment_row) {
       $credit_errors[] = 'Selected payment does not exist or does not belong to this customer.';
     }
@@ -1544,19 +1547,68 @@ render_header($invoice_heading);
   <?php if ($inv_cust_id_for_credit > 0): ?>
   <div class="card" id="inv-credit-card">
     <h3 style="margin:0 0 14px;">Customer Credit &amp; Balance</h3>
-    <div style="display:flex; flex-wrap:wrap; gap:16px; margin-bottom:<?= ($inv_credit_apps || $inv_can_apply_credit) ? '16px' : '0' ?>;">
-      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px 20px; min-width:180px;">
-        <div style="font-size:0.78em; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px;">Available Customer Credit</div>
-        <div style="font-size:1.35em; font-weight:700; color:<?= $inv_available_credit > INVOICE_BALANCE_EPSILON ? '#166534' : '#64748b' ?>;">$<?= h(number_format($inv_available_credit, 2)) ?></div>
-      </div>
+    <div style="display:flex; flex-wrap:wrap; gap:16px; margin-bottom:<?= ($inv_credit_apps || $inv_payment_options) ? '16px' : '0' ?>;">
       <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px 20px; min-width:180px;">
         <div style="font-size:0.78em; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px;">Outstanding Balance</div>
         <div style="font-size:1.35em; font-weight:700; color:<?= $inv_outstanding_balance > INVOICE_BALANCE_EPSILON ? '#991b1b' : '#166534' ?>;">$<?= h(number_format($inv_outstanding_balance, 2)) ?></div>
       </div>
     </div>
 
+    <?php if ($inv_payment_options && !$invoice_is_paid && $inv_outstanding_balance > INVOICE_BALANCE_EPSILON): ?>
+    <div style="margin-bottom:<?= $inv_credit_apps ? '16px' : '0' ?>;">
+      <p style="font-size:0.85em; font-weight:600; color:#475569; margin:0 0 8px;">Available Payments</p>
+      <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:0.88em;">
+          <thead>
+            <tr style="background:#f1f5f9; text-align:left;">
+              <th style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;">Payment</th>
+              <th style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;">Date</th>
+              <th style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;">Method</th>
+              <th style="padding:6px 10px; border:1px solid #e2e8f0; text-align:right; white-space:nowrap;">Available</th>
+              <th style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($inv_payment_options as $opt): ?>
+            <?php
+              $opt_method_label = match ((string)$opt['method']) {
+                'check'       => 'Check',
+                'cash'        => 'Cash',
+                'ach_wire'    => 'ACH/Wire',
+                'credit_card' => 'Credit Card',
+                default       => 'Other',
+              };
+              $opt_max_apply = round(min($opt['available'], $inv_outstanding_balance), 2);
+              $opt_ref = trim((string)($opt['reference_no'] ?? ''));
+              $opt_btn_label = 'Payment #' . (int)$opt['id'] . ($opt_ref !== '' ? ' · #' . $opt_ref : '') . ' (' . $opt_method_label . ', ' . fmt_date_mdY($opt['date']) . ')';
+            ?>
+            <tr>
+              <td style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap; font-weight:600;">
+                Payment #<?= (int)$opt['id'] ?>
+                <?php if ($opt_ref !== ''): ?>
+                  <span style="font-weight:400; color:#64748b;"> · #<?= h($opt_ref) ?></span>
+                <?php endif; ?>
+              </td>
+              <td style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;"><?= h(fmt_date_mdY($opt['date'])) ?></td>
+              <td style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;"><?= h($opt_method_label) ?></td>
+              <td style="padding:6px 10px; border:1px solid #e2e8f0; text-align:right; font-weight:600; color:#166534; white-space:nowrap;">$<?= h(number_format($opt['available'], 2)) ?></td>
+              <td style="padding:6px 10px; border:1px solid #e2e8f0; white-space:nowrap;">
+                <button type="button" class="btn primary inv-apply-payment-btn" style="padding:4px 10px; font-size:0.82em;"
+                  data-payment-id="<?= (int)$opt['id'] ?>"
+                  data-payment-label="<?= h($opt_btn_label) ?>"
+                  data-available="<?= h(number_format($opt['available'], 2, '.', '')) ?>"
+                  data-max-apply="<?= h(number_format($opt_max_apply, 2, '.', '')) ?>">Apply to this invoice</button>
+              </td>
+            </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <?php endif; ?>
+
     <?php if ($inv_credit_apps): ?>
-    <div style="margin-bottom:<?= $inv_can_apply_credit ? '16px' : '0' ?>;">
+    <div>
       <p style="font-size:0.85em; font-weight:600; color:#475569; margin:0 0 8px;">Credit Applied to This Invoice</p>
       <div style="overflow-x:auto;">
         <table style="width:100%; border-collapse:collapse; font-size:0.88em;">
@@ -1591,12 +1643,6 @@ render_header($invoice_heading);
           </tbody>
         </table>
       </div>
-    </div>
-    <?php endif; ?>
-
-    <?php if ($inv_can_apply_credit): ?>
-    <div>
-      <button type="button" class="btn primary" id="inv-open-credit-modal">Apply Credit to this Invoice</button>
     </div>
     <?php endif; ?>
   </div>
@@ -1672,41 +1718,16 @@ render_header($invoice_heading);
           <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
           <input type="hidden" name="action" value="apply_credit_to_invoice" />
           <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
+          <input type="hidden" name="apply_payment_id" id="inv-credit-payment-id" value="" />
           <div style="display:grid;gap:12px;">
             <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;font-size:0.88em;color:#166534;">
-              <strong>Available Credit:</strong> $<?= h(number_format($inv_available_credit, 2)) ?> &nbsp;|&nbsp;
-              <strong>Outstanding Balance:</strong> $<?= h(number_format($inv_outstanding_balance, 2)) ?>
+              <div><strong>Payment:</strong> <span id="inv-credit-payment-label" style="color:#0f172a;font-weight:600;"></span></div>
+              <div style="margin-top:4px;"><strong>Outstanding Balance:</strong> $<?= h(number_format($inv_outstanding_balance, 2)) ?></div>
             </div>
-            <?php if ($inv_payment_options): ?>
-            <div>
-              <label for="inv-credit-payment" style="display:block;font-size:0.88em;font-weight:600;margin-bottom:4px;">Payment <span style="color:#dc2626;">*</span></label>
-              <select id="inv-credit-payment" name="apply_payment_id" required style="width:100%;box-sizing:border-box;">
-                <option value="">— Select a payment —</option>
-                <?php foreach ($inv_payment_options as $opt): ?>
-                <?php
-                  $opt_method = match ((string)$opt['method']) {
-                    'check'       => 'Check',
-                    'cash'        => 'Cash',
-                    'ach_wire'    => 'ACH/Wire',
-                    'credit_card' => 'Credit Card',
-                    default       => 'Other',
-                  };
-                  $opt_label = fmt_date_mdY($opt['date'])
-                    . ' · $' . number_format($opt['amount'], 2)
-                    . ' · ' . $opt_method
-                    . ($opt['reference_no'] !== '' ? ' · #' . $opt['reference_no'] : '')
-                    . ' (avail $' . number_format($opt['available'], 2) . ')';
-                ?>
-                <option value="<?= (int)$opt['id'] ?>"><?= h($opt_label) ?></option>
-                <?php endforeach; ?>
-              </select>
-              <p style="font-size:0.8em;color:#64748b;margin:4px 0 0;">Choose which payment this credit comes from.</p>
-            </div>
-            <?php endif; ?>
             <div>
               <label for="inv-credit-amount" style="display:block;font-size:0.88em;font-weight:600;margin-bottom:4px;">Amount to Apply ($)</label>
-              <input id="inv-credit-amount" type="number" name="apply_amount" min="0.01" max="<?= h(number_format($inv_max_apply, 2, '.', '')) ?>" step="0.01" value="<?= h(number_format($inv_max_apply, 2, '.', '')) ?>" style="width:100%;box-sizing:border-box;" required />
-              <p style="font-size:0.8em;color:#64748b;margin:4px 0 0;">Maximum: $<?= h(number_format($inv_max_apply, 2)) ?></p>
+              <input id="inv-credit-amount" type="number" name="apply_amount" min="0.01" step="0.01" style="width:100%;box-sizing:border-box;" required />
+              <p id="inv-credit-amount-hint" style="font-size:0.8em;color:#64748b;margin:4px 0 0;"></p>
             </div>
             <div>
               <label for="inv-credit-notes" style="display:block;font-size:0.88em;font-weight:600;margin-bottom:4px;">Notes <span style="font-weight:400;color:#94a3b8;">(optional)</span></label>
@@ -1723,53 +1744,40 @@ render_header($invoice_heading);
   </div>
   <script>
   (function() {
-    var modal = document.getElementById('inv-credit-modal');
-    var openBtn = document.getElementById('inv-open-credit-modal');
-    var closeBtn = document.getElementById('inv-credit-modal-close');
-    var cancelBtn = document.getElementById('inv-credit-modal-cancel');
-    var backdrop = document.getElementById('inv-credit-modal-backdrop');
-    var paymentSelect = document.getElementById('inv-credit-payment');
-    var amountInput  = document.getElementById('inv-credit-amount');
-    var maxApply     = <?= json_encode(round($inv_max_apply, 2)) ?>;
+    var modal       = document.getElementById('inv-credit-modal');
+    var closeBtn    = document.getElementById('inv-credit-modal-close');
+    var cancelBtn   = document.getElementById('inv-credit-modal-cancel');
+    var backdrop    = document.getElementById('inv-credit-modal-backdrop');
+    var paymentId   = document.getElementById('inv-credit-payment-id');
+    var paymentLbl  = document.getElementById('inv-credit-payment-label');
+    var amountInput = document.getElementById('inv-credit-amount');
+    var amountHint  = document.getElementById('inv-credit-amount-hint');
 
-    // Per-payment available balances so amount cap can update on selection change
-    var paymentAvail = <?= json_encode(
-      array_combine(
-        array_column($inv_payment_options, 'id'),
-        array_column($inv_payment_options, 'available')
-      )
-    ) ?>;
-
-    function openModal() {
+    function openModal(pid, label, available, maxApply) {
+      paymentId.value = pid;
+      paymentLbl.textContent = label;
+      amountInput.max = maxApply.toFixed(2);
+      amountInput.value = maxApply.toFixed(2);
+      amountHint.textContent = 'Maximum: $' + maxApply.toFixed(2) + ' (available on this payment: $' + available.toFixed(2) + ')';
       modal.style.display = 'block';
-      if (paymentSelect) {
-        paymentSelect.focus();
-      } else {
-        amountInput.focus();
-      }
+      amountInput.focus();
     }
     function closeModal() { modal.style.display = 'none'; }
-    if (openBtn) openBtn.addEventListener('click', openModal);
-    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    if (closeBtn)  closeBtn.addEventListener('click', closeModal);
     if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
-    if (backdrop) backdrop.addEventListener('click', function(e) { if (e.target === backdrop) closeModal(); });
+    if (backdrop)  backdrop.addEventListener('click', function(e) { if (e.target === backdrop) closeModal(); });
     document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && modal.style.display === 'block') closeModal(); });
 
-    // When payment changes, cap the amount field to the selected payment's available balance
-    if (paymentSelect && amountInput) {
-      paymentSelect.addEventListener('change', function() {
-        var pid = parseInt(this.value, 10);
-        if (pid && paymentAvail[pid] !== undefined) {
-          var cap = Math.min(maxApply, paymentAvail[pid]);
-          amountInput.max = cap.toFixed(2);
-          if (parseFloat(amountInput.value) > cap) {
-            amountInput.value = cap.toFixed(2);
-          }
-        } else {
-          amountInput.max = maxApply.toFixed(2);
-        }
+    document.querySelectorAll('.inv-apply-payment-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        openModal(
+          parseInt(this.dataset.paymentId, 10),
+          this.dataset.paymentLabel,
+          parseFloat(this.dataset.available),
+          parseFloat(this.dataset.maxApply)
+        );
       });
-    }
+    });
   })();
   </script>
   <?php endif; ?>
