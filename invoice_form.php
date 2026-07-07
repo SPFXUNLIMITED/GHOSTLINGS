@@ -1397,8 +1397,9 @@ render_header($invoice_heading);
 
 <?php if ($is_view_mode && $quote): ?>
   <?php
-    $inv_paid_bg    = $invoice_is_paid ? '#dcfce7' : '#f1f5f9';
-    $inv_paid_color = $invoice_is_paid ? '#166534' : '#475569';
+    $inv_paid_bg     = $invoice_is_paid ? '#dcfce7' : '#ef4444';
+    $inv_paid_color  = $invoice_is_paid ? '#166534' : '#ffffff';
+    $inv_paid_border = $invoice_is_paid ? 'transparent' : '#991b1b';
     $inv_paid_label = $invoice_is_paid ? 'Paid' : 'Unpaid';
     $inv_number     = h($fields['invoice_number']);
     $inv_customer   = h((string)($quote['customer_name'] ?? ''));
@@ -1445,7 +1446,7 @@ render_header($invoice_heading);
         <?php endif; ?>
       </div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <span style="display:inline-flex; align-items:center; border-radius:999px; padding:6px 12px; font-weight:600; background:<?= $inv_paid_bg ?>; color:<?= $inv_paid_color ?>;"><?= $inv_paid_label ?></span>
+        <span style="display:inline-flex; align-items:center; border-radius:999px; padding:6px 12px; font-weight:600; background:<?= $inv_paid_bg ?>; color:<?= $inv_paid_color ?>; border:1.5px solid <?= $inv_paid_border ?>;"><?= $inv_paid_label ?></span>
         <span style="display:inline-flex; align-items:center; border-radius:999px; padding:6px 12px; font-weight:600; background:<?= h($invoice_approval_bg) ?>; color:<?= h($invoice_approval_color) ?>;">Approval: <?= h($invoice_approval_label) ?></span>
       </div>
     </div>
