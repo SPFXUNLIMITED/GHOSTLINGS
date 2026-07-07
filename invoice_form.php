@@ -1756,8 +1756,8 @@ render_header($invoice_heading);
     function openModal(pid, label, available, maxApply) {
       paymentId.value = pid;
       paymentLbl.textContent = label;
-      amountInput.max = maxApply.toFixed(2);
-      amountInput.value = maxApply.toFixed(2);
+      amountInput.max = maxApply;
+      amountInput.value = maxApply;
       amountHint.textContent = 'Maximum: $' + maxApply.toFixed(2) + ' (available on this payment: $' + available.toFixed(2) + ')';
       modal.style.display = 'block';
       amountInput.focus();
