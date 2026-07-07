@@ -216,6 +216,7 @@ if ($invoices) {
   $payment_totals_stmt = $pdo->prepare(
     "SELECT ica.quote_id, COALESCE(SUM(ica.applied_amount), 0) AS total_applied
      FROM invoice_credit_applications ica
+     INNER JOIN quotes q ON q.id = ica.quote_id AND q.customer_id = ica.customer_id
      WHERE ica.quote_id IN ($placeholders)
        AND EXISTS (
          SELECT 1
@@ -434,11 +435,14 @@ render_header('Invoice Tracker');
               error_log('invoice_tracker.php detected negative applied payment total for quote #' . $inv_id . ': ' . $invoice_paid_amount);
               $invoice_paid_amount = 0.0;
             }
-            if ($invoice_total_due <= INVOICE_TRACKER_PAYMENT_EPSILON || $invoice_paid_amount >= ($invoice_total_due - INVOICE_TRACKER_PAYMENT_EPSILON)) {
+            if ($invoice_total_due > INVOICE_TRACKER_PAYMENT_EPSILON && $invoice_paid_amount >= ($invoice_total_due - INVOICE_TRACKER_PAYMENT_EPSILON)) {
               $payment_label = 'Paid';
               $payment_bg = '#dcfce7';
               $payment_color = '#166534';
-            } elseif ($invoice_paid_amount > INVOICE_TRACKER_PAYMENT_EPSILON) {
+            } elseif (
+              $invoice_paid_amount > INVOICE_TRACKER_PAYMENT_EPSILON
+              && $invoice_paid_amount < ($invoice_total_due - INVOICE_TRACKER_PAYMENT_EPSILON)
+            ) {
               $payment_label = 'Partially Paid';
               $payment_bg = '#ffedd5';
               $payment_color = '#c2410c';
