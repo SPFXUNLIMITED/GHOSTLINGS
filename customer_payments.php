@@ -320,7 +320,7 @@ foreach ($payments as $p) {
 }
 $all_customer_ids = array_values($all_customer_ids);
 
-$customer_applied_totals = [];
+$customer_applied_totals = array_fill_keys($all_customer_ids, 0.0);
 
 // Compute per-customer balance in a single query:
 // total invoiced (converted invoices) − total payments for each customer.
@@ -650,7 +650,10 @@ render_header('Customer Payments');
             <td><?= h($pdate !== '' ? fmt_date_mdY($pdate) : '—') ?></td>
             <td>
               <strong>$<?= h(cp_format_money($amount)) ?></strong>
-              <span class="cp-amount-available <?= $payment_remaining_amount > 0 ? 'cp-amount-available-active' : 'cp-amount-available-empty' ?>">
+              <span
+                class="cp-amount-available <?= $payment_remaining_amount > 0 ? 'cp-amount-available-active' : 'cp-amount-available-empty' ?>"
+                aria-label="<?= h($payment_remaining_amount > 0 ? '$' . cp_format_money($payment_remaining_amount) . ' available to apply' : 'Fully applied, $0.00 available') ?>"
+              >
                 $<?= h(cp_format_money($payment_remaining_amount)) ?> available
               </span>
             </td>
