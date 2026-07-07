@@ -215,17 +215,21 @@ if ($invoices) {
   $payment_totals_stmt = $pdo->prepare(
     "SELECT ica.quote_id, COALESCE(SUM(ica.applied_amount), 0) AS total_applied
      FROM invoice_credit_applications ica
+     INNER JOIN (
+       SELECT customer_id, COALESCE(SUM(amount), 0) AS total_paid
+       FROM customer_payments
+       GROUP BY customer_id
+     ) cp_totals ON cp_totals.customer_id = ica.customer_id AND cp_totals.total_paid > 0
      WHERE ica.quote_id IN ($placeholders)
-       AND EXISTS (
-         SELECT 1
-         FROM customer_payments cp
-         WHERE cp.customer_id = ica.customer_id
-       )
      GROUP BY ica.quote_id"
   );
   $payment_totals_stmt->execute($inv_id_list);
   foreach ($payment_totals_stmt->fetchAll(PDO::FETCH_ASSOC) as $payment_row) {
-    $applied_payment_amounts[(int)($payment_row['quote_id'] ?? 0)] = round((float)($payment_row['total_applied'] ?? 0), 2);
+    $quote_id = (int)($payment_row['quote_id'] ?? 0);
+    if ($quote_id <= 0) {
+      continue;
+    }
+    $applied_payment_amounts[$quote_id] = round((float)($payment_row['total_applied'] ?? 0), 2);
   }
 }
 
@@ -420,6 +424,7 @@ render_header('Invoice Tracker');
             $invoice_total_due = round((float)($invoice['subtotal_amount'] ?? 0) + (float)($invoice['tax_amount'] ?? 0), 2);
             $invoice_paid_amount = round((float)($applied_payment_amounts[$inv_id] ?? 0), 2);
             if ($invoice_paid_amount < 0) {
+              error_log('invoice_tracker.php detected negative applied payment total for quote #' . $inv_id . ': ' . $invoice_paid_amount);
               $invoice_paid_amount = 0.0;
             }
             if ($invoice_total_due <= INVOICE_TRACKER_PAYMENT_EPSILON || $invoice_paid_amount >= ($invoice_total_due - INVOICE_TRACKER_PAYMENT_EPSILON)) {
