@@ -578,7 +578,7 @@ render_header('Customer Payments');
           <th>Amount</th>
           <th>Method</th>
           <th>Reference / Check #</th>
-          <th>Customer Balance</th>
+          <th>Outstanding</th>
           <th class="col-actions">Actions</th>
         </tr>
       </thead>
