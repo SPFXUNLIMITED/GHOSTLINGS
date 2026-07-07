@@ -61,6 +61,14 @@ function invoice_approval_badge_colors(string $status): array {
   };
 }
 
+function invoice_payment_badge_config(string $status): array {
+  return match ($status) {
+    'paid' => ['Paid', '#dcfce7', '#166534'],
+    'partially_paid' => ['Partially Paid', '#ffedd5', '#c2410c'],
+    default => ['Unpaid', '#f1f5f9', '#475569'],
+  };
+}
+
 function invoice_create_admin_approval_alerts(PDO $pdo, int $invoice_id, string $message): void {
   $admin_ids = $pdo->query("SELECT id FROM users WHERE is_admin = 1 OR role = 'admin'")->fetchAll(PDO::FETCH_COLUMN);
   if (!$admin_ids) {
@@ -435,22 +443,17 @@ render_header('Invoice Tracker');
               error_log('invoice_tracker.php detected negative applied payment total for quote #' . $inv_id . ': ' . $invoice_paid_amount);
               $invoice_paid_amount = 0.0;
             }
-            if ($invoice_total_due > INVOICE_TRACKER_PAYMENT_EPSILON && $invoice_paid_amount >= ($invoice_total_due - INVOICE_TRACKER_PAYMENT_EPSILON)) {
-              $payment_label = 'Paid';
-              $payment_bg = '#dcfce7';
-              $payment_color = '#166534';
+            if ($invoice_total_due <= INVOICE_TRACKER_PAYMENT_EPSILON || $invoice_paid_amount >= ($invoice_total_due - INVOICE_TRACKER_PAYMENT_EPSILON)) {
+              $payment_status = 'paid';
             } elseif (
               $invoice_paid_amount > INVOICE_TRACKER_PAYMENT_EPSILON
               && $invoice_paid_amount < ($invoice_total_due - INVOICE_TRACKER_PAYMENT_EPSILON)
             ) {
-              $payment_label = 'Partially Paid';
-              $payment_bg = '#ffedd5';
-              $payment_color = '#c2410c';
+              $payment_status = 'partially_paid';
             } else {
-              $payment_label = 'Unpaid';
-              $payment_bg = '#f1f5f9';
-              $payment_color = '#475569';
+              $payment_status = 'unpaid';
             }
+            [$payment_label, $payment_bg, $payment_color] = invoice_payment_badge_config($payment_status);
             $applied_tooltip = 'This payment has been applied to an invoice and cannot be modified';
           ?>
           <tr>
