@@ -615,7 +615,7 @@ render_header('Customer Payments');
             $ref_no       = trim((string)($pay['reference_no'] ?? ''));
             $pay_notes    = trim((string)($pay['notes'] ?? ''));
             $balance      = $customer_balances[$cid] ?? null;
-            $available_amount = round((float)($payment_remaining_amounts[$pid] ?? $amount), 2);
+            $available_amount = round((float)($payment_remaining_amounts[$pid] ?? 0), 2);
 
             // Method badge colours
             [$mbg, $mfg] = match ($method) {
