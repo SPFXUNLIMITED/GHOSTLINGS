@@ -351,19 +351,35 @@ if ($all_customer_ids) {
   }
 }
 
-// Per-customer total applied from invoice_credit_applications (for "Unapplied" vs "Partially Applied" fallback)
-$customer_applied = [];
+// Per-customer ICA summary: total applied + the most recently applied invoice (for Amount column status).
+// Keyed by customer_id → ['total_applied', 'latest_quote_id', 'latest_invoice_no'].
+$customer_ica = [];
 if ($all_customer_ids) {
   $ph = implode(',', array_fill(0, count($all_customer_ids), '?'));
-  $applied_stmt = $pdo->prepare(
-    "SELECT customer_id, COALESCE(SUM(applied_amount), 0) AS total_applied
-     FROM invoice_credit_applications
-     WHERE customer_id IN ($ph)
-     GROUP BY customer_id"
+  // Subquery grabs the aggregate and the highest ICA id (= most recently applied entry) per customer.
+  $ica_stmt = $pdo->prepare(
+    "SELECT agg.customer_id,
+            agg.total_applied,
+            q.id                   AS latest_quote_id,
+            q.converted_invoice_no AS latest_invoice_no
+     FROM (
+       SELECT customer_id,
+              COALESCE(SUM(applied_amount), 0) AS total_applied,
+              MAX(id)                          AS max_ica_id
+       FROM invoice_credit_applications
+       WHERE customer_id IN ($ph)
+       GROUP BY customer_id
+     ) agg
+     JOIN invoice_credit_applications ica ON ica.id = agg.max_ica_id
+     JOIN quotes q ON q.id = ica.quote_id"
   );
-  $applied_stmt->execute($all_customer_ids);
-  foreach ($applied_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-    $customer_applied[(int)$row['customer_id']] = (float)$row['total_applied'];
+  $ica_stmt->execute($all_customer_ids);
+  foreach ($ica_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    $customer_ica[(int)$row['customer_id']] = [
+      'total_applied'     => (float)$row['total_applied'],
+      'latest_quote_id'   => (int)$row['latest_quote_id'],
+      'latest_invoice_no' => trim((string)($row['latest_invoice_no'] ?? '')),
+    ];
   }
 }
 
@@ -594,11 +610,11 @@ render_header('Customer Payments');
             $pay_notes    = trim((string)($pay['notes'] ?? ''));
             $balance      = $customer_balances[$cid] ?? null;
 
-            // Determine application status for this payment
-            $matched_inv_id    = (int)($pay['matched_invoice_id'] ?? 0);
-            $matched_inv_no    = trim((string)($pay['matched_invoice_no'] ?? ''));
-            $matched_inv_qid   = (int)($pay['matched_invoice_quote_id'] ?? 0);
-            $cust_total_applied = $customer_applied[$cid] ?? 0.0;
+            // Application status — derived from invoice_credit_applications (works for all payment methods).
+            $ica              = $customer_ica[$cid] ?? null;
+            $ica_applied      = (float)($ica['total_applied'] ?? 0.0);
+            $ica_invoice_no   = $ica['latest_invoice_no'] ?? '';
+            $ica_quote_id     = (int)($ica['latest_quote_id'] ?? 0);
 
             // Method badge colours
             [$mbg, $mfg] = match ($method) {
@@ -634,9 +650,9 @@ render_header('Customer Payments');
             <td>
               <strong>$<?= h(cp_format_money($amount)) ?></strong>
               <br>
-              <?php if ($matched_inv_id > 0 && $matched_inv_no !== ''): ?>
-                <span style="font-size:0.8em;color:#166534;">Applied to <a href="invoice_form.php?id=<?= $matched_inv_qid ?>&amp;mode=view" style="color:inherit;font-weight:600;"><?= h($matched_inv_no) ?></a></span>
-              <?php elseif ($cust_total_applied > 0.00): ?>
+              <?php if ($ica_applied >= $amount - 0.001 && $ica_applied > 0.00 && $ica_invoice_no !== ''): ?>
+                <span style="font-size:0.8em;color:#166534;">Applied to <a href="invoice_form.php?id=<?= $ica_quote_id ?>&amp;mode=view" style="color:inherit;font-weight:600;"><?= h($ica_invoice_no) ?></a></span>
+              <?php elseif ($ica_applied > 0.00): ?>
                 <span style="font-size:0.8em;color:#92400e;">Partially Applied</span>
               <?php else: ?>
                 <span style="font-size:0.8em;color:#b45309;">Unapplied</span>
