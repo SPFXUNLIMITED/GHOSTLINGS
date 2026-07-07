@@ -4,6 +4,16 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_admin_or_moderator();
 
+// ── Matching thresholds ──────────────────────────────────────────────────────
+// High confidence: amount within $0.01 AND date within 3 days.
+const LPA_HIGH_AMOUNT_DIFF = 0.01;
+const LPA_HIGH_DAY_DIFF    = 3;
+// Medium confidence: amount within $5.00 AND date within 14 days.
+const LPA_MED_AMOUNT_DIFF  = 5.00;
+const LPA_MED_DAY_DIFF     = 14;
+// Score formula weight applied to day difference.
+const LPA_DAY_SCORE_WEIGHT = 5;
+
 if (empty($_SESSION['lpa_csrf'])) {
   $_SESSION['lpa_csrf'] = bin2hex(random_bytes(24));
 }
@@ -117,12 +127,12 @@ if ($unlinked_rows) {
       $cp_avail  = round($cp_amount - $cp_used, 2);
       $amt_diff  = abs($app_amount - $cp_amount);
       $day_diff  = (int)abs((strtotime($app_date) - strtotime($cp['payment_date'])) / 86400);
-      $score     = $amt_diff + $day_diff * 5;
+      $score     = $amt_diff + $day_diff * LPA_DAY_SCORE_WEIGHT;
 
       // Confidence
-      if ($amt_diff <= 0.01 && $day_diff <= 3) {
+      if ($amt_diff <= LPA_HIGH_AMOUNT_DIFF && $day_diff <= LPA_HIGH_DAY_DIFF) {
         $confidence = 'high';
-      } elseif ($amt_diff <= 5.00 && $day_diff <= 14) {
+      } elseif ($amt_diff <= LPA_MED_AMOUNT_DIFF && $day_diff <= LPA_MED_DAY_DIFF) {
         $confidence = 'medium';
       } else {
         $confidence = 'low';

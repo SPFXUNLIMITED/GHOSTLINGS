@@ -315,7 +315,9 @@ $all_customer_ids = [];
 $all_payment_ids  = [];
 foreach ($payments as $p) {
   $cid = (int)$p['customer_id'];
-  if ($cid > 0) $all_customer_ids[$cid] = $cid;
+  if ($cid > 0) {
+    $all_customer_ids[$cid] = $cid;
+  }
   $all_payment_ids[] = (int)$p['id'];
 }
 $all_customer_ids = array_values($all_customer_ids);
