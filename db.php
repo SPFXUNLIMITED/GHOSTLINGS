@@ -1912,13 +1912,16 @@ $pdo->exec("
     applied_date    DATE NOT NULL,
     notes           TEXT NULL,
     applied_by      INT UNSIGNED NULL,
+    payment_id      INT UNSIGNED NULL,
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     KEY idx_ica_quote_id (quote_id),
     KEY idx_ica_customer_id (customer_id),
     KEY idx_ica_applied_date (applied_date),
+    KEY idx_ica_payment_id (payment_id),
     CONSTRAINT fk_ica_quote FOREIGN KEY (quote_id) REFERENCES quotes (id) ON DELETE CASCADE,
-    CONSTRAINT fk_ica_customer FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE
+    CONSTRAINT fk_ica_customer FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE,
+    CONSTRAINT fk_ica_payment FOREIGN KEY (payment_id) REFERENCES customer_payments (id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
