@@ -69,6 +69,16 @@ function invoice_payment_badge_config(string $status): array {
   };
 }
 
+function invoice_payment_status_key(float $invoice_total_due, float $invoice_paid_amount, float $epsilon = INVOICE_TRACKER_PAYMENT_EPSILON): string {
+  if ($invoice_total_due > $epsilon && $invoice_paid_amount >= ($invoice_total_due - $epsilon)) {
+    return 'paid';
+  }
+  if ($invoice_paid_amount > $epsilon && $invoice_paid_amount < ($invoice_total_due - $epsilon)) {
+    return 'partially_paid';
+  }
+  return 'unpaid';
+}
+
 function invoice_create_admin_approval_alerts(PDO $pdo, int $invoice_id, string $message): void {
   $admin_ids = $pdo->query("SELECT id FROM users WHERE is_admin = 1 OR role = 'admin'")->fetchAll(PDO::FETCH_COLUMN);
   if (!$admin_ids) {
@@ -225,12 +235,8 @@ if ($invoices) {
     "SELECT ica.quote_id, COALESCE(SUM(ica.applied_amount), 0) AS total_applied
      FROM invoice_credit_applications ica
      INNER JOIN quotes q ON q.id = ica.quote_id AND q.customer_id = ica.customer_id
+     INNER JOIN (SELECT DISTINCT customer_id FROM customer_payments) cp_customers ON cp_customers.customer_id = ica.customer_id
      WHERE ica.quote_id IN ($placeholders)
-       AND EXISTS (
-         SELECT 1
-         FROM customer_payments cp
-         WHERE cp.customer_id = ica.customer_id
-       )
      GROUP BY ica.quote_id"
   );
   $payment_totals_stmt->execute($inv_id_list);
@@ -440,16 +446,7 @@ render_header('Invoice Tracker');
               error_log('invoice_tracker.php detected negative applied payment total for quote #' . $inv_id . ': ' . $invoice_paid_amount);
               $invoice_paid_amount = 0.0;
             }
-            if ($invoice_total_due > INVOICE_TRACKER_PAYMENT_EPSILON && $invoice_paid_amount >= ($invoice_total_due - INVOICE_TRACKER_PAYMENT_EPSILON)) {
-              $payment_status = 'paid';
-            } elseif (
-              $invoice_paid_amount > INVOICE_TRACKER_PAYMENT_EPSILON
-              && $invoice_paid_amount < ($invoice_total_due - INVOICE_TRACKER_PAYMENT_EPSILON)
-            ) {
-              $payment_status = 'partially_paid';
-            } else {
-              $payment_status = 'unpaid';
-            }
+            $payment_status = invoice_payment_status_key($invoice_total_due, $invoice_paid_amount);
             [$payment_label, $payment_bg, $payment_color] = invoice_payment_badge_config($payment_status);
             $applied_tooltip = 'This payment has been applied to an invoice and cannot be modified';
           ?>
