@@ -373,16 +373,16 @@ if ($all_customer_ids) {
      ORDER BY customer_id ASC, payment_date ASC, id ASC"
   );
   $payment_allocation_stmt->execute($all_customer_ids);
-  $remaining_applied_by_customer = $customer_applied_totals;
+  $credits_to_allocate_by_customer = $customer_applied_totals;
 
   foreach ($payment_allocation_stmt->fetchAll(PDO::FETCH_ASSOC) as $payment_row) {
     $payment_id = (int)($payment_row['id'] ?? 0);
     $customer_id = (int)($payment_row['customer_id'] ?? 0);
-    $payment_amount = round((float)($payment_row['amount'] ?? 0), 2);
-    $customer_applied_remaining = max(round((float)($remaining_applied_by_customer[$customer_id] ?? 0), 2), 0);
+    $payment_amount = (float)($payment_row['amount'] ?? 0);
+    $customer_applied_remaining = max((float)($credits_to_allocate_by_customer[$customer_id] ?? 0), 0);
     $applied_to_payment = min($payment_amount, $customer_applied_remaining);
     $payment_remaining_amounts[$payment_id] = round(max($payment_amount - $applied_to_payment, 0), 2);
-    $remaining_applied_by_customer[$customer_id] = round(max($customer_applied_remaining - $applied_to_payment, 0), 2);
+    $credits_to_allocate_by_customer[$customer_id] = round(max($customer_applied_remaining - $applied_to_payment, 0), 2);
   }
 }
 
@@ -502,8 +502,8 @@ render_header('Customer Payments');
 .cp-balance-pos { color:#991b1b; font-weight:600; }
 .cp-balance-zero { color:#166534; font-weight:600; }
 .cp-amount-available { display:block; font-size:0.82em; font-weight:600; margin-top:4px; }
-.cp-amount-available-pos { color:#166534; }
-.cp-amount-available-zero { color:#991b1b; }
+.cp-amount-available-active { color:#166534; }
+.cp-amount-available-empty { color:#991b1b; }
 
 /* ── Add / Edit modal ─────────────────────────────────────────────────────── */
 #cp-modal {
@@ -650,7 +650,7 @@ render_header('Customer Payments');
             <td><?= h($pdate !== '' ? fmt_date_mdY($pdate) : '—') ?></td>
             <td>
               <strong>$<?= h(cp_format_money($amount)) ?></strong>
-              <span class="cp-amount-available <?= $available_amount > 0 ? 'cp-amount-available-pos' : 'cp-amount-available-zero' ?>">
+              <span class="cp-amount-available <?= $available_amount > 0 ? 'cp-amount-available-active' : 'cp-amount-available-empty' ?>">
                 $<?= h(cp_format_money($available_amount)) ?> available
               </span>
             </td>
