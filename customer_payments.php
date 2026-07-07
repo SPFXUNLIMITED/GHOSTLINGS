@@ -489,7 +489,7 @@ render_header('Customer Payments');
 .cp-actions .btn-danger { background:#fef2f2; color:#991b1b; border-color:#fecaca; }
 .cp-actions .btn-danger:hover { background:#fee2e2; }
 .cp-balance-pos { color:#991b1b; font-weight:600; }
-.cp-balance-zero { color:#166534; font-weight:600; }
+.cp-balance-zero { color:#6b7280; font-weight:600; }
 
 /* ── Add / Edit modal ─────────────────────────────────────────────────────── */
 #cp-modal {
@@ -653,9 +653,9 @@ render_header('Customer Payments');
               <?php if ($balance === null): ?>
                 <span class="muted">—</span>
               <?php elseif ($balance > 0): ?>
-                <span class="cp-balance-pos">$<?= h(cp_format_money($balance)) ?> owed</span>
+                <span class="cp-balance-pos">$<?= h(cp_format_money($balance)) ?> outstanding</span>
               <?php else: ?>
-                <span class="cp-balance-zero">Paid up</span>
+                <span class="cp-balance-zero">No outstanding invoices</span>
               <?php endif; ?>
             </td>
             <td class="col-actions">
