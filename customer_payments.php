@@ -310,13 +310,13 @@ foreach ($params as $k => $v) {
 $list_stmt->execute();
 $payments = $list_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Collect unique customer IDs in the result set
+// Collect unique customer IDs and payment IDs in the result set
 $all_customer_ids = [];
+$all_payment_ids  = [];
 foreach ($payments as $p) {
   $cid = (int)$p['customer_id'];
-  if ($cid > 0) {
-    $all_customer_ids[$cid] = $cid;
-  }
+  if ($cid > 0) $all_customer_ids[$cid] = $cid;
+  $all_payment_ids[] = (int)$p['id'];
 }
 $all_customer_ids = array_values($all_customer_ids);
 
@@ -348,6 +348,25 @@ if ($all_customer_ids) {
   foreach ($balance_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
     $cid = (int)$row['customer_id'];
     $customer_balances[$cid] = (float)$row['total_invoiced'] - (float)$row['total_paid'];
+  }
+}
+
+// Fetch credit applications linked to the payments in the current result set,
+// keyed by payment_id.
+$payment_credit_apps = [];
+if ($all_payment_ids) {
+  $ph2 = implode(',', array_fill(0, count($all_payment_ids), '?'));
+  $ica_stmt = $pdo->prepare(
+    "SELECT ica.payment_id, ica.id AS ica_id, ica.applied_amount, ica.applied_date,
+            q.converted_invoice_no AS invoice_no, ica.quote_id
+     FROM invoice_credit_applications ica
+     LEFT JOIN quotes q ON q.id = ica.quote_id
+     WHERE ica.payment_id IN ($ph2)
+     ORDER BY ica.applied_date ASC, ica.id ASC"
+  );
+  $ica_stmt->execute($all_payment_ids);
+  foreach ($ica_stmt->fetchAll(PDO::FETCH_ASSOC) as $ica) {
+    $payment_credit_apps[(int)$ica['payment_id']][] = $ica;
   }
 }
 
@@ -423,6 +442,9 @@ render_header('Customer Payments');
   </div>
   <div class="laser-rfq-hero-actions">
     <button type="button" class="btn primary" id="cp-add-btn">+ Add Payment</button>
+    <?php if (is_admin()): ?>
+    <a href="link_payments_admin.php" class="btn" style="font-size:0.85em;">🔗 Admin: Link Existing Payments</a>
+    <?php endif; ?>
   </div>
 </div>
 
@@ -649,6 +671,37 @@ render_header('Customer Payments');
               <?php endif; ?>
             </td>
           </tr>
+          <?php
+            $linked_apps    = $payment_credit_apps[$pid] ?? [];
+            $total_applied  = round(array_sum(array_column($linked_apps, 'applied_amount')), 2);
+            $remaining_bal  = round($amount - $total_applied, 2);
+          ?>
+          <?php if ($linked_apps): ?>
+          <tr>
+            <td colspan="<?= CP_TABLE_COLUMNS ?>" style="padding:0 10px 8px 28px; background:#f8fafc; border-top:none; border-bottom:1px solid #e2e8f0;">
+              <div style="font-size:0.8em; color:#475569; padding-top:6px; display:flex; flex-wrap:wrap; gap:6px 20px; align-items:flex-start;">
+                <span style="font-weight:600; white-space:nowrap;">📋 Applied to invoices:</span>
+                <?php foreach ($linked_apps as $app): ?>
+                <?php
+                  $inv_label = $app['invoice_no'] !== null && $app['invoice_no'] !== '' ? h((string)$app['invoice_no']) : 'Quote #' . (int)$app['quote_id'];
+                  $inv_link  = 'invoice_form.php?id=' . (int)$app['quote_id'] . '&mode=view';
+                ?>
+                <span style="white-space:nowrap;">
+                  <a href="<?= h($inv_link) ?>" style="color:#1d4ed8; text-decoration:none;"><?= $inv_label ?></a>
+                  &nbsp;$<?= h(number_format((float)$app['applied_amount'], 2)) ?>
+                  <span class="muted">(<?= h((string)$app['applied_date']) ?>)</span>
+                </span>
+                <?php endforeach; ?>
+                <span style="margin-left:auto; white-space:nowrap;">
+                  <span class="muted">Total applied:</span> <strong>$<?= h(number_format($total_applied, 2)) ?></strong>
+                  &nbsp;·&nbsp;
+                  <span class="muted">Remaining:</span>
+                  <strong style="color:<?= $remaining_bal > 0.005 ? '#166534' : '#64748b' ?>;">$<?= h(number_format(max(0.0, $remaining_bal), 2)) ?></strong>
+                </span>
+              </div>
+            </td>
+          </tr>
+          <?php endif; ?>
         <?php endforeach; ?>
       </tbody>
     </table>

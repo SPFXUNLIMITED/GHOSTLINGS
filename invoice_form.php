@@ -895,16 +895,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $already_applied = round((float)$already_applied_stmt->fetchColumn(), 2);
     $outstanding_balance = round($inv_total - $already_applied, 2);
 
-    // Available credit = total paid - total already applied across all invoices for this customer
-    $total_paid_stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) AS total_paid FROM customer_payments WHERE customer_id = ?");
-    $total_paid_stmt->execute([$cust_id_for_credit]);
-    $total_paid_credit = round((float)$total_paid_stmt->fetchColumn(), 2);
+    // Validate and load the chosen payment
+    $apply_payment_id = (int)($_POST['apply_payment_id'] ?? 0);
+    $payment_row = null;
+    $payment_avail = 0.0;
+    if ($apply_payment_id > 0) {
+      $pay_stmt = $pdo->prepare(
+        "SELECT cp.id, cp.customer_id, cp.amount,
+                COALESCE(used.total_used, 0) AS total_used
+         FROM customer_payments cp
+         LEFT JOIN (
+           SELECT payment_id, SUM(applied_amount) AS total_used
+           FROM invoice_credit_applications
+           WHERE payment_id IS NOT NULL
+           GROUP BY payment_id
+         ) used ON used.payment_id = cp.id
+         WHERE cp.id = ? AND cp.customer_id = ?
+         LIMIT 1"
+      );
+      $pay_stmt->execute([$apply_payment_id, $cust_id_for_credit]);
+      $payment_row = $pay_stmt->fetch(PDO::FETCH_ASSOC);
+      if ($payment_row) {
+        $payment_avail = round((float)$payment_row['amount'] - (float)$payment_row['total_used'], 2);
+      }
+    }
 
-    $total_all_applied_stmt = $pdo->prepare("SELECT COALESCE(SUM(applied_amount), 0) AS total FROM invoice_credit_applications WHERE customer_id = ?");
-    $total_all_applied_stmt->execute([$cust_id_for_credit]);
-    $total_all_applied = round((float)$total_all_applied_stmt->fetchColumn(), 2);
+    // Available credit: per-payment remaining balances minus unlinked applied amounts
+    $cp_avail_stmt = $pdo->prepare(
+      "SELECT COALESCE(SUM(cp.amount - COALESCE(used.total_used, 0)), 0) AS sum_avail
+       FROM customer_payments cp
+       LEFT JOIN (
+         SELECT payment_id, SUM(applied_amount) AS total_used
+         FROM invoice_credit_applications
+         WHERE payment_id IS NOT NULL
+         GROUP BY payment_id
+       ) used ON used.payment_id = cp.id
+       WHERE cp.customer_id = ?"
+    );
+    $cp_avail_stmt->execute([$cust_id_for_credit]);
+    $sum_linked_avail = round((float)$cp_avail_stmt->fetchColumn(), 2);
 
-    $available_credit = round($total_paid_credit - $total_all_applied, 2);
+    $unlinked_applied_stmt = $pdo->prepare(
+      "SELECT COALESCE(SUM(applied_amount), 0) FROM invoice_credit_applications WHERE customer_id = ? AND payment_id IS NULL"
+    );
+    $unlinked_applied_stmt->execute([$cust_id_for_credit]);
+    $unlinked_applied = round((float)$unlinked_applied_stmt->fetchColumn(), 2);
+
+    $available_credit = max(0.0, round($sum_linked_avail - $unlinked_applied, 2));
 
     $apply_amount_raw = trim((string)($_POST['apply_amount'] ?? ''));
     $apply_amount = round((float)str_replace(',', '', $apply_amount_raw), 2);
@@ -914,6 +951,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $credit_errors = [];
     if ($apply_amount <= 0) {
       $credit_errors[] = 'Amount must be greater than zero.';
+    }
+    if ($apply_payment_id > 0 && !$payment_row) {
+      $credit_errors[] = 'Selected payment does not exist or does not belong to this customer.';
+    }
+    if ($apply_payment_id > 0 && $payment_row && $apply_amount > $payment_avail) {
+      $credit_errors[] = 'Amount exceeds the remaining balance of the selected payment ($' . number_format($payment_avail, 2) . ').';
     }
     if ($apply_amount > $available_credit) {
       $credit_errors[] = 'Amount exceeds available customer credit ($' . number_format($available_credit, 2) . ').';
@@ -929,9 +972,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $apply_by = ((int)($_SESSION['user_id'] ?? 0)) ?: null;
     $pdo->prepare(
-      "INSERT INTO invoice_credit_applications (quote_id, customer_id, applied_amount, applied_date, notes, applied_by)
-       VALUES (?, ?, ?, ?, ?, ?)"
-    )->execute([$row_id, $cust_id_for_credit, $apply_amount, $apply_date, $apply_notes !== '' ? $apply_notes : null, $apply_by]);
+      "INSERT INTO invoice_credit_applications (quote_id, customer_id, applied_amount, applied_date, notes, applied_by, payment_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)"
+    )->execute([
+      $row_id,
+      $cust_id_for_credit,
+      $apply_amount,
+      $apply_date,
+      $apply_notes !== '' ? $apply_notes : null,
+      $apply_by,
+      $apply_payment_id > 0 ? $apply_payment_id : null,
+    ]);
 
     // If outstanding balance is now fully covered, mark invoice as paid
     $new_balance = round($outstanding_balance - $apply_amount, 2);
@@ -1411,7 +1462,7 @@ render_header($invoice_heading);
 
     // Credits already applied to this invoice
     $inv_credit_apps_stmt = $pdo->prepare(
-      "SELECT id, applied_amount, applied_date, notes FROM invoice_credit_applications WHERE quote_id = ? ORDER BY applied_date ASC, id ASC"
+      "SELECT id, applied_amount, applied_date, notes, payment_id FROM invoice_credit_applications WHERE quote_id = ? ORDER BY applied_date ASC, id ASC"
     );
     $inv_credit_apps_stmt->execute([$quote_id]);
     $inv_credit_apps = $inv_credit_apps_stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1419,19 +1470,57 @@ render_header($invoice_heading);
     $inv_outstanding_balance = round($inv_total_for_credit - $inv_total_applied_here, 2);
     if ($inv_outstanding_balance < 0) $inv_outstanding_balance = 0.0;
 
-    // Available credit = total customer payments - total applied across ALL invoices for this customer
+    // Available credit: sum of per-payment remaining balances for this customer.
+    // This is more precise than total_paid - total_applied because it respects
+    // per-payment caps (payment_id IS NOT NULL rows) while still counting
+    // unlinked applications (payment_id IS NULL) against the aggregate.
     $inv_available_credit = 0.0;
+    $inv_payment_options  = []; // for the Apply Credit modal dropdown
     if ($inv_cust_id_for_credit > 0) {
-      $inv_tp_stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) AS total_paid FROM customer_payments WHERE customer_id = ?");
-      $inv_tp_stmt->execute([$inv_cust_id_for_credit]);
-      $inv_total_paid_credit = round((float)$inv_tp_stmt->fetchColumn(), 2);
+      $inv_cp_stmt = $pdo->prepare(
+        "SELECT cp.id, cp.payment_date, cp.amount, cp.payment_method, cp.reference_no,
+                COALESCE(used.total_used, 0) AS total_used
+         FROM customer_payments cp
+         LEFT JOIN (
+           SELECT payment_id, SUM(applied_amount) AS total_used
+           FROM invoice_credit_applications
+           WHERE payment_id IS NOT NULL
+           GROUP BY payment_id
+         ) used ON used.payment_id = cp.id
+         WHERE cp.customer_id = ?
+         ORDER BY cp.payment_date DESC, cp.id DESC"
+      );
+      $inv_cp_stmt->execute([$inv_cust_id_for_credit]);
+      $all_payments_for_credit = $inv_cp_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-      $inv_ta_stmt = $pdo->prepare("SELECT COALESCE(SUM(applied_amount), 0) AS total FROM invoice_credit_applications WHERE customer_id = ?");
-      $inv_ta_stmt->execute([$inv_cust_id_for_credit]);
-      $inv_total_all_applied = round((float)$inv_ta_stmt->fetchColumn(), 2);
+      // Subtract unlinked applications from the aggregate pool
+      $inv_unlinked_applied_stmt = $pdo->prepare(
+        "SELECT COALESCE(SUM(applied_amount), 0) FROM invoice_credit_applications WHERE customer_id = ? AND payment_id IS NULL"
+      );
+      $inv_unlinked_applied_stmt->execute([$inv_cust_id_for_credit]);
+      $inv_unlinked_applied = round((float)$inv_unlinked_applied_stmt->fetchColumn(), 2);
 
-      $inv_available_credit = round($inv_total_paid_credit - $inv_total_all_applied, 2);
-      if ($inv_available_credit < 0) $inv_available_credit = 0.0;
+      $inv_sum_available = 0.0;
+      foreach ($all_payments_for_credit as $cp) {
+        $avail = round((float)$cp['amount'] - (float)$cp['total_used'], 2);
+        if ($avail > 0) $inv_sum_available += $avail;
+      }
+      $inv_available_credit = max(0.0, round($inv_sum_available - $inv_unlinked_applied, 2));
+
+      // Build dropdown options — only payments with remaining balance
+      foreach ($all_payments_for_credit as $cp) {
+        $avail = round((float)$cp['amount'] - (float)$cp['total_used'], 2);
+        if ($avail > INVOICE_BALANCE_EPSILON) {
+          $inv_payment_options[] = [
+            'id'         => (int)$cp['id'],
+            'date'       => (string)$cp['payment_date'],
+            'amount'     => (float)$cp['amount'],
+            'available'  => $avail,
+            'method'     => (string)$cp['payment_method'],
+            'reference_no' => trim((string)($cp['reference_no'] ?? '')),
+          ];
+        }
+      }
     }
 
     $inv_max_apply = min($inv_available_credit, $inv_outstanding_balance);
@@ -1572,7 +1661,7 @@ render_header($invoice_heading);
   <!-- Apply Credit Modal -->
   <div id="inv-credit-modal" role="dialog" aria-modal="true" aria-labelledby="inv-credit-modal-title" style="position:fixed;inset:0;z-index:9000;display:none;">
     <div id="inv-credit-modal-backdrop" style="position:absolute;inset:0;background:rgba(15,23,42,0.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);"></div>
-    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:min(480px,calc(100vw - 32px));background:#fff;border-radius:16px;box-shadow:0 32px 80px rgba(0,0,0,.4),0 0 0 1px rgba(0,0,0,.08);overflow:hidden;">
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:min(520px,calc(100vw - 32px));background:#fff;border-radius:16px;box-shadow:0 32px 80px rgba(0,0,0,.4),0 0 0 1px rgba(0,0,0,.08);overflow:hidden;">
       <div style="padding:20px 24px 14px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:12px;">
         <span aria-hidden="true" style="font-size:1.3em;">💳</span>
         <h2 id="inv-credit-modal-title" style="font-size:1.1em;font-weight:700;color:#0f172a;margin:0;">Apply Credit to Invoice</h2>
@@ -1588,6 +1677,32 @@ render_header($invoice_heading);
               <strong>Available Credit:</strong> $<?= h(number_format($inv_available_credit, 2)) ?> &nbsp;|&nbsp;
               <strong>Outstanding Balance:</strong> $<?= h(number_format($inv_outstanding_balance, 2)) ?>
             </div>
+            <?php if ($inv_payment_options): ?>
+            <div>
+              <label for="inv-credit-payment" style="display:block;font-size:0.88em;font-weight:600;margin-bottom:4px;">Payment <span style="color:#dc2626;">*</span></label>
+              <select id="inv-credit-payment" name="apply_payment_id" required style="width:100%;box-sizing:border-box;">
+                <option value="">— Select a payment —</option>
+                <?php foreach ($inv_payment_options as $opt): ?>
+                <?php
+                  $opt_method = match ((string)$opt['method']) {
+                    'check'       => 'Check',
+                    'cash'        => 'Cash',
+                    'ach_wire'    => 'ACH/Wire',
+                    'credit_card' => 'Credit Card',
+                    default       => 'Other',
+                  };
+                  $opt_label = fmt_date_mdY($opt['date'])
+                    . ' · $' . number_format($opt['amount'], 2)
+                    . ' · ' . $opt_method
+                    . ($opt['reference_no'] !== '' ? ' · #' . $opt['reference_no'] : '')
+                    . ' (avail $' . number_format($opt['available'], 2) . ')';
+                ?>
+                <option value="<?= (int)$opt['id'] ?>"><?= h($opt_label) ?></option>
+                <?php endforeach; ?>
+              </select>
+              <p style="font-size:0.8em;color:#64748b;margin:4px 0 0;">Choose which payment this credit comes from.</p>
+            </div>
+            <?php endif; ?>
             <div>
               <label for="inv-credit-amount" style="display:block;font-size:0.88em;font-weight:600;margin-bottom:4px;">Amount to Apply ($)</label>
               <input id="inv-credit-amount" type="number" name="apply_amount" min="0.01" max="<?= h(number_format($inv_max_apply, 2, '.', '')) ?>" step="0.01" value="<?= h(number_format($inv_max_apply, 2, '.', '')) ?>" style="width:100%;box-sizing:border-box;" required />
@@ -1613,13 +1728,48 @@ render_header($invoice_heading);
     var closeBtn = document.getElementById('inv-credit-modal-close');
     var cancelBtn = document.getElementById('inv-credit-modal-cancel');
     var backdrop = document.getElementById('inv-credit-modal-backdrop');
-    function openModal() { modal.style.display = 'block'; document.getElementById('inv-credit-amount').focus(); }
+    var paymentSelect = document.getElementById('inv-credit-payment');
+    var amountInput  = document.getElementById('inv-credit-amount');
+    var maxApply     = <?= json_encode(round($inv_max_apply, 2)) ?>;
+
+    // Per-payment available balances so amount cap can update on selection change
+    var paymentAvail = <?= json_encode(
+      array_combine(
+        array_column($inv_payment_options, 'id'),
+        array_column($inv_payment_options, 'available')
+      )
+    ) ?>;
+
+    function openModal() {
+      modal.style.display = 'block';
+      if (paymentSelect) {
+        paymentSelect.focus();
+      } else {
+        amountInput.focus();
+      }
+    }
     function closeModal() { modal.style.display = 'none'; }
     if (openBtn) openBtn.addEventListener('click', openModal);
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
     if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
     if (backdrop) backdrop.addEventListener('click', function(e) { if (e.target === backdrop) closeModal(); });
     document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && modal.style.display === 'block') closeModal(); });
+
+    // When payment changes, cap the amount field to the selected payment's available balance
+    if (paymentSelect && amountInput) {
+      paymentSelect.addEventListener('change', function() {
+        var pid = parseInt(this.value, 10);
+        if (pid && paymentAvail[pid] !== undefined) {
+          var cap = Math.min(maxApply, paymentAvail[pid]);
+          amountInput.max = cap.toFixed(2);
+          if (parseFloat(amountInput.value) > cap) {
+            amountInput.value = cap.toFixed(2);
+          }
+        } else {
+          amountInput.max = maxApply.toFixed(2);
+        }
+      });
+    }
   })();
   </script>
   <?php endif; ?>
