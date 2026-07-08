@@ -25,6 +25,7 @@ $fields = [
   'height'          => '',
   'width_mm'        => '',
   'height_mm'       => '',
+  'weight_kg'       => '',
   'primary_photo'   => '',
   'secondary_photo' => '',
   'description'     => '',
@@ -32,10 +33,11 @@ $fields = [
 ];
 
 // For the form's imperial decomposition (display only; recombined on submit)
-$width_ft  = '';
-$width_in  = '';
-$height_ft = '';
-$height_in = '';
+$width_ft   = '';
+$width_in   = '';
+$height_ft  = '';
+$height_in  = '';
+$weight_lbs = '';
 
 if ($is_edit) {
   $stmt = $pdo->prepare("SELECT * FROM machines WHERE id = ?");
@@ -61,6 +63,9 @@ if ($is_edit) {
     $total_in   = (float)$fields['height'];
     $height_ft  = (string)(int)floor($total_in / 12);
     $height_in  = (string)round($total_in - ((int)floor($total_in / 12)) * 12, 4);
+  }
+  if ($fields['weight_kg'] !== '' && (float)$fields['weight_kg'] > 0) {
+    $weight_lbs = (string)round((float)$fields['weight_kg'] * 2.20462, 4);
   }
 }
 
@@ -125,11 +130,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $post_height_ft = trim((string)($_POST['height_ft'] ?? ''));
     $post_height_in = trim((string)($_POST['height_in'] ?? ''));
     $post_height_mm = trim((string)($_POST['height_mm'] ?? ''));
+    $post_weight_lbs = trim((string)($_POST['weight_lbs'] ?? ''));
+    $post_weight_kg  = trim((string)($_POST['weight_kg']  ?? ''));
 
     $width_db     = null;
     $width_mm_db  = null;
     $height_db    = null;
     $height_mm_db = null;
+    $weight_kg_db = null;
 
     if ($post_width_mm !== '') {
       $width_mm_db = round((float)$post_width_mm, 2);
@@ -147,15 +155,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $height_mm_db = round($height_db * 25.4, 2);
     }
 
+    if ($post_weight_kg !== '') {
+      $weight_kg_db = round((float)$post_weight_kg, 2);
+    } elseif ($post_weight_lbs !== '') {
+      $weight_kg_db = round((float)$post_weight_lbs / 2.20462, 2);
+    }
+
     // Repopulate for re-display if there are errors
     $fields['width']     = $width_db    !== null ? (string)$width_db    : '';
     $fields['height']    = $height_db   !== null ? (string)$height_db   : '';
     $fields['width_mm']  = $width_mm_db  !== null ? (string)$width_mm_db  : '';
     $fields['height_mm'] = $height_mm_db !== null ? (string)$height_mm_db : '';
-    $width_ft  = $post_width_ft;
-    $width_in  = $post_width_in;
-    $height_ft = $post_height_ft;
-    $height_in = $post_height_in;
+    $fields['weight_kg'] = $weight_kg_db !== null ? (string)$weight_kg_db : '';
+    $width_ft   = $post_width_ft;
+    $width_in   = $post_width_in;
+    $height_ft  = $post_height_ft;
+    $height_in  = $post_height_in;
+    $weight_lbs = $post_weight_lbs;
 
     // ── Validation ───────────────────────────────────────────────────────────
     if ($fields['name'] === '') {
@@ -172,6 +188,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($height_db !== null && $height_db < 0) {
       $errors[] = 'Height must be a positive number.';
     }
+    if ($weight_kg_db !== null && $weight_kg_db < 0) {
+      $errors[] = 'Weight must be a positive number.';
+    }
 
     // ── Photo uploads ────────────────────────────────────────────────────────
     $new_primary   = $processPhotoUpload('primary_photo_upload',   'Primary photo',   'machine_primary');
@@ -186,14 +205,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->prepare("
           UPDATE machines SET
             name = ?, model = ?,
-            width = ?, height = ?, width_mm = ?, height_mm = ?,
+            width = ?, height = ?, width_mm = ?, height_mm = ?, weight_kg = ?,
             primary_photo = ?, secondary_photo = ?,
             description = ?, is_active = ?
           WHERE id = ?
         ")->execute([
           $fields['name'],
           $fields['model'] !== '' ? $fields['model'] : null,
-          $width_db, $height_db, $width_mm_db, $height_mm_db,
+          $width_db, $height_db, $width_mm_db, $height_mm_db, $weight_kg_db,
           $primary_final, $secondary_final,
           $fields['description'] !== '' ? $fields['description'] : null,
           (int)$fields['is_active'],
@@ -202,12 +221,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $success = 'Machine updated.';
       } else {
         $pdo->prepare("
-          INSERT INTO machines (name, model, width, height, width_mm, height_mm, primary_photo, secondary_photo, description, is_active)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO machines (name, model, width, height, width_mm, height_mm, weight_kg, primary_photo, secondary_photo, description, is_active)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ")->execute([
           $fields['name'],
           $fields['model'] !== '' ? $fields['model'] : null,
-          $width_db, $height_db, $width_mm_db, $height_mm_db,
+          $width_db, $height_db, $width_mm_db, $height_mm_db, $weight_kg_db,
           $primary_final, $secondary_final,
           $fields['description'] !== '' ? $fields['description'] : null,
           (int)$fields['is_active'],
@@ -228,43 +247,61 @@ render_header($page_title);
 ?>
 
 <style>
-  .dim-group {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap;
+  /* ── Dimension / Weight cards ──────────────────────────────────────── */
+  .dim-sections {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 14px;
+    margin-top: 4px;
   }
-  .dim-group label { margin: 0; white-space: nowrap; font-size: 0.85rem; color: #64748b; }
-  .dim-group input[type="number"] { width: 90px; }
-  .dim-separator {
-    font-size: 1.2rem;
-    color: #94a3b8;
+  .dim-card {
+    background: #f8fafc;
+    border: 1px solid var(--b);
+    border-radius: 10px;
+    padding: 16px 18px 18px;
+  }
+  .dim-card-title {
+    font-size: 0.95rem;
     font-weight: 700;
-    padding: 0 4px;
+    color: #1e293b;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--b);
   }
-  .dim-section-label {
-    font-weight: 600;
-    font-size: 0.8rem;
+  .dim-unit-label {
+    font-size: 0.72rem;
+    font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #64748b;
-    margin-bottom: 6px;
-  }
-  .dim-or-divider {
-    display: flex;
-    align-items: center;
-    gap: 10px;
     color: #94a3b8;
-    font-size: 0.85rem;
-    margin: 4px 0;
+    margin-bottom: 8px;
   }
-  .dim-or-divider::before,
-  .dim-or-divider::after {
-    content: '';
-    flex: 1;
+  .dim-inputs {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .dim-inputs > div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .dim-inputs > div > label {
+    font-size: 0.78rem;
+    color: #64748b;
+    margin: 0;
+    white-space: nowrap;
+  }
+  .dim-inputs input[type="number"] {
+    width: 90px;
+  }
+  .dim-unit-sep {
     height: 1px;
     background: var(--b);
+    margin: 14px 0;
   }
+  /* ── Photo previews ────────────────────────────────────────────────── */
   .photo-preview {
     max-width: 280px;
     max-height: 200px;
@@ -318,76 +355,105 @@ render_header($page_title);
                placeholder="e.g. Thunder Laser Nova 63" />
       </div>
 
-      <!-- ── Width ────────────────────────────────────────────────────────── -->
+      <!-- ── Dimensions & Weight ──────────────────────────────────────────── -->
       <div class="full">
-        <label>Width</label>
+        <label>Dimensions &amp; Weight</label>
+        <div class="dim-sections">
 
-        <div class="dim-section-label">Imperial</div>
-        <div class="dim-group">
-          <div>
-            <label for="width_ft">Feet</label>
-            <input type="number" id="width_ft" name="width_ft" min="0" step="1"
-                   value="<?= h($width_ft) ?>" placeholder="0"
-                   oninput="syncWidthImperialToMm()" />
+          <!-- Width -->
+          <div class="dim-card">
+            <div class="dim-card-title">Width</div>
+
+            <div class="dim-unit-label">Imperial</div>
+            <div class="dim-inputs">
+              <div>
+                <label for="width_ft">Feet</label>
+                <input type="number" id="width_ft" name="width_ft" min="0" step="1"
+                       value="<?= h($width_ft) ?>" placeholder="0"
+                       oninput="syncWidthImperialToMm()" />
+              </div>
+              <div>
+                <label for="width_in">Inches</label>
+                <input type="number" id="width_in" name="width_in" min="0" max="11.9999" step="0.01"
+                       value="<?= h($width_in) ?>" placeholder="0"
+                       oninput="syncWidthImperialToMm()" />
+              </div>
+            </div>
+
+            <div class="dim-unit-sep"></div>
+
+            <div class="dim-unit-label">Metric</div>
+            <div class="dim-inputs">
+              <div>
+                <label for="width_mm">Millimeters</label>
+                <input type="number" id="width_mm" name="width_mm" min="0" step="0.1"
+                       value="<?= h($fields['width_mm']) ?>" placeholder="0"
+                       oninput="syncWidthMmToImperial()" />
+              </div>
+            </div>
           </div>
-          <span class="dim-separator">'</span>
-          <div>
-            <label for="width_in">Inches</label>
-            <input type="number" id="width_in" name="width_in" min="0" max="11.9999" step="0.01"
-                   value="<?= h($width_in) ?>" placeholder="0"
-                   oninput="syncWidthImperialToMm()" />
+
+          <!-- Height (Depth) -->
+          <div class="dim-card">
+            <div class="dim-card-title">Height (Depth)</div>
+
+            <div class="dim-unit-label">Imperial</div>
+            <div class="dim-inputs">
+              <div>
+                <label for="height_ft">Feet</label>
+                <input type="number" id="height_ft" name="height_ft" min="0" step="1"
+                       value="<?= h($height_ft) ?>" placeholder="0"
+                       oninput="syncHeightImperialToMm()" />
+              </div>
+              <div>
+                <label for="height_in">Inches</label>
+                <input type="number" id="height_in" name="height_in" min="0" max="11.9999" step="0.01"
+                       value="<?= h($height_in) ?>" placeholder="0"
+                       oninput="syncHeightImperialToMm()" />
+              </div>
+            </div>
+
+            <div class="dim-unit-sep"></div>
+
+            <div class="dim-unit-label">Metric</div>
+            <div class="dim-inputs">
+              <div>
+                <label for="height_mm">Millimeters</label>
+                <input type="number" id="height_mm" name="height_mm" min="0" step="0.1"
+                       value="<?= h($fields['height_mm']) ?>" placeholder="0"
+                       oninput="syncHeightMmToImperial()" />
+              </div>
+            </div>
           </div>
-          <span class="dim-separator">"</span>
-        </div>
 
-        <div class="dim-or-divider">or</div>
+          <!-- Weight -->
+          <div class="dim-card">
+            <div class="dim-card-title">Weight</div>
 
-        <div class="dim-section-label">Metric</div>
-        <div class="dim-group">
-          <div>
-            <label for="width_mm">Millimeters</label>
-            <input type="number" id="width_mm" name="width_mm" min="0" step="0.1"
-                   value="<?= h($fields['width_mm']) ?>" placeholder="0"
-                   oninput="syncWidthMmToImperial()" />
+            <div class="dim-unit-label">Imperial</div>
+            <div class="dim-inputs">
+              <div>
+                <label for="weight_lbs">Pounds (lbs)</label>
+                <input type="number" id="weight_lbs" name="weight_lbs" min="0" step="0.01"
+                       value="<?= h($weight_lbs) ?>" placeholder="0"
+                       oninput="syncWeightLbsToKg()" />
+              </div>
+            </div>
+
+            <div class="dim-unit-sep"></div>
+
+            <div class="dim-unit-label">Metric</div>
+            <div class="dim-inputs">
+              <div>
+                <label for="weight_kg">Kilograms (kg)</label>
+                <input type="number" id="weight_kg" name="weight_kg" min="0" step="0.01"
+                       value="<?= h($fields['weight_kg']) ?>" placeholder="0"
+                       oninput="syncWeightKgToLbs()" />
+              </div>
+            </div>
           </div>
-          <span style="color:#64748b; font-size:0.9rem;">mm</span>
-        </div>
-      </div>
 
-      <!-- ── Height ───────────────────────────────────────────────────────── -->
-      <div class="full">
-        <label>Height (Depth)</label>
-
-        <div class="dim-section-label">Imperial</div>
-        <div class="dim-group">
-          <div>
-            <label for="height_ft">Feet</label>
-            <input type="number" id="height_ft" name="height_ft" min="0" step="1"
-                   value="<?= h($height_ft) ?>" placeholder="0"
-                   oninput="syncHeightImperialToMm()" />
-          </div>
-          <span class="dim-separator">'</span>
-          <div>
-            <label for="height_in">Inches</label>
-            <input type="number" id="height_in" name="height_in" min="0" max="11.9999" step="0.01"
-                   value="<?= h($height_in) ?>" placeholder="0"
-                   oninput="syncHeightImperialToMm()" />
-          </div>
-          <span class="dim-separator">"</span>
-        </div>
-
-        <div class="dim-or-divider">or</div>
-
-        <div class="dim-section-label">Metric</div>
-        <div class="dim-group">
-          <div>
-            <label for="height_mm">Millimeters</label>
-            <input type="number" id="height_mm" name="height_mm" min="0" step="0.1"
-                   value="<?= h($fields['height_mm']) ?>" placeholder="0"
-                   oninput="syncHeightMmToImperial()" />
-          </div>
-          <span style="color:#64748b; font-size:0.9rem;">mm</span>
-        </div>
+        </div><!-- .dim-sections -->
       </div>
 
       <!-- ── Photos ───────────────────────────────────────────────────────── -->
@@ -495,6 +561,16 @@ function syncHeightMmToImperial() {
     document.getElementById('height_ft').value = '';
     document.getElementById('height_in').value = '';
   }
+}
+
+function syncWeightLbsToKg() {
+  var lbs = parseFloat(document.getElementById('weight_lbs').value) || 0;
+  document.getElementById('weight_kg').value = lbs > 0 ? round2(lbs / 2.20462) : '';
+}
+
+function syncWeightKgToLbs() {
+  var kg = parseFloat(document.getElementById('weight_kg').value) || 0;
+  document.getElementById('weight_lbs').value = kg > 0 ? round2(kg * 2.20462) : '';
 }
 
 // ── Photo preview ───────────────────────────────────────────────────────────
