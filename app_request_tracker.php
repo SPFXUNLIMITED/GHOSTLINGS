@@ -114,49 +114,52 @@ render_header('Request Tracker');
 
 <div class="card">
   <div class="table-wrap" style="overflow-x:auto;">
-    <table class="table-auto" style="min-width:1100px;">
+    <table style="width:100%; min-width:900px; border-collapse:collapse;">
+      <colgroup>
+        <col style="width:3%;">
+        <col style="width:27%;">
+        <col style="width:35%;">
+        <col style="width:20%;">
+        <col style="width:15%;">
+      </colgroup>
       <thead>
         <tr>
           <th>ID</th>
-          <th>Submitted By</th>
-          <th>Type</th>
-          <th>Priority</th>
-          <th>Title</th>
+          <th>Request Info</th>
           <th>Details</th>
-          <th>Status</th>
           <th>Admin Notes</th>
-          <th>Created</th>
-          <th>Updated</th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody>
         <?php if (!$rows): ?>
           <tr>
-            <td colspan="11" class="muted">No app requests found.</td>
+            <td colspan="5" class="muted">No app requests found.</td>
           </tr>
         <?php endif; ?>
         <?php foreach ($rows as $row): ?>
           <tr>
-            <td class="muted"><?= (int)$row['id'] ?></td>
-            <td>
+            <td class="muted" style="vertical-align:top;"><?= (int)$row['id'] ?></td>
+            <td style="vertical-align:top; white-space:normal;">
               <strong><?= h($row['contact_name'] ?: $row['username']) ?></strong><br>
-              <span class="muted"><?= h($row['email']) ?></span>
+              <span class="muted" style="font-size:0.85em;"><?= h($row['email']) ?></span>
+              <div style="margin-top:6px; font-size:0.9em; line-height:1.6;">
+                <span class="muted">Type:</span> <?= h($type_labels[$row['request_type']] ?? $row['request_type']) ?><br>
+                <span class="muted">Priority:</span> <?= h($priority_labels[$row['priority']] ?? $row['priority']) ?><br>
+                <span class="muted">Status:</span> <span class="badge <?= h($row['status']) ?>"><?= h($status_labels[$row['status']] ?? $row['status']) ?></span><br>
+                <span class="muted">Created:</span> <?= h($row['created_at']) ?><br>
+                <span class="muted">Updated:</span> <?= h($row['updated_at']) ?>
+              </div>
             </td>
-            <td><?= h($type_labels[$row['request_type']] ?? $row['request_type']) ?></td>
-            <td><?= h($priority_labels[$row['priority']] ?? $row['priority']) ?></td>
-            <td style="max-width:220px; white-space:normal;"><?= h($row['request_title']) ?></td>
-            <td style="max-width:300px; white-space:normal;">
-              <?= nl2br(h(excerpt_text((string)$row['request_details'], 180))) ?>
+            <td style="vertical-align:top; white-space:normal; word-break:break-word;">
+              <strong style="display:block; margin-bottom:4px;"><?= h($row['request_title']) ?></strong>
+              <span class="muted" style="font-size:0.92em;"><?= nl2br(h(excerpt_text((string)$row['request_details'], 400))) ?></span>
             </td>
-            <td><span class="badge <?= h($row['status']) ?>"><?= h($status_labels[$row['status']] ?? $row['status']) ?></span></td>
-            <td style="max-width:240px; white-space:normal;">
-              <?= nl2br(h(excerpt_text((string)($row['admin_notes'] ?? ''), 160))) ?>
+            <td style="vertical-align:top; white-space:normal; word-break:break-word;">
+              <span class="muted" style="font-size:0.92em;"><?= nl2br(h(excerpt_text((string)($row['admin_notes'] ?? ''), 300))) ?></span>
             </td>
-            <td class="muted" style="white-space:nowrap;"><?= h($row['created_at']) ?></td>
-            <td class="muted" style="white-space:nowrap;"><?= h($row['updated_at']) ?></td>
-            <td class="col-actions">
-              <form method="post" style="display:grid; gap:6px; min-width:220px;">
+            <td style="vertical-align:top;" class="col-actions">
+              <form method="post" style="display:grid; gap:6px; min-width:180px;">
                 <input type="hidden" name="csrf_token" value="<?= h($_SESSION['app_request_tracker_csrf']) ?>" />
                 <input type="hidden" name="request_id" value="<?= (int)$row['id'] ?>" />
                 <select name="status" required>
