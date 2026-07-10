@@ -2145,7 +2145,7 @@ foreach ($_mach_rename_map as [$_old_col, $_new_col, $_col_type]) {
     try {
       $pdo->exec("ALTER TABLE machines CHANGE `{$_old_col}` `{$_new_col}` {$_col_type}");
     } catch (PDOException $_mach_ren_e) {
-      // Suppress only: duplicate column (42S21) or unknown column (42S22 / 1054).
+      // Suppress only: duplicate column (SQLSTATE 42S21) or unknown column (SQLSTATE 42S22).
       // Any other error (e.g. connection, permissions) is re-thrown.
       if (!in_array($_mach_ren_e->getCode(), ['42S21', '42S22'], true)) {
         throw $_mach_ren_e;
