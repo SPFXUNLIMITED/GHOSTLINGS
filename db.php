@@ -2120,12 +2120,15 @@ foreach ([
 }
 unset($_mach_crate_sql, $_mach_crate_e);
 
-// Rename legacy machine dimension columns to explicit prefixed names
+// Rename legacy machine dimension columns to explicit prefixed names.
+// Note: 'height' (machine depth/length) maps to machine_length;
+//       'width'  (machine width)         maps to machine_width.
+// All values come from a hardcoded array — no user input is interpolated here.
 foreach ([
-  ['width',     'machine_length',    'DECIMAL(10,4) NULL'],
-  ['height',    'machine_width',     'DECIMAL(10,4) NULL'],
-  ['width_mm',  'machine_length_mm', 'DECIMAL(10,2) NULL'],
-  ['height_mm', 'machine_width_mm',  'DECIMAL(10,2) NULL'],
+  ['height',    'machine_length',    'DECIMAL(10,4) NULL'],
+  ['width',     'machine_width',     'DECIMAL(10,4) NULL'],
+  ['height_mm', 'machine_length_mm', 'DECIMAL(10,2) NULL'],
+  ['width_mm',  'machine_width_mm',  'DECIMAL(10,2) NULL'],
   ['weight_kg', 'machine_weight_kg', 'DECIMAL(10,2) NULL'],
 ] as [$_old_col, $_new_col, $_col_type]) {
   $_chk_stmt = $pdo->prepare("SHOW COLUMNS FROM machines LIKE ?");
