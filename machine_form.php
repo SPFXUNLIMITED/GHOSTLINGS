@@ -187,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $fields['height_mm']    = $mach_length_mm_db !== null ? (string)$mach_length_mm_db : '';
     $fields['cut_length']   = $cut_length_db    !== null ? (string)$cut_length_db    : '';
     $fields['cut_width']    = $cut_width_db     !== null ? (string)$cut_width_db     : '';
-    $fields['cut_length_mm']= $cut_length_mm_db !== null ? (string)$cut_length_mm_db : '';
+    $fields['cut_length_mm'] = $cut_length_mm_db !== null ? (string)$cut_length_mm_db : '';
     $fields['cut_width_mm'] = $cut_width_mm_db  !== null ? (string)$cut_width_mm_db  : '';
     $fields['crate_length']    = $crate_length_db    !== null ? (string)$crate_length_db    : '';
     $fields['crate_width']     = $crate_width_db     !== null ? (string)$crate_width_db     : '';
@@ -704,21 +704,26 @@ render_header($page_title);
       <!-- ── Toggles ──────────────────────────────────────────────────────── -->
       <div class="full">
         <div class="toggle-row">
-          <label>
+          <label title="Machine is operational and available for use">
             <input type="checkbox" name="is_active" value="1"
                    <?= $fields['is_active']  === '1' ? 'checked' : '' ?> />
             Active
           </label>
-          <label>
+          <label title="Machine is displayed on the public-facing site">
             <input type="checkbox" name="is_visible" value="1"
                    <?= $fields['is_visible'] === '1' ? 'checked' : '' ?> />
             Visible
           </label>
-          <label>
+          <label title="Machine appears in the equipment catalog">
             <input type="checkbox" name="is_catalog" value="1"
                    <?= $fields['is_catalog'] === '1' ? 'checked' : '' ?> />
             Catalog
           </label>
+        </div>
+        <div class="muted" style="margin-top:6px; font-size:0.82rem;">
+          <strong>Active</strong> — machine is operational &nbsp;·&nbsp;
+          <strong>Visible</strong> — shown on the public site &nbsp;·&nbsp;
+          <strong>Catalog</strong> — listed in the equipment catalog
         </div>
       </div>
 
