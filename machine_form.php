@@ -21,12 +21,12 @@ $success = '';
 $fields = [
   'name'             => '',
   'model'            => '',
-  // Machine Dimensions (existing cols)
-  'width'            => '',
-  'height'           => '',
-  'width_mm'         => '',
-  'height_mm'        => '',
-  'weight_kg'        => '',
+  // Machine Dimensions
+  'machine_length'     => '',
+  'machine_width'      => '',
+  'machine_length_mm'  => '',
+  'machine_width_mm'   => '',
+  'weight_kg'          => '',
   // Cutting Area
   'cut_length'       => '',
   'cut_width'        => '',
@@ -79,8 +79,8 @@ if ($is_edit) {
     $ft_var = (string)(int)floor($total / 12);
     $in_var = (string)round($total - ((int)floor($total / 12)) * 12, 4);
   };
-  $decompose($fields['width'],        $mach_width_ft,   $mach_width_in);
-  $decompose($fields['height'],       $mach_length_ft,  $mach_length_in);
+  $decompose($fields['machine_width'],  $mach_width_ft,   $mach_width_in);
+  $decompose($fields['machine_length'], $mach_length_ft,  $mach_length_in);
   $decompose($fields['cut_length'],   $cut_length_ft,   $cut_length_in);
   $decompose($fields['cut_width'],    $cut_width_ft,    $cut_width_in);
   $decompose($fields['crate_length'], $crate_length_ft, $crate_length_in);
@@ -181,10 +181,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Repopulate for re-display if there are errors
-    $fields['width']        = $mach_width_db    !== null ? (string)$mach_width_db    : '';
-    $fields['height']       = $mach_length_db   !== null ? (string)$mach_length_db   : '';
-    $fields['width_mm']     = $mach_width_mm_db  !== null ? (string)$mach_width_mm_db  : '';
-    $fields['height_mm']    = $mach_length_mm_db !== null ? (string)$mach_length_mm_db : '';
+    $fields['machine_length']    = $mach_length_db    !== null ? (string)$mach_length_db    : '';
+    $fields['machine_width']     = $mach_width_db     !== null ? (string)$mach_width_db     : '';
+    $fields['machine_length_mm'] = $mach_length_mm_db !== null ? (string)$mach_length_mm_db : '';
+    $fields['machine_width_mm']  = $mach_width_mm_db  !== null ? (string)$mach_width_mm_db  : '';
     $fields['cut_length']   = $cut_length_db    !== null ? (string)$cut_length_db    : '';
     $fields['cut_width']    = $cut_width_db     !== null ? (string)$cut_width_db     : '';
     $fields['cut_length_mm'] = $cut_length_mm_db !== null ? (string)$cut_length_mm_db : '';
@@ -248,7 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fields['name'],
         $fields['model'] !== '' ? $fields['model'] : null,
         // Machine Dimensions
-        $mach_width_db, $mach_length_db, $mach_width_mm_db, $mach_length_mm_db,
+      $mach_length_db, $mach_width_db, $mach_length_mm_db, $mach_width_mm_db,
         $weight_kg_db,
         // Cutting Area
         $cut_length_db, $cut_width_db, $cut_length_mm_db, $cut_width_mm_db,
@@ -267,7 +267,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->prepare("
           UPDATE machines SET
             name = ?, model = ?,
-            width = ?, height = ?, width_mm = ?, height_mm = ?, weight_kg = ?,
+            machine_length = ?, machine_width = ?, machine_length_mm = ?, machine_width_mm = ?, weight_kg = ?,
             cut_length = ?, cut_width = ?, cut_length_mm = ?, cut_width_mm = ?,
             crate_length = ?, crate_width = ?, crate_length_mm = ?, crate_width_mm = ?,
             primary_photo = ?, secondary_photo = ?, tertiary_photo = ?,
@@ -279,7 +279,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->prepare("
           INSERT INTO machines
             (name, model,
-             width, height, width_mm, height_mm, weight_kg,
+             machine_length, machine_width, machine_length_mm, machine_width_mm, weight_kg,
              cut_length, cut_width, cut_length_mm, cut_width_mm,
              crate_length, crate_width, crate_length_mm, crate_width_mm,
              primary_photo, secondary_photo, tertiary_photo,
@@ -529,7 +529,7 @@ render_header($page_title);
               <div>
                 <label for="mach_length_mm">Millimeters</label>
                 <input type="number" id="mach_length_mm" name="mach_length_mm" min="0" step="0.1"
-                       value="<?= h($fields['height_mm']) ?>" placeholder="0"
+                       value="<?= h($fields['machine_length_mm']) ?>" placeholder="0"
                        oninput="syncMmToImperial('mach_length_mm','mach_length_ft','mach_length_in')" />
               </div>
             </div>
@@ -561,7 +561,7 @@ render_header($page_title);
               <div>
                 <label for="mach_width_mm">Millimeters</label>
                 <input type="number" id="mach_width_mm" name="mach_width_mm" min="0" step="0.1"
-                       value="<?= h($fields['width_mm']) ?>" placeholder="0"
+                       value="<?= h($fields['machine_width_mm']) ?>" placeholder="0"
                        oninput="syncMmToImperial('mach_width_mm','mach_width_ft','mach_width_in')" />
               </div>
             </div>

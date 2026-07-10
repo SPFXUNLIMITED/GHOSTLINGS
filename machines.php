@@ -203,7 +203,7 @@ render_header('Machines');
 
     // Cutting area (preferred) or machine dimensions for size badge
     $has_cut  = (isset($m['cut_width_mm']) && $m['cut_width_mm'] !== null) || (isset($m['cut_length_mm']) && $m['cut_length_mm'] !== null);
-    $has_mach = ($m['width_mm'] !== null || $m['height_mm'] !== null);
+    $has_mach = ($m['machine_width_mm'] !== null || $m['machine_length_mm'] !== null);
 
     if ($has_cut) {
       $cw_imp = fmt_inches_imperial($m['cut_width']  ?? null);
@@ -212,10 +212,10 @@ render_header('Machines');
       $cl_mm  = fmt_mm_display($m['cut_length_mm'] ?? null);
       $size_str = '✂️ ' . $cl_imp . ' × ' . $cw_imp . ' (' . $cl_mm . ' × ' . $cw_mm . ')';
     } elseif ($has_mach) {
-      $mw_imp = fmt_inches_imperial($m['width']);
-      $ml_imp = fmt_inches_imperial($m['height']);
-      $mw_mm  = fmt_mm_display($m['width_mm']);
-      $ml_mm  = fmt_mm_display($m['height_mm']);
+      $mw_imp = fmt_inches_imperial($m['machine_width']);
+      $ml_imp = fmt_inches_imperial($m['machine_length']);
+      $mw_mm  = fmt_mm_display($m['machine_width_mm']);
+      $ml_mm  = fmt_mm_display($m['machine_length_mm']);
       $size_str = '📐 ' . $ml_imp . ' × ' . $mw_imp . ' (' . $ml_mm . ' × ' . $mw_mm . ')';
     } else {
       $size_str = '';
