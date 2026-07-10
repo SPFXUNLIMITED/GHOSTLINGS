@@ -37,6 +37,9 @@ $fields = [
   'crate_width'      => '',
   'crate_length_mm'  => '',
   'crate_width_mm'   => '',
+  'crate_height'     => '',
+  'crate_height_mm'  => '',
+  'crate_weight_kg'  => '',
   // Photos
   'primary_photo'    => '',
   'secondary_photo'  => '',
@@ -56,7 +59,9 @@ $cut_length_ft    = ''; $cut_length_in    = '';
 $cut_width_ft     = ''; $cut_width_in     = '';
 $crate_length_ft  = ''; $crate_length_in  = '';
 $crate_width_ft   = ''; $crate_width_in   = '';
+$crate_height_ft  = ''; $crate_height_in  = '';
 $weight_lbs = '';
+$crate_weight_lbs = '';
 
 if ($is_edit) {
   $stmt = $pdo->prepare("SELECT * FROM machines WHERE id = ?");
@@ -85,8 +90,12 @@ if ($is_edit) {
   $decompose($fields['cut_width'],    $cut_width_ft,    $cut_width_in);
   $decompose($fields['crate_length'], $crate_length_ft, $crate_length_in);
   $decompose($fields['crate_width'],  $crate_width_ft,  $crate_width_in);
+  $decompose($fields['crate_height'], $crate_height_ft, $crate_height_in);
   if ($fields['weight_kg'] !== '' && (float)$fields['weight_kg'] > 0) {
     $weight_lbs = (string)round((float)$fields['weight_kg'] * 2.20462, 4);
+  }
+  if ($fields['crate_weight_kg'] !== '' && (float)$fields['crate_weight_kg'] > 0) {
+    $crate_weight_lbs = (string)round((float)$fields['crate_weight_kg'] * 2.20462, 4);
   }
 }
 
@@ -170,7 +179,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Crate Dimensions
     [$crate_width_db,  $crate_width_mm_db]  = $parseDim('crate_width_ft',  'crate_width_in',  'crate_width_mm');
     [$crate_length_db, $crate_length_mm_db] = $parseDim('crate_length_ft', 'crate_length_in', 'crate_length_mm');
-    // Weight
+    [$crate_height_db, $crate_height_mm_db] = $parseDim('crate_height_ft', 'crate_height_in', 'crate_height_mm');
+    // Machine Weight
     $post_weight_lbs = trim((string)($_POST['weight_lbs'] ?? ''));
     $post_weight_kg  = trim((string)($_POST['weight_kg']  ?? ''));
     $weight_kg_db = null;
@@ -178,6 +188,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $weight_kg_db = round((float)$post_weight_kg, 2);
     } elseif ($post_weight_lbs !== '') {
       $weight_kg_db = round((float)$post_weight_lbs / 2.20462, 2);
+    }
+    // Crate Weight
+    $post_crate_weight_lbs = trim((string)($_POST['crate_weight_lbs'] ?? ''));
+    $post_crate_weight_kg  = trim((string)($_POST['crate_weight_kg']  ?? ''));
+    $crate_weight_kg_db = null;
+    if ($post_crate_weight_kg !== '') {
+      $crate_weight_kg_db = round((float)$post_crate_weight_kg, 2);
+    } elseif ($post_crate_weight_lbs !== '') {
+      $crate_weight_kg_db = round((float)$post_crate_weight_lbs / 2.20462, 2);
     }
 
     // Repopulate for re-display if there are errors
@@ -193,6 +212,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $fields['crate_width']     = $crate_width_db     !== null ? (string)$crate_width_db     : '';
     $fields['crate_length_mm'] = $crate_length_mm_db !== null ? (string)$crate_length_mm_db : '';
     $fields['crate_width_mm']  = $crate_width_mm_db  !== null ? (string)$crate_width_mm_db  : '';
+    $fields['crate_height']    = $crate_height_db    !== null ? (string)$crate_height_db    : '';
+    $fields['crate_height_mm'] = $crate_height_mm_db !== null ? (string)$crate_height_mm_db : '';
+    $fields['crate_weight_kg'] = $crate_weight_kg_db !== null ? (string)$crate_weight_kg_db : '';
     $fields['weight_kg']    = $weight_kg_db !== null ? (string)$weight_kg_db : '';
     $mach_width_ft  = trim((string)($_POST['mach_width_ft']  ?? ''));
     $mach_width_in  = trim((string)($_POST['mach_width_in']  ?? ''));
@@ -206,7 +228,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $crate_length_in = trim((string)($_POST['crate_length_in'] ?? ''));
     $crate_width_ft  = trim((string)($_POST['crate_width_ft']  ?? ''));
     $crate_width_in  = trim((string)($_POST['crate_width_in']  ?? ''));
+    $crate_height_ft = trim((string)($_POST['crate_height_ft'] ?? ''));
+    $crate_height_in = trim((string)($_POST['crate_height_in'] ?? ''));
     $weight_lbs = $post_weight_lbs;
+    $crate_weight_lbs = $post_crate_weight_lbs;
 
     // ── Validation ───────────────────────────────────────────────────────────
     if ($fields['name'] === '') {
@@ -224,13 +249,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       'Machine Length'       => $mach_length_db,
       'Crate Width'          => $crate_width_db,
       'Crate Length'         => $crate_length_db,
+      'Crate Height'         => $crate_height_db,
     ] as $_dim_label => $_dim_val) {
       if ($_dim_val !== null && $_dim_val < 0) {
         $errors[] = $_dim_label . ' must be a positive number.';
       }
     }
     if ($weight_kg_db !== null && $weight_kg_db < 0) {
-      $errors[] = 'Weight must be a positive number.';
+      $errors[] = 'Machine Weight must be a positive number.';
+    }
+    if ($crate_weight_kg_db !== null && $crate_weight_kg_db < 0) {
+      $errors[] = 'Crate Weight must be a positive number.';
     }
 
     // ── Photo uploads ────────────────────────────────────────────────────────
@@ -254,6 +283,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $cut_length_db, $cut_width_db, $cut_length_mm_db, $cut_width_mm_db,
         // Crate Dimensions
         $crate_length_db, $crate_width_db, $crate_length_mm_db, $crate_width_mm_db,
+        $crate_height_db, $crate_height_mm_db, $crate_weight_kg_db,
         // Photos
         $primary_final, $secondary_final, $tertiary_final,
         // Content & toggles
@@ -270,6 +300,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             machine_length = ?, machine_width = ?, machine_length_mm = ?, machine_width_mm = ?, weight_kg = ?,
             cut_length = ?, cut_width = ?, cut_length_mm = ?, cut_width_mm = ?,
             crate_length = ?, crate_width = ?, crate_length_mm = ?, crate_width_mm = ?,
+            crate_height = ?, crate_height_mm = ?, crate_weight_kg = ?,
             primary_photo = ?, secondary_photo = ?, tertiary_photo = ?,
             description = ?, is_active = ?, is_visible = ?, is_catalog = ?
           WHERE id = ?
@@ -282,9 +313,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              machine_length, machine_width, machine_length_mm, machine_width_mm, weight_kg,
              cut_length, cut_width, cut_length_mm, cut_width_mm,
              crate_length, crate_width, crate_length_mm, crate_width_mm,
+             crate_height, crate_height_mm, crate_weight_kg,
              primary_photo, secondary_photo, tertiary_photo,
              description, is_active, is_visible, is_catalog)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ")->execute($common_params);
         $id      = (int)$pdo->lastInsertId();
         $is_edit = true;
@@ -567,6 +599,32 @@ render_header($page_title);
             </div>
           </div>
 
+          <div class="dim-card">
+            <div class="dim-card-title">Weight</div>
+
+            <div class="dim-unit-label">Imperial</div>
+            <div class="dim-row">
+              <div>
+                <label for="weight_lbs">Pounds (lbs)</label>
+                <input type="number" id="weight_lbs" name="weight_lbs" min="0" step="0.01"
+                       value="<?= h($weight_lbs) ?>" placeholder="0"
+                       oninput="syncLbsToKg('weight_lbs','weight_kg')" />
+              </div>
+            </div>
+
+            <div class="dim-unit-sep"></div>
+
+            <div class="dim-unit-label">Metric</div>
+            <div class="dim-row">
+              <div>
+                <label for="weight_kg">Kilograms (kg)</label>
+                <input type="number" id="weight_kg" name="weight_kg" min="0" step="0.01"
+                       value="<?= h($fields['weight_kg']) ?>" placeholder="0"
+                       oninput="syncKgToLbs('weight_kg','weight_lbs')" />
+              </div>
+            </div>
+          </div>
+
         </div><!-- .dim-sections machine -->
       </div>
 
@@ -635,6 +693,64 @@ render_header($page_title);
                 <input type="number" id="crate_width_mm" name="crate_width_mm" min="0" step="0.1"
                        value="<?= h($fields['crate_width_mm']) ?>" placeholder="0"
                        oninput="syncMmToImperial('crate_width_mm','crate_width_ft','crate_width_in')" />
+              </div>
+            </div>
+          </div>
+
+          <div class="dim-card">
+            <div class="dim-card-title">Height</div>
+
+            <div class="dim-unit-label">Imperial</div>
+            <div class="dim-row">
+              <div>
+                <label for="crate_height_ft">Feet</label>
+                <input type="number" id="crate_height_ft" name="crate_height_ft" min="0" step="1"
+                       value="<?= h($crate_height_ft) ?>" placeholder="0"
+                       oninput="syncImperialToMm('crate_height_ft','crate_height_in','crate_height_mm')" />
+              </div>
+              <div>
+                <label for="crate_height_in">Inches</label>
+                <input type="number" id="crate_height_in" name="crate_height_in" min="0" max="11.9999" step="0.01"
+                       value="<?= h($crate_height_in) ?>" placeholder="0"
+                       oninput="syncImperialToMm('crate_height_ft','crate_height_in','crate_height_mm')" />
+              </div>
+            </div>
+
+            <div class="dim-unit-sep"></div>
+
+            <div class="dim-unit-label">Metric</div>
+            <div class="dim-row">
+              <div>
+                <label for="crate_height_mm">Millimeters</label>
+                <input type="number" id="crate_height_mm" name="crate_height_mm" min="0" step="0.1"
+                       value="<?= h($fields['crate_height_mm']) ?>" placeholder="0"
+                       oninput="syncMmToImperial('crate_height_mm','crate_height_ft','crate_height_in')" />
+              </div>
+            </div>
+          </div>
+
+          <div class="dim-card">
+            <div class="dim-card-title">Weight</div>
+
+            <div class="dim-unit-label">Imperial</div>
+            <div class="dim-row">
+              <div>
+                <label for="crate_weight_lbs">Pounds (lbs)</label>
+                <input type="number" id="crate_weight_lbs" name="crate_weight_lbs" min="0" step="0.01"
+                       value="<?= h($crate_weight_lbs) ?>" placeholder="0"
+                       oninput="syncLbsToKg('crate_weight_lbs','crate_weight_kg')" />
+              </div>
+            </div>
+
+            <div class="dim-unit-sep"></div>
+
+            <div class="dim-unit-label">Metric</div>
+            <div class="dim-row">
+              <div>
+                <label for="crate_weight_kg">Kilograms (kg)</label>
+                <input type="number" id="crate_weight_kg" name="crate_weight_kg" min="0" step="0.01"
+                       value="<?= h($fields['crate_weight_kg']) ?>" placeholder="0"
+                       oninput="syncKgToLbs('crate_weight_kg','crate_weight_lbs')" />
               </div>
             </div>
           </div>
@@ -759,6 +875,16 @@ function syncMmToImperial(mmId, ftId, inId) {
     document.getElementById(ftId).value = '';
     document.getElementById(inId).value = '';
   }
+}
+
+function syncLbsToKg(lbsId, kgId) {
+  var lbs = parseFloat(document.getElementById(lbsId).value) || 0;
+  document.getElementById(kgId).value = lbs > 0 ? round2(lbs / 2.20462) : '';
+}
+
+function syncKgToLbs(kgId, lbsId) {
+  var kg = parseFloat(document.getElementById(kgId).value) || 0;
+  document.getElementById(lbsId).value = kg > 0 ? round2(kg * 2.20462) : '';
 }
 
 // ── Photo preview ───────────────────────────────────────────────────────────
