@@ -2123,22 +2123,34 @@ unset($_mach_crate_sql, $_mach_crate_e);
 // Rename legacy machine dimension columns to explicit prefixed names.
 // Note: 'height' (machine depth/length) maps to machine_length;
 //       'width'  (machine width)         maps to machine_width.
-// All values come from a hardcoded array — no user input is interpolated here.
-foreach ([
+// Column names are validated against a whitelist before being interpolated into SQL.
+$_mach_rename_map = [
   ['height',    'machine_length',    'DECIMAL(10,4) NULL'],
   ['width',     'machine_width',     'DECIMAL(10,4) NULL'],
   ['height_mm', 'machine_length_mm', 'DECIMAL(10,2) NULL'],
   ['width_mm',  'machine_width_mm',  'DECIMAL(10,2) NULL'],
   ['weight_kg', 'machine_weight_kg', 'DECIMAL(10,2) NULL'],
-] as [$_old_col, $_new_col, $_col_type]) {
+];
+$_mach_rename_allowed = array_merge(
+  array_column($_mach_rename_map, 0),
+  array_column($_mach_rename_map, 1)
+);
+foreach ($_mach_rename_map as [$_old_col, $_new_col, $_col_type]) {
+  if (!in_array($_old_col, $_mach_rename_allowed, true) || !in_array($_new_col, $_mach_rename_allowed, true)) {
+    continue; // skip anything not in the whitelist
+  }
   $_chk_stmt = $pdo->prepare("SHOW COLUMNS FROM machines LIKE ?");
   $_chk_stmt->execute([$_new_col]);
   if ($_chk_stmt->fetch(PDO::FETCH_ASSOC) === false) {
     try {
       $pdo->exec("ALTER TABLE machines CHANGE `{$_old_col}` `{$_new_col}` {$_col_type}");
     } catch (PDOException $_mach_ren_e) {
-      // Old column already gone or new column already exists — skip silently
+      // Suppress only: duplicate column (42S21) or unknown column (42S22 / 1054).
+      // Any other error (e.g. connection, permissions) is re-thrown.
+      if (!in_array($_mach_ren_e->getCode(), ['42S21', '42S22'], true)) {
+        throw $_mach_ren_e;
+      }
     }
   }
 }
-unset($_old_col, $_new_col, $_col_type, $_chk_stmt, $_mach_ren_e);
+unset($_mach_rename_map, $_mach_rename_allowed, $_old_col, $_new_col, $_col_type, $_chk_stmt, $_mach_ren_e);
