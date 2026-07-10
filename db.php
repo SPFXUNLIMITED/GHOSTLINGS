@@ -167,6 +167,71 @@ function app_decrypt_setting_value(?string $encoded): string {
   return $plaintext === false ? '' : (string)$plaintext;
 }
 
+// Add playbook column to projects if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE projects ADD COLUMN playbook TINYINT(1) NOT NULL DEFAULT 0");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
+// Add priority column to projects if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE projects ADD COLUMN priority ENUM('low','medium','high','critical') NOT NULL DEFAULT 'medium'");
+} catch (PDOException $e) {
+  // Column already exists — SQLSTATE 42S21
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
+// Add priority column to tasks if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE tasks ADD COLUMN priority ENUM('low','medium','high','critical') NOT NULL DEFAULT 'medium'");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
+// Add assigned_to column to tasks if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE tasks ADD COLUMN assigned_to INT NULL DEFAULT NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
+// Add owner_id column to projects if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE projects ADD COLUMN owner_id INT NULL DEFAULT NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
+// Add is_admin column to users if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE users ADD COLUMN is_admin TINYINT(1) NOT NULL DEFAULT 0");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
+// Add archived column to projects if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE projects ADD COLUMN archived TINYINT(1) NOT NULL DEFAULT 0");
+} catch (PDOException $e) {
+  // SQLSTATE 42S21 = column already exists
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
 // Create task_uploads table if it does not exist yet
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS task_uploads (
@@ -182,6 +247,33 @@ $pdo->exec("
     KEY idx_task_uploads_task_id (task_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+// Add caption column to task_uploads if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE task_uploads ADD COLUMN caption VARCHAR(255) NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
+// Add is_doc_category column to projects if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE projects ADD COLUMN is_doc_category TINYINT(1) NOT NULL DEFAULT 0");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
+// Add is_sop_category column to projects if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE projects ADD COLUMN is_sop_category TINYINT(1) NOT NULL DEFAULT 0");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
 
 // Create task_comments table if it does not exist yet
 $pdo->exec("
@@ -223,6 +315,15 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Add caption column to project_uploads if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE project_uploads ADD COLUMN caption VARCHAR(255) NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
 // Create time_entries table if it does not exist yet
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS time_entries (
@@ -242,8 +343,100 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+if (!defined('MYSQL_DUPLICATE_COLUMN_ERROR')) {
+  define('MYSQL_DUPLICATE_COLUMN_ERROR', '42S21');
+}
+
+foreach ([
+  "ALTER TABLE time_entries ADD COLUMN lunch_start DATETIME NULL DEFAULT NULL",
+  "ALTER TABLE time_entries ADD COLUMN lunch_end DATETIME NULL DEFAULT NULL",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    if ($e->getCode() !== MYSQL_DUPLICATE_COLUMN_ERROR) {
+      throw $e;
+    }
+  }
+}
+
 if (!defined('ATTENDANCE_IDLE_SESSION_KEY')) {
   define('ATTENDANCE_IDLE_SESSION_KEY', 'attendance_idle_logged');
+}
+
+// Add email column to users if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE users ADD COLUMN email VARCHAR(255) NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') throw $e;
+}
+
+// Add unique index on email if not already present (ignore error if exists)
+try {
+  $pdo->exec("ALTER TABLE users ADD UNIQUE INDEX idx_users_email (email)");
+} catch (PDOException $e) {
+  // 42000 duplicate key name or 42S21; just skip
+}
+
+// Add role column to users if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE users ADD COLUMN role ENUM('admin','moderator','user') NOT NULL DEFAULT 'user'");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') throw $e;
+}
+
+// Ensure users.role supports system accounts
+$users_role_column = $pdo->query("SHOW COLUMNS FROM users LIKE 'role'");
+$users_role_meta = $users_role_column ? $users_role_column->fetch(PDO::FETCH_ASSOC) : false;
+if ($users_role_meta && stripos((string)($users_role_meta['Type'] ?? ''), "'system'") === false) {
+  $pdo->exec("ALTER TABLE users MODIFY COLUMN role ENUM('admin','moderator','user','system') NOT NULL DEFAULT 'user'");
+}
+
+// Add email_verified column to users if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE users ADD COLUMN email_verified TINYINT(1) NOT NULL DEFAULT 0");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') throw $e;
+}
+
+// Add verification_token column to users if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE users ADD COLUMN verification_token VARCHAR(64) NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') throw $e;
+}
+
+// Add token_expires column to users if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE users ADD COLUMN token_expires DATETIME NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') throw $e;
+}
+
+// Add lat/lng columns to users if they do not exist yet
+try {
+  $pdo->exec("ALTER TABLE users ADD COLUMN lat DECIMAL(10,7) NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') throw $e;
+}
+try {
+  $pdo->exec("ALTER TABLE users ADD COLUMN lng DECIMAL(10,7) NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') throw $e;
+}
+
+// Add RFQ profile columns to users if they do not exist yet
+foreach ([
+  "ALTER TABLE users ADD COLUMN contact_name VARCHAR(255) NULL",
+  "ALTER TABLE users ADD COLUMN company_name VARCHAR(255) NULL",
+  "ALTER TABLE users ADD COLUMN contact_phone VARCHAR(100) NULL",
+  "ALTER TABLE users ADD COLUMN delivery_address VARCHAR(500) NULL",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    if ($e->getCode() !== '42S21') throw $e;
+  }
 }
 
 // Sync existing admin users: set role='admin' where is_admin=1 and role='user'
@@ -289,6 +482,25 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Add service_type column to laser_entries for existing installations
+// (new installs already have it from the CREATE TABLE above; 42S21 = duplicate column, safe to ignore)
+try {
+  $pdo->exec("ALTER TABLE laser_entries ADD COLUMN service_type VARCHAR(20) NOT NULL DEFAULT 'standard' AFTER laser_problem");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
+// Add bumped_at column to projects if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE projects ADD COLUMN bumped_at DATETIME NULL DEFAULT NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
 // Create form_rate_limit table for CSRF / rate-limit tracking
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS form_rate_limit (
@@ -319,6 +531,25 @@ $pdo->exec("
     KEY idx_app_requests_created_at (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+// Add foreign key on app_requests.requested_by for existing databases created before this constraint
+$fk_check = $pdo->prepare("
+  SELECT COUNT(*)
+  FROM information_schema.TABLE_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'app_requests'
+    AND CONSTRAINT_NAME = 'fk_app_requests_requested_by'
+    AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+");
+$fk_check->execute();
+if ((int)$fk_check->fetchColumn() === 0) {
+  $pdo->exec("
+    ALTER TABLE app_requests
+    ADD CONSTRAINT fk_app_requests_requested_by
+    FOREIGN KEY (requested_by) REFERENCES users(id)
+    ON DELETE CASCADE
+  ");
+}
 
 // Create rfq_requests table for CO2 laser cutter procurement requests
 $pdo->exec("
@@ -353,6 +584,31 @@ $pdo->exec("
     KEY idx_rfq_requests_created_at (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+// Add RFQ request category and parts fields if they do not exist yet
+foreach ([
+  "ALTER TABLE rfq_requests ADD COLUMN request_category ENUM('machine','parts') NOT NULL DEFAULT 'machine' AFTER requested_by",
+  "ALTER TABLE rfq_requests ADD COLUMN part_category VARCHAR(100) NULL AFTER tube_type",
+  "ALTER TABLE rfq_requests ADD COLUMN part_specs TEXT NULL AFTER part_category",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    if ($e->getCode() !== '42S21') { // 42S21 = duplicate column name
+      throw $e;
+    }
+  }
+
+  // Align machine-specific legacy columns to nullable so parts requests can store null cleanly
+  foreach ([
+    "ALTER TABLE rfq_requests MODIFY machine_size VARCHAR(100) NULL",
+    "ALTER TABLE rfq_requests MODIFY laser_watts VARCHAR(50) NULL",
+    "ALTER TABLE rfq_requests MODIFY tube_type VARCHAR(100) NULL",
+    "ALTER TABLE rfq_requests MODIFY required_features TEXT NULL",
+  ] as $sql) {
+    $pdo->exec($sql);
+  }
+}
 
 // Create rfq_quotes table for quote, lead time, and shipping tracking
 $pdo->exec("
@@ -395,8 +651,50 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Add RFQ quote file metadata columns if they do not exist yet
+foreach ([
+  "ALTER TABLE rfq_quotes ADD COLUMN model_name VARCHAR(255) NULL",
+  "ALTER TABLE rfq_quotes ADD COLUMN alibaba_chat_link VARCHAR(1000) NULL AFTER supplier_name",
+  "ALTER TABLE rfq_quotes ADD COLUMN dimensions VARCHAR(255) NULL AFTER model_name",
+  "ALTER TABLE rfq_quotes ADD COLUMN weight VARCHAR(255) NULL AFTER dimensions",
+  "ALTER TABLE rfq_quotes ADD COLUMN sku VARCHAR(100) NULL",
+  "ALTER TABLE rfq_quotes ADD COLUMN msrp DECIMAL(12,2) NULL",
+  "ALTER TABLE rfq_quotes ADD COLUMN map_price DECIMAL(12,2) NULL AFTER msrp",
+  "ALTER TABLE rfq_quotes ADD COLUMN moq_20_price DECIMAL(12,2) NULL AFTER map_price",
+  "ALTER TABLE rfq_quotes ADD COLUMN moq_20_margin_msrp DECIMAL(6,2) NULL AFTER moq_20_price",
+  "ALTER TABLE rfq_quotes ADD COLUMN moq_20_margin_map DECIMAL(6,2) NULL AFTER moq_20_margin_msrp",
+  "ALTER TABLE rfq_quotes ADD COLUMN moq_10_price DECIMAL(12,2) NULL AFTER moq_20_margin_map",
+  "ALTER TABLE rfq_quotes ADD COLUMN moq_10_margin_msrp DECIMAL(6,2) NULL AFTER moq_10_price",
+  "ALTER TABLE rfq_quotes ADD COLUMN moq_10_margin_map DECIMAL(6,2) NULL AFTER moq_10_margin_msrp",
+  "ALTER TABLE rfq_quotes ADD COLUMN drop_ship_price DECIMAL(12,2) NULL AFTER moq_10_margin_map",
+  "ALTER TABLE rfq_quotes ADD COLUMN drop_ship_margin_msrp DECIMAL(6,2) NULL AFTER drop_ship_price",
+  "ALTER TABLE rfq_quotes ADD COLUMN drop_ship_margin_map DECIMAL(6,2) NULL AFTER drop_ship_margin_msrp",
+  "ALTER TABLE rfq_quotes ADD COLUMN quote_file_original_name VARCHAR(255) NULL",
+  "ALTER TABLE rfq_quotes ADD COLUMN quote_file_stored_name VARCHAR(255) NULL",
+  "ALTER TABLE rfq_quotes ADD COLUMN quote_file_mime_type VARCHAR(191) NULL",
+  "ALTER TABLE rfq_quotes ADD COLUMN quote_file_size_bytes BIGINT UNSIGNED NULL",
+  "ALTER TABLE rfq_quotes ADD COLUMN moq VARCHAR(255) NULL",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    // 42S21 = SQLSTATE duplicate column name (column already exists)
+    if ($e->getCode() !== '42S21') {
+      throw $e;
+    }
+  }
+}
+
+// Add 'shortlisted' to rfq_quotes.quote_status ENUM if not present
+try {
+  $pdo->exec("ALTER TABLE rfq_quotes MODIFY COLUMN quote_status ENUM('received','shortlisted','under_review','negotiating','accepted','rejected') NOT NULL DEFAULT 'received'");
+} catch (PDOException $e) {
+  // Ignore if column definition is already correct
+}
+
 // Create rfq_orders table for purchase orders converted from accepted RFQ quotes
 $rfq_order_status_enum = "ENUM('create_rfq','receive_quotes','evaluate_select_quote','negotiate_terms','send_purchase_order','vendor_accepts_po','make_deposit_payment','vendor_produces_machine','make_final_payment','vendor_ships_machine','receive_tracking_documents','arrives_clears_customs','final_inspection_acceptance','cancelled')";
+$rfq_order_status_enum_with_legacy = "ENUM('draft','deposit_pending','deposit_paid','in_production','ready_to_ship','shipped','delivered','completed','create_rfq','receive_quotes','evaluate_select_quote','negotiate_terms','send_purchase_order','vendor_accepts_po','make_deposit_payment','vendor_produces_machine','make_final_payment','vendor_ships_machine','receive_tracking_documents','arrives_clears_customs','final_inspection_acceptance','cancelled')";
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS rfq_orders (
     id                       INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -447,6 +745,82 @@ $pdo->exec("
     KEY idx_rfq_orders_order_date (order_date)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+// Add RFQ order columns if they do not exist yet
+foreach ([
+  "ALTER TABLE rfq_orders ADD COLUMN po_number VARCHAR(50) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN order_status {$rfq_order_status_enum} NOT NULL DEFAULT 'create_rfq'",
+  "ALTER TABLE rfq_orders ADD COLUMN order_date DATE NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN expected_ready_date DATE NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN expected_ship_date DATE NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN supplier_name VARCHAR(255) NOT NULL DEFAULT ''",
+  "ALTER TABLE rfq_orders ADD COLUMN model_name VARCHAR(255) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN sku VARCHAR(100) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN quantity INT UNSIGNED NOT NULL DEFAULT 1",
+  "ALTER TABLE rfq_orders ADD COLUMN unit_price DECIMAL(12,2) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN order_total DECIMAL(12,2) NOT NULL DEFAULT 0",
+  "ALTER TABLE rfq_orders ADD COLUMN currency CHAR(3) NOT NULL DEFAULT 'USD'",
+  "ALTER TABLE rfq_orders ADD COLUMN deposit_percent DECIMAL(5,2) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN deposit_amount DECIMAL(12,2) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN balance_amount DECIMAL(12,2) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN payment_terms VARCHAR(255) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN incoterm VARCHAR(20) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN shipping_method VARCHAR(100) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN shipping_origin VARCHAR(255) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN destination_port VARCHAR(255) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN destination_address VARCHAR(500) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN production_lead_time_days INT UNSIGNED NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN trade_assurance_order_no VARCHAR(100) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN proforma_invoice_no VARCHAR(100) NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN warranty_terms TEXT NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN included_accessories TEXT NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN notes TEXT NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN deposit_paid_at DATETIME NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN po_accepted_at DATETIME NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN production_started_at DATETIME NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN final_payment_paid_at DATETIME NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN shipped_at DATETIME NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN tracking_docs_received_at DATETIME NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN customs_cleared_at DATETIME NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN accepted_at DATETIME NULL",
+  "ALTER TABLE rfq_orders ADD COLUMN created_by INT UNSIGNED NOT NULL DEFAULT 0",
+  "ALTER TABLE rfq_orders ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+  "ALTER TABLE rfq_orders ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    if ($e->getCode() !== '42S21') {
+      throw $e;
+    }
+  }
+}
+
+// Allow rfq_orders to be created without a quote (direct PO submissions).
+try {
+  $pdo->exec("ALTER TABLE rfq_orders MODIFY rfq_quote_id INT UNSIGNED NULL");
+} catch (PDOException $e) {
+  // Ignore – column may already be nullable.
+}
+
+// Migrate rfq_orders.order_status from legacy values to Alibaba 13-stage workflow values.
+$pdo->exec("ALTER TABLE rfq_orders MODIFY COLUMN order_status {$rfq_order_status_enum_with_legacy} NOT NULL DEFAULT 'create_rfq'");
+$pdo->exec("
+  UPDATE rfq_orders
+  SET order_status = CASE order_status
+    WHEN 'draft' THEN 'create_rfq'
+    WHEN 'deposit_pending' THEN 'send_purchase_order'
+    WHEN 'deposit_paid' THEN 'make_deposit_payment'
+    WHEN 'in_production' THEN 'vendor_produces_machine'
+    WHEN 'ready_to_ship' THEN 'make_final_payment'
+    WHEN 'shipped' THEN 'vendor_ships_machine'
+    WHEN 'delivered' THEN 'arrives_clears_customs'
+    WHEN 'completed' THEN 'final_inspection_acceptance'
+    ELSE order_status
+  END
+  WHERE order_status IN ('draft','deposit_pending','deposit_paid','in_production','ready_to_ship','shipped','delivered','completed')
+");
+$pdo->exec("ALTER TABLE rfq_orders MODIFY COLUMN order_status {$rfq_order_status_enum} NOT NULL DEFAULT 'create_rfq'");
 
 // Stage history for RFQ order workflow timeline.
 $pdo->exec("
@@ -653,6 +1027,157 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+$hasCustomersFirstName = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'customers'
+    AND COLUMN_NAME = 'first_name'
+")->fetchColumn();
+if ($hasCustomersFirstName === 0) {
+  $pdo->exec("ALTER TABLE customers ADD COLUMN first_name VARCHAR(255) NOT NULL DEFAULT '' AFTER hubspot_contact_id");
+}
+
+$hasCustomersLastName = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'customers'
+    AND COLUMN_NAME = 'last_name'
+")->fetchColumn();
+if ($hasCustomersLastName === 0) {
+  $pdo->exec("ALTER TABLE customers ADD COLUMN last_name VARCHAR(255) NOT NULL DEFAULT '' AFTER first_name");
+}
+
+$hasLegacyCustomerName = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'customers'
+    AND COLUMN_NAME = 'customer_name'
+")->fetchColumn();
+if ($hasLegacyCustomerName > 0) {
+  $pdo->exec("
+    UPDATE customers
+    SET
+      first_name = CASE
+        WHEN TRIM(first_name) <> '' THEN first_name
+        WHEN TRIM(customer_name) = '' THEN ''
+        WHEN INSTR(TRIM(customer_name), ' ') > 0 THEN SUBSTRING_INDEX(TRIM(customer_name), ' ', 1)
+        ELSE TRIM(customer_name)
+      END,
+      last_name = CASE
+        WHEN TRIM(last_name) <> '' THEN last_name
+        WHEN TRIM(customer_name) = '' OR INSTR(TRIM(customer_name), ' ') = 0 THEN ''
+        ELSE TRIM(SUBSTRING(TRIM(customer_name), LENGTH(SUBSTRING_INDEX(TRIM(customer_name), ' ', 1)) + 1))
+      END
+  ");
+  $pdo->exec("ALTER TABLE customers DROP COLUMN customer_name");
+}
+
+foreach ([
+  'address' => "ALTER TABLE customers ADD COLUMN address VARCHAR(255) NOT NULL DEFAULT '' AFTER email",
+  'city'    => "ALTER TABLE customers ADD COLUMN city    VARCHAR(100) NOT NULL DEFAULT '' AFTER address",
+  'state'   => "ALTER TABLE customers ADD COLUMN state   VARCHAR(100) NOT NULL DEFAULT '' AFTER city",
+  'zip'     => "ALTER TABLE customers ADD COLUMN zip     VARCHAR(20)  NOT NULL DEFAULT '' AFTER state",
+  'country' => "ALTER TABLE customers ADD COLUMN country VARCHAR(100) NOT NULL DEFAULT '' AFTER zip",
+] as $col => $sql) {
+  $stmt = $pdo->prepare("
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'customers'
+      AND COLUMN_NAME = ?
+  ");
+  $stmt->execute([$col]);
+  if ((int)$stmt->fetchColumn() === 0) {
+    $pdo->exec($sql);
+  }
+}
+
+try {
+  $pdo->exec("ALTER TABLE vendors ADD COLUMN alibaba_store VARCHAR(255) NOT NULL DEFAULT ''");
+} catch (PDOException $e) {
+  // Column already exists
+}
+
+$hasVendorsPort = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'vendors'
+    AND COLUMN_NAME = 'port'
+")->fetchColumn();
+if ($hasVendorsPort === 0) {
+  $pdo->exec("ALTER TABLE vendors ADD COLUMN port VARCHAR(255) NOT NULL DEFAULT '' AFTER phone");
+}
+
+$hasVendorsRating = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'vendors'
+    AND COLUMN_NAME = 'rating'
+")->fetchColumn();
+if ($hasVendorsRating === 0) {
+  $pdo->exec("ALTER TABLE vendors ADD COLUMN rating TINYINT UNSIGNED NULL DEFAULT NULL");
+}
+
+$hasVendorsReview = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'vendors'
+    AND COLUMN_NAME = 'review'
+")->fetchColumn();
+if ($hasVendorsReview === 0) {
+  $pdo->exec("ALTER TABLE vendors ADD COLUMN review TEXT NULL DEFAULT NULL");
+}
+
+$hasVendorsLogoPath = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'vendors'
+    AND COLUMN_NAME = 'logo_path'
+")->fetchColumn();
+if ($hasVendorsLogoPath === 0) {
+  $pdo->exec("ALTER TABLE vendors ADD COLUMN logo_path  VARCHAR(255) NULL DEFAULT NULL");
+}
+
+$hasVendorsLogoThumb = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'vendors'
+    AND COLUMN_NAME = 'logo_thumb'
+")->fetchColumn();
+if ($hasVendorsLogoThumb === 0) {
+  $pdo->exec("ALTER TABLE vendors ADD COLUMN logo_thumb VARCHAR(255) NULL DEFAULT NULL");
+}
+
+$hasVendorsAlibabaProfilePhotoPath = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'vendors'
+    AND COLUMN_NAME = 'alibaba_profile_photo_path'
+")->fetchColumn();
+if ($hasVendorsAlibabaProfilePhotoPath === 0) {
+  $pdo->exec("ALTER TABLE vendors ADD COLUMN alibaba_profile_photo_path VARCHAR(255) NULL DEFAULT NULL");
+}
+
+$hasVendorsAlibabaProfilePhotoThumb = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'vendors'
+    AND COLUMN_NAME = 'alibaba_profile_photo_thumb'
+")->fetchColumn();
+if ($hasVendorsAlibabaProfilePhotoThumb === 0) {
+  $pdo->exec("ALTER TABLE vendors ADD COLUMN alibaba_profile_photo_thumb VARCHAR(255) NULL DEFAULT NULL");
+}
+
 // Create freight_forwarders table if it does not exist yet
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS freight_forwarders (
@@ -676,6 +1201,121 @@ $pdo->exec("
     KEY idx_ff_company_name (company_name(191))
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+$hasFreightForwardersLogoPath = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'freight_forwarders'
+    AND COLUMN_NAME = 'logo_path'
+")->fetchColumn();
+if ($hasFreightForwardersLogoPath === 0) {
+  $pdo->exec("ALTER TABLE freight_forwarders ADD COLUMN logo_path VARCHAR(255) NULL DEFAULT NULL");
+}
+
+$hasFreightForwardersLogoThumb = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'freight_forwarders'
+    AND COLUMN_NAME = 'logo_thumb'
+")->fetchColumn();
+if ($hasFreightForwardersLogoThumb === 0) {
+  $pdo->exec("ALTER TABLE freight_forwarders ADD COLUMN logo_thumb VARCHAR(255) NULL DEFAULT NULL");
+}
+
+$hasFreightForwardersDoesConsolidation = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'freight_forwarders'
+    AND COLUMN_NAME = 'does_consolidation'
+")->fetchColumn();
+if ($hasFreightForwardersDoesConsolidation === 0) {
+  $pdo->exec("ALTER TABLE freight_forwarders ADD COLUMN does_consolidation TINYINT(1) NOT NULL DEFAULT 0");
+}
+
+// Add profile_notes column to users if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE users ADD COLUMN profile_notes TEXT NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') throw $e;
+}
+
+// Add company/contact header columns to rfq_requests if they do not exist yet
+foreach ([
+  "ALTER TABLE rfq_requests ADD COLUMN contact_name  VARCHAR(255) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN company_name  VARCHAR(255) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN contact_email VARCHAR(255) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN contact_phone VARCHAR(100)  NULL",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    // 42S21 = SQLSTATE 'Duplicate column name' — column already exists, safe to skip
+    if ($e->getCode() !== '42S21') {
+      throw $e;
+    }
+  }
+}
+
+// Add buyer/end-user columns to rfq_requests for internal sourcing tracking
+foreach ([
+  "ALTER TABLE rfq_requests ADD COLUMN buyer_name    VARCHAR(255) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN buyer_company VARCHAR(255) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN buyer_email   VARCHAR(255) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN buyer_phone   VARCHAR(100)  NULL",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    if ($e->getCode() !== '42S21') {
+      throw $e;
+    }
+  }
+}
+
+// Add acquisition_purpose column to rfq_requests if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE rfq_requests ADD COLUMN acquisition_purpose ENUM('customer','internal') NOT NULL DEFAULT 'customer'");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
+// Add urgency column to rfq_requests if it does not exist yet
+try {
+  $pdo->exec("ALTER TABLE rfq_requests ADD COLUMN urgency ENUM('low','normal','high','critical') NOT NULL DEFAULT 'normal'");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
+// Add PO-specific fields to rfq_requests if they do not exist yet
+foreach ([
+  "ALTER TABLE rfq_requests ADD COLUMN po_supplier_info VARCHAR(500) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN po_unit_price DECIMAL(12,2) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN po_line_total DECIMAL(12,2) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN po_expected_delivery_date DATE NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN po_delivery_address VARCHAR(500) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN po_payment_terms TEXT NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN po_shipping_method ENUM('Sea Freight','Air Freight','Express','Pickup') NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN po_shipping_cost DECIMAL(12,2) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN po_total_amount DECIMAL(12,2) NULL",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    if ($e->getCode() !== '42S21') {
+      throw $e;
+    }
+  }
+}
+
+// Widen po_shipping_method to VARCHAR(20) to support incoterm codes (DDP, FOB, CIF, EXW, DAP)
+$pdo->exec("ALTER TABLE rfq_requests MODIFY COLUMN po_shipping_method VARCHAR(20) NULL");
 
 // Create machine_inquiries table for CO2 laser machine purchase inquiries
 $pdo->exec("
@@ -750,6 +1390,40 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Ensure customer_phone_inquiries.status exists for older deployments
+$hasCpiStatus = (int)$pdo->query("
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'customer_phone_inquiries'
+    AND COLUMN_NAME = 'status'
+")->fetchColumn();
+if ($hasCpiStatus === 0) {
+  $pdo->exec("
+    ALTER TABLE customer_phone_inquiries
+    ADD COLUMN status ENUM('pending','urgent','critical','ordered') NOT NULL DEFAULT 'pending' AFTER inquiry_date
+  ");
+  $pdo->exec("ALTER TABLE customer_phone_inquiries ADD KEY idx_cpi_status (status)");
+}
+
+// Migrate customer_phone_inquiries status ENUM from old values (new/in_progress/purchased/completed/archived) to new ones
+$cpiOldEnum = $pdo->query("
+  SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME   = 'customer_phone_inquiries'
+    AND COLUMN_NAME  = 'status'
+    AND COLUMN_TYPE LIKE \"%'new'%\"
+")->fetchColumn();
+if ($cpiOldEnum !== false) {
+  // Widen to VARCHAR so all old values are valid during the transition
+  $pdo->exec("ALTER TABLE customer_phone_inquiries MODIFY COLUMN status VARCHAR(20) NOT NULL DEFAULT 'pending'");
+  // Map old statuses to new ones
+  $pdo->exec("UPDATE customer_phone_inquiries SET status = 'pending'  WHERE status IN ('new', 'in_progress')");
+  $pdo->exec("UPDATE customer_phone_inquiries SET status = 'ordered'  WHERE status IN ('purchased', 'completed', 'archived')");
+  // Apply the new ENUM definition
+  $pdo->exec("ALTER TABLE customer_phone_inquiries MODIFY COLUMN status ENUM('pending','urgent','critical','ordered') NOT NULL DEFAULT 'pending'");
+}
+
 // Create quotes table for customer quotes and invoice conversion
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS quotes (
@@ -779,6 +1453,125 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+$_quotes_approval_status_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'approval_status'");
+if ($_quotes_approval_status_col === false || $_quotes_approval_status_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN approval_status ENUM('none','pending_approval','approved') NOT NULL DEFAULT 'none' AFTER status");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'approval_status'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_approval_status_col);
+
+$_quotes_payment_status_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'payment_status'");
+if ($_quotes_payment_status_col === false || $_quotes_payment_status_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN payment_status ENUM('unpaid','paid') NOT NULL DEFAULT 'unpaid' AFTER status");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'payment_status'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_payment_status_col);
+
+$_quotes_paid_at_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'paid_at'");
+if ($_quotes_paid_at_col === false || $_quotes_paid_at_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN paid_at DATETIME NULL AFTER payment_status");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'paid_at'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_paid_at_col);
+
+$_quotes_online_payment_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'enable_online_payment'");
+if ($_quotes_online_payment_col === false || $_quotes_online_payment_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN enable_online_payment TINYINT(1) NOT NULL DEFAULT 0 AFTER subtotal_amount");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'enable_online_payment'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_online_payment_col);
+
+$_quotes_checkout_url_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'stripe_checkout_url'");
+if ($_quotes_checkout_url_col === false || $_quotes_checkout_url_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN stripe_checkout_url TEXT NULL AFTER enable_online_payment");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'stripe_checkout_url'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_checkout_url_col);
+
+$_quotes_checkout_session_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'stripe_checkout_session_id'");
+if ($_quotes_checkout_session_col === false || $_quotes_checkout_session_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN stripe_checkout_session_id VARCHAR(255) NULL AFTER stripe_checkout_url");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'stripe_checkout_session_id'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_checkout_session_col);
+
+$_quotes_checkout_created_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'stripe_checkout_created_at'");
+if ($_quotes_checkout_created_col === false || $_quotes_checkout_created_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN stripe_checkout_created_at DATETIME NULL AFTER stripe_checkout_session_id");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'stripe_checkout_created_at'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_checkout_created_col);
+
+$_quotes_checkout_amount_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'stripe_checkout_amount'");
+if ($_quotes_checkout_amount_col === false || $_quotes_checkout_amount_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN stripe_checkout_amount DECIMAL(12,2) NULL AFTER stripe_checkout_created_at");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'stripe_checkout_amount'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_checkout_amount_col);
+
+$_quotes_emailed_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'invoice_emailed'");
+if ($_quotes_emailed_col === false || $_quotes_emailed_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN invoice_emailed TINYINT(1) NOT NULL DEFAULT 0");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'invoice_emailed'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_emailed_col);
+
+foreach ([
+  'billing_street' => "ALTER TABLE quotes ADD COLUMN billing_street VARCHAR(255) NULL AFTER email",
+  'billing_city'   => "ALTER TABLE quotes ADD COLUMN billing_city   VARCHAR(100) NULL AFTER billing_street",
+  'billing_state'  => "ALTER TABLE quotes ADD COLUMN billing_state  VARCHAR(100) NULL AFTER billing_city",
+  'billing_zip'    => "ALTER TABLE quotes ADD COLUMN billing_zip    VARCHAR(20)  NULL AFTER billing_state",
+] as $_col => $_sql) {
+  $_stmt = $pdo->prepare("SHOW COLUMNS FROM quotes LIKE ?");
+  $_stmt->execute([$_col]);
+  if ($_stmt->fetch(PDO::FETCH_ASSOC) === false) {
+    try {
+      $pdo->exec($_sql);
+    } catch (Throwable $e) {
+      $_rechk = $pdo->prepare("SHOW COLUMNS FROM quotes LIKE ?");
+      $_rechk->execute([$_col]);
+      if ($_rechk->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+    }
+  }
+}
+unset($_col, $_sql, $_stmt, $_rechk);
+
 // Create quote_items table for line items on quotes
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS quote_items (
@@ -798,6 +1591,57 @@ $pdo->exec("
     CONSTRAINT fk_quote_items_quote FOREIGN KEY (quote_id) REFERENCES quotes (id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+$_qi_cost_col = $pdo->query("SHOW COLUMNS FROM quote_items LIKE 'cost'");
+if ($_qi_cost_col === false || $_qi_cost_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quote_items ADD COLUMN cost DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER quantity");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quote_items LIKE 'cost'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_qi_cost_col);
+
+$_qi_markup_col = $pdo->query("SHOW COLUMNS FROM quote_items LIKE 'markup_percent'");
+if ($_qi_markup_col === false || $_qi_markup_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quote_items ADD COLUMN markup_percent DECIMAL(8,2) NOT NULL DEFAULT 20.00 AFTER cost");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quote_items LIKE 'markup_percent'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_qi_markup_col);
+
+$_qi_taxable_col = $pdo->query("SHOW COLUMNS FROM quote_items LIKE 'is_taxable'");
+if ($_qi_taxable_col === false || $_qi_taxable_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quote_items ADD COLUMN is_taxable TINYINT(1) NOT NULL DEFAULT 0 AFTER line_total");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quote_items LIKE 'is_taxable'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_qi_taxable_col);
+
+foreach ([
+  'tax_rate'   => "ALTER TABLE quotes ADD COLUMN tax_rate   DECIMAL(6,2)  NOT NULL DEFAULT 0.00 AFTER subtotal_amount",
+  'tax_amount' => "ALTER TABLE quotes ADD COLUMN tax_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER tax_rate",
+] as $_tax_col => $_tax_sql) {
+  $_tax_stmt = $pdo->prepare("SHOW COLUMNS FROM quotes LIKE ?");
+  $_tax_stmt->execute([$_tax_col]);
+  if ($_tax_stmt->fetch(PDO::FETCH_ASSOC) === false) {
+    try {
+      $pdo->exec($_tax_sql);
+    } catch (Throwable $e) {
+      $_tax_rechk = $pdo->prepare("SHOW COLUMNS FROM quotes LIKE ?");
+      $_tax_rechk->execute([$_tax_col]);
+      if ($_tax_rechk->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+    }
+  }
+}
+unset($_tax_col, $_tax_sql, $_tax_stmt, $_tax_rechk);
 
 // Create shipping_rfq_requests table for freight/shipping quote requests
 $pdo->exec("
@@ -868,6 +1712,13 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Add rfq_id column to time_entries for associating clock entries with sourcing RFQs
+try {
+  $pdo->exec("ALTER TABLE time_entries ADD COLUMN rfq_id INT UNSIGNED NULL");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') throw $e;
+}
+
 // Create order_documents table for shipping/trade documents attached to purchase orders
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS order_documents (
@@ -918,6 +1769,19 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Add dismissed column to approval_alerts if it does not exist yet
+$has_dismissed = $pdo->query("SHOW COLUMNS FROM approval_alerts LIKE 'dismissed'");
+if ($has_dismissed === false || $has_dismissed->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE approval_alerts ADD COLUMN dismissed TINYINT(1) NOT NULL DEFAULT 0");
+  } catch (Throwable $e) {
+    $recheck_dismissed = $pdo->query("SHOW COLUMNS FROM approval_alerts LIKE 'dismissed'");
+    if ($recheck_dismissed === false || $recheck_dismissed->fetch(PDO::FETCH_ASSOC) === false) {
+      throw $e;
+    }
+  }
+}
+
 // Create admin activity log table for key backend audit events
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS admin_activity_log (
@@ -932,6 +1796,18 @@ $pdo->exec("
     KEY idx_admin_activity_user_id (user_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+// Add image columns to rfq_requests if they do not exist yet
+foreach ([
+  "ALTER TABLE rfq_requests ADD COLUMN image_path  VARCHAR(255) NULL",
+  "ALTER TABLE rfq_requests ADD COLUMN image_thumb VARCHAR(255) NULL",
+] as $sql) {
+  try {
+    $pdo->exec($sql);
+  } catch (PDOException $e) {
+    if ($e->getCode() !== '42S21') throw $e;
+  }
+}
 
 // Create page_views table for employee page view tracking
 $pdo->exec("
@@ -1204,3 +2080,83 @@ if (!function_exists('bank_tx_invoice_search_term')) {
   }
 }
 
+// Expand machines table: cutting area, crate dimensions, third photo, visible/catalog toggles
+try {
+  foreach ([
+    "ALTER TABLE machines ADD COLUMN cut_length      DECIMAL(10,4) NULL AFTER weight_kg",
+    "ALTER TABLE machines ADD COLUMN cut_width       DECIMAL(10,4) NULL AFTER cut_length",
+    "ALTER TABLE machines ADD COLUMN cut_length_mm   DECIMAL(10,2) NULL AFTER cut_width",
+    "ALTER TABLE machines ADD COLUMN cut_width_mm    DECIMAL(10,2) NULL AFTER cut_length_mm",
+    "ALTER TABLE machines ADD COLUMN crate_length    DECIMAL(10,4) NULL AFTER cut_width_mm",
+    "ALTER TABLE machines ADD COLUMN crate_width     DECIMAL(10,4) NULL AFTER crate_length",
+    "ALTER TABLE machines ADD COLUMN crate_length_mm DECIMAL(10,2) NULL AFTER crate_width",
+    "ALTER TABLE machines ADD COLUMN crate_width_mm  DECIMAL(10,2) NULL AFTER crate_length_mm",
+    "ALTER TABLE machines ADD COLUMN tertiary_photo  VARCHAR(255)  NULL AFTER secondary_photo",
+    "ALTER TABLE machines ADD COLUMN is_visible      TINYINT(1)    NOT NULL DEFAULT 1 AFTER is_active",
+    "ALTER TABLE machines ADD COLUMN is_catalog      TINYINT(1)    NOT NULL DEFAULT 1 AFTER is_visible",
+  ] as $_machines_sql) {
+    try {
+      $pdo->exec($_machines_sql);
+    } catch (PDOException $_machines_e) {
+      if ($_machines_e->getCode() !== '42S21') {
+        throw $_machines_e;
+      }
+    }
+  }
+  unset($_machines_sql, $_machines_e);
+
+  // Add crate height and weight columns to machines (if not already present)
+  foreach ([
+    "ALTER TABLE machines ADD COLUMN crate_height    DECIMAL(10,4) NULL AFTER crate_width_mm",
+    "ALTER TABLE machines ADD COLUMN crate_height_mm DECIMAL(10,2) NULL AFTER crate_height",
+    "ALTER TABLE machines ADD COLUMN crate_weight_kg DECIMAL(10,2) NULL AFTER crate_height_mm",
+  ] as $_mach_crate_sql) {
+    try {
+      $pdo->exec($_mach_crate_sql);
+    } catch (PDOException $_mach_crate_e) {
+      if ($_mach_crate_e->getCode() !== '42S21') {
+        throw $_mach_crate_e;
+      }
+    }
+  }
+  unset($_mach_crate_sql, $_mach_crate_e);
+
+  // Rename legacy machine dimension columns to explicit prefixed names.
+  // Note: 'height' (machine depth/length) maps to machine_length;
+  //       'width'  (machine width)         maps to machine_width.
+  // Column names are validated against a whitelist before being interpolated into SQL.
+  $_mach_rename_map = [
+    ['height',    'machine_length',    'DECIMAL(10,4) NULL'],
+    ['width',     'machine_width',     'DECIMAL(10,4) NULL'],
+    ['height_mm', 'machine_length_mm', 'DECIMAL(10,2) NULL'],
+    ['width_mm',  'machine_width_mm',  'DECIMAL(10,2) NULL'],
+    ['weight_kg', 'machine_weight_kg', 'DECIMAL(10,2) NULL'],
+  ];
+  $_mach_rename_allowed = array_merge(
+    array_column($_mach_rename_map, 0),
+    array_column($_mach_rename_map, 1)
+  );
+  foreach ($_mach_rename_map as [$_old_col, $_new_col, $_col_type]) {
+    if (!in_array($_old_col, $_mach_rename_allowed, true) || !in_array($_new_col, $_mach_rename_allowed, true)) {
+      continue; // skip anything not in the whitelist
+    }
+    $_chk_stmt = $pdo->prepare("SHOW COLUMNS FROM machines LIKE ?");
+    $_chk_stmt->execute([$_new_col]);
+    if ($_chk_stmt->fetch(PDO::FETCH_ASSOC) === false) {
+      try {
+        $pdo->exec("ALTER TABLE machines CHANGE `{$_old_col}` `{$_new_col}` {$_col_type}");
+      } catch (PDOException $_mach_ren_e) {
+        // Suppress only: duplicate column (SQLSTATE 42S21) or unknown column (SQLSTATE 42S22).
+        // Any other error (e.g. connection, permissions) is re-thrown.
+        if (!in_array($_mach_ren_e->getCode(), ['42S21', '42S22'], true)) {
+          throw $_mach_ren_e;
+        }
+      }
+    }
+  }
+  unset($_mach_rename_map, $_mach_rename_allowed, $_old_col, $_new_col, $_col_type, $_chk_stmt, $_mach_ren_e);
+} catch (Throwable $_mach_migration_e) {
+  // Machines table migration is best-effort: columns already exist or table structure
+  // differs from what the migration expects. Ignore and continue.
+  unset($_mach_migration_e);
+}
