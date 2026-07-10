@@ -2080,19 +2080,32 @@ if (!function_exists('bank_tx_invoice_search_term')) {
   }
 }
 
-// Expand machines table: cutting area, crate dimensions, third photo, visible/catalog toggles
+// Ensure all machines columns exist (cutting area, machine dimensions, crate dimensions, extras).
+// Each ADD COLUMN is idempotent: 42S21 (duplicate column name) is silently ignored.
 foreach ([
-  "ALTER TABLE machines ADD COLUMN cut_length      DECIMAL(10,4) NULL AFTER weight_kg",
-  "ALTER TABLE machines ADD COLUMN cut_width       DECIMAL(10,4) NULL AFTER cut_length",
-  "ALTER TABLE machines ADD COLUMN cut_length_mm   DECIMAL(10,2) NULL AFTER cut_width",
-  "ALTER TABLE machines ADD COLUMN cut_width_mm    DECIMAL(10,2) NULL AFTER cut_length_mm",
-  "ALTER TABLE machines ADD COLUMN crate_length    DECIMAL(10,4) NULL AFTER cut_width_mm",
-  "ALTER TABLE machines ADD COLUMN crate_width     DECIMAL(10,4) NULL AFTER crate_length",
-  "ALTER TABLE machines ADD COLUMN crate_length_mm DECIMAL(10,2) NULL AFTER crate_width",
-  "ALTER TABLE machines ADD COLUMN crate_width_mm  DECIMAL(10,2) NULL AFTER crate_length_mm",
-  "ALTER TABLE machines ADD COLUMN tertiary_photo  VARCHAR(255)  NULL AFTER secondary_photo",
-  "ALTER TABLE machines ADD COLUMN is_visible      TINYINT(1)    NOT NULL DEFAULT 1 AFTER is_active",
-  "ALTER TABLE machines ADD COLUMN is_catalog      TINYINT(1)    NOT NULL DEFAULT 1 AFTER is_visible",
+  // Cutting area
+  "ALTER TABLE machines ADD COLUMN cut_length      DECIMAL(10,4) NULL",
+  "ALTER TABLE machines ADD COLUMN cut_width       DECIMAL(10,4) NULL",
+  "ALTER TABLE machines ADD COLUMN cut_length_mm   DECIMAL(10,2) NULL",
+  "ALTER TABLE machines ADD COLUMN cut_width_mm    DECIMAL(10,2) NULL",
+  // Machine dimensions
+  "ALTER TABLE machines ADD COLUMN machine_length    DECIMAL(10,4) NULL",
+  "ALTER TABLE machines ADD COLUMN machine_width     DECIMAL(10,4) NULL",
+  "ALTER TABLE machines ADD COLUMN machine_length_mm DECIMAL(10,2) NULL",
+  "ALTER TABLE machines ADD COLUMN machine_width_mm  DECIMAL(10,2) NULL",
+  "ALTER TABLE machines ADD COLUMN machine_weight_kg DECIMAL(10,2) NULL",
+  // Crate dimensions
+  "ALTER TABLE machines ADD COLUMN crate_length    DECIMAL(10,4) NULL",
+  "ALTER TABLE machines ADD COLUMN crate_width     DECIMAL(10,4) NULL",
+  "ALTER TABLE machines ADD COLUMN crate_length_mm DECIMAL(10,2) NULL",
+  "ALTER TABLE machines ADD COLUMN crate_width_mm  DECIMAL(10,2) NULL",
+  "ALTER TABLE machines ADD COLUMN crate_height    DECIMAL(10,4) NULL",
+  "ALTER TABLE machines ADD COLUMN crate_height_mm DECIMAL(10,2) NULL",
+  "ALTER TABLE machines ADD COLUMN crate_weight_kg DECIMAL(10,2) NULL",
+  // Extras
+  "ALTER TABLE machines ADD COLUMN tertiary_photo  VARCHAR(255)  NULL",
+  "ALTER TABLE machines ADD COLUMN is_visible      TINYINT(1)    NOT NULL DEFAULT 1",
+  "ALTER TABLE machines ADD COLUMN is_catalog      TINYINT(1)    NOT NULL DEFAULT 1",
 ] as $_machines_sql) {
   try {
     $pdo->exec($_machines_sql);
@@ -2103,54 +2116,3 @@ foreach ([
   }
 }
 unset($_machines_sql, $_machines_e);
-
-// Add crate height and weight columns to machines (if not already present)
-foreach ([
-  "ALTER TABLE machines ADD COLUMN crate_height    DECIMAL(10,4) NULL AFTER crate_width_mm",
-  "ALTER TABLE machines ADD COLUMN crate_height_mm DECIMAL(10,2) NULL AFTER crate_height",
-  "ALTER TABLE machines ADD COLUMN crate_weight_kg DECIMAL(10,2) NULL AFTER crate_height_mm",
-] as $_mach_crate_sql) {
-  try {
-    $pdo->exec($_mach_crate_sql);
-  } catch (PDOException $_mach_crate_e) {
-    if ($_mach_crate_e->getCode() !== '42S21') {
-      throw $_mach_crate_e;
-    }
-  }
-}
-unset($_mach_crate_sql, $_mach_crate_e);
-
-// Rename legacy machine dimension columns to explicit prefixed names.
-// Note: 'height' (machine depth/length) maps to machine_length;
-//       'width'  (machine width)         maps to machine_width.
-// Column names are validated against a whitelist before being interpolated into SQL.
-$_mach_rename_map = [
-  ['height',    'machine_length',    'DECIMAL(10,4) NULL'],
-  ['width',     'machine_width',     'DECIMAL(10,4) NULL'],
-  ['height_mm', 'machine_length_mm', 'DECIMAL(10,2) NULL'],
-  ['width_mm',  'machine_width_mm',  'DECIMAL(10,2) NULL'],
-  ['weight_kg', 'machine_weight_kg', 'DECIMAL(10,2) NULL'],
-];
-$_mach_rename_allowed = array_merge(
-  array_column($_mach_rename_map, 0),
-  array_column($_mach_rename_map, 1)
-);
-foreach ($_mach_rename_map as [$_old_col, $_new_col, $_col_type]) {
-  if (!in_array($_old_col, $_mach_rename_allowed, true) || !in_array($_new_col, $_mach_rename_allowed, true)) {
-    continue; // skip anything not in the whitelist
-  }
-  $_chk_stmt = $pdo->prepare("SHOW COLUMNS FROM machines LIKE ?");
-  $_chk_stmt->execute([$_new_col]);
-  if ($_chk_stmt->fetch(PDO::FETCH_ASSOC) === false) {
-    try {
-      $pdo->exec("ALTER TABLE machines CHANGE `{$_old_col}` `{$_new_col}` {$_col_type}");
-    } catch (PDOException $_mach_ren_e) {
-      // Suppress only: duplicate column (SQLSTATE 42S21) or unknown column (SQLSTATE 42S22).
-      // Any other error (e.g. connection, permissions) is re-thrown.
-      if (!in_array($_mach_ren_e->getCode(), ['42S21', '42S22'], true)) {
-        throw $_mach_ren_e;
-      }
-    }
-  }
-}
-unset($_mach_rename_map, $_mach_rename_allowed, $_old_col, $_new_col, $_col_type, $_chk_stmt, $_mach_ren_e);
