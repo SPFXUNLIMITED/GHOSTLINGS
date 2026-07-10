@@ -2079,3 +2079,27 @@ if (!function_exists('bank_tx_invoice_search_term')) {
     return mb_substr($description, 0, 60);
   }
 }
+
+// Expand machines table: cutting area, crate dimensions, third photo, visible/catalog toggles
+foreach ([
+  "ALTER TABLE machines ADD COLUMN cut_length      DECIMAL(10,4) NULL AFTER weight_kg",
+  "ALTER TABLE machines ADD COLUMN cut_width       DECIMAL(10,4) NULL AFTER cut_length",
+  "ALTER TABLE machines ADD COLUMN cut_length_mm   DECIMAL(10,2) NULL AFTER cut_width",
+  "ALTER TABLE machines ADD COLUMN cut_width_mm    DECIMAL(10,2) NULL AFTER cut_length_mm",
+  "ALTER TABLE machines ADD COLUMN crate_length    DECIMAL(10,4) NULL AFTER cut_width_mm",
+  "ALTER TABLE machines ADD COLUMN crate_width     DECIMAL(10,4) NULL AFTER crate_length",
+  "ALTER TABLE machines ADD COLUMN crate_length_mm DECIMAL(10,2) NULL AFTER crate_width",
+  "ALTER TABLE machines ADD COLUMN crate_width_mm  DECIMAL(10,2) NULL AFTER crate_length_mm",
+  "ALTER TABLE machines ADD COLUMN tertiary_photo  VARCHAR(255)  NULL AFTER secondary_photo",
+  "ALTER TABLE machines ADD COLUMN is_visible      TINYINT(1)    NOT NULL DEFAULT 1 AFTER is_active",
+  "ALTER TABLE machines ADD COLUMN is_catalog      TINYINT(1)    NOT NULL DEFAULT 1 AFTER is_visible",
+] as $_machines_sql) {
+  try {
+    $pdo->exec($_machines_sql);
+  } catch (PDOException $_machines_e) {
+    if ($_machines_e->getCode() !== '42S21') {
+      throw $_machines_e;
+    }
+  }
+}
+unset($_machines_sql, $_machines_e);

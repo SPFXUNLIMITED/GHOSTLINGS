@@ -19,25 +19,49 @@ $errors  = [];
 $success = '';
 
 $fields = [
-  'name'            => '',
-  'model'           => '',
-  'width'           => '',
-  'height'          => '',
-  'width_mm'        => '',
-  'height_mm'       => '',
-  'weight_kg'       => '',
-  'primary_photo'   => '',
-  'secondary_photo' => '',
-  'description'     => '',
-  'is_active'       => '1',
+  'name'             => '',
+  'model'            => '',
+  // Machine Dimensions
+  'machine_length'     => '',
+  'machine_width'      => '',
+  'machine_length_mm'  => '',
+  'machine_width_mm'   => '',
+  'weight_kg'          => '',
+  // Cutting Area
+  'cut_length'       => '',
+  'cut_width'        => '',
+  'cut_length_mm'    => '',
+  'cut_width_mm'     => '',
+  // Crate Dimensions
+  'crate_length'     => '',
+  'crate_width'      => '',
+  'crate_length_mm'  => '',
+  'crate_width_mm'   => '',
+  'crate_height'     => '',
+  'crate_height_mm'  => '',
+  'crate_weight_kg'  => '',
+  // Photos
+  'primary_photo'    => '',
+  'secondary_photo'  => '',
+  'tertiary_photo'   => '',
+  // Content
+  'description'      => '',
+  // Toggles
+  'is_active'        => '1',
+  'is_visible'       => '1',
+  'is_catalog'       => '1',
 ];
 
-// For the form's imperial decomposition (display only; recombined on submit)
-$width_ft   = '';
-$width_in   = '';
-$length_ft  = '';
-$length_in  = '';
+// Imperial decomposition variables (ft + remaining in) for display
+$mach_width_ft    = ''; $mach_width_in    = '';
+$mach_length_ft   = ''; $mach_length_in   = '';
+$cut_length_ft    = ''; $cut_length_in    = '';
+$cut_width_ft     = ''; $cut_width_in     = '';
+$crate_length_ft  = ''; $crate_length_in  = '';
+$crate_width_ft   = ''; $crate_width_in   = '';
+$crate_height_ft  = ''; $crate_height_in  = '';
 $weight_lbs = '';
+$crate_weight_lbs = '';
 
 if ($is_edit) {
   $stmt = $pdo->prepare("SELECT * FROM machines WHERE id = ?");
@@ -54,18 +78,24 @@ if ($is_edit) {
     $fields[$k] = (string)($machine[$k] ?? '');
   }
   // Decompose stored inches into feet + remaining inches for the form fields
-  if ($fields['width'] !== '' && (float)$fields['width'] > 0) {
-    $total_in  = (float)$fields['width'];
-    $width_ft  = (string)(int)floor($total_in / 12);
-    $width_in  = (string)round($total_in - ((int)floor($total_in / 12)) * 12, 4);
-  }
-  if ($fields['height'] !== '' && (float)$fields['height'] > 0) {
-    $total_in   = (float)$fields['height'];
-    $length_ft  = (string)(int)floor($total_in / 12);
-    $length_in  = (string)round($total_in - ((int)floor($total_in / 12)) * 12, 4);
-  }
+  $decompose = function(?string $total_in_str, string &$ft_var, string &$in_var): void {
+    if ($total_in_str === null || $total_in_str === '' || (float)$total_in_str <= 0) return;
+    $total = (float)$total_in_str;
+    $ft_var = (string)(int)floor($total / 12);
+    $in_var = (string)round($total - ((int)floor($total / 12)) * 12, 4);
+  };
+  $decompose($fields['machine_width'],  $mach_width_ft,   $mach_width_in);
+  $decompose($fields['machine_length'], $mach_length_ft,  $mach_length_in);
+  $decompose($fields['cut_length'],   $cut_length_ft,   $cut_length_in);
+  $decompose($fields['cut_width'],    $cut_width_ft,    $cut_width_in);
+  $decompose($fields['crate_length'], $crate_length_ft, $crate_length_in);
+  $decompose($fields['crate_width'],  $crate_width_ft,  $crate_width_in);
+  $decompose($fields['crate_height'], $crate_height_ft, $crate_height_in);
   if ($fields['weight_kg'] !== '' && (float)$fields['weight_kg'] > 0) {
     $weight_lbs = (string)round((float)$fields['weight_kg'] * 2.20462, 4);
+  }
+  if ($fields['crate_weight_kg'] !== '' && (float)$fields['crate_weight_kg'] > 0) {
+    $crate_weight_lbs = (string)round((float)$fields['crate_weight_kg'] * 2.20462, 4);
   }
 }
 
@@ -119,59 +149,89 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $fields['name']        = trim((string)($_POST['name'] ?? ''));
     $fields['model']       = trim((string)($_POST['model'] ?? ''));
     $fields['description'] = trim((string)($_POST['description'] ?? ''));
-    $fields['is_active']   = isset($_POST['is_active']) ? '1' : '0';
+    $fields['is_active']   = isset($_POST['is_active'])  ? '1' : '0';
+    $fields['is_visible']  = isset($_POST['is_visible'])  ? '1' : '0';
+    $fields['is_catalog']  = isset($_POST['is_catalog'])  ? '1' : '0';
 
-    // ── Dimension parsing ────────────────────────────────────────────────────
-    // Accept imperial (ft + in) OR metric (mm); JS keeps both in sync.
-    // If mm fields are provided, prefer them; otherwise calculate from ft+in.
-    $post_width_ft  = trim((string)($_POST['width_ft']  ?? ''));
-    $post_width_in  = trim((string)($_POST['width_in']  ?? ''));
-    $post_width_mm  = trim((string)($_POST['width_mm']  ?? ''));
-    $post_length_ft = trim((string)($_POST['length_ft'] ?? ''));
-    $post_length_in = trim((string)($_POST['length_in'] ?? ''));
-    $post_length_mm = trim((string)($_POST['length_mm'] ?? ''));
+    // ── Dimension parsing helper ─────────────────────────────────────────────
+    // Returns [inches_decimal|null, mm_decimal|null] from POST ft/in/mm fields.
+    $parseDim = function (string $ft_key, string $in_key, string $mm_key): array {
+      $ft  = trim((string)($_POST[$ft_key]  ?? ''));
+      $in  = trim((string)($_POST[$in_key]  ?? ''));
+      $mm  = trim((string)($_POST[$mm_key]  ?? ''));
+      if ($mm !== '') {
+        $mm_v = round((float)$mm, 2);
+        return [round($mm_v / 25.4, 4), $mm_v];
+      }
+      if ($ft !== '' || $in !== '') {
+        $in_v = round(((float)$ft * 12) + (float)$in, 4);
+        return [$in_v, round($in_v * 25.4, 2)];
+      }
+      return [null, null];
+    };
+
+    // Machine Dimensions
+    [$mach_width_db,  $mach_width_mm_db]  = $parseDim('mach_width_ft',  'mach_width_in',  'mach_width_mm');
+    [$mach_length_db, $mach_length_mm_db] = $parseDim('mach_length_ft', 'mach_length_in', 'mach_length_mm');
+    // Cutting Area
+    [$cut_width_db,   $cut_width_mm_db]   = $parseDim('cut_width_ft',   'cut_width_in',   'cut_width_mm');
+    [$cut_length_db,  $cut_length_mm_db]  = $parseDim('cut_length_ft',  'cut_length_in',  'cut_length_mm');
+    // Crate Dimensions
+    [$crate_width_db,  $crate_width_mm_db]  = $parseDim('crate_width_ft',  'crate_width_in',  'crate_width_mm');
+    [$crate_length_db, $crate_length_mm_db] = $parseDim('crate_length_ft', 'crate_length_in', 'crate_length_mm');
+    [$crate_height_db, $crate_height_mm_db] = $parseDim('crate_height_ft', 'crate_height_in', 'crate_height_mm');
+    // Machine Weight
     $post_weight_lbs = trim((string)($_POST['weight_lbs'] ?? ''));
     $post_weight_kg  = trim((string)($_POST['weight_kg']  ?? ''));
-
-    $width_db     = null;
-    $width_mm_db  = null;
-    $length_db    = null;
-    $length_mm_db = null;
     $weight_kg_db = null;
-
-    if ($post_width_mm !== '') {
-      $width_mm_db = round((float)$post_width_mm, 2);
-      $width_db    = round($width_mm_db / 25.4, 4);
-    } elseif ($post_width_ft !== '' || $post_width_in !== '') {
-      $width_db    = round(((float)$post_width_ft * 12) + (float)$post_width_in, 4);
-      $width_mm_db = round($width_db * 25.4, 2);
-    }
-
-    if ($post_length_mm !== '') {
-      $length_mm_db = round((float)$post_length_mm, 2);
-      $length_db    = round($length_mm_db / 25.4, 4);
-    } elseif ($post_length_ft !== '' || $post_length_in !== '') {
-      $length_db    = round(((float)$post_length_ft * 12) + (float)$post_length_in, 4);
-      $length_mm_db = round($length_db * 25.4, 2);
-    }
-
     if ($post_weight_kg !== '') {
       $weight_kg_db = round((float)$post_weight_kg, 2);
     } elseif ($post_weight_lbs !== '') {
       $weight_kg_db = round((float)$post_weight_lbs / 2.20462, 2);
     }
+    // Crate Weight
+    $post_crate_weight_lbs = trim((string)($_POST['crate_weight_lbs'] ?? ''));
+    $post_crate_weight_kg  = trim((string)($_POST['crate_weight_kg']  ?? ''));
+    $crate_weight_kg_db = null;
+    if ($post_crate_weight_kg !== '') {
+      $crate_weight_kg_db = round((float)$post_crate_weight_kg, 2);
+    } elseif ($post_crate_weight_lbs !== '') {
+      $crate_weight_kg_db = round((float)$post_crate_weight_lbs / 2.20462, 2);
+    }
 
     // Repopulate for re-display if there are errors
-    $fields['width']     = $width_db    !== null ? (string)$width_db    : '';
-    $fields['height']    = $length_db   !== null ? (string)$length_db   : '';
-    $fields['width_mm']  = $width_mm_db  !== null ? (string)$width_mm_db  : '';
-    $fields['height_mm'] = $length_mm_db !== null ? (string)$length_mm_db : '';
-    $fields['weight_kg'] = $weight_kg_db !== null ? (string)$weight_kg_db : '';
-    $width_ft   = $post_width_ft;
-    $width_in   = $post_width_in;
-    $length_ft  = $post_length_ft;
-    $length_in  = $post_length_in;
+    $fields['machine_length']    = $mach_length_db    !== null ? (string)$mach_length_db    : '';
+    $fields['machine_width']     = $mach_width_db     !== null ? (string)$mach_width_db     : '';
+    $fields['machine_length_mm'] = $mach_length_mm_db !== null ? (string)$mach_length_mm_db : '';
+    $fields['machine_width_mm']  = $mach_width_mm_db  !== null ? (string)$mach_width_mm_db  : '';
+    $fields['cut_length']   = $cut_length_db    !== null ? (string)$cut_length_db    : '';
+    $fields['cut_width']    = $cut_width_db     !== null ? (string)$cut_width_db     : '';
+    $fields['cut_length_mm'] = $cut_length_mm_db !== null ? (string)$cut_length_mm_db : '';
+    $fields['cut_width_mm'] = $cut_width_mm_db  !== null ? (string)$cut_width_mm_db  : '';
+    $fields['crate_length']    = $crate_length_db    !== null ? (string)$crate_length_db    : '';
+    $fields['crate_width']     = $crate_width_db     !== null ? (string)$crate_width_db     : '';
+    $fields['crate_length_mm'] = $crate_length_mm_db !== null ? (string)$crate_length_mm_db : '';
+    $fields['crate_width_mm']  = $crate_width_mm_db  !== null ? (string)$crate_width_mm_db  : '';
+    $fields['crate_height']    = $crate_height_db    !== null ? (string)$crate_height_db    : '';
+    $fields['crate_height_mm'] = $crate_height_mm_db !== null ? (string)$crate_height_mm_db : '';
+    $fields['crate_weight_kg'] = $crate_weight_kg_db !== null ? (string)$crate_weight_kg_db : '';
+    $fields['weight_kg']    = $weight_kg_db !== null ? (string)$weight_kg_db : '';
+    $mach_width_ft  = trim((string)($_POST['mach_width_ft']  ?? ''));
+    $mach_width_in  = trim((string)($_POST['mach_width_in']  ?? ''));
+    $mach_length_ft = trim((string)($_POST['mach_length_ft'] ?? ''));
+    $mach_length_in = trim((string)($_POST['mach_length_in'] ?? ''));
+    $cut_length_ft  = trim((string)($_POST['cut_length_ft']  ?? ''));
+    $cut_length_in  = trim((string)($_POST['cut_length_in']  ?? ''));
+    $cut_width_ft   = trim((string)($_POST['cut_width_ft']   ?? ''));
+    $cut_width_in   = trim((string)($_POST['cut_width_in']   ?? ''));
+    $crate_length_ft = trim((string)($_POST['crate_length_ft'] ?? ''));
+    $crate_length_in = trim((string)($_POST['crate_length_in'] ?? ''));
+    $crate_width_ft  = trim((string)($_POST['crate_width_ft']  ?? ''));
+    $crate_width_in  = trim((string)($_POST['crate_width_in']  ?? ''));
+    $crate_height_ft = trim((string)($_POST['crate_height_ft'] ?? ''));
+    $crate_height_in = trim((string)($_POST['crate_height_in'] ?? ''));
     $weight_lbs = $post_weight_lbs;
+    $crate_weight_lbs = $post_crate_weight_lbs;
 
     // ── Validation ───────────────────────────────────────────────────────────
     if ($fields['name'] === '') {
@@ -182,55 +242,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (mb_strlen($fields['model']) > 255) {
       $errors[] = 'Model must be 255 characters or fewer.';
     }
-    if ($width_db !== null && $width_db < 0) {
-      $errors[] = 'Width must be a positive number.';
-    }
-    if ($length_db !== null && $length_db < 0) {
-      $errors[] = 'Length must be a positive number.';
+    foreach ([
+      'Cutting Area Width'   => $cut_width_db,
+      'Cutting Area Length'  => $cut_length_db,
+      'Machine Width'        => $mach_width_db,
+      'Machine Length'       => $mach_length_db,
+      'Crate Width'          => $crate_width_db,
+      'Crate Length'         => $crate_length_db,
+      'Crate Height'         => $crate_height_db,
+    ] as $_dim_label => $_dim_val) {
+      if ($_dim_val !== null && $_dim_val < 0) {
+        $errors[] = $_dim_label . ' must be a positive number.';
+      }
     }
     if ($weight_kg_db !== null && $weight_kg_db < 0) {
-      $errors[] = 'Weight must be a positive number.';
+      $errors[] = 'Machine Weight must be a positive number.';
+    }
+    if ($crate_weight_kg_db !== null && $crate_weight_kg_db < 0) {
+      $errors[] = 'Crate Weight must be a positive number.';
     }
 
     // ── Photo uploads ────────────────────────────────────────────────────────
     $new_primary   = $processPhotoUpload('primary_photo_upload',   'Primary photo',   'machine_primary');
     $new_secondary = $processPhotoUpload('secondary_photo_upload', 'Secondary photo', 'machine_secondary');
+    $new_tertiary  = $processPhotoUpload('tertiary_photo_upload',  'Tertiary photo',  'machine_tertiary');
 
     // ── Save ─────────────────────────────────────────────────────────────────
     if (!$errors) {
       $primary_final   = $new_primary   ?? ($is_edit ? $fields['primary_photo']   : null) ?: null;
       $secondary_final = $new_secondary ?? ($is_edit ? $fields['secondary_photo'] : null) ?: null;
+      $tertiary_final  = $new_tertiary  ?? ($is_edit ? $fields['tertiary_photo']  : null) ?: null;
+
+      $common_params = [
+        $fields['name'],
+        $fields['model'] !== '' ? $fields['model'] : null,
+        // Machine Dimensions
+      $mach_length_db, $mach_width_db, $mach_length_mm_db, $mach_width_mm_db,
+        $weight_kg_db,
+        // Cutting Area
+        $cut_length_db, $cut_width_db, $cut_length_mm_db, $cut_width_mm_db,
+        // Crate Dimensions
+        $crate_length_db, $crate_width_db, $crate_length_mm_db, $crate_width_mm_db,
+        $crate_height_db, $crate_height_mm_db, $crate_weight_kg_db,
+        // Photos
+        $primary_final, $secondary_final, $tertiary_final,
+        // Content & toggles
+        $fields['description'] !== '' ? $fields['description'] : null,
+        (int)$fields['is_active'],
+        (int)$fields['is_visible'],
+        (int)$fields['is_catalog'],
+      ];
 
       if ($is_edit) {
         $pdo->prepare("
           UPDATE machines SET
             name = ?, model = ?,
-            width = ?, height = ?, width_mm = ?, height_mm = ?, weight_kg = ?,
-            primary_photo = ?, secondary_photo = ?,
-            description = ?, is_active = ?
+            machine_length = ?, machine_width = ?, machine_length_mm = ?, machine_width_mm = ?, weight_kg = ?,
+            cut_length = ?, cut_width = ?, cut_length_mm = ?, cut_width_mm = ?,
+            crate_length = ?, crate_width = ?, crate_length_mm = ?, crate_width_mm = ?,
+            crate_height = ?, crate_height_mm = ?, crate_weight_kg = ?,
+            primary_photo = ?, secondary_photo = ?, tertiary_photo = ?,
+            description = ?, is_active = ?, is_visible = ?, is_catalog = ?
           WHERE id = ?
-        ")->execute([
-          $fields['name'],
-          $fields['model'] !== '' ? $fields['model'] : null,
-          $width_db, $length_db, $width_mm_db, $length_mm_db, $weight_kg_db,
-          $primary_final, $secondary_final,
-          $fields['description'] !== '' ? $fields['description'] : null,
-          (int)$fields['is_active'],
-          $id,
-        ]);
+        ")->execute([...$common_params, $id]);
         $success = 'Machine updated.';
       } else {
         $pdo->prepare("
-          INSERT INTO machines (name, model, width, height, width_mm, height_mm, weight_kg, primary_photo, secondary_photo, description, is_active)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ")->execute([
-          $fields['name'],
-          $fields['model'] !== '' ? $fields['model'] : null,
-          $width_db, $length_db, $width_mm_db, $length_mm_db, $weight_kg_db,
-          $primary_final, $secondary_final,
-          $fields['description'] !== '' ? $fields['description'] : null,
-          (int)$fields['is_active'],
-        ]);
+          INSERT INTO machines
+            (name, model,
+             machine_length, machine_width, machine_length_mm, machine_width_mm, weight_kg,
+             cut_length, cut_width, cut_length_mm, cut_width_mm,
+             crate_length, crate_width, crate_length_mm, crate_width_mm,
+             crate_height, crate_height_mm, crate_weight_kg,
+             primary_photo, secondary_photo, tertiary_photo,
+             description, is_active, is_visible, is_catalog)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ")->execute($common_params);
         $id      = (int)$pdo->lastInsertId();
         $is_edit = true;
         $success = 'Machine added.';
@@ -247,10 +334,10 @@ render_header($page_title);
 ?>
 
 <style>
-  /* ── Dimension / Weight cards ──────────────────────────────────────── */
+  /* ── Dimension section cards ───────────────────────────────────────── */
   .dim-sections {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 14px;
     margin-top: 4px;
   }
@@ -276,24 +363,25 @@ render_header($page_title);
     color: #94a3b8;
     margin-bottom: 8px;
   }
-  .dim-inputs {
+  .dim-row {
     display: flex;
     gap: 10px;
     align-items: flex-end;
     flex-wrap: wrap;
+    margin-bottom: 4px;
   }
-  .dim-inputs > div {
+  .dim-row > div {
     display: flex;
     flex-direction: column;
     gap: 3px;
   }
-  .dim-inputs > div > label {
+  .dim-row > div > label {
     font-size: 0.78rem;
     color: #64748b;
     margin: 0;
     white-space: nowrap;
   }
-  .dim-inputs input[type="number"] {
+  .dim-row input[type="number"] {
     width: 90px;
   }
   .dim-unit-sep {
@@ -311,6 +399,21 @@ render_header($page_title);
     display: block;
     background: #f8fafc;
     margin-top: 8px;
+  }
+  /* ── Toggle row ────────────────────────────────────────────────────── */
+  .toggle-row {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .toggle-row label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    margin: 0;
   }
 </style>
 
@@ -355,110 +458,309 @@ render_header($page_title);
                placeholder="e.g. Thunder Laser Nova 63" />
       </div>
 
-      <!-- ── Dimensions & Weight ──────────────────────────────────────────── -->
+      <!-- ── Cutting Area ───────────────────────────────────────────────── -->
       <div class="full">
-        <label>Dimensions &amp; Weight</label>
+        <label>Cutting Area</label>
         <div class="dim-sections">
 
-          <!-- Width -->
-          <div class="dim-card">
-            <div class="dim-card-title">Width</div>
-
-            <div class="dim-unit-label">Imperial</div>
-            <div class="dim-inputs">
-              <div>
-                <label for="width_ft">Feet</label>
-                <input type="number" id="width_ft" name="width_ft" min="0" step="1"
-                       value="<?= h($width_ft) ?>" placeholder="0"
-                       oninput="syncWidthImperialToMm()" />
-              </div>
-              <div>
-                <label for="width_in">Inches</label>
-                <input type="number" id="width_in" name="width_in" min="0" max="11.9999" step="0.01"
-                       value="<?= h($width_in) ?>" placeholder="0"
-                       oninput="syncWidthImperialToMm()" />
-              </div>
-            </div>
-
-            <div class="dim-unit-sep"></div>
-
-            <div class="dim-unit-label">Metric</div>
-            <div class="dim-inputs">
-              <div>
-                <label for="width_mm">Millimeters</label>
-                <input type="number" id="width_mm" name="width_mm" min="0" step="0.1"
-                       value="<?= h($fields['width_mm']) ?>" placeholder="0"
-                       oninput="syncWidthMmToImperial()" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Length -->
           <div class="dim-card">
             <div class="dim-card-title">Length</div>
 
             <div class="dim-unit-label">Imperial</div>
-            <div class="dim-inputs">
+            <div class="dim-row">
               <div>
-                <label for="length_ft">Feet</label>
-                <input type="number" id="length_ft" name="length_ft" min="0" step="1"
-                       value="<?= h($length_ft) ?>" placeholder="0"
-                       oninput="syncLengthImperialToMm()" />
+                <label for="cut_length_ft">Feet</label>
+                <input type="number" id="cut_length_ft" name="cut_length_ft" min="0" step="1"
+                       value="<?= h($cut_length_ft) ?>" placeholder="0"
+                       oninput="syncImperialToMm('cut_length_ft','cut_length_in','cut_length_mm')" />
               </div>
               <div>
-                <label for="length_in">Inches</label>
-                <input type="number" id="length_in" name="length_in" min="0" max="11.9999" step="0.01"
-                       value="<?= h($length_in) ?>" placeholder="0"
-                       oninput="syncLengthImperialToMm()" />
+                <label for="cut_length_in">Inches</label>
+                <input type="number" id="cut_length_in" name="cut_length_in" min="0" max="11.9999" step="0.01"
+                       value="<?= h($cut_length_in) ?>" placeholder="0"
+                       oninput="syncImperialToMm('cut_length_ft','cut_length_in','cut_length_mm')" />
               </div>
             </div>
 
             <div class="dim-unit-sep"></div>
 
             <div class="dim-unit-label">Metric</div>
-            <div class="dim-inputs">
+            <div class="dim-row">
               <div>
-                <label for="length_mm">Millimeters</label>
-                <input type="number" id="length_mm" name="length_mm" min="0" step="0.1"
-                       value="<?= h($fields['height_mm']) ?>" placeholder="0"
-                       oninput="syncLengthMmToImperial()" />
+                <label for="cut_length_mm">Millimeters</label>
+                <input type="number" id="cut_length_mm" name="cut_length_mm" min="0" step="0.1"
+                       value="<?= h($fields['cut_length_mm']) ?>" placeholder="0"
+                       oninput="syncMmToImperial('cut_length_mm','cut_length_ft','cut_length_in')" />
               </div>
             </div>
           </div>
 
-          <!-- Weight -->
+          <div class="dim-card">
+            <div class="dim-card-title">Width</div>
+
+            <div class="dim-unit-label">Imperial</div>
+            <div class="dim-row">
+              <div>
+                <label for="cut_width_ft">Feet</label>
+                <input type="number" id="cut_width_ft" name="cut_width_ft" min="0" step="1"
+                       value="<?= h($cut_width_ft) ?>" placeholder="0"
+                       oninput="syncImperialToMm('cut_width_ft','cut_width_in','cut_width_mm')" />
+              </div>
+              <div>
+                <label for="cut_width_in">Inches</label>
+                <input type="number" id="cut_width_in" name="cut_width_in" min="0" max="11.9999" step="0.01"
+                       value="<?= h($cut_width_in) ?>" placeholder="0"
+                       oninput="syncImperialToMm('cut_width_ft','cut_width_in','cut_width_mm')" />
+              </div>
+            </div>
+
+            <div class="dim-unit-sep"></div>
+
+            <div class="dim-unit-label">Metric</div>
+            <div class="dim-row">
+              <div>
+                <label for="cut_width_mm">Millimeters</label>
+                <input type="number" id="cut_width_mm" name="cut_width_mm" min="0" step="0.1"
+                       value="<?= h($fields['cut_width_mm']) ?>" placeholder="0"
+                       oninput="syncMmToImperial('cut_width_mm','cut_width_ft','cut_width_in')" />
+              </div>
+            </div>
+          </div>
+
+        </div><!-- .dim-sections cutting area -->
+      </div>
+
+      <!-- ── Machine Dimensions ────────────────────────────────────────── -->
+      <div class="full">
+        <label>Machine Dimensions</label>
+        <div class="dim-sections">
+
+          <div class="dim-card">
+            <div class="dim-card-title">Length</div>
+
+            <div class="dim-unit-label">Imperial</div>
+            <div class="dim-row">
+              <div>
+                <label for="mach_length_ft">Feet</label>
+                <input type="number" id="mach_length_ft" name="mach_length_ft" min="0" step="1"
+                       value="<?= h($mach_length_ft) ?>" placeholder="0"
+                       oninput="syncImperialToMm('mach_length_ft','mach_length_in','mach_length_mm')" />
+              </div>
+              <div>
+                <label for="mach_length_in">Inches</label>
+                <input type="number" id="mach_length_in" name="mach_length_in" min="0" max="11.9999" step="0.01"
+                       value="<?= h($mach_length_in) ?>" placeholder="0"
+                       oninput="syncImperialToMm('mach_length_ft','mach_length_in','mach_length_mm')" />
+              </div>
+            </div>
+
+            <div class="dim-unit-sep"></div>
+
+            <div class="dim-unit-label">Metric</div>
+            <div class="dim-row">
+              <div>
+                <label for="mach_length_mm">Millimeters</label>
+                <input type="number" id="mach_length_mm" name="mach_length_mm" min="0" step="0.1"
+                       value="<?= h($fields['machine_length_mm']) ?>" placeholder="0"
+                       oninput="syncMmToImperial('mach_length_mm','mach_length_ft','mach_length_in')" />
+              </div>
+            </div>
+          </div>
+
+          <div class="dim-card">
+            <div class="dim-card-title">Width</div>
+
+            <div class="dim-unit-label">Imperial</div>
+            <div class="dim-row">
+              <div>
+                <label for="mach_width_ft">Feet</label>
+                <input type="number" id="mach_width_ft" name="mach_width_ft" min="0" step="1"
+                       value="<?= h($mach_width_ft) ?>" placeholder="0"
+                       oninput="syncImperialToMm('mach_width_ft','mach_width_in','mach_width_mm')" />
+              </div>
+              <div>
+                <label for="mach_width_in">Inches</label>
+                <input type="number" id="mach_width_in" name="mach_width_in" min="0" max="11.9999" step="0.01"
+                       value="<?= h($mach_width_in) ?>" placeholder="0"
+                       oninput="syncImperialToMm('mach_width_ft','mach_width_in','mach_width_mm')" />
+              </div>
+            </div>
+
+            <div class="dim-unit-sep"></div>
+
+            <div class="dim-unit-label">Metric</div>
+            <div class="dim-row">
+              <div>
+                <label for="mach_width_mm">Millimeters</label>
+                <input type="number" id="mach_width_mm" name="mach_width_mm" min="0" step="0.1"
+                       value="<?= h($fields['machine_width_mm']) ?>" placeholder="0"
+                       oninput="syncMmToImperial('mach_width_mm','mach_width_ft','mach_width_in')" />
+              </div>
+            </div>
+          </div>
+
           <div class="dim-card">
             <div class="dim-card-title">Weight</div>
 
             <div class="dim-unit-label">Imperial</div>
-            <div class="dim-inputs">
+            <div class="dim-row">
               <div>
                 <label for="weight_lbs">Pounds (lbs)</label>
                 <input type="number" id="weight_lbs" name="weight_lbs" min="0" step="0.01"
                        value="<?= h($weight_lbs) ?>" placeholder="0"
-                       oninput="syncWeightLbsToKg()" />
+                       oninput="syncLbsToKg('weight_lbs','weight_kg')" />
               </div>
             </div>
 
             <div class="dim-unit-sep"></div>
 
             <div class="dim-unit-label">Metric</div>
-            <div class="dim-inputs">
+            <div class="dim-row">
               <div>
                 <label for="weight_kg">Kilograms (kg)</label>
                 <input type="number" id="weight_kg" name="weight_kg" min="0" step="0.01"
                        value="<?= h($fields['weight_kg']) ?>" placeholder="0"
-                       oninput="syncWeightKgToLbs()" />
+                       oninput="syncKgToLbs('weight_kg','weight_lbs')" />
               </div>
             </div>
           </div>
 
-        </div><!-- .dim-sections -->
+        </div><!-- .dim-sections machine -->
+      </div>
+
+      <!-- ── Crate Dimensions ──────────────────────────────────────────── -->
+      <div class="full">
+        <label>Crate Dimensions</label>
+        <div class="dim-sections">
+
+          <div class="dim-card">
+            <div class="dim-card-title">Length</div>
+
+            <div class="dim-unit-label">Imperial</div>
+            <div class="dim-row">
+              <div>
+                <label for="crate_length_ft">Feet</label>
+                <input type="number" id="crate_length_ft" name="crate_length_ft" min="0" step="1"
+                       value="<?= h($crate_length_ft) ?>" placeholder="0"
+                       oninput="syncImperialToMm('crate_length_ft','crate_length_in','crate_length_mm')" />
+              </div>
+              <div>
+                <label for="crate_length_in">Inches</label>
+                <input type="number" id="crate_length_in" name="crate_length_in" min="0" max="11.9999" step="0.01"
+                       value="<?= h($crate_length_in) ?>" placeholder="0"
+                       oninput="syncImperialToMm('crate_length_ft','crate_length_in','crate_length_mm')" />
+              </div>
+            </div>
+
+            <div class="dim-unit-sep"></div>
+
+            <div class="dim-unit-label">Metric</div>
+            <div class="dim-row">
+              <div>
+                <label for="crate_length_mm">Millimeters</label>
+                <input type="number" id="crate_length_mm" name="crate_length_mm" min="0" step="0.1"
+                       value="<?= h($fields['crate_length_mm']) ?>" placeholder="0"
+                       oninput="syncMmToImperial('crate_length_mm','crate_length_ft','crate_length_in')" />
+              </div>
+            </div>
+          </div>
+
+          <div class="dim-card">
+            <div class="dim-card-title">Width</div>
+
+            <div class="dim-unit-label">Imperial</div>
+            <div class="dim-row">
+              <div>
+                <label for="crate_width_ft">Feet</label>
+                <input type="number" id="crate_width_ft" name="crate_width_ft" min="0" step="1"
+                       value="<?= h($crate_width_ft) ?>" placeholder="0"
+                       oninput="syncImperialToMm('crate_width_ft','crate_width_in','crate_width_mm')" />
+              </div>
+              <div>
+                <label for="crate_width_in">Inches</label>
+                <input type="number" id="crate_width_in" name="crate_width_in" min="0" max="11.9999" step="0.01"
+                       value="<?= h($crate_width_in) ?>" placeholder="0"
+                       oninput="syncImperialToMm('crate_width_ft','crate_width_in','crate_width_mm')" />
+              </div>
+            </div>
+
+            <div class="dim-unit-sep"></div>
+
+            <div class="dim-unit-label">Metric</div>
+            <div class="dim-row">
+              <div>
+                <label for="crate_width_mm">Millimeters</label>
+                <input type="number" id="crate_width_mm" name="crate_width_mm" min="0" step="0.1"
+                       value="<?= h($fields['crate_width_mm']) ?>" placeholder="0"
+                       oninput="syncMmToImperial('crate_width_mm','crate_width_ft','crate_width_in')" />
+              </div>
+            </div>
+          </div>
+
+          <div class="dim-card">
+            <div class="dim-card-title">Height</div>
+
+            <div class="dim-unit-label">Imperial</div>
+            <div class="dim-row">
+              <div>
+                <label for="crate_height_ft">Feet</label>
+                <input type="number" id="crate_height_ft" name="crate_height_ft" min="0" step="1"
+                       value="<?= h($crate_height_ft) ?>" placeholder="0"
+                       oninput="syncImperialToMm('crate_height_ft','crate_height_in','crate_height_mm')" />
+              </div>
+              <div>
+                <label for="crate_height_in">Inches</label>
+                <input type="number" id="crate_height_in" name="crate_height_in" min="0" max="11.9999" step="0.01"
+                       value="<?= h($crate_height_in) ?>" placeholder="0"
+                       oninput="syncImperialToMm('crate_height_ft','crate_height_in','crate_height_mm')" />
+              </div>
+            </div>
+
+            <div class="dim-unit-sep"></div>
+
+            <div class="dim-unit-label">Metric</div>
+            <div class="dim-row">
+              <div>
+                <label for="crate_height_mm">Millimeters</label>
+                <input type="number" id="crate_height_mm" name="crate_height_mm" min="0" step="0.1"
+                       value="<?= h($fields['crate_height_mm']) ?>" placeholder="0"
+                       oninput="syncMmToImperial('crate_height_mm','crate_height_ft','crate_height_in')" />
+              </div>
+            </div>
+          </div>
+
+          <div class="dim-card">
+            <div class="dim-card-title">Weight</div>
+
+            <div class="dim-unit-label">Imperial</div>
+            <div class="dim-row">
+              <div>
+                <label for="crate_weight_lbs">Pounds (lbs)</label>
+                <input type="number" id="crate_weight_lbs" name="crate_weight_lbs" min="0" step="0.01"
+                       value="<?= h($crate_weight_lbs) ?>" placeholder="0"
+                       oninput="syncLbsToKg('crate_weight_lbs','crate_weight_kg')" />
+              </div>
+            </div>
+
+            <div class="dim-unit-sep"></div>
+
+            <div class="dim-unit-label">Metric</div>
+            <div class="dim-row">
+              <div>
+                <label for="crate_weight_kg">Kilograms (kg)</label>
+                <input type="number" id="crate_weight_kg" name="crate_weight_kg" min="0" step="0.01"
+                       value="<?= h($fields['crate_weight_kg']) ?>" placeholder="0"
+                       oninput="syncKgToLbs('crate_weight_kg','crate_weight_lbs')" />
+              </div>
+            </div>
+          </div>
+
+        </div><!-- .dim-sections crate -->
       </div>
 
       <!-- ── Photos ───────────────────────────────────────────────────────── -->
       <div>
-        <label>Primary Photo (JPG, PNG, GIF, WebP)</label>
+        <label>Photo 1 (JPG, PNG, GIF, WebP)</label>
         <input type="file" name="primary_photo_upload" id="primary_photo_upload"
                accept="image/jpeg,image/png,image/gif,image/webp"
                onchange="previewPhoto(this, 'primary_preview')" />
@@ -467,7 +769,7 @@ render_header($page_title);
           <a href="uploads/<?= h(rawurlencode($fields['primary_photo'])) ?>" target="_blank" rel="noopener noreferrer">
             <img class="photo-preview" id="primary_preview"
                  src="uploads/<?= h(rawurlencode($fields['primary_photo'])) ?>"
-                 alt="Current primary photo" />
+                 alt="Current photo 1" />
           </a>
         <?php else: ?>
           <img class="photo-preview" id="primary_preview" src="" alt="" style="display:none;" />
@@ -475,7 +777,7 @@ render_header($page_title);
       </div>
 
       <div>
-        <label>Secondary Photo (JPG, PNG, GIF, WebP)</label>
+        <label>Photo 2 (JPG, PNG, GIF, WebP)</label>
         <input type="file" name="secondary_photo_upload" id="secondary_photo_upload"
                accept="image/jpeg,image/png,image/gif,image/webp"
                onchange="previewPhoto(this, 'secondary_preview')" />
@@ -484,25 +786,61 @@ render_header($page_title);
           <a href="uploads/<?= h(rawurlencode($fields['secondary_photo'])) ?>" target="_blank" rel="noopener noreferrer">
             <img class="photo-preview" id="secondary_preview"
                  src="uploads/<?= h(rawurlencode($fields['secondary_photo'])) ?>"
-                 alt="Current secondary photo" />
+                 alt="Current photo 2" />
           </a>
         <?php else: ?>
           <img class="photo-preview" id="secondary_preview" src="" alt="" style="display:none;" />
         <?php endif; ?>
       </div>
 
+      <div>
+        <label>Photo 3 (JPG, PNG, GIF, WebP)</label>
+        <input type="file" name="tertiary_photo_upload" id="tertiary_photo_upload"
+               accept="image/jpeg,image/png,image/gif,image/webp"
+               onchange="previewPhoto(this, 'tertiary_preview')" />
+        <?php if ($is_edit && $fields['tertiary_photo'] !== ''): ?>
+          <div class="muted" style="margin-top:4px;">Upload a new file to replace the current photo.</div>
+          <a href="uploads/<?= h(rawurlencode($fields['tertiary_photo'])) ?>" target="_blank" rel="noopener noreferrer">
+            <img class="photo-preview" id="tertiary_preview"
+                 src="uploads/<?= h(rawurlencode($fields['tertiary_photo'])) ?>"
+                 alt="Current photo 3" />
+          </a>
+        <?php else: ?>
+          <img class="photo-preview" id="tertiary_preview" src="" alt="" style="display:none;" />
+        <?php endif; ?>
+      </div>
+
+      <!-- ── Description ──────────────────────────────────────────────────── -->
       <div class="full">
         <label>Description</label>
         <textarea name="description" rows="4"
                   placeholder="e.g. High-powered CO₂ laser cutter for large-format sheet work…"><?= h($fields['description']) ?></textarea>
       </div>
 
+      <!-- ── Toggles ──────────────────────────────────────────────────────── -->
       <div class="full">
-        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-          <input type="checkbox" name="is_active" value="1"
-                 <?= $fields['is_active'] === '1' ? 'checked' : '' ?> />
-          Active (visible in catalog)
-        </label>
+        <div class="toggle-row">
+          <label title="Machine is operational and available for use">
+            <input type="checkbox" name="is_active" value="1"
+                   <?= $fields['is_active']  === '1' ? 'checked' : '' ?> />
+            Active
+          </label>
+          <label title="Machine is displayed on the public-facing site">
+            <input type="checkbox" name="is_visible" value="1"
+                   <?= $fields['is_visible'] === '1' ? 'checked' : '' ?> />
+            Visible
+          </label>
+          <label title="Machine appears in the equipment catalog">
+            <input type="checkbox" name="is_catalog" value="1"
+                   <?= $fields['is_catalog'] === '1' ? 'checked' : '' ?> />
+            Catalog
+          </label>
+        </div>
+        <div class="muted" style="margin-top:6px; font-size:0.82rem;">
+          <strong>Active</strong> — machine is operational &nbsp;·&nbsp;
+          <strong>Visible</strong> — shown on the public site &nbsp;·&nbsp;
+          <strong>Catalog</strong> — listed in the equipment catalog
+        </div>
       </div>
 
     </div><!-- .form-grid -->
@@ -516,61 +854,37 @@ render_header($page_title);
 
 <script>
 // ── Unit conversion helpers ─────────────────────────────────────────────────
-function inchesToMm(inches) { return inches * 25.4; }
-function mmToInches(mm)     { return mm / 25.4; }
-
 function round2(n) { return Math.round(n * 100) / 100; }
 
-function syncWidthImperialToMm() {
-  var ft     = parseFloat(document.getElementById('width_ft').value) || 0;
-  var inches = parseFloat(document.getElementById('width_in').value) || 0;
+function syncImperialToMm(ftId, inId, mmId) {
+  var ft       = parseFloat(document.getElementById(ftId).value) || 0;
+  var inches   = parseFloat(document.getElementById(inId).value) || 0;
   var total_in = ft * 12 + inches;
-  document.getElementById('width_mm').value = total_in > 0 ? round2(inchesToMm(total_in)) : '';
+  document.getElementById(mmId).value = total_in > 0 ? round2(total_in * 25.4) : '';
 }
 
-function syncWidthMmToImperial() {
-  var mm = parseFloat(document.getElementById('width_mm').value) || 0;
+function syncMmToImperial(mmId, ftId, inId) {
+  var mm = parseFloat(document.getElementById(mmId).value) || 0;
   if (mm > 0) {
-    var total_in = mmToInches(mm);
-    var ft     = Math.floor(total_in / 12);
-    var inches = round2(total_in - ft * 12);
-    document.getElementById('width_ft').value = ft || '';
-    document.getElementById('width_in').value = inches || '';
+    var total_in = mm / 25.4;
+    var ft       = Math.floor(total_in / 12);
+    var inches   = round2(total_in - ft * 12);
+    document.getElementById(ftId).value = ft   || '';
+    document.getElementById(inId).value = inches || '';
   } else {
-    document.getElementById('width_ft').value = '';
-    document.getElementById('width_in').value = '';
+    document.getElementById(ftId).value = '';
+    document.getElementById(inId).value = '';
   }
 }
 
-function syncLengthImperialToMm() {
-  var ft     = parseFloat(document.getElementById('length_ft').value) || 0;
-  var inches = parseFloat(document.getElementById('length_in').value) || 0;
-  var total_in = ft * 12 + inches;
-  document.getElementById('length_mm').value = total_in > 0 ? round2(inchesToMm(total_in)) : '';
+function syncLbsToKg(lbsId, kgId) {
+  var lbs = parseFloat(document.getElementById(lbsId).value) || 0;
+  document.getElementById(kgId).value = lbs > 0 ? round2(lbs / 2.20462) : '';
 }
 
-function syncLengthMmToImperial() {
-  var mm = parseFloat(document.getElementById('length_mm').value) || 0;
-  if (mm > 0) {
-    var total_in = mmToInches(mm);
-    var ft     = Math.floor(total_in / 12);
-    var inches = round2(total_in - ft * 12);
-    document.getElementById('length_ft').value = ft || '';
-    document.getElementById('length_in').value = inches || '';
-  } else {
-    document.getElementById('length_ft').value = '';
-    document.getElementById('length_in').value = '';
-  }
-}
-
-function syncWeightLbsToKg() {
-  var lbs = parseFloat(document.getElementById('weight_lbs').value) || 0;
-  document.getElementById('weight_kg').value = lbs > 0 ? round2(lbs / 2.20462) : '';
-}
-
-function syncWeightKgToLbs() {
-  var kg = parseFloat(document.getElementById('weight_kg').value) || 0;
-  document.getElementById('weight_lbs').value = kg > 0 ? round2(kg * 2.20462) : '';
+function syncKgToLbs(kgId, lbsId) {
+  var kg = parseFloat(document.getElementById(kgId).value) || 0;
+  document.getElementById(lbsId).value = kg > 0 ? round2(kg * 2.20462) : '';
 }
 
 // ── Photo preview ───────────────────────────────────────────────────────────

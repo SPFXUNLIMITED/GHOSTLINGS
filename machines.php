@@ -12,12 +12,12 @@ if (empty($_SESSION['machine_delete_csrf'])) {
   $_SESSION['machine_delete_csrf'] = bin2hex(random_bytes(24));
 }
 
-// Ordered by area descending (largest machines first); NULLs last
+// Ordered by cutting area descending (largest first); fall back to machine dims; NULLs last
 $stmt = $pdo->query("
   SELECT * FROM machines
   ORDER BY
-    CASE WHEN width_mm IS NULL OR height_mm IS NULL THEN 1 ELSE 0 END ASC,
-    (COALESCE(width_mm, 0) * COALESCE(height_mm, 0)) DESC,
+    CASE WHEN cut_width_mm IS NULL OR cut_length_mm IS NULL THEN 1 ELSE 0 END ASC,
+    (COALESCE(cut_width_mm, 0) * COALESCE(cut_length_mm, 0)) DESC,
     name ASC
 ");
 $machines = $stmt->fetchAll();
@@ -199,15 +199,24 @@ render_header('Machines');
   <?php
     $primary_url   = ($m['primary_photo']   !== null && $m['primary_photo']   !== '') ? 'uploads/' . rawurlencode($m['primary_photo'])   : '';
     $secondary_url = ($m['secondary_photo'] !== null && $m['secondary_photo'] !== '') ? 'uploads/' . rawurlencode($m['secondary_photo']) : '';
+    $tertiary_url  = (isset($m['tertiary_photo']) && $m['tertiary_photo']  !== null && $m['tertiary_photo']  !== '') ? 'uploads/' . rawurlencode($m['tertiary_photo'])  : '';
 
-    $width_imperial  = fmt_inches_imperial($m['width']);
-    $height_imperial = fmt_inches_imperial($m['height']);
-    $width_mm_disp   = fmt_mm_display($m['width_mm']);
-    $height_mm_disp  = fmt_mm_display($m['height_mm']);
+    // Cutting area (preferred) or machine dimensions for size badge
+    $has_cut  = (isset($m['cut_width_mm']) && $m['cut_width_mm'] !== null) || (isset($m['cut_length_mm']) && $m['cut_length_mm'] !== null);
+    $has_mach = ($m['machine_width_mm'] !== null || $m['machine_length_mm'] !== null);
 
-    $has_size = ($m['width'] !== null || $m['width_mm'] !== null);
-    if ($has_size) {
-      $size_str = $width_imperial . ' × ' . $height_imperial . ' (' . $width_mm_disp . ' × ' . $height_mm_disp . ')';
+    if ($has_cut) {
+      $cw_imp = fmt_inches_imperial($m['cut_width']  ?? null);
+      $cl_imp = fmt_inches_imperial($m['cut_length'] ?? null);
+      $cw_mm  = fmt_mm_display($m['cut_width_mm']  ?? null);
+      $cl_mm  = fmt_mm_display($m['cut_length_mm'] ?? null);
+      $size_str = '✂️ ' . $cl_imp . ' × ' . $cw_imp . ' (' . $cl_mm . ' × ' . $cw_mm . ')';
+    } elseif ($has_mach) {
+      $mw_imp = fmt_inches_imperial($m['machine_width']);
+      $ml_imp = fmt_inches_imperial($m['machine_length']);
+      $mw_mm  = fmt_mm_display($m['machine_width_mm']);
+      $ml_mm  = fmt_mm_display($m['machine_length_mm']);
+      $size_str = '📐 ' . $ml_imp . ' × ' . $mw_imp . ' (' . $ml_mm . ' × ' . $mw_mm . ')';
     } else {
       $size_str = '';
     }
@@ -215,10 +224,10 @@ render_header('Machines');
   <div class="machine-card">
     <div class="machine-photos">
       <?php if ($primary_url !== ''): ?>
-        <a href="<?= h($primary_url) ?>" target="_blank" rel="noopener noreferrer" title="View primary photo">
+        <a href="<?= h($primary_url) ?>" target="_blank" rel="noopener noreferrer" title="View photo 1">
           <img class="machine-photo"
                src="<?= h($primary_url) ?>"
-               alt="<?= h($m['name']) ?> — primary photo"
+               alt="<?= h($m['name']) ?> — photo 1"
                loading="lazy"
                decoding="async" />
         </a>
@@ -227,10 +236,20 @@ render_header('Machines');
       <?php endif; ?>
 
       <?php if ($secondary_url !== ''): ?>
-        <a href="<?= h($secondary_url) ?>" target="_blank" rel="noopener noreferrer" title="View secondary photo">
+        <a href="<?= h($secondary_url) ?>" target="_blank" rel="noopener noreferrer" title="View photo 2">
           <img class="machine-photo"
                src="<?= h($secondary_url) ?>"
-               alt="<?= h($m['name']) ?> — secondary photo"
+               alt="<?= h($m['name']) ?> — photo 2"
+               loading="lazy"
+               decoding="async" />
+        </a>
+      <?php endif; ?>
+
+      <?php if ($tertiary_url !== ''): ?>
+        <a href="<?= h($tertiary_url) ?>" target="_blank" rel="noopener noreferrer" title="View photo 3">
+          <img class="machine-photo"
+               src="<?= h($tertiary_url) ?>"
+               alt="<?= h($m['name']) ?> — photo 3"
                loading="lazy"
                decoding="async" />
         </a>
@@ -240,6 +259,12 @@ render_header('Machines');
     <div class="machine-info">
       <?php if (!$m['is_active']): ?>
         <span class="machine-inactive-badge">Inactive</span>
+      <?php endif; ?>
+      <?php if (isset($m['is_visible']) && !$m['is_visible']): ?>
+        <span class="machine-inactive-badge">Hidden</span>
+      <?php endif; ?>
+      <?php if (isset($m['is_catalog']) && !$m['is_catalog']): ?>
+        <span class="machine-inactive-badge">Off Catalog</span>
       <?php endif; ?>
 
       <h2 class="machine-name"><?= h($m['name']) ?></h2>
