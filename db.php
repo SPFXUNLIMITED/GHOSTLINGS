@@ -2103,3 +2103,39 @@ foreach ([
   }
 }
 unset($_machines_sql, $_machines_e);
+
+// Add crate height and weight columns to machines (if not already present)
+foreach ([
+  "ALTER TABLE machines ADD COLUMN crate_height    DECIMAL(10,4) NULL AFTER crate_width_mm",
+  "ALTER TABLE machines ADD COLUMN crate_height_mm DECIMAL(10,2) NULL AFTER crate_height",
+  "ALTER TABLE machines ADD COLUMN crate_weight_kg DECIMAL(10,2) NULL AFTER crate_height_mm",
+] as $_mach_crate_sql) {
+  try {
+    $pdo->exec($_mach_crate_sql);
+  } catch (PDOException $_mach_crate_e) {
+    if ($_mach_crate_e->getCode() !== '42S21') {
+      throw $_mach_crate_e;
+    }
+  }
+}
+unset($_mach_crate_sql, $_mach_crate_e);
+
+// Rename legacy machine dimension columns to explicit prefixed names
+foreach ([
+  ['width',     'machine_length',    'DECIMAL(10,4) NULL'],
+  ['height',    'machine_width',     'DECIMAL(10,4) NULL'],
+  ['width_mm',  'machine_length_mm', 'DECIMAL(10,2) NULL'],
+  ['height_mm', 'machine_width_mm',  'DECIMAL(10,2) NULL'],
+  ['weight_kg', 'machine_weight_kg', 'DECIMAL(10,2) NULL'],
+] as [$_old_col, $_new_col, $_col_type]) {
+  $_chk_stmt = $pdo->prepare("SHOW COLUMNS FROM machines LIKE ?");
+  $_chk_stmt->execute([$_new_col]);
+  if ($_chk_stmt->fetch(PDO::FETCH_ASSOC) === false) {
+    try {
+      $pdo->exec("ALTER TABLE machines CHANGE `{$_old_col}` `{$_new_col}` {$_col_type}");
+    } catch (PDOException $_mach_ren_e) {
+      // Old column already gone or new column already exists — skip silently
+    }
+  }
+}
+unset($_old_col, $_new_col, $_col_type, $_chk_stmt, $_mach_ren_e);

@@ -26,7 +26,7 @@ $fields = [
   'machine_width'      => '',
   'machine_length_mm'  => '',
   'machine_width_mm'   => '',
-  'weight_kg'          => '',
+  'machine_weight_kg'  => '',
   // Cutting Area
   'cut_length'       => '',
   'cut_width'        => '',
@@ -91,8 +91,8 @@ if ($is_edit) {
   $decompose($fields['crate_length'], $crate_length_ft, $crate_length_in);
   $decompose($fields['crate_width'],  $crate_width_ft,  $crate_width_in);
   $decompose($fields['crate_height'], $crate_height_ft, $crate_height_in);
-  if ($fields['weight_kg'] !== '' && (float)$fields['weight_kg'] > 0) {
-    $weight_lbs = (string)round((float)$fields['weight_kg'] * 2.20462, 4);
+  if ($fields['machine_weight_kg'] !== '' && (float)$fields['machine_weight_kg'] > 0) {
+    $weight_lbs = (string)round((float)$fields['machine_weight_kg'] * 2.20462, 4);
   }
   if ($fields['crate_weight_kg'] !== '' && (float)$fields['crate_weight_kg'] > 0) {
     $crate_weight_lbs = (string)round((float)$fields['crate_weight_kg'] * 2.20462, 4);
@@ -215,7 +215,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $fields['crate_height']    = $crate_height_db    !== null ? (string)$crate_height_db    : '';
     $fields['crate_height_mm'] = $crate_height_mm_db !== null ? (string)$crate_height_mm_db : '';
     $fields['crate_weight_kg'] = $crate_weight_kg_db !== null ? (string)$crate_weight_kg_db : '';
-    $fields['weight_kg']    = $weight_kg_db !== null ? (string)$weight_kg_db : '';
+    $fields['machine_weight_kg'] = $weight_kg_db !== null ? (string)$weight_kg_db : '';
     $mach_width_ft  = trim((string)($_POST['mach_width_ft']  ?? ''));
     $mach_width_in  = trim((string)($_POST['mach_width_in']  ?? ''));
     $mach_length_ft = trim((string)($_POST['mach_length_ft'] ?? ''));
@@ -297,7 +297,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->prepare("
           UPDATE machines SET
             name = ?, model = ?,
-            machine_length = ?, machine_width = ?, machine_length_mm = ?, machine_width_mm = ?, weight_kg = ?,
+            machine_length = ?, machine_width = ?, machine_length_mm = ?, machine_width_mm = ?, machine_weight_kg = ?,
             cut_length = ?, cut_width = ?, cut_length_mm = ?, cut_width_mm = ?,
             crate_length = ?, crate_width = ?, crate_length_mm = ?, crate_width_mm = ?,
             crate_height = ?, crate_height_mm = ?, crate_weight_kg = ?,
@@ -310,7 +310,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->prepare("
           INSERT INTO machines
             (name, model,
-             machine_length, machine_width, machine_length_mm, machine_width_mm, weight_kg,
+             machine_length, machine_width, machine_length_mm, machine_width_mm, machine_weight_kg,
              cut_length, cut_width, cut_length_mm, cut_width_mm,
              crate_length, crate_width, crate_length_mm, crate_width_mm,
              crate_height, crate_height_mm, crate_weight_kg,
@@ -619,7 +619,7 @@ render_header($page_title);
               <div>
                 <label for="weight_kg">Kilograms (kg)</label>
                 <input type="number" id="weight_kg" name="weight_kg" min="0" step="0.01"
-                       value="<?= h($fields['weight_kg']) ?>" placeholder="0"
+                       value="<?= h($fields['machine_weight_kg']) ?>" placeholder="0"
                        oninput="syncKgToLbs('weight_kg','weight_lbs')" />
               </div>
             </div>
