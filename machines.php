@@ -141,17 +141,35 @@ render_header('Machines');
     color: #64748b;
     margin: 0 0 10px;
   }
+  .machine-size-badges {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
   .machine-size-badge {
     display: inline-block;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    font-family: monospace;
+    white-space: nowrap;
+  }
+  .machine-size-badge--cut {
     background: #f0f9ff;
     border: 1px solid #bae6fd;
     color: #0369a1;
-    border-radius: 6px;
-    padding: 4px 10px;
-    font-size: 0.92rem;
-    font-weight: 600;
-    margin-bottom: 12px;
-    font-family: monospace;
+  }
+  .machine-size-badge--mach {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+  }
+  .machine-size-badge--crate {
+    background: #fefce8;
+    border: 1px solid #fde68a;
+    color: #92400e;
   }
   .machine-desc {
     color: #475569;
@@ -201,24 +219,56 @@ render_header('Machines');
     $secondary_url = ($m['secondary_photo'] !== null && $m['secondary_photo'] !== '') ? 'uploads/' . rawurlencode($m['secondary_photo']) : '';
     $tertiary_url  = (isset($m['tertiary_photo']) && $m['tertiary_photo']  !== null && $m['tertiary_photo']  !== '') ? 'uploads/' . rawurlencode($m['tertiary_photo'])  : '';
 
-    // Cutting area (preferred) or machine dimensions for size badge
-    $has_cut  = (isset($m['cut_width_mm']) && $m['cut_width_mm'] !== null) || (isset($m['cut_length_mm']) && $m['cut_length_mm'] !== null);
-    $has_mach = ($m['machine_width_mm'] !== null || $m['machine_length_mm'] !== null);
-
+    // ── Cutting area ──────────────────────────────────────────────────────────
+    $has_cut = (!empty($m['cut_width_mm']) || !empty($m['cut_length_mm']));
     if ($has_cut) {
-      $cw_imp = fmt_inches_imperial($m['cut_width']  ?? null);
-      $cl_imp = fmt_inches_imperial($m['cut_length'] ?? null);
+      $cw_imp = fmt_inches_imperial($m['cut_width']    ?? null);
+      $cl_imp = fmt_inches_imperial($m['cut_length']   ?? null);
       $cw_mm  = fmt_mm_display($m['cut_width_mm']  ?? null);
       $cl_mm  = fmt_mm_display($m['cut_length_mm'] ?? null);
-      $size_str = '⌖ ' . $cl_mm . ' × ' . $cw_mm . ' (' . $cl_imp . ' × ' . $cw_imp . ' U.S.)';
-    } elseif ($has_mach) {
-      $mw_imp = fmt_inches_imperial($m['machine_width']);
-      $ml_imp = fmt_inches_imperial($m['machine_length']);
-      $mw_mm  = fmt_mm_display($m['machine_width_mm']);
-      $ml_mm  = fmt_mm_display($m['machine_length_mm']);
-      $size_str = '⌖ ' . $ml_mm . ' × ' . $mw_mm . ' (' . $ml_imp . ' × ' . $mw_imp . ' U.S.)';
+      $cut_str = '⌖ ' . $cl_mm . ' × ' . $cw_mm . ' (' . $cl_imp . ' × ' . $cw_imp . ')';
     } else {
-      $size_str = '';
+      $cut_str = '';
+    }
+
+    // ── Machine dimensions + weight ───────────────────────────────────────────
+    $has_mach = (!empty($m['machine_width_mm']) || !empty($m['machine_length_mm']));
+    if ($has_mach) {
+      $mw_imp   = fmt_inches_imperial($m['machine_width']    ?? null);
+      $ml_imp   = fmt_inches_imperial($m['machine_length']   ?? null);
+      $mw_mm    = fmt_mm_display($m['machine_width_mm']  ?? null);
+      $ml_mm    = fmt_mm_display($m['machine_length_mm'] ?? null);
+      $mach_str = '📐 ' . $ml_mm . ' × ' . $mw_mm . ' (' . $ml_imp . ' × ' . $mw_imp . ')';
+      if (!empty($m['machine_weight_kg']) && (float)$m['machine_weight_kg'] > 0) {
+        $mkg  = round((float)$m['machine_weight_kg'], 1);
+        $mlbs = (int)round($mkg * 2.20462);
+        $mach_str .= ' · ' . $mkg . ' kg / ' . $mlbs . ' lbs';
+      }
+    } else {
+      $mach_str = '';
+    }
+
+    // ── Crate dimensions + weight ─────────────────────────────────────────────
+    $has_crate = (!empty($m['crate_width_mm']) || !empty($m['crate_length_mm']));
+    if ($has_crate) {
+      $crw_imp   = fmt_inches_imperial($m['crate_width']    ?? null);
+      $crl_imp   = fmt_inches_imperial($m['crate_length']   ?? null);
+      $crh_imp   = fmt_inches_imperial($m['crate_height']   ?? null);
+      $crw_mm    = fmt_mm_display($m['crate_width_mm']  ?? null);
+      $crl_mm    = fmt_mm_display($m['crate_length_mm'] ?? null);
+      $crh_mm    = fmt_mm_display($m['crate_height_mm'] ?? null);
+      $crate_str = '📦 ' . $crl_mm . ' × ' . $crw_mm;
+      if ($crh_mm !== '—') $crate_str .= ' × ' . $crh_mm;
+      $crate_str .= ' (' . $crl_imp . ' × ' . $crw_imp;
+      if ($crh_imp !== '—') $crate_str .= ' × ' . $crh_imp;
+      $crate_str .= ')';
+      if (!empty($m['crate_weight_kg']) && (float)$m['crate_weight_kg'] > 0) {
+        $ckg  = round((float)$m['crate_weight_kg'], 1);
+        $clbs = (int)round($ckg * 2.20462);
+        $crate_str .= ' · ' . $ckg . ' kg / ' . $clbs . ' lbs';
+      }
+    } else {
+      $crate_str = '';
     }
   ?>
   <div class="machine-card">
@@ -273,8 +323,18 @@ render_header('Machines');
         <p class="machine-model">Model: <?= h($m['model']) ?></p>
       <?php endif; ?>
 
-      <?php if ($size_str !== ''): ?>
-        <div class="machine-size-badge"><?= h($size_str) ?></div>
+      <?php if ($cut_str !== '' || $mach_str !== '' || $crate_str !== ''): ?>
+        <div class="machine-size-badges">
+          <?php if ($cut_str !== ''): ?>
+            <div class="machine-size-badge machine-size-badge--cut"><?= h($cut_str) ?></div>
+          <?php endif; ?>
+          <?php if ($mach_str !== ''): ?>
+            <div class="machine-size-badge machine-size-badge--mach"><?= h($mach_str) ?></div>
+          <?php endif; ?>
+          <?php if ($crate_str !== ''): ?>
+            <div class="machine-size-badge machine-size-badge--crate"><?= h($crate_str) ?></div>
+          <?php endif; ?>
+        </div>
       <?php endif; ?>
 
       <?php if ($m['description'] !== null && $m['description'] !== ''): ?>
