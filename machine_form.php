@@ -35,8 +35,8 @@ $fields = [
 // For the form's imperial decomposition (display only; recombined on submit)
 $width_ft   = '';
 $width_in   = '';
-$height_ft  = '';
-$height_in  = '';
+$length_ft  = '';
+$length_in  = '';
 $weight_lbs = '';
 
 if ($is_edit) {
@@ -61,8 +61,8 @@ if ($is_edit) {
   }
   if ($fields['height'] !== '' && (float)$fields['height'] > 0) {
     $total_in   = (float)$fields['height'];
-    $height_ft  = (string)(int)floor($total_in / 12);
-    $height_in  = (string)round($total_in - ((int)floor($total_in / 12)) * 12, 4);
+    $length_ft  = (string)(int)floor($total_in / 12);
+    $length_in  = (string)round($total_in - ((int)floor($total_in / 12)) * 12, 4);
   }
   if ($fields['weight_kg'] !== '' && (float)$fields['weight_kg'] > 0) {
     $weight_lbs = (string)round((float)$fields['weight_kg'] * 2.20462, 4);
@@ -127,16 +127,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $post_width_ft  = trim((string)($_POST['width_ft']  ?? ''));
     $post_width_in  = trim((string)($_POST['width_in']  ?? ''));
     $post_width_mm  = trim((string)($_POST['width_mm']  ?? ''));
-    $post_height_ft = trim((string)($_POST['height_ft'] ?? ''));
-    $post_height_in = trim((string)($_POST['height_in'] ?? ''));
-    $post_height_mm = trim((string)($_POST['height_mm'] ?? ''));
+    $post_length_ft = trim((string)($_POST['length_ft'] ?? ''));
+    $post_length_in = trim((string)($_POST['length_in'] ?? ''));
+    $post_length_mm = trim((string)($_POST['length_mm'] ?? ''));
     $post_weight_lbs = trim((string)($_POST['weight_lbs'] ?? ''));
     $post_weight_kg  = trim((string)($_POST['weight_kg']  ?? ''));
 
     $width_db     = null;
     $width_mm_db  = null;
-    $height_db    = null;
-    $height_mm_db = null;
+    $length_db    = null;
+    $length_mm_db = null;
     $weight_kg_db = null;
 
     if ($post_width_mm !== '') {
@@ -147,12 +147,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $width_mm_db = round($width_db * 25.4, 2);
     }
 
-    if ($post_height_mm !== '') {
-      $height_mm_db = round((float)$post_height_mm, 2);
-      $height_db    = round($height_mm_db / 25.4, 4);
-    } elseif ($post_height_ft !== '' || $post_height_in !== '') {
-      $height_db    = round(((float)$post_height_ft * 12) + (float)$post_height_in, 4);
-      $height_mm_db = round($height_db * 25.4, 2);
+    if ($post_length_mm !== '') {
+      $length_mm_db = round((float)$post_length_mm, 2);
+      $length_db    = round($length_mm_db / 25.4, 4);
+    } elseif ($post_length_ft !== '' || $post_length_in !== '') {
+      $length_db    = round(((float)$post_length_ft * 12) + (float)$post_length_in, 4);
+      $length_mm_db = round($length_db * 25.4, 2);
     }
 
     if ($post_weight_kg !== '') {
@@ -163,14 +163,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Repopulate for re-display if there are errors
     $fields['width']     = $width_db    !== null ? (string)$width_db    : '';
-    $fields['height']    = $height_db   !== null ? (string)$height_db   : '';
+    $fields['height']    = $length_db   !== null ? (string)$length_db   : '';
     $fields['width_mm']  = $width_mm_db  !== null ? (string)$width_mm_db  : '';
-    $fields['height_mm'] = $height_mm_db !== null ? (string)$height_mm_db : '';
+    $fields['height_mm'] = $length_mm_db !== null ? (string)$length_mm_db : '';
     $fields['weight_kg'] = $weight_kg_db !== null ? (string)$weight_kg_db : '';
     $width_ft   = $post_width_ft;
     $width_in   = $post_width_in;
-    $height_ft  = $post_height_ft;
-    $height_in  = $post_height_in;
+    $length_ft  = $post_length_ft;
+    $length_in  = $post_length_in;
     $weight_lbs = $post_weight_lbs;
 
     // ── Validation ───────────────────────────────────────────────────────────
@@ -185,8 +185,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($width_db !== null && $width_db < 0) {
       $errors[] = 'Width must be a positive number.';
     }
-    if ($height_db !== null && $height_db < 0) {
-      $errors[] = 'Height must be a positive number.';
+    if ($length_db !== null && $length_db < 0) {
+      $errors[] = 'Length must be a positive number.';
     }
     if ($weight_kg_db !== null && $weight_kg_db < 0) {
       $errors[] = 'Weight must be a positive number.';
@@ -212,7 +212,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ")->execute([
           $fields['name'],
           $fields['model'] !== '' ? $fields['model'] : null,
-          $width_db, $height_db, $width_mm_db, $height_mm_db, $weight_kg_db,
+          $width_db, $length_db, $width_mm_db, $length_mm_db, $weight_kg_db,
           $primary_final, $secondary_final,
           $fields['description'] !== '' ? $fields['description'] : null,
           (int)$fields['is_active'],
@@ -226,7 +226,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ")->execute([
           $fields['name'],
           $fields['model'] !== '' ? $fields['model'] : null,
-          $width_db, $height_db, $width_mm_db, $height_mm_db, $weight_kg_db,
+          $width_db, $length_db, $width_mm_db, $length_mm_db, $weight_kg_db,
           $primary_final, $secondary_final,
           $fields['description'] !== '' ? $fields['description'] : null,
           (int)$fields['is_active'],
@@ -393,23 +393,23 @@ render_header($page_title);
             </div>
           </div>
 
-          <!-- Height (Depth) -->
+          <!-- Length -->
           <div class="dim-card">
-            <div class="dim-card-title">Height (Depth)</div>
+            <div class="dim-card-title">Length</div>
 
             <div class="dim-unit-label">Imperial</div>
             <div class="dim-inputs">
               <div>
-                <label for="height_ft">Feet</label>
-                <input type="number" id="height_ft" name="height_ft" min="0" step="1"
-                       value="<?= h($height_ft) ?>" placeholder="0"
-                       oninput="syncHeightImperialToMm()" />
+                <label for="length_ft">Feet</label>
+                <input type="number" id="length_ft" name="length_ft" min="0" step="1"
+                       value="<?= h($length_ft) ?>" placeholder="0"
+                       oninput="syncLengthImperialToMm()" />
               </div>
               <div>
-                <label for="height_in">Inches</label>
-                <input type="number" id="height_in" name="height_in" min="0" max="11.9999" step="0.01"
-                       value="<?= h($height_in) ?>" placeholder="0"
-                       oninput="syncHeightImperialToMm()" />
+                <label for="length_in">Inches</label>
+                <input type="number" id="length_in" name="length_in" min="0" max="11.9999" step="0.01"
+                       value="<?= h($length_in) ?>" placeholder="0"
+                       oninput="syncLengthImperialToMm()" />
               </div>
             </div>
 
@@ -418,10 +418,10 @@ render_header($page_title);
             <div class="dim-unit-label">Metric</div>
             <div class="dim-inputs">
               <div>
-                <label for="height_mm">Millimeters</label>
-                <input type="number" id="height_mm" name="height_mm" min="0" step="0.1"
+                <label for="length_mm">Millimeters</label>
+                <input type="number" id="length_mm" name="length_mm" min="0" step="0.1"
                        value="<?= h($fields['height_mm']) ?>" placeholder="0"
-                       oninput="syncHeightMmToImperial()" />
+                       oninput="syncLengthMmToImperial()" />
               </div>
             </div>
           </div>
@@ -542,24 +542,24 @@ function syncWidthMmToImperial() {
   }
 }
 
-function syncHeightImperialToMm() {
-  var ft     = parseFloat(document.getElementById('height_ft').value) || 0;
-  var inches = parseFloat(document.getElementById('height_in').value) || 0;
+function syncLengthImperialToMm() {
+  var ft     = parseFloat(document.getElementById('length_ft').value) || 0;
+  var inches = parseFloat(document.getElementById('length_in').value) || 0;
   var total_in = ft * 12 + inches;
-  document.getElementById('height_mm').value = total_in > 0 ? round2(inchesToMm(total_in)) : '';
+  document.getElementById('length_mm').value = total_in > 0 ? round2(inchesToMm(total_in)) : '';
 }
 
-function syncHeightMmToImperial() {
-  var mm = parseFloat(document.getElementById('height_mm').value) || 0;
+function syncLengthMmToImperial() {
+  var mm = parseFloat(document.getElementById('length_mm').value) || 0;
   if (mm > 0) {
     var total_in = mmToInches(mm);
     var ft     = Math.floor(total_in / 12);
     var inches = round2(total_in - ft * 12);
-    document.getElementById('height_ft').value = ft || '';
-    document.getElementById('height_in').value = inches || '';
+    document.getElementById('length_ft').value = ft || '';
+    document.getElementById('length_in').value = inches || '';
   } else {
-    document.getElementById('height_ft').value = '';
-    document.getElementById('height_in').value = '';
+    document.getElementById('length_ft').value = '';
+    document.getElementById('length_in').value = '';
   }
 }
 
