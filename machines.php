@@ -210,13 +210,13 @@ render_header('Machines');
       $cl_imp = fmt_inches_imperial($m['cut_length'] ?? null);
       $cw_mm  = fmt_mm_display($m['cut_width_mm']  ?? null);
       $cl_mm  = fmt_mm_display($m['cut_length_mm'] ?? null);
-      $size_str = '✂️ ' . $cl_imp . ' × ' . $cw_imp . ' (' . $cl_mm . ' × ' . $cw_mm . ')';
+      $size_str = '⌖ ' . $cl_mm . ' × ' . $cw_mm . ' (' . $cl_imp . ' × ' . $cw_imp . ' U.S.)';
     } elseif ($has_mach) {
       $mw_imp = fmt_inches_imperial($m['machine_width']);
       $ml_imp = fmt_inches_imperial($m['machine_length']);
       $mw_mm  = fmt_mm_display($m['machine_width_mm']);
       $ml_mm  = fmt_mm_display($m['machine_length_mm']);
-      $size_str = '📐 ' . $ml_imp . ' × ' . $mw_imp . ' (' . $ml_mm . ' × ' . $mw_mm . ')';
+      $size_str = '⌖ ' . $ml_mm . ' × ' . $mw_mm . ' (' . $ml_imp . ' × ' . $mw_imp . ' U.S.)';
     } else {
       $size_str = '';
     }
@@ -274,7 +274,7 @@ render_header('Machines');
       <?php endif; ?>
 
       <?php if ($size_str !== ''): ?>
-        <div class="machine-size-badge">📐 <?= h($size_str) ?></div>
+        <div class="machine-size-badge"><?= h($size_str) ?></div>
       <?php endif; ?>
 
       <?php if ($m['description'] !== null && $m['description'] !== ''): ?>
