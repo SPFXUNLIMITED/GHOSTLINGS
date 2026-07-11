@@ -1531,12 +1531,23 @@ if ($_quotes_signature_expires_col === false || $_quotes_signature_expires_col->
 }
 unset($_quotes_signature_expires_col);
 
-$_quotes_signature_token_hash_idx = $pdo->query("SHOW INDEX FROM quotes WHERE Key_name = 'uniq_quotes_signature_access_token_hash'");
-if ($_quotes_signature_token_hash_idx === false || $_quotes_signature_token_hash_idx->fetch(PDO::FETCH_ASSOC) === false) {
+$_quotes_signature_token_hash_unique_idx = $pdo->query("SHOW INDEX FROM quotes WHERE Key_name = 'uniq_quotes_signature_access_token_hash'");
+if ($_quotes_signature_token_hash_unique_idx !== false && $_quotes_signature_token_hash_unique_idx->fetch(PDO::FETCH_ASSOC) !== false) {
   try {
-    $pdo->exec("ALTER TABLE quotes ADD UNIQUE KEY uniq_quotes_signature_access_token_hash (signature_access_token_hash)");
+    $pdo->exec("ALTER TABLE quotes DROP INDEX uniq_quotes_signature_access_token_hash");
   } catch (Throwable $e) {
     $recheck = $pdo->query("SHOW INDEX FROM quotes WHERE Key_name = 'uniq_quotes_signature_access_token_hash'");
+    if ($recheck !== false && $recheck->fetch(PDO::FETCH_ASSOC) !== false) { throw $e; }
+  }
+}
+unset($_quotes_signature_token_hash_unique_idx);
+
+$_quotes_signature_token_hash_idx = $pdo->query("SHOW INDEX FROM quotes WHERE Key_name = 'idx_quotes_signature_access_token_hash'");
+if ($_quotes_signature_token_hash_idx === false || $_quotes_signature_token_hash_idx->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD INDEX idx_quotes_signature_access_token_hash (signature_access_token_hash)");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW INDEX FROM quotes WHERE Key_name = 'idx_quotes_signature_access_token_hash'");
     if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
   }
 }

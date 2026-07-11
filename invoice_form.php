@@ -843,7 +843,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (trim((string)($_POST['action'] ?? '')) === 'collect_signature') {
     $row_id = (int)($_POST['row_id'] ?? 0);
     $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
-    unset($_SESSION['invoice_signature_request_links'][$row_id]);
     if ($row_id <= 0) {
       header('Location: invoice_tracker.php');
       exit;
