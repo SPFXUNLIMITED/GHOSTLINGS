@@ -2130,3 +2130,9 @@ $pdo->exec("
     CONSTRAINT fk_invoice_signatures_quote FOREIGN KEY (quote_id) REFERENCES quotes (id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+if (!function_exists('invoice_signature_storage_dir')) {
+  function invoice_signature_storage_dir(): string {
+    return dirname(__DIR__) . '/protected_signatures';
+  }
+}

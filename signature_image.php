@@ -3,9 +3,6 @@ require __DIR__ . '/db.php';
 require __DIR__ . '/auth.php';
 require_login();
 
-define('SIGNATURE_IMAGE_STORAGE_ROOT', dirname(__DIR__));
-define('SIGNATURE_IMAGE_STORAGE_DIR', SIGNATURE_IMAGE_STORAGE_ROOT . '/protected_signatures');
-
 $signature_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($signature_id <= 0) {
     http_response_code(400);
@@ -27,9 +24,24 @@ if ($relative_path === '' || !preg_match('#^protected_signatures/sig_[a-f0-9]{32
     exit('Signature file not found.');
 }
 
-$storage_root = realpath(SIGNATURE_IMAGE_STORAGE_DIR);
-$full_path = realpath(SIGNATURE_IMAGE_STORAGE_ROOT . '/' . $relative_path);
-if ($storage_root === false || $full_path === false || !str_starts_with($full_path, $storage_root . DIRECTORY_SEPARATOR) || !is_file($full_path)) {
+$storage_root = realpath(invoice_signature_storage_dir());
+if ($storage_root === false) {
+    http_response_code(404);
+    exit('Signature file not found.');
+}
+
+$full_path = realpath(dirname(__DIR__) . '/' . $relative_path);
+if ($full_path === false) {
+    http_response_code(404);
+    exit('Signature file not found.');
+}
+
+if (!str_starts_with($full_path, $storage_root . DIRECTORY_SEPARATOR)) {
+    http_response_code(404);
+    exit('Signature file not found.');
+}
+
+if (!is_file($full_path)) {
     http_response_code(404);
     exit('Signature file not found.');
 }

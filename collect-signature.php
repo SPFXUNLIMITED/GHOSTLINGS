@@ -25,8 +25,6 @@ $customer_name   = htmlspecialchars((string)$invoice['customer_name'], ENT_QUOTE
 $error   = null;
 $success = false;
 
-define('SIGNATURE_STORAGE_DIR', dirname(__DIR__) . '/protected_signatures');
-
 // Empty canvas submissions produce very small PNG payloads in testing; requiring at least 500 bytes
 // filters those out while still accepting normal handwritten signatures from mobile devices.
 const SIG_MIN_PNG_BYTES = 500;
@@ -45,13 +43,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($binary === false || strlen($binary) < SIG_MIN_PNG_BYTES) {
             $error = 'The signature data appears to be empty or invalid. Please sign again.';
         } else {
-            if (!is_dir(SIGNATURE_STORAGE_DIR)) {
-                mkdir(SIGNATURE_STORAGE_DIR, 0700, true);
+            $signature_storage_dir = invoice_signature_storage_dir();
+            if (!is_dir($signature_storage_dir)) {
+                mkdir($signature_storage_dir, 0700, true);
             }
 
             do {
                 $filename = 'sig_' . bin2hex(random_bytes(16)) . '.png';
-                $filepath = SIGNATURE_STORAGE_DIR . '/' . $filename;
+                $filepath = $signature_storage_dir . '/' . $filename;
             } while (is_file($filepath));
 
             if (file_put_contents($filepath, $binary) === false) {
@@ -293,7 +292,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="success-icon">✅</div>
         <p class="success-heading">Thank You!</p>
         <p class="success-sub">Your signature has been saved.<br>Invoice <?= htmlspecialchars($invoice_label, ENT_QUOTES, 'UTF-8') ?> is now signed.</p>
-        <span class="success-message">You can close this page now.</span>
+        <p class="success-message">You can close this page now.</p>
       </div>
     </div>
 
