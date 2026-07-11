@@ -865,6 +865,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $twilio = function_exists('twilio_config') ? twilio_config() : [];
       $sms_to = trim((string)($twilio['to_number'] ?? ''));
       $signature_link = invoice_signature_request_url($row_id);
+      if (!filter_var($signature_link, FILTER_VALIDATE_URL)) {
+        throw new RuntimeException('Could not build a valid signature link.');
+      }
       send_sms($sms_to, 'Please have the customer sign this invoice: ' . $signature_link);
 
       $pdo->commit();

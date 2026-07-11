@@ -17,7 +17,15 @@ if (!function_exists('twilio_config')) {
 if (!function_exists('twilio_normalize_phone')) {
     function twilio_normalize_phone(string $phone): string
     {
-        $normalized = preg_replace('/[^\d+]/', '', trim($phone)) ?? '';
+        $phone = trim($phone);
+        if (substr_count($phone, '+') > 1 || (str_contains($phone, '+') && !str_starts_with($phone, '+'))) {
+            throw new RuntimeException('Twilio phone numbers must use E.164 format, like +15551234567.');
+        }
+
+        $normalized = preg_replace('/\D/', '', $phone) ?? '';
+        if (str_starts_with($phone, '+')) {
+            $normalized = '+' . $normalized;
+        }
         if ($normalized === '' || preg_match('/^\+[1-9]\d{7,14}$/', $normalized) !== 1) {
             throw new RuntimeException('Twilio phone numbers must use E.164 format, like +15551234567.');
         }
@@ -27,6 +35,9 @@ if (!function_exists('twilio_normalize_phone')) {
 }
 
 if (!function_exists('send_sms')) {
+    /**
+     * @throws RuntimeException
+     */
     function send_sms($to, $message): bool
     {
         if (!function_exists('curl_init')) {
