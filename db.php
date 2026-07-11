@@ -2212,12 +2212,14 @@ if (!function_exists('invoice_signature_filename_regex')) {
 }
 
 if (!function_exists('invoice_signature_access_token_generate')) {
+  // 32 random bytes are hex-encoded into a 64-character token for public signature links.
   function invoice_signature_access_token_generate(): string {
     return bin2hex(random_bytes(32));
   }
 }
 
 if (!function_exists('invoice_signature_access_token_hash')) {
+  // Store only a SHA-256 hex digest in the database so the raw public token is never persisted.
   function invoice_signature_access_token_hash(string $token): string {
     return hash('sha256', $token);
   }

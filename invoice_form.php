@@ -857,12 +857,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
       }
 
+      $signature_base_url = invoice_application_base_url();
+      if (!filter_var($signature_base_url, FILTER_VALIDATE_URL)) {
+        throw new RuntimeException('Could not build a valid signature link.');
+      }
+
       $signature_access_token = invoice_signature_access_token_generate();
-      $signature_access_expires_at = invoice_signature_access_expires_at();
       $signature_link = invoice_signature_request_url($signature_access_token);
       if (!filter_var($signature_link, FILTER_VALIDATE_URL)) {
         throw new RuntimeException('Could not build a valid signature link.');
       }
+      $signature_access_expires_at = invoice_signature_access_expires_at();
 
       $pdo->prepare(
         "UPDATE quotes
