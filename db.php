@@ -2218,6 +2218,12 @@ if (!function_exists('invoice_signature_access_token_generate')) {
   }
 }
 
+if (!function_exists('invoice_signature_access_token_pattern')) {
+  function invoice_signature_access_token_pattern(): string {
+    return '/^[a-f0-9]{64}$/i';
+  }
+}
+
 if (!function_exists('invoice_signature_access_token_hash')) {
   // Store only a SHA-256 hex digest in the database so the raw public token is never persisted.
   function invoice_signature_access_token_hash(string $token): string {

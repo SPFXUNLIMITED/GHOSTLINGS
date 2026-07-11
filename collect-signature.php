@@ -35,7 +35,6 @@ if (!function_exists('collect_signature_inactive_cleanup')) {
 
 const SIG_MIN_PNG_BYTES = 500;
 const MAX_FILENAME_ALLOCATION_ATTEMPTS = 10;
-const COLLECT_SIGNATURE_TOKEN_PATTERN = '/^[a-f0-9]{64}$/i';
 
 $success = false;
 $error = null;
@@ -47,7 +46,7 @@ $customer_name = '';
 $show_signature_form = false;
 $request_method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 $raw_token = trim((string)($request_method === 'POST' ? ($_POST['token'] ?? '') : ($_GET['token'] ?? '')));
-$token_has_valid_format = preg_match(COLLECT_SIGNATURE_TOKEN_PATTERN, $raw_token) === 1;
+$token_has_valid_format = preg_match(invoice_signature_access_token_pattern(), $raw_token) === 1;
 $token_hash = $token_has_valid_format ? invoice_signature_access_token_hash($raw_token) : '';
 
 if ($token_hash !== '') {
