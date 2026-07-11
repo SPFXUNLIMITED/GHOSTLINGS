@@ -9,7 +9,7 @@ if ($invoice_id <= 0) {
 }
 
 // Load invoice (quotes table)
-$stmt = $pdo->prepare('SELECT id, converted_invoice_no, customer_name, subtotal_amount, tax_amount FROM quotes WHERE id = ? LIMIT 1');
+$stmt = $pdo->prepare('SELECT id, converted_invoice_no, customer_name, subtotal_amount, tax_amount, waiting_for_signature FROM quotes WHERE id = ? LIMIT 1');
 $stmt->execute([$invoice_id]);
 $invoice = $stmt->fetch();
 if (!$invoice) {
@@ -32,12 +32,17 @@ if (!function_exists('collect_signature_client_ip')) {
     }
 }
 
-$invoice_label   = collect_signature_invoice_label($invoice);
-$total_amount    = (float)$invoice['subtotal_amount'] + (float)$invoice['tax_amount'];
+$invoice_label = collect_signature_invoice_label($invoice);
+$total_amount = (float)$invoice['subtotal_amount'] + (float)$invoice['tax_amount'];
 $total_formatted = '$' . number_format($total_amount, 2);
-$customer_name   = htmlspecialchars((string)$invoice['customer_name'], ENT_QUOTES, 'UTF-8');
+$customer_name = htmlspecialchars((string)$invoice['customer_name'], ENT_QUOTES, 'UTF-8');
+$link_is_active = (int)($invoice['waiting_for_signature'] ?? 0) === 1;
 
-$error   = null;
+$error = null;
+$show_signature_form = $link_is_active;
+if (!$link_is_active) {
+    $error = 'This signature link is no longer active.';
+}
 $success = false;
 
 // Empty canvas submissions produce very small PNG payloads in testing; requiring at least 500 bytes
@@ -46,7 +51,7 @@ const SIG_MIN_PNG_BYTES = 500;
 const MAX_FILENAME_ALLOCATION_ATTEMPTS = 10;
 
 // ── Handle POST (signature submission) ──────────────────────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $link_is_active) {
     $raw_data = trim((string)($_POST['signature_data'] ?? ''));
 
     // Must be a data URI for a PNG image
@@ -59,6 +64,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($binary === false || strlen($binary) < SIG_MIN_PNG_BYTES) {
             $error = 'The signature data appears to be empty or invalid. Please sign again.';
         } else {
+            $image_info = @getimagesizefromstring($binary);
+            if (!is_array($image_info) || (($image_info['mime'] ?? '') !== 'image/png')) {
+                $error = 'The signature data appears to be empty or invalid. Please sign again.';
+            }
+
             $signature_storage_dir = invoice_signature_storage_dir();
             if (!is_dir($signature_storage_dir)) {
                 if (!mkdir($signature_storage_dir, 0700, true) && !is_dir($signature_storage_dir)) {
@@ -86,13 +96,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            if ($error === null && file_put_contents($filepath, $binary) === false) {
-                $error = 'Could not save the signature file. Please try again.';
-            } elseif ($error === null) {
-                $ip = collect_signature_client_ip();
-                $ins = $pdo->prepare('INSERT INTO invoice_signatures (quote_id, signature_path, ip_address) VALUES (?, ?, ?)');
-                $ins->execute([$invoice_id, invoice_signature_relative_path($filename), $ip]);
-                $success = true;
+            if ($error === null) {
+                $file_written = false;
+                try {
+                    $pdo->beginTransaction();
+
+                    $lock_stmt = $pdo->prepare('SELECT waiting_for_signature FROM quotes WHERE id = ? LIMIT 1 FOR UPDATE');
+                    $lock_stmt->execute([$invoice_id]);
+                    $waiting_for_signature = (int)$lock_stmt->fetchColumn();
+                    if ($waiting_for_signature !== 1) {
+                        throw new RuntimeException('signature_link_inactive');
+                    }
+
+                    if (file_put_contents($filepath, $binary) === false) {
+                        throw new RuntimeException('signature_file_write_failed');
+                    }
+                    $file_written = true;
+
+                    $ip = collect_signature_client_ip();
+                    $ins = $pdo->prepare('INSERT INTO invoice_signatures (quote_id, signature_path, ip_address) VALUES (?, ?, ?)');
+                    $ins->execute([$invoice_id, invoice_signature_relative_path($filename), $ip]);
+
+                    $deactivate_stmt = $pdo->prepare('UPDATE quotes SET waiting_for_signature = 0 WHERE id = ?');
+                    $deactivate_stmt->execute([$invoice_id]);
+
+                    $pdo->commit();
+                    $success = true;
+                    $link_is_active = false;
+                    $show_signature_form = false;
+                } catch (Throwable $e) {
+                    if ($pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
+                    if ($file_written && is_file($filepath)) {
+                        @unlink($filepath);
+                    }
+                    if ($e->getMessage() === 'signature_link_inactive') {
+                        $error = 'This signature link is no longer active.';
+                        $link_is_active = false;
+                        $show_signature_form = false;
+                    } elseif ($e->getMessage() === 'signature_file_write_failed') {
+                        $error = 'Could not save the signature file. Please try again.';
+                    } else {
+                        $error = 'Could not save the signature. Please try again.';
+                    }
+                }
             }
         }
     }
@@ -329,7 +377,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </div>
     </div>
 
-  <?php else: ?>
+  <?php elseif ($show_signature_form): ?>
 
     <?php if ($error !== null): ?>
       <div class="error-box"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
@@ -337,7 +385,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <!-- ── Signature card ── -->
     <div class="card">
-      <p class="instructions">Please sign below to confirm you are satisfied with the work</p>
+      <p class="instructions">Please sign below to complete this invoice signature request.</p>
 
       <div class="sig-wrap">
         <canvas id="sig-canvas"></canvas>
@@ -351,6 +399,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <button type="submit" class="btn btn-submit" id="btn-submit">Submit Signature</button>
         </div>
       </form>
+    </div>
+
+  <?php else: ?>
+    <div class="card">
+      <div class="error-box" style="margin:0;"><?= htmlspecialchars($error ?? 'This signature link is no longer active.', ENT_QUOTES, 'UTF-8') ?></div>
     </div>
 
   <?php endif; ?>
@@ -393,6 +446,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ctx.lineWidth   = 2.4;
     ctx.lineCap     = 'round';
     ctx.lineJoin    = 'round';
+  }
+
+  function clearCanvas() {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
   }
 
   // ── Coordinate helpers ──
@@ -450,7 +510,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   // ── Clear ──
   if (btnClear) {
     btnClear.addEventListener('click', function () {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      clearCanvas();
       hasMark = false;
     });
   }

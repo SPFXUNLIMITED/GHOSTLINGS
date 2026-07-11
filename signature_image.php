@@ -25,14 +25,14 @@ if ($relative_path === '' || !preg_match($path_pattern, $relative_path)) {
     exit('Signature file not found.');
 }
 
-$storage_root = realpath(dirname(__DIR__));
+$app_parent_dir = realpath(dirname(__DIR__));
 $protected_dir = realpath(invoice_signature_storage_dir());
-if ($storage_root === false || $protected_dir === false) {
+if ($app_parent_dir === false || $protected_dir === false) {
     http_response_code(404);
     exit('Signature file not found.');
 }
 
-$full_path = realpath($storage_root . '/' . $relative_path);
+$full_path = realpath($app_parent_dir . '/' . $relative_path);
 if ($full_path === false) {
     http_response_code(404);
     exit('Signature file not found.');
@@ -51,7 +51,7 @@ if (!is_file($full_path)) {
 header('Content-Type: image/png');
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: private, no-store, max-age=0');
-$download_name = preg_replace('/[^A-Za-z0-9._-]/', '', sprintf('signature-%d.png', $signature_id)) ?: 'signature.png';
+$download_name = sprintf('signature-%d.png', $signature_id);
 header('Content-Disposition: inline; filename="' . $download_name . '"');
 readfile($full_path);
 exit;
