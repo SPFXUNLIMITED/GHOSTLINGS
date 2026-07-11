@@ -565,7 +565,7 @@ if ($success && $invoice_label !== '') {
         : 'The page you requested is unavailable or has moved.';
     ?>
     <div class="card status-shell">
-      <div class="status-badge"><?= $inactive ? '!' : '?' ?></div>
+      <div class="status-badge" aria-label="<?= htmlspecialchars($inactive ? 'Inactive signature link' : 'Page not found', ENT_QUOTES, 'UTF-8') ?>"><?= $inactive ? '!' : '?' ?></div>
       <p class="status-code"><?= $status_code ?> · signature request</p>
       <h1 class="status-title"><?= htmlspecialchars($status_title, ENT_QUOTES, 'UTF-8') ?></h1>
       <p class="status-message"><?= htmlspecialchars($status_message, ENT_QUOTES, 'UTF-8') ?></p>

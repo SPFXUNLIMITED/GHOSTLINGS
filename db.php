@@ -2226,6 +2226,7 @@ if (!function_exists('invoice_signature_access_token_hash')) {
 }
 
 if (!function_exists('invoice_signature_access_expires_at')) {
+  // Build the APP_TZ expiration timestamp used for signature-link expiry checks.
   function invoice_signature_access_expires_at(int $days = 7): string {
     $days = max(1, $days);
     $expires = new DateTime('now', new DateTimeZone(APP_TZ));
@@ -2235,6 +2236,7 @@ if (!function_exists('invoice_signature_access_expires_at')) {
 }
 
 if (!function_exists('invoice_signature_access_is_expired')) {
+  // Treat blank or invalid timestamps as expired so inactive links fail closed.
   function invoice_signature_access_is_expired(?string $expires_at): bool {
     $expires_at = trim((string)$expires_at);
     if ($expires_at === '') {

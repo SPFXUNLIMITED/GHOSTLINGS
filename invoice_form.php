@@ -859,7 +859,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       $signature_base_url = invoice_application_base_url();
       if (!filter_var($signature_base_url, FILTER_VALIDATE_URL)) {
-        throw new RuntimeException('Could not build a valid signature link.');
+        throw new RuntimeException('Could not build a valid signature base URL.');
       }
 
       $signature_access_token = invoice_signature_access_token_generate();
