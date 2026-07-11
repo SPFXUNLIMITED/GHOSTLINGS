@@ -2,6 +2,7 @@
 require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
+require_once __DIR__ . '/includes/twilio_helper.php';
 require_once __DIR__ . '/lib/PHPMailer/src/Exception.php';
 require_once __DIR__ . '/lib/PHPMailer/src/PHPMailer.php';
 require_once __DIR__ . '/lib/PHPMailer/src/SMTP.php';
@@ -158,6 +159,43 @@ function invoice_env_value(string $key): string {
 function invoice_logo_path(): string {
   $path = __DIR__ . '/logo1.jpg';
   return is_file($path) && is_readable($path) ? $path : '';
+}
+
+function invoice_application_base_url(): string {
+  static $base_url = null;
+
+  if ($base_url !== null) {
+    return $base_url;
+  }
+
+  $twilio = function_exists('twilio_config') ? twilio_config() : [];
+  $configured_base = '';
+  if (is_array($twilio)) {
+    $configured_base = trim((string)($twilio['app_url'] ?? ''));
+  }
+  if ($configured_base === '') {
+    $configured_base = rtrim(invoice_env_value('APP_URL'), '/');
+  }
+  if ($configured_base === '') {
+    $forwarded_proto = strtolower(trim((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')));
+    $https_on = !empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off';
+    $scheme = $forwarded_proto !== '' ? $forwarded_proto : ($https_on ? 'https' : 'http');
+    $host = trim((string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost'));
+    $script_dir = str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? '/')));
+    if ($script_dir === '.' || $script_dir === '/') {
+      $script_dir = '';
+    }
+    $configured_base = $scheme . '://' . $host . rtrim($script_dir, '/');
+  }
+
+  $base_url = rtrim($configured_base, '/');
+  return $base_url;
+}
+
+function invoice_signature_request_url(int $quote_id): string {
+  return invoice_application_base_url() . '/collect-signature.php?' . http_build_query([
+    'id' => $quote_id,
+  ], '', '&', PHP_QUERY_RFC3986);
 }
 
 function invoice_build_email_message_data(PDO $pdo, array $quote, array $items, bool $require_payment_link = true, ?string &$error_message = null, ?string $logo_src = null): ?array {
@@ -812,14 +850,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       header('Location: invoice_tracker.php');
       exit;
     }
-    $check = $pdo->prepare("SELECT id FROM quotes WHERE id = ? LIMIT 1");
-    $check->execute([$row_id]);
-    if (!$check->fetch()) {
-      header('Location: invoice_tracker.php');
-      exit;
+    try {
+      $pdo->beginTransaction();
+      $check = $pdo->prepare("SELECT id FROM quotes WHERE id = ? LIMIT 1 FOR UPDATE");
+      $check->execute([$row_id]);
+      if (!$check->fetch()) {
+        $pdo->rollBack();
+        header('Location: invoice_tracker.php');
+        exit;
+      }
+
+      $pdo->prepare("UPDATE quotes SET waiting_for_signature = 1 WHERE id = ?")->execute([$row_id]);
+
+      $twilio = function_exists('twilio_config') ? twilio_config() : [];
+      $sms_to = trim((string)($twilio['to_number'] ?? ''));
+      $signature_link = invoice_signature_request_url($row_id);
+      send_sms($sms_to, 'Please have the customer sign this invoice: ' . $signature_link);
+
+      $pdo->commit();
+      header('Location: invoice_form.php?id=' . $row_id . '&mode=view&signature_request_ready=1&sms_sent=1');
+    } catch (Throwable $e) {
+      if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+      }
+      header('Location: invoice_form.php?id=' . $row_id . '&mode=view&sms_error=' . urlencode($e->getMessage()));
     }
-    $pdo->prepare("UPDATE quotes SET waiting_for_signature = 1 WHERE id = ?")->execute([$row_id]);
-    header('Location: invoice_form.php?id=' . $row_id . '&mode=view&signature_request_ready=1');
     exit;
   }
 
@@ -1381,11 +1436,13 @@ $invoice_credit_applied = isset($_GET['credit_applied']) && $_GET['credit_applie
 $invoice_credit_removed = isset($_GET['credit_removed']) && $_GET['credit_removed'] === '1';
 $invoice_credit_error = isset($_GET['credit_error']) && $_GET['credit_error'] !== '' ? trim((string)$_GET['credit_error']) : '';
 $invoice_signature_request_ready = isset($_GET['signature_request_ready']) && $_GET['signature_request_ready'] === '1';
+$invoice_sms_sent = isset($_GET['sms_sent']) && $_GET['sms_sent'] === '1';
+$invoice_sms_error = isset($_GET['sms_error']) && $_GET['sms_error'] !== '' ? trim((string)$_GET['sms_error']) : '';
 $invoice_approval_status = is_array($quote) ? (string)($quote['approval_status'] ?? 'none') : 'none';
 $invoice_is_paid = is_array($quote) && invoice_is_paid($quote);
 $invoice_waiting_for_signature = is_array($quote) && (int)($quote['waiting_for_signature'] ?? 0) === 1;
 $invoice_signature_button_label = $invoice_waiting_for_signature ? 'Regenerate Signature Link' : 'Collect Signature';
-$invoice_signature_link = $quote_id > 0 ? 'collect-signature.php?id=' . (int)$quote_id : '';
+$invoice_signature_link = $quote_id > 0 ? invoice_signature_request_url((int)$quote_id) : '';
 $invoice_payment_toggle_action = $invoice_is_paid ? 'mark_as_unpaid' : 'mark_as_paid';
 $invoice_payment_toggle_label = $invoice_is_paid ? 'Mark as Unpaid' : 'Mark as Paid';
 [$invoice_approval_bg, $invoice_approval_color] = invoice_form_approval_colors($invoice_approval_status);
@@ -1469,6 +1526,12 @@ render_header($invoice_heading);
 <?php endif; ?>
 <?php if ($invoice_credit_error !== ''): ?>
   <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b;"><?= h($invoice_credit_error) ?></div>
+<?php endif; ?>
+<?php if ($invoice_sms_sent): ?>
+  <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Signature request text sent successfully.</div>
+<?php endif; ?>
+<?php if ($invoice_sms_error !== ''): ?>
+  <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b;">Failed to send signature request text: <?= h($invoice_sms_error) ?></div>
 <?php endif; ?>
 <?php if ($invoice_waiting_for_signature && $invoice_signature_link !== ''): ?>
   <div class="alert" style="border-color:<?= $invoice_signature_request_ready ? '#bbf7d0' : '#bfdbfe' ?>; background:<?= $invoice_signature_request_ready ? '#f0fdf4' : '#eff6ff' ?>; color:<?= $invoice_signature_request_ready ? '#166534' : '#1e40af' ?>;">
