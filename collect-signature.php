@@ -25,6 +25,23 @@ if (!function_exists('collect_signature_invoice_label')) {
     }
 }
 
+if (!function_exists('collect_signature_client_ip')) {
+    function collect_signature_client_ip(): ?string {
+        $forwarded_for = trim((string)($_SERVER['HTTP_X_FORWARDED_FOR'] ?? ''));
+        if ($forwarded_for !== '') {
+            foreach (explode(',', $forwarded_for) as $candidate) {
+                $candidate = trim($candidate);
+                if ($candidate !== '' && filter_var($candidate, FILTER_VALIDATE_IP)) {
+                    return $candidate;
+                }
+            }
+        }
+
+        $remote_addr = trim((string)($_SERVER['REMOTE_ADDR'] ?? ''));
+        return $remote_addr !== '' && filter_var($remote_addr, FILTER_VALIDATE_IP) ? $remote_addr : null;
+    }
+}
+
 $invoice_label   = collect_signature_invoice_label($invoice);
 $total_amount    = (float)$invoice['subtotal_amount'] + (float)$invoice['tax_amount'];
 $total_formatted = '$' . number_format($total_amount, 2);
@@ -80,7 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($error === null && file_put_contents($filepath, $binary) === false) {
                 $error = 'Could not save the signature file. Please try again.';
             } elseif ($error === null) {
-                $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+                $ip = collect_signature_client_ip();
                 $ins = $pdo->prepare('INSERT INTO invoice_signatures (quote_id, signature_path, ip_address) VALUES (?, ?, ?)');
                 $ins->execute([$invoice_id, invoice_signature_relative_path($filename), $ip]);
                 $success = true;

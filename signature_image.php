@@ -51,7 +51,7 @@ if (!is_file($full_path)) {
 header('Content-Type: image/png');
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: private, no-store, max-age=0');
-$download_name = sprintf('signature-%d.png', $signature_id);
+$download_name = preg_replace('/[^A-Za-z0-9._-]/', '', sprintf('signature-%d.png', $signature_id)) ?: 'signature.png';
 header('Content-Disposition: inline; filename="' . $download_name . '"');
 readfile($full_path);
 exit;
