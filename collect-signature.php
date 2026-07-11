@@ -47,9 +47,8 @@ $customer_name = '';
 $show_signature_form = false;
 $request_method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 $raw_token = trim((string)($request_method === 'POST' ? ($_POST['token'] ?? '') : ($_GET['token'] ?? '')));
-$token_hash = preg_match(COLLECT_SIGNATURE_TOKEN_PATTERN, $raw_token) === 1
-    ? invoice_signature_access_token_hash($raw_token)
-    : '';
+$token_has_valid_format = preg_match(COLLECT_SIGNATURE_TOKEN_PATTERN, $raw_token) === 1;
+$token_hash = $token_has_valid_format ? invoice_signature_access_token_hash($raw_token) : '';
 
 if ($token_hash !== '') {
     $stmt = $pdo->prepare(
