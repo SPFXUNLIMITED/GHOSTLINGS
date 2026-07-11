@@ -1,21 +1,5 @@
 <?php
-// collect-signature.php — Customer digital signature collection for invoices
 require __DIR__ . '/db.php';
-
-$invoice_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-if ($invoice_id <= 0) {
-    http_response_code(400);
-    exit('Invalid invoice ID.');
-}
-
-// Load invoice (quotes table)
-$stmt = $pdo->prepare('SELECT id, converted_invoice_no, customer_name, subtotal_amount, tax_amount, waiting_for_signature FROM quotes WHERE id = ? LIMIT 1');
-$stmt->execute([$invoice_id]);
-$invoice = $stmt->fetch();
-if (!$invoice) {
-    http_response_code(404);
-    exit('Invoice not found.');
-}
 
 if (!function_exists('collect_signature_invoice_label')) {
     function collect_signature_invoice_label(array $invoice): string {
@@ -32,34 +16,82 @@ if (!function_exists('collect_signature_client_ip')) {
     }
 }
 
-$invoice_label = collect_signature_invoice_label($invoice);
-$total_amount = (float)$invoice['subtotal_amount'] + (float)$invoice['tax_amount'];
-$total_formatted = '$' . number_format($total_amount, 2);
-$customer_name = htmlspecialchars((string)$invoice['customer_name'], ENT_QUOTES, 'UTF-8');
-$link_is_active = (int)($invoice['waiting_for_signature'] ?? 0) === 1;
-
-$error = null;
-$show_signature_form = $link_is_active;
-if (!$link_is_active) {
-    $error = 'This signature link is no longer active.';
+if (!function_exists('collect_signature_inactive_cleanup')) {
+    function collect_signature_inactive_cleanup(PDO $pdo, int $invoice_id): void {
+        try {
+            $stmt = $pdo->prepare(
+                'UPDATE quotes
+                    SET waiting_for_signature = 0,
+                        signature_access_token_hash = NULL,
+                        signature_access_expires_at = NULL
+                  WHERE id = ?'
+            );
+            $stmt->execute([$invoice_id]);
+        } catch (Throwable $e) {
+            // Best-effort cleanup only.
+        }
+    }
 }
-$success = false;
 
-// Empty canvas submissions produce very small PNG payloads in testing; requiring at least 500 bytes
-// filters those out while still accepting normal handwritten signatures from mobile devices.
 const SIG_MIN_PNG_BYTES = 500;
 const MAX_FILENAME_ALLOCATION_ATTEMPTS = 10;
+const COLLECT_SIGNATURE_TOKEN_PATTERN = '/^[a-f0-9]{64}$/i';
 
-// ── Handle POST (signature submission) ──────────────────────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $link_is_active) {
+$success = false;
+$error = null;
+$page_variant = 'missing';
+$invoice = null;
+$invoice_label = '';
+$total_formatted = '';
+$customer_name = '';
+$show_signature_form = false;
+$raw_token = trim((string)($_POST['token'] ?? $_GET['token'] ?? ''));
+$token_hash = preg_match(COLLECT_SIGNATURE_TOKEN_PATTERN, $raw_token) === 1
+    ? invoice_signature_access_token_hash(strtolower($raw_token))
+    : '';
+
+if ($token_hash !== '') {
+    $stmt = $pdo->prepare(
+        'SELECT id, converted_invoice_no, customer_name, subtotal_amount, tax_amount,
+                waiting_for_signature, signature_access_token_hash, signature_access_expires_at
+           FROM quotes
+          WHERE signature_access_token_hash = ?
+          LIMIT 1'
+    );
+    $stmt->execute([$token_hash]);
+    $invoice = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+    if ($invoice) {
+        $link_is_active = (int)($invoice['waiting_for_signature'] ?? 0) === 1
+            && !invoice_signature_access_is_expired((string)($invoice['signature_access_expires_at'] ?? ''));
+
+        if ($link_is_active) {
+            $page_variant = 'active';
+            $invoice_label = collect_signature_invoice_label($invoice);
+            $total_amount = (float)$invoice['subtotal_amount'] + (float)$invoice['tax_amount'];
+            $total_formatted = '$' . number_format($total_amount, 2);
+            $customer_name = htmlspecialchars((string)$invoice['customer_name'], ENT_QUOTES, 'UTF-8');
+            $show_signature_form = true;
+        } else {
+            $page_variant = 'inactive';
+            http_response_code(410);
+            collect_signature_inactive_cleanup($pdo, (int)$invoice['id']);
+        }
+    }
+}
+
+if ($page_variant === 'missing') {
+    http_response_code(404);
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page_variant === 'active' && $invoice) {
     $raw_data = trim((string)($_POST['signature_data'] ?? ''));
 
-    // Must be a data URI for a PNG image
     if (!str_starts_with($raw_data, 'data:image/png;base64,')) {
         $error = 'No signature was submitted. Please sign above and try again.';
     } else {
         $base64 = substr($raw_data, strlen('data:image/png;base64,'));
-        $binary  = base64_decode($base64, true);
+        $binary = base64_decode($base64, true);
 
         if ($binary === false || strlen($binary) < SIG_MIN_PNG_BYTES) {
             $error = 'The signature data appears to be empty or invalid. Please sign again.';
@@ -101,10 +133,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $link_is_active) {
                 try {
                     $pdo->beginTransaction();
 
-                    $lock_stmt = $pdo->prepare('SELECT waiting_for_signature FROM quotes WHERE id = ? LIMIT 1 FOR UPDATE');
-                    $lock_stmt->execute([$invoice_id]);
-                    $waiting_for_signature = (int)$lock_stmt->fetchColumn();
-                    if ($waiting_for_signature !== 1) {
+                    $lock_stmt = $pdo->prepare(
+                        'SELECT waiting_for_signature, signature_access_token_hash, signature_access_expires_at
+                           FROM quotes
+                          WHERE id = ?
+                          LIMIT 1
+                          FOR UPDATE'
+                    );
+                    $lock_stmt->execute([(int)$invoice['id']]);
+                    $locked_invoice = $lock_stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+                    $locked_hash = trim((string)($locked_invoice['signature_access_token_hash'] ?? ''));
+                    $locked_waiting = (int)($locked_invoice['waiting_for_signature'] ?? 0) === 1;
+                    $locked_active = $locked_invoice
+                        && $locked_hash !== ''
+                        && hash_equals($locked_hash, $token_hash)
+                        && $locked_waiting
+                        && !invoice_signature_access_is_expired((string)($locked_invoice['signature_access_expires_at'] ?? ''));
+
+                    if (!$locked_active) {
                         throw new RuntimeException('signature_link_inactive');
                     }
 
@@ -115,15 +161,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $link_is_active) {
 
                     $ip = collect_signature_client_ip();
                     $ins = $pdo->prepare('INSERT INTO invoice_signatures (quote_id, signature_path, ip_address) VALUES (?, ?, ?)');
-                    $ins->execute([$invoice_id, invoice_signature_relative_path($filename), $ip]);
+                    $ins->execute([(int)$invoice['id'], invoice_signature_relative_path($filename), $ip]);
 
-                    $deactivate_stmt = $pdo->prepare('UPDATE quotes SET waiting_for_signature = 0 WHERE id = ?');
-                    $deactivate_stmt->execute([$invoice_id]);
+                    $deactivate_stmt = $pdo->prepare(
+                        'UPDATE quotes
+                            SET waiting_for_signature = 0,
+                                signature_access_token_hash = NULL,
+                                signature_access_expires_at = NULL
+                          WHERE id = ?'
+                    );
+                    $deactivate_stmt->execute([(int)$invoice['id']]);
 
                     $pdo->commit();
                     $success = true;
-                    $link_is_active = false;
                     $show_signature_form = false;
+                    $page_variant = 'success';
                 } catch (Throwable $e) {
                     if ($pdo->inTransaction()) {
                         $pdo->rollBack();
@@ -132,9 +184,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $link_is_active) {
                         @unlink($filepath);
                     }
                     if ($e->getMessage() === 'signature_link_inactive') {
-                        $error = 'This signature link is no longer active.';
-                        $link_is_active = false;
+                        $error = null;
                         $show_signature_form = false;
+                        $page_variant = 'inactive';
+                        http_response_code(410);
+                        collect_signature_inactive_cleanup($pdo, (int)$invoice['id']);
                     } elseif ($e->getMessage() === 'signature_file_write_failed') {
                         $error = 'Could not save the signature file. Please try again.';
                     } else {
@@ -145,105 +199,137 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $link_is_active) {
         }
     }
 }
+
+$page_title = 'Signature Request';
+if ($success && $invoice_label !== '') {
+    $page_title = 'Invoice Signed';
+} elseif ($show_signature_form && $invoice_label !== '') {
+    $page_title = 'Sign Invoice ' . $invoice_label;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Sign Invoice <?= htmlspecialchars($invoice_label, ENT_QUOTES, 'UTF-8') ?></title>
+<title><?= htmlspecialchars($page_title, ENT_QUOTES, 'UTF-8') ?></title>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
 
+  :root {
+    color-scheme: light;
+    --bg: #f3f6fb;
+    --card: #ffffff;
+    --text: #111827;
+    --muted: #64748b;
+    --brand: #1e3a5f;
+    --brand-strong: #16304f;
+    --accent: #2563eb;
+    --accent-soft: rgba(37, 99, 235, 0.14);
+    --danger-bg: #fef2f2;
+    --danger-border: #fecaca;
+    --danger-text: #b91c1c;
+    --shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+  }
+
   body {
     margin: 0;
-    padding: 0;
-    font-family: system-ui, -apple-system, Arial, sans-serif;
-    background: #f0f4f8;
-    color: #111827;
     min-height: 100vh;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: radial-gradient(circle at top, #ffffff 0, var(--bg) 52%);
+    color: var(--text);
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: center;
+    padding: 24px 16px;
   }
 
   .page {
     width: 100%;
-    max-width: 600px;
-    padding: 24px 16px 40px;
+    max-width: 640px;
   }
 
-  /* ── Header ── */
-  .header {
-    background: #1e3a5f;
-    color: #fff;
-    border-radius: 14px;
-    padding: 20px 24px;
-    margin-bottom: 20px;
-    text-align: center;
-  }
-  .header-title {
-    font-size: 13px;
-    letter-spacing: .06em;
-    text-transform: uppercase;
-    opacity: .7;
-    margin: 0 0 6px;
-  }
-  .header-invoice {
-    font-size: 26px;
-    font-weight: 700;
-    margin: 0 0 4px;
-    letter-spacing: -.01em;
-  }
-  .header-customer {
-    font-size: 14px;
-    opacity: .8;
-    margin: 0 0 14px;
-  }
-  .header-total-label {
-    font-size: 12px;
-    opacity: .65;
-    text-transform: uppercase;
-    letter-spacing: .05em;
-    margin: 0;
-  }
-  .header-total-amount {
-    font-size: 36px;
-    font-weight: 800;
-    margin: 2px 0 0;
-    color: #7dd3fc;
-  }
-
-  /* ── Card ── */
   .card {
-    background: #fff;
-    border-radius: 14px;
-    padding: 24px 20px;
-    box-shadow: 0 2px 12px rgba(0,0,0,.08);
-    margin-bottom: 16px;
+    background: var(--card);
+    border-radius: 24px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
   }
 
-  /* ── Instructions ── */
+  .hero {
+    padding: 30px 28px;
+    background: linear-gradient(135deg, var(--brand) 0%, #24496f 100%);
+    color: #fff;
+  }
+
+  .hero-title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.74;
+  }
+
+  .hero-heading {
+    margin: 10px 0 4px;
+    font-size: 28px;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  .hero-subtitle {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .hero-meta {
+    display: grid;
+    gap: 16px;
+    margin-top: 22px;
+  }
+
+  .hero-meta-block small {
+    display: block;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.66;
+    margin-bottom: 4px;
+  }
+
+  .hero-meta-block strong {
+    display: block;
+    font-size: 20px;
+    letter-spacing: -0.02em;
+  }
+
+  .content {
+    padding: 28px;
+  }
+
   .instructions {
     text-align: center;
     font-size: 17px;
     font-weight: 600;
-    color: #1e3a5f;
+    color: var(--brand);
     margin: 0 0 18px;
     line-height: 1.4;
   }
 
-  /* ── Signature pad ── */
   .sig-wrap {
     position: relative;
     width: 100%;
-    border: 2.5px solid #2563eb;
-    border-radius: 10px;
+    border: 2.5px solid var(--accent);
+    border-radius: 16px;
     background: #fafafa;
     overflow: hidden;
     touch-action: none;
     cursor: crosshair;
   }
+
   .sig-wrap::after {
     content: 'Sign here';
     position: absolute;
@@ -256,14 +342,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $link_is_active) {
     pointer-events: none;
     letter-spacing: .04em;
   }
+
   #sig-canvas {
     display: block;
     width: 100%;
     height: 240px;
     touch-action: none;
   }
+
   @media (min-width: 480px) {
     #sig-canvas { height: 280px; }
+    .hero-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 
   .sig-line {
@@ -276,153 +365,219 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $link_is_active) {
     pointer-events: none;
   }
 
-  /* ── Buttons ── */
   .btn-row {
     display: flex;
     gap: 10px;
     margin-top: 16px;
   }
+
   .btn {
     flex: 1;
     padding: 16px 12px;
     border: none;
-    border-radius: 10px;
-    font-size: 17px;
+    border-radius: 12px;
+    font-size: 16px;
     font-weight: 700;
     cursor: pointer;
     letter-spacing: -.01em;
-    transition: opacity .15s, transform .1s;
+    transition: opacity .15s, transform .1s, background-color .15s;
   }
-  .btn:active { transform: scale(.97); }
+
+  .btn:active { transform: scale(.98); }
   .btn-clear {
     background: #f3f4f6;
     color: #374151;
     border: 1.5px solid #d1d5db;
   }
+
   .btn-clear:hover { background: #e5e7eb; }
   .btn-submit {
-    background: #2563eb;
+    background: var(--accent);
     color: #fff;
   }
+
   .btn-submit:hover { opacity: .92; }
   .btn-submit:disabled { opacity: .5; cursor: not-allowed; }
 
-  /* ── Error ── */
   .error-box {
-    background: #fef2f2;
-    border: 1.5px solid #fca5a5;
-    color: #b91c1c;
-    border-radius: 10px;
+    background: var(--danger-bg);
+    border: 1px solid var(--danger-border);
+    color: var(--danger-text);
+    border-radius: 14px;
     padding: 14px 16px;
     font-size: 15px;
     margin-bottom: 16px;
   }
 
-  /* ── Success screen ── */
+  .status-shell {
+    text-align: center;
+    padding: 52px 28px;
+  }
+
+  .status-badge {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 22px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    font-weight: 800;
+    color: var(--brand);
+    background: var(--accent-soft);
+  }
+
+  .status-code {
+    margin: 0;
+    color: #94a3b8;
+    font-size: 13px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  .status-title {
+    margin: 12px 0 10px;
+    font-size: 30px;
+    line-height: 1.15;
+    letter-spacing: -0.03em;
+    color: #0f172a;
+  }
+
+  .status-message {
+    max-width: 360px;
+    margin: 0 auto;
+    color: var(--muted);
+    font-size: 16px;
+    line-height: 1.7;
+  }
+
   .success-screen {
     text-align: center;
-    padding: 16px 0 8px;
+    padding: 8px 0 2px;
   }
+
   .success-icon {
-    font-size: 72px;
-    line-height: 1;
-    margin-bottom: 12px;
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 20px;
+    border-radius: 999px;
+    background: rgba(22, 163, 74, 0.14);
+    color: #15803d;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
   }
+
   .success-heading {
-    font-size: 26px;
+    font-size: 30px;
     font-weight: 800;
     color: #15803d;
     margin: 0 0 8px;
+    letter-spacing: -0.03em;
   }
+
   .success-sub {
     font-size: 16px;
-    color: #6b7280;
+    color: var(--muted);
     margin: 0 0 24px;
-    line-height: 1.5;
+    line-height: 1.6;
   }
+
   .success-message {
     display: inline-block;
     padding: 14px 28px;
-    background: #1e3a5f;
+    background: var(--brand);
     color: #fff;
     border: none;
-    border-radius: 10px;
+    border-radius: 12px;
     font-size: 15px;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
-    touch-action: manipulation;
   }
-  .success-message:hover {
-    background: #16304f;
-  }
-  .success-message:active {
-    background: #0f2238;
-  }
+
+  .success-message:hover { background: var(--brand-strong); }
 </style>
 </head>
 <body>
 <div class="page">
-
-  <!-- Invoice header -->
-  <div class="header">
-    <p class="header-title">Invoice</p>
-    <p class="header-invoice"><?= htmlspecialchars($invoice_label, ENT_QUOTES, 'UTF-8') ?></p>
-    <?php if ($customer_name !== ''): ?>
-      <p class="header-customer"><?= $customer_name ?></p>
-    <?php endif; ?>
-    <p class="header-total-label">Total Due</p>
-    <p class="header-total-amount"><?= $total_formatted ?></p>
-  </div>
-
-  <?php if ($success): ?>
-
-    <!-- ── Success screen ── -->
+  <?php if ($show_signature_form || $success): ?>
     <div class="card">
-      <div class="success-screen">
-        <div class="success-icon">✅</div>
-        <p class="success-heading">Thank You!</p>
-        <p class="success-sub">Your signature has been saved.<br>Invoice <?= htmlspecialchars($invoice_label, ENT_QUOTES, 'UTF-8') ?> is now signed.</p>
-        <button type="button" class="success-message" onclick="window.close()">You can close this page now.</button>
-      </div>
-    </div>
-
-  <?php elseif ($show_signature_form): ?>
-
-    <?php if ($error !== null): ?>
-      <div class="error-box"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
-    <?php endif; ?>
-
-    <!-- ── Signature card ── -->
-    <div class="card">
-      <p class="instructions">Please sign below to complete this invoice signature request.</p>
-
-      <div class="sig-wrap">
-        <canvas id="sig-canvas"></canvas>
-        <div class="sig-line"></div>
-      </div>
-
-      <form method="POST" id="sig-form">
-        <input type="hidden" name="signature_data" id="signature_data">
-        <div class="btn-row">
-          <button type="button" class="btn btn-clear" id="btn-clear">Clear</button>
-          <button type="submit" class="btn btn-submit" id="btn-submit">Submit Signature</button>
+      <div class="hero">
+        <p class="hero-title">Invoice Signature</p>
+        <h1 class="hero-heading"><?= htmlspecialchars($invoice_label, ENT_QUOTES, 'UTF-8') ?></h1>
+        <?php if ($customer_name !== ''): ?>
+          <p class="hero-subtitle"><?= $customer_name ?></p>
+        <?php endif; ?>
+        <div class="hero-meta">
+          <div class="hero-meta-block">
+            <small>Total due</small>
+            <strong><?= htmlspecialchars($total_formatted, ENT_QUOTES, 'UTF-8') ?></strong>
+          </div>
+          <div class="hero-meta-block">
+            <small>Status</small>
+            <strong><?= $success ? 'Signed' : 'Awaiting signature' ?></strong>
+          </div>
         </div>
-      </form>
-    </div>
+      </div>
 
+      <div class="content">
+        <?php if ($success): ?>
+          <div class="success-screen">
+            <div class="success-icon">✓</div>
+            <p class="success-heading">Thank you</p>
+            <p class="success-sub">Your signature has been saved successfully.</p>
+            <button type="button" class="success-message" onclick="window.close()">You can close this page now.</button>
+          </div>
+        <?php else: ?>
+          <?php if ($error !== null): ?>
+            <div class="error-box"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
+          <?php endif; ?>
+
+          <p class="instructions">Please sign below to complete this invoice signature request.</p>
+
+          <div class="sig-wrap">
+            <canvas id="sig-canvas"></canvas>
+            <div class="sig-line"></div>
+          </div>
+
+          <form method="POST" id="sig-form">
+            <input type="hidden" name="token" value="<?= htmlspecialchars($raw_token, ENT_QUOTES, 'UTF-8') ?>">
+            <input type="hidden" name="signature_data" id="signature_data">
+            <div class="btn-row">
+              <button type="button" class="btn btn-clear" id="btn-clear">Clear</button>
+              <button type="submit" class="btn btn-submit" id="btn-submit">Submit Signature</button>
+            </div>
+          </form>
+        <?php endif; ?>
+      </div>
+    </div>
   <?php else: ?>
-    <div class="card">
-      <div class="error-box" style="margin:0;"><?= htmlspecialchars($error ?? 'This signature link is no longer active.', ENT_QUOTES, 'UTF-8') ?></div>
+    <?php
+      $inactive = $page_variant === 'inactive';
+      $status_code = $inactive ? '410' : '404';
+      $status_title = $inactive ? 'This link is no longer active' : 'Nothing to see here';
+      $status_message = $inactive
+        ? 'This signature request is no longer available. If you still need to sign, please request a new secure link.'
+        : 'The page you requested is unavailable or has moved.';
+    ?>
+    <div class="card status-shell">
+      <div class="status-badge"><?= $inactive ? '!' : '?' ?></div>
+      <p class="status-code"><?= $status_code ?> · signature request</p>
+      <h1 class="status-title"><?= htmlspecialchars($status_title, ENT_QUOTES, 'UTF-8') ?></h1>
+      <p class="status-message"><?= htmlspecialchars($status_message, ENT_QUOTES, 'UTF-8') ?></p>
     </div>
-
   <?php endif; ?>
 </div>
 
+<?php if ($show_signature_form): ?>
 <script>
 (function () {
-  var canvas  = document.getElementById('sig-canvas');
-  var form    = document.getElementById('sig-form');
-  var btnClear  = document.getElementById('btn-clear');
+  var canvas = document.getElementById('sig-canvas');
+  var form = document.getElementById('sig-form');
+  var btnClear = document.getElementById('btn-clear');
   var btnSubmit = document.getElementById('btn-submit');
   var hiddenInput = document.getElementById('signature_data');
 
@@ -432,13 +587,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $link_is_active) {
   var drawing = false;
   var hasMark = false;
 
-  // ── Size canvas to its CSS size (hi-DPI aware) ──
   function resizeCanvas() {
-    var dpr  = window.devicePixelRatio || 1;
+    var dpr = window.devicePixelRatio || 1;
     var rect = canvas.getBoundingClientRect();
     var prevData = hasMark ? canvas.toDataURL() : null;
 
-    canvas.width  = Math.round(rect.width  * dpr);
+    canvas.width = Math.round(rect.width * dpr);
     canvas.height = Math.round(rect.height * dpr);
     ctx.scale(dpr, dpr);
     setupCtx();
@@ -452,9 +606,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $link_is_active) {
 
   function setupCtx() {
     ctx.strokeStyle = '#111827';
-    ctx.lineWidth   = 2.4;
-    ctx.lineCap     = 'round';
-    ctx.lineJoin    = 'round';
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
   }
 
   function clearCanvas() {
@@ -464,7 +618,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $link_is_active) {
     ctx.restore();
   }
 
-  // ── Coordinate helpers ──
   function getPos(e) {
     var rect = canvas.getBoundingClientRect();
     if (e.touches) {
@@ -479,7 +632,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $link_is_active) {
     };
   }
 
-  // ── Drawing events ──
   function onStart(e) {
     e.preventDefault();
     drawing = true;
@@ -506,17 +658,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $link_is_active) {
     ctx.beginPath();
   }
 
-  canvas.addEventListener('mousedown',  onStart, { passive: false });
-  canvas.addEventListener('mousemove',  onMove,  { passive: false });
-  canvas.addEventListener('mouseup',    onEnd,   { passive: false });
-  canvas.addEventListener('mouseleave', onEnd,   { passive: false });
-
+  canvas.addEventListener('mousedown', onStart, { passive: false });
+  canvas.addEventListener('mousemove', onMove, { passive: false });
+  canvas.addEventListener('mouseup', onEnd, { passive: false });
+  canvas.addEventListener('mouseleave', onEnd, { passive: false });
   canvas.addEventListener('touchstart', onStart, { passive: false });
-  canvas.addEventListener('touchmove',  onMove,  { passive: false });
-  canvas.addEventListener('touchend',   onEnd,   { passive: false });
-  canvas.addEventListener('touchcancel',onEnd,   { passive: false });
+  canvas.addEventListener('touchmove', onMove, { passive: false });
+  canvas.addEventListener('touchend', onEnd, { passive: false });
+  canvas.addEventListener('touchcancel', onEnd, { passive: false });
 
-  // ── Clear ──
   if (btnClear) {
     btnClear.addEventListener('click', function () {
       clearCanvas();
@@ -524,23 +674,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $link_is_active) {
     });
   }
 
-  // ── Submit: attach data URI before POST ──
-  if (form) {
-    form.addEventListener('submit', function (e) {
-      if (!hasMark) {
-        e.preventDefault();
-        alert('Please sign before submitting.');
-        return;
-      }
-      hiddenInput.value = canvas.toDataURL('image/png');
-      if (btnSubmit) btnSubmit.disabled = true;
-    });
-  }
+  form.addEventListener('submit', function (e) {
+    if (!hasMark) {
+      e.preventDefault();
+      alert('Please sign before submitting.');
+      return;
+    }
+    hiddenInput.value = canvas.toDataURL('image/png');
+    if (btnSubmit) btnSubmit.disabled = true;
+  });
 
-  // ── Initial resize + watch for layout changes ──
   resizeCanvas();
   window.addEventListener('resize', resizeCanvas);
 })();
 </script>
+<?php endif; ?>
 </body>
 </html>

@@ -189,9 +189,9 @@ function invoice_application_base_url(): string {
   return $base_url;
 }
 
-function invoice_signature_request_url(int $quote_id): string {
+function invoice_signature_request_url(string $access_token): string {
   return invoice_application_base_url() . '/collect-signature.php?' . http_build_query([
-    'id' => $quote_id,
+    'token' => $access_token,
   ], '', '&', PHP_QUERY_RFC3986);
 }
 
@@ -843,6 +843,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (trim((string)($_POST['action'] ?? '')) === 'collect_signature') {
     $row_id = (int)($_POST['row_id'] ?? 0);
     $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
+    unset($_SESSION['invoice_signature_request_link']);
     if ($row_id <= 0) {
       header('Location: invoice_tracker.php');
       exit;
@@ -857,17 +858,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
       }
 
-      $pdo->prepare("UPDATE quotes SET waiting_for_signature = 1 WHERE id = ?")->execute([$row_id]);
-
-      $twilio = function_exists('twilio_config') ? twilio_config() : [];
-      $sms_to = trim((string)($twilio['to_number'] ?? ''));
-      $signature_link = invoice_signature_request_url($row_id);
+      $signature_access_token = invoice_signature_access_token_generate();
+      $signature_access_expires_at = invoice_signature_access_expires_at();
+      $signature_link = invoice_signature_request_url($signature_access_token);
       if (!filter_var($signature_link, FILTER_VALIDATE_URL)) {
         throw new RuntimeException('Could not build a valid signature link.');
       }
+
+      $pdo->prepare(
+        "UPDATE quotes
+            SET waiting_for_signature = 1,
+                signature_access_token_hash = ?,
+                signature_access_expires_at = ?
+          WHERE id = ?"
+      )->execute([
+        invoice_signature_access_token_hash($signature_access_token),
+        $signature_access_expires_at,
+        $row_id,
+      ]);
+
+      $twilio = function_exists('twilio_config') ? twilio_config() : [];
+      $sms_to = trim((string)($twilio['to_number'] ?? ''));
       send_sms($sms_to, 'Please have the customer sign this invoice: ' . $signature_link);
 
       $pdo->commit();
+      $_SESSION['invoice_signature_request_link'] = $signature_link;
       header('Location: invoice_form.php?id=' . $row_id . '&mode=view&signature_request_ready=1&sms_sent=1');
     } catch (Throwable $e) {
       if ($pdo->inTransaction()) {
@@ -1440,9 +1455,15 @@ $invoice_sms_sent = isset($_GET['sms_sent']) && $_GET['sms_sent'] === '1';
 $invoice_sms_error = isset($_GET['sms_error']) && $_GET['sms_error'] !== '' ? trim((string)$_GET['sms_error']) : '';
 $invoice_approval_status = is_array($quote) ? (string)($quote['approval_status'] ?? 'none') : 'none';
 $invoice_is_paid = is_array($quote) && invoice_is_paid($quote);
-$invoice_waiting_for_signature = is_array($quote) && (int)($quote['waiting_for_signature'] ?? 0) === 1;
+$invoice_signature_link = trim((string)($_SESSION['invoice_signature_request_link'] ?? ''));
+unset($_SESSION['invoice_signature_request_link']);
+$invoice_signature_link_valid = $invoice_signature_link !== '' && filter_var($invoice_signature_link, FILTER_VALIDATE_URL);
+$invoice_signature_link_expired = !is_array($quote) || invoice_signature_access_is_expired((string)($quote['signature_access_expires_at'] ?? ''));
+$invoice_waiting_for_signature = is_array($quote)
+  && (int)($quote['waiting_for_signature'] ?? 0) === 1
+  && trim((string)($quote['signature_access_token_hash'] ?? '')) !== ''
+  && !$invoice_signature_link_expired;
 $invoice_signature_button_label = $invoice_waiting_for_signature ? 'Regenerate Signature Link' : 'Collect Signature';
-$invoice_signature_link = $quote_id > 0 ? invoice_signature_request_url((int)$quote_id) : '';
 $invoice_payment_toggle_action = $invoice_is_paid ? 'mark_as_unpaid' : 'mark_as_paid';
 $invoice_payment_toggle_label = $invoice_is_paid ? 'Mark as Unpaid' : 'Mark as Paid';
 [$invoice_approval_bg, $invoice_approval_color] = invoice_form_approval_colors($invoice_approval_status);
@@ -1533,10 +1554,14 @@ render_header($invoice_heading);
 <?php if ($invoice_sms_error !== ''): ?>
   <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b;">Failed to send signature request text: <?= h($invoice_sms_error) ?></div>
 <?php endif; ?>
-<?php if ($invoice_waiting_for_signature && $invoice_signature_link !== ''): ?>
+<?php if ($invoice_waiting_for_signature && $invoice_signature_link_valid): ?>
   <div class="alert" style="border-color:<?= $invoice_signature_request_ready ? '#bbf7d0' : '#bfdbfe' ?>; background:<?= $invoice_signature_request_ready ? '#f0fdf4' : '#eff6ff' ?>; color:<?= $invoice_signature_request_ready ? '#166534' : '#1e40af' ?>;">
     <?= $invoice_signature_request_ready ? 'Signature link activated:' : 'Signature link is active:' ?>
     <a href="<?= h($invoice_signature_link) ?>" target="_blank" rel="noopener noreferrer"><?= h($invoice_signature_link) ?></a>
+  </div>
+<?php elseif ($invoice_waiting_for_signature): ?>
+  <div class="alert" style="border-color:#bfdbfe; background:#eff6ff; color:#1e40af;">
+    A secure signature link is currently active for this invoice.
   </div>
 <?php endif; ?>
 
