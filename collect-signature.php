@@ -47,7 +47,7 @@ $customer_name = '';
 $show_signature_form = false;
 $raw_token = trim((string)($_POST['token'] ?? $_GET['token'] ?? ''));
 $token_hash = preg_match(COLLECT_SIGNATURE_TOKEN_PATTERN, $raw_token) === 1
-    ? invoice_signature_access_token_hash(strtolower($raw_token))
+    ? invoice_signature_access_token_hash($raw_token)
     : '';
 
 if ($token_hash !== '') {

@@ -843,7 +843,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (trim((string)($_POST['action'] ?? '')) === 'collect_signature') {
     $row_id = (int)($_POST['row_id'] ?? 0);
     $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
-    unset($_SESSION['invoice_signature_request_link']);
+    unset($_SESSION['invoice_signature_request_links'][$row_id]);
     if ($row_id <= 0) {
       header('Location: invoice_tracker.php');
       exit;
@@ -882,7 +882,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       send_sms($sms_to, 'Please have the customer sign this invoice: ' . $signature_link);
 
       $pdo->commit();
-      $_SESSION['invoice_signature_request_link'] = $signature_link;
+      $_SESSION['invoice_signature_request_links'][$row_id] = $signature_link;
       header('Location: invoice_form.php?id=' . $row_id . '&mode=view&signature_request_ready=1&sms_sent=1');
     } catch (Throwable $e) {
       if ($pdo->inTransaction()) {
@@ -1455,8 +1455,8 @@ $invoice_sms_sent = isset($_GET['sms_sent']) && $_GET['sms_sent'] === '1';
 $invoice_sms_error = isset($_GET['sms_error']) && $_GET['sms_error'] !== '' ? trim((string)$_GET['sms_error']) : '';
 $invoice_approval_status = is_array($quote) ? (string)($quote['approval_status'] ?? 'none') : 'none';
 $invoice_is_paid = is_array($quote) && invoice_is_paid($quote);
-$invoice_signature_link = trim((string)($_SESSION['invoice_signature_request_link'] ?? ''));
-unset($_SESSION['invoice_signature_request_link']);
+$invoice_signature_link = trim((string)($_SESSION['invoice_signature_request_links'][$quote_id] ?? ''));
+unset($_SESSION['invoice_signature_request_links'][$quote_id]);
 $invoice_signature_link_valid = $invoice_signature_link !== '' && filter_var($invoice_signature_link, FILTER_VALIDATE_URL);
 $invoice_signature_link_expired = !is_array($quote) || invoice_signature_access_is_expired((string)($quote['signature_access_expires_at'] ?? ''));
 $invoice_waiting_for_signature = is_array($quote)
