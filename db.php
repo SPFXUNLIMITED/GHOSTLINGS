@@ -1509,6 +1509,50 @@ if ($_quotes_waiting_for_signature_col === false || $_quotes_waiting_for_signatu
 }
 unset($_quotes_waiting_for_signature_col);
 
+$_quotes_signature_token_hash_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'signature_access_token_hash'");
+if ($_quotes_signature_token_hash_col === false || $_quotes_signature_token_hash_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN signature_access_token_hash CHAR(64) NULL AFTER waiting_for_signature");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'signature_access_token_hash'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_signature_token_hash_col);
+
+$_quotes_signature_expires_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'signature_access_expires_at'");
+if ($_quotes_signature_expires_col === false || $_quotes_signature_expires_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN signature_access_expires_at DATETIME NULL AFTER signature_access_token_hash");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'signature_access_expires_at'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_signature_expires_col);
+
+$_quotes_signature_token_hash_unique_idx = $pdo->query("SHOW INDEX FROM quotes WHERE Key_name = 'uniq_quotes_signature_access_token_hash'");
+if ($_quotes_signature_token_hash_unique_idx !== false && $_quotes_signature_token_hash_unique_idx->fetch(PDO::FETCH_ASSOC) !== false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes DROP INDEX uniq_quotes_signature_access_token_hash");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW INDEX FROM quotes WHERE Key_name = 'uniq_quotes_signature_access_token_hash'");
+    if ($recheck !== false && $recheck->fetch(PDO::FETCH_ASSOC) !== false) { throw $e; }
+  }
+}
+unset($_quotes_signature_token_hash_unique_idx);
+
+$_quotes_signature_token_hash_idx = $pdo->query("SHOW INDEX FROM quotes WHERE Key_name = 'idx_quotes_signature_access_token_hash'");
+if ($_quotes_signature_token_hash_idx === false || $_quotes_signature_token_hash_idx->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD INDEX idx_quotes_signature_access_token_hash (signature_access_token_hash)");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW INDEX FROM quotes WHERE Key_name = 'idx_quotes_signature_access_token_hash'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_signature_token_hash_idx);
+
 $_quotes_checkout_url_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'stripe_checkout_url'");
 if ($_quotes_checkout_url_col === false || $_quotes_checkout_url_col->fetch(PDO::FETCH_ASSOC) === false) {
   try {
@@ -2164,5 +2208,62 @@ if (!function_exists('invoice_signature_relative_path')) {
 if (!function_exists('invoice_signature_filename_regex')) {
   function invoice_signature_filename_regex(): string {
     return 'sig_[a-f0-9]{32}\.png';
+  }
+}
+
+if (!function_exists('invoice_signature_access_token_generate')) {
+  // 32 random bytes are hex-encoded into a 64-character token for public signature links.
+  function invoice_signature_access_token_generate(): string {
+    return bin2hex(random_bytes(32));
+  }
+}
+
+if (!defined('INVOICE_SIGNATURE_ACCESS_MIN_EXPIRY_DAYS')) {
+  define('INVOICE_SIGNATURE_ACCESS_MIN_EXPIRY_DAYS', 1);
+}
+
+if (!defined('INVOICE_SIGNATURE_ACCESS_MAX_EXPIRY_DAYS')) {
+  define('INVOICE_SIGNATURE_ACCESS_MAX_EXPIRY_DAYS', 365);
+}
+
+if (!function_exists('invoice_signature_access_token_pattern')) {
+  function invoice_signature_access_token_pattern(): string {
+    return '/^[a-f0-9]{64}$/i';
+  }
+}
+
+if (!function_exists('invoice_signature_access_token_hash')) {
+  // Store only a SHA-256 hex digest in the database so the raw public token is never persisted.
+  function invoice_signature_access_token_hash(string $token): string {
+    return hash('sha256', $token);
+  }
+}
+
+if (!function_exists('invoice_signature_access_expires_at')) {
+  // Build the APP_TZ expiration timestamp used for signature-link expiry checks.
+  function invoice_signature_access_expires_at(int $days = 7): string {
+    $days = max(INVOICE_SIGNATURE_ACCESS_MIN_EXPIRY_DAYS, min(INVOICE_SIGNATURE_ACCESS_MAX_EXPIRY_DAYS, $days));
+    $expires = new DateTime('now', new DateTimeZone(APP_TZ));
+    $expires->modify('+' . $days . ' days');
+    return $expires->format('Y-m-d H:i:s');
+  }
+}
+
+if (!function_exists('invoice_signature_access_is_expired')) {
+  // Treat blank or invalid timestamps as expired so inactive links fail closed.
+  function invoice_signature_access_is_expired(?string $expires_at): bool {
+    $expires_at = trim((string)$expires_at);
+    if ($expires_at === '') {
+      return true;
+    }
+
+    try {
+      $tz = new DateTimeZone(APP_TZ);
+      $expires = new DateTime($expires_at, $tz);
+      $now = new DateTime('now', $tz);
+      return $now > $expires;
+    } catch (Throwable $e) {
+      return true;
+    }
   }
 }
