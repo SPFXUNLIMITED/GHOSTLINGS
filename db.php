@@ -2218,6 +2218,14 @@ if (!function_exists('invoice_signature_access_token_generate')) {
   }
 }
 
+if (!defined('INVOICE_SIGNATURE_ACCESS_MIN_EXPIRY_DAYS')) {
+  define('INVOICE_SIGNATURE_ACCESS_MIN_EXPIRY_DAYS', 1);
+}
+
+if (!defined('INVOICE_SIGNATURE_ACCESS_MAX_EXPIRY_DAYS')) {
+  define('INVOICE_SIGNATURE_ACCESS_MAX_EXPIRY_DAYS', 365);
+}
+
 if (!function_exists('invoice_signature_access_token_pattern')) {
   function invoice_signature_access_token_pattern(): string {
     return '/^[a-f0-9]{64}$/i';
@@ -2234,7 +2242,7 @@ if (!function_exists('invoice_signature_access_token_hash')) {
 if (!function_exists('invoice_signature_access_expires_at')) {
   // Build the APP_TZ expiration timestamp used for signature-link expiry checks.
   function invoice_signature_access_expires_at(int $days = 7): string {
-    $days = max(1, min(365, $days));
+    $days = max(INVOICE_SIGNATURE_ACCESS_MIN_EXPIRY_DAYS, min(INVOICE_SIGNATURE_ACCESS_MAX_EXPIRY_DAYS, $days));
     $expires = new DateTime('now', new DateTimeZone(APP_TZ));
     $expires->modify('+' . $days . ' days');
     return $expires->format('Y-m-d H:i:s');

@@ -33,6 +33,7 @@ if (!function_exists('collect_signature_inactive_cleanup')) {
     }
 }
 
+// Empty canvas submissions stay tiny, so this threshold blocks blank PNG payloads without rejecting normal signatures.
 const SIG_MIN_PNG_BYTES = 500;
 const MAX_FILENAME_ALLOCATION_ATTEMPTS = 10;
 
