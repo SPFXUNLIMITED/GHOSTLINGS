@@ -886,6 +886,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       send_sms($sms_to, 'Please have the customer sign this invoice: ' . $signature_link);
 
       $pdo->commit();
+      $_SESSION['invoice_signature_link_' . $row_id] = $signature_link;
       header('Location: invoice_form.php?id=' . $row_id . '&mode=view&signature_request_ready=1&sms_sent=1');
     } catch (Throwable $e) {
       if ($pdo->inTransaction()) {
@@ -1456,6 +1457,14 @@ $invoice_credit_error = isset($_GET['credit_error']) && $_GET['credit_error'] !=
 $invoice_signature_request_ready = isset($_GET['signature_request_ready']) && $_GET['signature_request_ready'] === '1';
 $invoice_sms_sent = isset($_GET['sms_sent']) && $_GET['sms_sent'] === '1';
 $invoice_sms_error = isset($_GET['sms_error']) && $_GET['sms_error'] !== '' ? trim((string)$_GET['sms_error']) : '';
+$invoice_signature_new_link = '';
+if ($invoice_signature_request_ready && $quote_id > 0) {
+  $sess_key = 'invoice_signature_link_' . $quote_id;
+  if (!empty($_SESSION[$sess_key])) {
+    $invoice_signature_new_link = (string)$_SESSION[$sess_key];
+    unset($_SESSION[$sess_key]);
+  }
+}
 $invoice_approval_status = is_array($quote) ? (string)($quote['approval_status'] ?? 'none') : 'none';
 $invoice_is_paid = is_array($quote) && invoice_is_paid($quote);
 $invoice_signature_link_expired = !is_array($quote) || invoice_signature_access_is_expired((string)($quote['signature_access_expires_at'] ?? ''));
@@ -1557,6 +1566,12 @@ render_header($invoice_heading);
 <?php if ($invoice_waiting_for_signature): ?>
   <div class="alert" style="border-color:#bfdbfe; background:#eff6ff; color:#1e40af;">
     <?= $invoice_signature_request_ready ? 'A new secure signature link is active for this invoice.' : 'A secure signature link is currently active for this invoice.' ?>
+    <?php if ($invoice_signature_new_link !== ''): ?>
+      <div style="margin-top:8px; word-break:break-all;">
+        <strong>Signature Link:</strong>
+        <a href="<?= h($invoice_signature_new_link) ?>" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;"><?= h($invoice_signature_new_link) ?></a>
+      </div>
+    <?php endif; ?>
   </div>
 <?php endif; ?>
 
