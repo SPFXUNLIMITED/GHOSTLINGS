@@ -27,6 +27,10 @@ $customer_name   = htmlspecialchars((string)$invoice['customer_name'], ENT_QUOTE
 $error   = null;
 $success = false;
 
+// Minimum byte length for a valid PNG (8-byte magic + IHDR chunk = 33 bytes minimum; we require
+// substantially more to ensure the canvas contained actual drawn content, not just an empty image).
+const SIG_MIN_PNG_BYTES = 500;
+
 // ── Handle POST (signature submission) ──────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $raw_data = trim((string)($_POST['signature_data'] ?? ''));
@@ -38,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $base64 = substr($raw_data, strlen('data:image/png;base64,'));
         $binary  = base64_decode($base64, true);
 
-        if ($binary === false || strlen($binary) < 100) {
+        if ($binary === false || strlen($binary) < SIG_MIN_PNG_BYTES) {
             $error = 'The signature data appears to be empty or invalid. Please sign again.';
         } else {
             $uploads_dir = __DIR__ . '/uploads';
@@ -46,7 +50,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mkdir($uploads_dir, 0755, true);
             }
 
-            $filename = 'sig_' . $invoice_id . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.png';
+            // Use a fully random filename so signatures cannot be enumerated or guessed.
+            $filename = 'sig_' . bin2hex(random_bytes(16)) . '.png';
             $filepath = $uploads_dir . '/' . $filename;
 
             if (file_put_contents($filepath, $binary) === false) {
@@ -302,7 +307,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <!-- ── Signature card ── -->
     <div class="card">
-      <p class="instructions">Please sign below to confirm you are satisfied&nbsp;with&nbsp;the&nbsp;work</p>
+      <p class="instructions">Please sign below to confirm you are satisfied with the work</p>
 
       <div class="sig-wrap">
         <canvas id="sig-canvas"></canvas>
