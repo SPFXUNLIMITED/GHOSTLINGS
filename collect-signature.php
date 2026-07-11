@@ -45,17 +45,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $signature_storage_dir = invoice_signature_storage_dir();
             if (!is_dir($signature_storage_dir)) {
-                mkdir($signature_storage_dir, 0700, true);
+                if (!mkdir($signature_storage_dir, 0700, true) && !is_dir($signature_storage_dir)) {
+                    $error = 'Could not prepare secure signature storage. Please try again.';
+                }
             }
 
-            do {
-                $filename = 'sig_' . bin2hex(random_bytes(16)) . '.png';
-                $filepath = $signature_storage_dir . '/' . $filename;
-            } while (is_file($filepath));
+            if ($error === null) {
+                $filename = '';
+                $filepath = '';
+                $max_attempts = 10;
+                for ($attempt = 0; $attempt < $max_attempts; $attempt++) {
+                    $filename = 'sig_' . bin2hex(random_bytes(16)) . '.png';
+                    $filepath = $signature_storage_dir . '/' . $filename;
+                    if (!is_file($filepath)) {
+                        break;
+                    }
+                }
 
-            if (file_put_contents($filepath, $binary) === false) {
+                if ($filepath === '' || is_file($filepath)) {
+                    $error = 'Could not allocate secure signature storage. Please try again.';
+                }
+            }
+
+            if ($error === null && file_put_contents($filepath, $binary) === false) {
                 $error = 'Could not save the signature file. Please try again.';
-            } else {
+            } elseif ($error === null) {
                 $ip = $_SERVER['REMOTE_ADDR'] ?? null;
                 $ins = $pdo->prepare('INSERT INTO invoice_signatures (quote_id, signature_path, ip_address) VALUES (?, ?, ?)');
                 $ins->execute([$invoice_id, 'protected_signatures/' . $filename, $ip]);

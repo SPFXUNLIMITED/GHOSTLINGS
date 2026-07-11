@@ -30,7 +30,8 @@ if ($storage_root === false) {
     exit('Signature file not found.');
 }
 
-$full_path = realpath(dirname(__DIR__) . '/' . $relative_path);
+$filename = basename($relative_path);
+$full_path = realpath($storage_root . '/' . $filename);
 if ($full_path === false) {
     http_response_code(404);
     exit('Signature file not found.');
