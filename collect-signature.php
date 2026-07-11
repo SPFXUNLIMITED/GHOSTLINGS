@@ -1,8 +1,6 @@
 <?php
 // collect-signature.php — Customer digital signature collection for invoices
 require __DIR__ . '/db.php';
-require __DIR__ . '/auth.php';
-require_login();
 
 $invoice_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($invoice_id <= 0) {
@@ -27,6 +25,8 @@ $customer_name   = htmlspecialchars((string)$invoice['customer_name'], ENT_QUOTE
 $error   = null;
 $success = false;
 
+define('SIGNATURE_STORAGE_DIR', dirname(__DIR__) . '/protected_signatures');
+
 // Minimum byte length for a valid PNG (8-byte magic + IHDR chunk = 33 bytes minimum; we require
 // substantially more to ensure the canvas contained actual drawn content, not just an empty image).
 const SIG_MIN_PNG_BYTES = 500;
@@ -45,21 +45,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($binary === false || strlen($binary) < SIG_MIN_PNG_BYTES) {
             $error = 'The signature data appears to be empty or invalid. Please sign again.';
         } else {
-            $uploads_dir = __DIR__ . '/uploads';
-            if (!is_dir($uploads_dir)) {
-                mkdir($uploads_dir, 0755, true);
+            if (!is_dir(SIGNATURE_STORAGE_DIR)) {
+                mkdir(SIGNATURE_STORAGE_DIR, 0700, true);
             }
 
-            // Use a fully random filename so signatures cannot be enumerated or guessed.
             $filename = 'sig_' . bin2hex(random_bytes(16)) . '.png';
-            $filepath = $uploads_dir . '/' . $filename;
+            $filepath = SIGNATURE_STORAGE_DIR . '/' . $filename;
 
             if (file_put_contents($filepath, $binary) === false) {
                 $error = 'Could not save the signature file. Please try again.';
             } else {
                 $ip = $_SERVER['REMOTE_ADDR'] ?? null;
                 $ins = $pdo->prepare('INSERT INTO invoice_signatures (quote_id, signature_path, ip_address) VALUES (?, ?, ?)');
-                $ins->execute([$invoice_id, 'uploads/' . $filename, $ip]);
+                $ins->execute([$invoice_id, 'protected_signatures/' . $filename, $ip]);
                 $success = true;
             }
         }
@@ -295,7 +293,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="success-icon">✅</div>
         <p class="success-heading">Thank You!</p>
         <p class="success-sub">Your signature has been saved.<br>Invoice <?= htmlspecialchars($invoice_label, ENT_QUOTES, 'UTF-8') ?> is now signed.</p>
-        <a class="success-link" href="invoice_form.php?id=<?= $invoice_id ?>">← Back to Invoice</a>
+        <span class="success-link">You can close this page now.</span>
       </div>
     </div>
 
