@@ -805,6 +805,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
   }
 
+  if (trim((string)($_POST['action'] ?? '')) === 'collect_signature') {
+    $row_id = (int)($_POST['row_id'] ?? 0);
+    $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
+    if ($row_id <= 0) {
+      header('Location: invoice_tracker.php');
+      exit;
+    }
+    $check = $pdo->prepare("SELECT id FROM quotes WHERE id = ? LIMIT 1");
+    $check->execute([$row_id]);
+    if (!$check->fetch()) {
+      header('Location: invoice_tracker.php');
+      exit;
+    }
+    $pdo->prepare("UPDATE quotes SET waiting_for_signature = 1 WHERE id = ?")->execute([$row_id]);
+    header('Location: invoice_form.php?id=' . $row_id . '&mode=view&signature_request_ready=1');
+    exit;
+  }
+
   if (trim((string)($_POST['action'] ?? '')) === 'approve_invoice') {
     $row_id = (int)($_POST['row_id'] ?? 0);
     $_SESSION['invoice_form_csrf'] = bin2hex(random_bytes(24));
@@ -1362,8 +1380,12 @@ $invoice_already_unpaid = isset($_GET['already_unpaid']) && $_GET['already_unpai
 $invoice_credit_applied = isset($_GET['credit_applied']) && $_GET['credit_applied'] === '1';
 $invoice_credit_removed = isset($_GET['credit_removed']) && $_GET['credit_removed'] === '1';
 $invoice_credit_error = isset($_GET['credit_error']) && $_GET['credit_error'] !== '' ? trim((string)$_GET['credit_error']) : '';
+$invoice_signature_request_ready = isset($_GET['signature_request_ready']) && $_GET['signature_request_ready'] === '1';
 $invoice_approval_status = is_array($quote) ? (string)($quote['approval_status'] ?? 'none') : 'none';
 $invoice_is_paid = is_array($quote) && invoice_is_paid($quote);
+$invoice_waiting_for_signature = is_array($quote) && (int)($quote['waiting_for_signature'] ?? 0) === 1;
+$invoice_signature_button_label = $invoice_waiting_for_signature ? 'Regenerate Signature Link' : 'Collect Signature';
+$invoice_signature_link = $quote_id > 0 ? 'collect-signature.php?id=' . (int)$quote_id : '';
 $invoice_payment_toggle_action = $invoice_is_paid ? 'mark_as_unpaid' : 'mark_as_paid';
 $invoice_payment_toggle_label = $invoice_is_paid ? 'Mark as Unpaid' : 'Mark as Paid';
 [$invoice_approval_bg, $invoice_approval_color] = invoice_form_approval_colors($invoice_approval_status);
@@ -1447,6 +1469,12 @@ render_header($invoice_heading);
 <?php endif; ?>
 <?php if ($invoice_credit_error !== ''): ?>
   <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b;"><?= h($invoice_credit_error) ?></div>
+<?php endif; ?>
+<?php if ($invoice_waiting_for_signature && $invoice_signature_link !== ''): ?>
+  <div class="alert" style="border-color:<?= $invoice_signature_request_ready ? '#bbf7d0' : '#bfdbfe' ?>; background:<?= $invoice_signature_request_ready ? '#f0fdf4' : '#eff6ff' ?>; color:<?= $invoice_signature_request_ready ? '#166534' : '#1e40af' ?>;">
+    <?= $invoice_signature_request_ready ? 'Signature link activated:' : 'Signature link is active:' ?>
+    <a href="<?= h($invoice_signature_link) ?>" target="_blank" rel="noopener noreferrer"><?= h($invoice_signature_link) ?></a>
+  </div>
 <?php endif; ?>
 
 <?php if ($is_view_mode && $quote): ?>
@@ -1684,6 +1712,12 @@ render_header($invoice_heading);
         <input type="hidden" name="action" value="send_email_admin" />
         <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
         <button type="submit" class="btn">Email Invoice to Admin</button>
+      </form>
+      <form method="post" style="margin:0;" action="">
+        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['invoice_form_csrf']) ?>" />
+        <input type="hidden" name="action" value="collect_signature" />
+        <input type="hidden" name="row_id" value="<?= (int)$quote_id ?>" />
+        <button type="submit" class="btn"><?= h($invoice_signature_button_label) ?></button>
       </form>
 
       <form method="post" style="margin:0;" action="">

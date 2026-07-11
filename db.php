@@ -1436,6 +1436,7 @@ $pdo->exec("
     quote_date             DATE NOT NULL,
     status                 ENUM('draft','sent','converted') NOT NULL DEFAULT 'draft',
     payment_status         ENUM('unpaid','paid') NOT NULL DEFAULT 'unpaid',
+    waiting_for_signature  TINYINT(1) NOT NULL DEFAULT 0,
     paid_at                DATETIME NULL,
     notes                  TEXT NULL,
     subtotal_amount        DECIMAL(12,2) NOT NULL DEFAULT 0,
@@ -1496,6 +1497,17 @@ if ($_quotes_online_payment_col === false || $_quotes_online_payment_col->fetch(
   }
 }
 unset($_quotes_online_payment_col);
+
+$_quotes_waiting_for_signature_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'waiting_for_signature'");
+if ($_quotes_waiting_for_signature_col === false || $_quotes_waiting_for_signature_col->fetch(PDO::FETCH_ASSOC) === false) {
+  try {
+    $pdo->exec("ALTER TABLE quotes ADD COLUMN waiting_for_signature TINYINT(1) NOT NULL DEFAULT 0 AFTER payment_status");
+  } catch (Throwable $e) {
+    $recheck = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'waiting_for_signature'");
+    if ($recheck === false || $recheck->fetch(PDO::FETCH_ASSOC) === false) { throw $e; }
+  }
+}
+unset($_quotes_waiting_for_signature_col);
 
 $_quotes_checkout_url_col = $pdo->query("SHOW COLUMNS FROM quotes LIKE 'stripe_checkout_url'");
 if ($_quotes_checkout_url_col === false || $_quotes_checkout_url_col->fetch(PDO::FETCH_ASSOC) === false) {
@@ -2116,3 +2128,41 @@ foreach ([
   }
 }
 unset($_machines_sql, $_machines_e);
+
+// Create invoice_signatures table for customer digital signatures on invoices
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS invoice_signatures (
+    id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    quote_id       INT UNSIGNED NOT NULL,
+    signature_path VARCHAR(255) NOT NULL,
+    signed_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ip_address     VARCHAR(45) NULL,
+    PRIMARY KEY (id),
+    KEY idx_invoice_signatures_quote_id (quote_id),
+    CONSTRAINT fk_invoice_signatures_quote FOREIGN KEY (quote_id) REFERENCES quotes (id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+if (!function_exists('invoice_signature_storage_dir')) {
+  function invoice_signature_storage_dir(): string {
+    return dirname(__DIR__) . DIRECTORY_SEPARATOR . invoice_signature_storage_prefix();
+  }
+}
+
+if (!function_exists('invoice_signature_storage_prefix')) {
+  function invoice_signature_storage_prefix(): string {
+    return 'protected_signatures';
+  }
+}
+
+if (!function_exists('invoice_signature_relative_path')) {
+  function invoice_signature_relative_path(string $filename): string {
+    return invoice_signature_storage_prefix() . '/' . ltrim($filename, '/');
+  }
+}
+
+if (!function_exists('invoice_signature_filename_regex')) {
+  function invoice_signature_filename_regex(): string {
+    return 'sig_[a-f0-9]{32}\.png';
+  }
+}
