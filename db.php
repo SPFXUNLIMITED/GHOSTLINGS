@@ -2133,7 +2133,7 @@ $pdo->exec("
 
 if (!function_exists('invoice_signature_storage_dir')) {
   function invoice_signature_storage_dir(): string {
-    return dirname(__DIR__) . '/' . invoice_signature_storage_prefix();
+    return dirname(__DIR__) . DIRECTORY_SEPARATOR . invoice_signature_storage_prefix();
   }
 }
 

@@ -27,16 +27,6 @@ if (!function_exists('collect_signature_invoice_label')) {
 
 if (!function_exists('collect_signature_client_ip')) {
     function collect_signature_client_ip(): ?string {
-        $forwarded_for = trim((string)($_SERVER['HTTP_X_FORWARDED_FOR'] ?? ''));
-        if ($forwarded_for !== '') {
-            foreach (explode(',', $forwarded_for) as $candidate) {
-                $candidate = trim($candidate);
-                if ($candidate !== '' && filter_var($candidate, FILTER_VALIDATE_IP)) {
-                    return $candidate;
-                }
-            }
-        }
-
         $remote_addr = trim((string)($_SERVER['REMOTE_ADDR'] ?? ''));
         return $remote_addr !== '' && filter_var($remote_addr, FILTER_VALIDATE_IP) ? $remote_addr : null;
     }
@@ -73,6 +63,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!is_dir($signature_storage_dir)) {
                 if (!mkdir($signature_storage_dir, 0700, true) && !is_dir($signature_storage_dir)) {
                     $error = 'Could not prepare secure signature storage. Please try again.';
+                } else {
+                    @chmod($signature_storage_dir, 0700);
                 }
             }
 

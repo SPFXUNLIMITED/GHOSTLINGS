@@ -25,7 +25,7 @@ if ($relative_path === '' || !preg_match($path_pattern, $relative_path)) {
     exit('Signature file not found.');
 }
 
-$storage_root = realpath(dirname(invoice_signature_storage_dir()));
+$storage_root = realpath(dirname(__DIR__));
 $protected_dir = realpath(invoice_signature_storage_dir());
 if ($storage_root === false || $protected_dir === false) {
     http_response_code(404);
