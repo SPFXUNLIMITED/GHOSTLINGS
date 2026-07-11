@@ -237,16 +237,16 @@ function get_suggested_dates(string $priority, PDO $pdo): array {
 
 function resolve_customer_id(
     PDO $pdo,
-    string $name,
+    string $first_name,
+    string $last_name,
     string $phone,
     string $email,
-    string $street,
+    string $address,
     string $city,
     string $state,
     string $zip,
     string $country
 ): int {
-    [$first_name, $last_name] = split_name_parts($name);
 
     if ($email !== '') {
         $stmt = $pdo->prepare("SELECT id FROM customers WHERE email = ? ORDER BY id ASC LIMIT 1");
@@ -288,7 +288,7 @@ function resolve_customer_id(
         $last_name,
         $phone,
         $email,
-        $street,
+        $address,
         $city,
         $state,
         $zip,
@@ -299,7 +299,8 @@ function resolve_customer_id(
 }
 
 // ── Collect fields ────────────────────────────────────────────────────────────
-$name          = str_field($body, 'name');
+$first_name    = str_field($body, 'first_name');
+$last_name     = str_field($body, 'last_name');
 $phone         = str_field($body, 'phone');
 $email         = str_field($body, 'email');
 $machine_brand = str_field($body, 'machine_brand');
@@ -307,7 +308,7 @@ $machine_model = str_field($body, 'machine_model');
 $machine_watts = str_field($body, 'machine_watts');
 $machine_age   = str_field($body, 'machine_age');
 $problem       = str_field($body, 'problem');
-$street        = str_field($body, 'street');
+$address       = str_field($body, 'address');
 $city          = str_field($body, 'city');
 $state         = str_field($body, 'state');
 $zip           = str_field($body, 'zip');
@@ -318,12 +319,20 @@ $priority      = str_field($body, 'priority') ?: 'standard';
 $errors       = [];
 $field_errors = [];
 
-if ($name === '') {
-    $msg = 'Name is required.';
-    $errors[] = $msg; $field_errors['name'] = $msg;
-} elseif (strlen($name) > 255) {
-    $msg = 'Name must be 255 characters or fewer.';
-    $errors[] = $msg; $field_errors['name'] = $msg;
+if ($first_name === '') {
+    $msg = 'First name is required.';
+    $errors[] = $msg; $field_errors['first_name'] = $msg;
+} elseif (strlen($first_name) > 100) {
+    $msg = 'First name must be 100 characters or fewer.';
+    $errors[] = $msg; $field_errors['first_name'] = $msg;
+}
+
+if ($last_name === '') {
+    $msg = 'Last name is required.';
+    $errors[] = $msg; $field_errors['last_name'] = $msg;
+} elseif (strlen($last_name) > 100) {
+    $msg = 'Last name must be 100 characters or fewer.';
+    $errors[] = $msg; $field_errors['last_name'] = $msg;
 }
 
 if ($phone === '') {
@@ -379,12 +388,12 @@ if ($problem === '') {
     $errors[] = $msg; $field_errors['problem'] = $msg;
 }
 
-if ($street === '') {
+if ($address === '') {
     $msg = 'Street address is required.';
-    $errors[] = $msg; $field_errors['street'] = $msg;
-} elseif (strlen($street) > 255) {
+    $errors[] = $msg; $field_errors['address'] = $msg;
+} elseif (strlen($address) > 255) {
     $msg = 'Street address must be 255 characters or fewer.';
-    $errors[] = $msg; $field_errors['street'] = $msg;
+    $errors[] = $msg; $field_errors['address'] = $msg;
 }
 
 if ($city === '') {
@@ -423,7 +432,8 @@ if ($errors) {
         'errors'       => $errors,
         'field_errors' => $field_errors,
         'received'     => [
-            'name'          => $name,
+            'first_name'    => $first_name,
+            'last_name'     => $last_name,
             'phone'         => $phone,
             'email'         => $email,
             'machine_brand' => $machine_brand,
@@ -431,7 +441,7 @@ if ($errors) {
             'machine_watts' => $machine_watts,
             'machine_age'   => $machine_age,
             'problem'       => mb_substr($problem, 0, 200) . (mb_strlen($problem) > 200 ? '…' : ''),
-            'street'        => $street,
+            'address'       => $address,
             'city'          => $city,
             'state'         => $state,
             'zip'           => $zip,
@@ -449,10 +459,11 @@ $problem_summary = mb_substr($problem, 0, 255);
 try {
     $customer_id = resolve_customer_id(
         $pdo,
-        $name,
+        $first_name,
+        $last_name,
         $phone,
         $email,
-        $street,
+        $address,
         $city,
         $state,
         $zip,
@@ -460,7 +471,7 @@ try {
     );
 
     // Geocode the service address
-    $full_address = implode(', ', array_filter([$street, $city, $state, $zip, $country], fn($p) => $p !== ''));
+    $full_address = implode(', ', array_filter([$address, $city, $state, $zip, $country], fn($p) => $p !== ''));
     $geo = $full_address !== '' ? geocode_address($full_address) : ['lat' => null, 'lng' => null, 'status' => 'failed'];
 
     $stmt = $pdo->prepare("
