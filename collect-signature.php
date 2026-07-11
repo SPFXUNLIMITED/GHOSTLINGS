@@ -17,7 +17,15 @@ if (!$invoice) {
     exit('Invoice not found.');
 }
 
-$invoice_label   = !empty($invoice['converted_invoice_no']) ? $invoice['converted_invoice_no'] : 'INV-' . str_pad((string)$invoice['id'], 5, '0', STR_PAD_LEFT);
+if (!function_exists('collect_signature_invoice_label')) {
+    function collect_signature_invoice_label(array $invoice): string {
+        return !empty($invoice['converted_invoice_no'])
+            ? (string)$invoice['converted_invoice_no']
+            : 'INV-' . str_pad((string)$invoice['id'], 5, '0', STR_PAD_LEFT);
+    }
+}
+
+$invoice_label   = collect_signature_invoice_label($invoice);
 $total_amount    = (float)$invoice['subtotal_amount'] + (float)$invoice['tax_amount'];
 $total_formatted = '$' . number_format($total_amount, 2);
 $customer_name   = htmlspecialchars((string)$invoice['customer_name'], ENT_QUOTES, 'UTF-8');
@@ -28,6 +36,7 @@ $success = false;
 // Empty canvas submissions produce very small PNG payloads in testing; requiring at least 500 bytes
 // filters those out while still accepting normal handwritten signatures from mobile devices.
 const SIG_MIN_PNG_BYTES = 500;
+const MAX_FILENAME_ALLOCATION_ATTEMPTS = 10;
 
 // ── Handle POST (signature submission) ──────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -53,9 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($error === null) {
                 $filename = '';
                 $filepath = '';
-                $max_attempts = 10;
                 $allocated = false;
-                for ($attempt = 0; $attempt < $max_attempts; $attempt++) {
+                for ($attempt = 0; $attempt < MAX_FILENAME_ALLOCATION_ATTEMPTS; $attempt++) {
                     $filename = 'sig_' . bin2hex(random_bytes(16)) . '.png';
                     $filepath = $signature_storage_dir . '/' . $filename;
                     if (!is_file($filepath)) {

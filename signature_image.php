@@ -19,7 +19,7 @@ if (!$signature) {
 }
 
 $relative_path = trim((string)($signature['signature_path'] ?? ''));
-$path_pattern = '#^' . preg_quote(invoice_signature_storage_prefix(), '#') . '/sig_[a-f0-9]{32}\.png$#';
+$path_pattern = '#^' . preg_quote(invoice_signature_storage_prefix(), '#') . '/' . invoice_signature_filename_regex() . '$#';
 if ($relative_path === '' || !preg_match($path_pattern, $relative_path)) {
     http_response_code(404);
     exit('Signature file not found.');
@@ -51,6 +51,7 @@ if (!is_file($full_path)) {
 header('Content-Type: image/png');
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: private, no-store, max-age=0');
-header('Content-Disposition: inline; filename="signature-' . $signature_id . '.png"');
+$download_name = sprintf('signature-%d.png', $signature_id);
+header('Content-Disposition: inline; filename="' . $download_name . '"');
 readfile($full_path);
 exit;

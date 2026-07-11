@@ -2133,7 +2133,7 @@ $pdo->exec("
 
 if (!function_exists('invoice_signature_storage_dir')) {
   function invoice_signature_storage_dir(): string {
-    return dirname(__DIR__) . '/protected_signatures';
+    return dirname(__DIR__) . '/' . invoice_signature_storage_prefix();
   }
 }
 
@@ -2146,5 +2146,11 @@ if (!function_exists('invoice_signature_storage_prefix')) {
 if (!function_exists('invoice_signature_relative_path')) {
   function invoice_signature_relative_path(string $filename): string {
     return invoice_signature_storage_prefix() . '/' . ltrim($filename, '/');
+  }
+}
+
+if (!function_exists('invoice_signature_filename_regex')) {
+  function invoice_signature_filename_regex(): string {
+    return 'sig_[a-f0-9]{32}\.png';
   }
 }
