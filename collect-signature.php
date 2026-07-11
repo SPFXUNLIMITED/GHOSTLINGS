@@ -345,9 +345,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $link_is_active) {
     padding: 14px 28px;
     background: #1e3a5f;
     color: #fff;
+    border: none;
     border-radius: 10px;
     font-size: 15px;
     font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .success-message:hover {
+    background: #16304f;
+  }
+  .success-message:active {
+    background: #0f2238;
   }
 </style>
 </head>
@@ -373,7 +382,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $link_is_active) {
         <div class="success-icon">✅</div>
         <p class="success-heading">Thank You!</p>
         <p class="success-sub">Your signature has been saved.<br>Invoice <?= htmlspecialchars($invoice_label, ENT_QUOTES, 'UTF-8') ?> is now signed.</p>
-        <p class="success-message">You can close this page now.</p>
+        <button type="button" class="success-message" onclick="window.close()">You can close this page now.</button>
       </div>
     </div>
 
