@@ -38,7 +38,7 @@ if (!function_exists('send_sms')) {
     /**
      * @throws RuntimeException
      */
-    function send_sms($to, $message): bool
+    function send_sms(string $to, string $message): bool
     {
         if (!function_exists('curl_init')) {
             throw new RuntimeException('cURL is required to send Twilio SMS messages.');
