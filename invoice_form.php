@@ -169,10 +169,7 @@ function invoice_application_base_url(): string {
   }
 
   $twilio = function_exists('twilio_config') ? twilio_config() : [];
-  $configured_base = '';
-  if (is_array($twilio)) {
-    $configured_base = trim((string)($twilio['app_url'] ?? ''));
-  }
+  $configured_base = trim((string)($twilio['app_url'] ?? ''));
   if ($configured_base === '') {
     $configured_base = rtrim(invoice_env_value('APP_URL'), '/');
   }
