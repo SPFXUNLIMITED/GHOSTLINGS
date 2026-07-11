@@ -54,15 +54,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $filename = '';
                 $filepath = '';
                 $max_attempts = 10;
+                $allocated = false;
                 for ($attempt = 0; $attempt < $max_attempts; $attempt++) {
                     $filename = 'sig_' . bin2hex(random_bytes(16)) . '.png';
                     $filepath = $signature_storage_dir . '/' . $filename;
                     if (!is_file($filepath)) {
+                        $allocated = true;
                         break;
                     }
                 }
 
-                if ($filepath === '' || is_file($filepath)) {
+                if (!$allocated) {
                     $error = 'Could not allocate secure signature storage. Please try again.';
                 }
             }
@@ -72,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } elseif ($error === null) {
                 $ip = $_SERVER['REMOTE_ADDR'] ?? null;
                 $ins = $pdo->prepare('INSERT INTO invoice_signatures (quote_id, signature_path, ip_address) VALUES (?, ?, ?)');
-                $ins->execute([$invoice_id, 'protected_signatures/' . $filename, $ip]);
+                $ins->execute([$invoice_id, invoice_signature_relative_path($filename), $ip]);
                 $success = true;
             }
         }

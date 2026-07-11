@@ -19,25 +19,26 @@ if (!$signature) {
 }
 
 $relative_path = trim((string)($signature['signature_path'] ?? ''));
-if ($relative_path === '' || !preg_match('#^protected_signatures/sig_[a-f0-9]{32}\.png$#', $relative_path)) {
+$path_pattern = '#^' . preg_quote(invoice_signature_storage_prefix(), '#') . '/sig_[a-f0-9]{32}\.png$#';
+if ($relative_path === '' || !preg_match($path_pattern, $relative_path)) {
     http_response_code(404);
     exit('Signature file not found.');
 }
 
-$storage_root = realpath(invoice_signature_storage_dir());
-if ($storage_root === false) {
+$storage_root = realpath(dirname(invoice_signature_storage_dir()));
+$protected_dir = realpath(invoice_signature_storage_dir());
+if ($storage_root === false || $protected_dir === false) {
     http_response_code(404);
     exit('Signature file not found.');
 }
 
-$filename = basename($relative_path);
-$full_path = realpath($storage_root . '/' . $filename);
+$full_path = realpath($storage_root . '/' . $relative_path);
 if ($full_path === false) {
     http_response_code(404);
     exit('Signature file not found.');
 }
 
-if (!str_starts_with($full_path, $storage_root . DIRECTORY_SEPARATOR)) {
+if (!str_starts_with($full_path, $protected_dir . DIRECTORY_SEPARATOR)) {
     http_response_code(404);
     exit('Signature file not found.');
 }

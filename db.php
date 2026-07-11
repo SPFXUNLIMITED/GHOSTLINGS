@@ -2136,3 +2136,15 @@ if (!function_exists('invoice_signature_storage_dir')) {
     return dirname(__DIR__) . '/protected_signatures';
   }
 }
+
+if (!function_exists('invoice_signature_storage_prefix')) {
+  function invoice_signature_storage_prefix(): string {
+    return 'protected_signatures';
+  }
+}
+
+if (!function_exists('invoice_signature_relative_path')) {
+  function invoice_signature_relative_path(string $filename): string {
+    return invoice_signature_storage_prefix() . '/' . ltrim($filename, '/');
+  }
+}
