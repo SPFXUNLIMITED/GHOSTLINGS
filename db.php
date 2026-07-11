@@ -2116,3 +2116,17 @@ foreach ([
   }
 }
 unset($_machines_sql, $_machines_e);
+
+// Create invoice_signatures table for customer digital signatures on invoices
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS invoice_signatures (
+    id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    quote_id       INT UNSIGNED NOT NULL,
+    signature_path VARCHAR(255) NOT NULL,
+    signed_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ip_address     VARCHAR(45) NULL,
+    PRIMARY KEY (id),
+    KEY idx_invoice_signatures_quote_id (quote_id),
+    CONSTRAINT fk_invoice_signatures_quote FOREIGN KEY (quote_id) REFERENCES quotes (id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
