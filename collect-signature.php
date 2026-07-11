@@ -27,8 +27,8 @@ $success = false;
 
 define('SIGNATURE_STORAGE_DIR', dirname(__DIR__) . '/protected_signatures');
 
-// Minimum byte length for a valid PNG (8-byte magic + IHDR chunk = 33 bytes minimum; we require
-// substantially more to ensure the canvas contained actual drawn content, not just an empty image).
+// Empty canvas submissions produce very small PNG payloads in testing; requiring at least 500 bytes
+// filters those out while still accepting normal handwritten signatures from mobile devices.
 const SIG_MIN_PNG_BYTES = 500;
 
 // ── Handle POST (signature submission) ──────────────────────────────────────
@@ -49,8 +49,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mkdir(SIGNATURE_STORAGE_DIR, 0700, true);
             }
 
-            $filename = 'sig_' . bin2hex(random_bytes(16)) . '.png';
-            $filepath = SIGNATURE_STORAGE_DIR . '/' . $filename;
+            do {
+                $filename = 'sig_' . bin2hex(random_bytes(16)) . '.png';
+                $filepath = SIGNATURE_STORAGE_DIR . '/' . $filename;
+            } while (is_file($filepath));
 
             if (file_put_contents($filepath, $binary) === false) {
                 $error = 'Could not save the signature file. Please try again.';
@@ -258,17 +260,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     margin: 0 0 24px;
     line-height: 1.5;
   }
-  .success-link {
+  .success-message {
     display: inline-block;
     padding: 14px 28px;
     background: #1e3a5f;
     color: #fff;
     border-radius: 10px;
-    text-decoration: none;
     font-size: 15px;
     font-weight: 600;
   }
-  .success-link:hover { opacity: .88; }
 </style>
 </head>
 <body>
@@ -293,7 +293,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="success-icon">✅</div>
         <p class="success-heading">Thank You!</p>
         <p class="success-sub">Your signature has been saved.<br>Invoice <?= htmlspecialchars($invoice_label, ENT_QUOTES, 'UTF-8') ?> is now signed.</p>
-        <span class="success-link">You can close this page now.</span>
+        <span class="success-message">You can close this page now.</span>
       </div>
     </div>
 
