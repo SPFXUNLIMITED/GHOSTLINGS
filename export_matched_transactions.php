@@ -23,7 +23,12 @@ $stmt = $pdo->prepare(
    FROM bank_transactions bt
    LEFT JOIN customer_payments cp ON cp.id = bt.linked_payment_id
    LEFT JOIN customers c ON c.id = COALESCE(bt.matched_customer_id, cp.customer_id)
-   LEFT JOIN quotes q ON q.id = bt.matched_invoice_id
+   LEFT JOIN (
+     SELECT payment_id, MIN(quote_id) AS quote_id
+     FROM invoice_credit_applications
+     GROUP BY payment_id
+   ) ica ON ica.payment_id = bt.linked_payment_id
+   LEFT JOIN quotes q ON q.id = ica.quote_id
    ORDER BY bt.transaction_date ASC, bt.id ASC"
 );
 $stmt->execute();
