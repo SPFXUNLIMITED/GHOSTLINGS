@@ -3,7 +3,7 @@ require __DIR__ . '/db.php';
 require __DIR__ . '/auth.php';
 require_admin_or_moderator();
 
-$stmt = $pdo->query(
+$stmt = $pdo->prepare(
   "SELECT bt.id,
           bt.transaction_date,
           bt.description,
@@ -26,6 +26,7 @@ $stmt = $pdo->query(
    WHERE bt.match_status = 'matched'
    ORDER BY bt.transaction_date ASC, bt.id ASC"
 );
+$stmt->execute();
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $filename = 'bank_matched_transactions_' . date('Y-m-d') . '.csv';
@@ -44,8 +45,8 @@ foreach ($rows as $row) {
     number_format((float)($row['amount'] ?? 0), 2, '.', ''),
     (string)($row['reference'] ?? ''),
     (string)($row['source'] ?? ''),
-    (int)($row['id'] ?? 0),
-    (int)($row['linked_payment_id'] ?? 0) ?: '',
+    (string)($row['id'] ?? ''),
+    (string)($row['linked_payment_id'] ?? ''),
     (string)($row['invoice_number'] ?? ''),
   ]);
 }
