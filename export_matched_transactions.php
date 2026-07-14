@@ -31,10 +31,9 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $exportTimezone = defined('APP_TZ') ? APP_TZ : 'America/Los_Angeles';
 $filename = 'bank_matched_transactions_' . (new DateTime('now', new DateTimeZone($exportTimezone)))->format('Y-m-d') . '.csv';
-$downloadName = preg_replace('/[^A-Za-z0-9._-]/', '_', $filename) ?: 'bank_matched_transactions.csv';
 
 header('Content-Type: text/csv; charset=utf-8');
-header('Content-Disposition: attachment; filename="' . $downloadName . '"; filename*=UTF-8\'\'' . rawurlencode($filename));
+header('Content-Disposition: attachment; filename="' . $filename . '"; filename*=UTF-8\'\'' . rawurlencode($filename));
 
 $out = fopen('php://output', 'w');
 if ($out === false) {
@@ -56,6 +55,4 @@ foreach ($rows as $row) {
     (string)($row['invoice_number'] ?? ''),
   ]);
 }
-
-fclose($out);
 exit;
