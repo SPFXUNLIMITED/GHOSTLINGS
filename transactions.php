@@ -182,7 +182,7 @@ render_header('Bank Transactions');
   </div>
   <div class="laser-rfq-hero-actions">
     <a class="btn primary" href="bank_import.php">Import CSV</a>
-    <a class="btn" href="export_matched_transactions.php">📤 Export Matched</a>
+    <a class="btn" href="export_matched_transactions.php">📤 Export All for Bookkeeper</a>
   </div>
 </div>
 
