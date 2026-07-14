@@ -29,13 +29,17 @@ $stmt = $pdo->prepare(
 $stmt->execute();
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-$filename = 'bank_matched_transactions_' . gmdate('Y-m-d') . '.csv';
+$filename = 'bank_matched_transactions_' . (new DateTime('now', new DateTimeZone(APP_TZ)))->format('Y-m-d') . '.csv';
 $downloadName = str_replace(['\\', '"'], ['_', '_'], $filename);
 
 header('Content-Type: text/csv; charset=utf-8');
 header('Content-Disposition: attachment; filename="' . $downloadName . '"; filename*=UTF-8\'\'' . rawurlencode($filename));
 
 $out = fopen('php://output', 'w');
+if ($out === false) {
+  http_response_code(500);
+  exit('Unable to open export stream.');
+}
 fputcsv($out, ['Date', 'Description', 'Customer', 'Amount', 'Reference', 'Source', 'Transaction ID', 'Payment ID', 'Invoice Number']);
 
 foreach ($rows as $row) {
