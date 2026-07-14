@@ -11,6 +11,7 @@ $stmt = $pdo->prepare(
           bt.reference,
           bt.source,
           bt.linked_payment_id,
+          bt.match_status,
           COALESCE(
             NULLIF(TRIM(CONCAT_WS(' ', NULLIF(c.first_name,''), NULLIF(c.last_name,''))), ''),
             NULLIF(c.company, ''),
@@ -18,19 +19,18 @@ $stmt = $pdo->prepare(
             NULLIF(bt.customer_name, ''),
             ''
           ) AS customer_name,
-          COALESCE(NULLIF(q.converted_invoice_no, ''), '') AS invoice_number
+          COALESCE(NULLIF(q.converted_invoice_no, ''), NULLIF(CAST(q.id AS CHAR), ''), '') AS invoice_number
    FROM bank_transactions bt
    LEFT JOIN customer_payments cp ON cp.id = bt.linked_payment_id
    LEFT JOIN customers c ON c.id = COALESCE(bt.matched_customer_id, cp.customer_id)
    LEFT JOIN quotes q ON q.id = bt.matched_invoice_id
-   WHERE bt.match_status = 'matched'
    ORDER BY bt.transaction_date ASC, bt.id ASC"
 );
 $stmt->execute();
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $exportTimezone = defined('APP_TZ') ? APP_TZ : 'America/Los_Angeles';
-$filename = 'bank_matched_transactions_' . (new DateTime('now', new DateTimeZone($exportTimezone)))->format('Y-m-d') . '.csv';
+$filename = 'bank_transactions_' . (new DateTime('now', new DateTimeZone($exportTimezone)))->format('Y-m-d') . '.csv';
 
 $out = fopen('php://temp', 'w+');
 if ($out === false) {
@@ -38,11 +38,20 @@ if ($out === false) {
   exit('Unable to open export stream.');
 }
 
-fputcsv($out, ['Date', 'Description', 'Customer', 'Amount', 'Reference', 'Source', 'Transaction ID', 'Payment ID', 'Invoice Number']);
+fputcsv($out, ['Date', 'Description', 'Customer', 'Amount', 'Reference', 'Source', 'Transaction ID', 'Payment ID', 'Invoice Number', 'Status']);
 
 foreach ($rows as $row) {
+  $dateRaw = $row['transaction_date'] ?? '';
+  $dateFormatted = '';
+  if ($dateRaw !== '') {
+    try {
+      $dateFormatted = (new DateTime($dateRaw))->format('m/d/Y');
+    } catch (Exception $e) {
+      $dateFormatted = $dateRaw;
+    }
+  }
   fputcsv($out, [
-    (string)($row['transaction_date'] ?? ''),
+    $dateFormatted,
     (string)($row['description'] ?? ''),
     (string)($row['customer_name'] ?? ''),
     number_format((float)($row['amount'] ?? 0), 2, '.', ''),
@@ -51,6 +60,7 @@ foreach ($rows as $row) {
     (string)($row['id'] ?? ''),
     (string)($row['linked_payment_id'] ?? ''),
     (string)($row['invoice_number'] ?? ''),
+    (string)($row['match_status'] ?? ''),
   ]);
 }
 
