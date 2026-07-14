@@ -32,14 +32,11 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $exportTimezone = defined('APP_TZ') ? APP_TZ : 'America/Los_Angeles';
 $filename = 'bank_matched_transactions_' . (new DateTime('now', new DateTimeZone($exportTimezone)))->format('Y-m-d') . '.csv';
 
-$out = fopen('php://output', 'w');
+$out = fopen('php://temp', 'w+');
 if ($out === false) {
   http_response_code(500);
   exit('Unable to open export stream.');
 }
-
-header('Content-Type: text/csv; charset=utf-8');
-header('Content-Disposition: attachment; filename="' . $filename . '"; filename*=UTF-8\'\'' . rawurlencode($filename));
 
 fputcsv($out, ['Date', 'Description', 'Customer', 'Amount', 'Reference', 'Source', 'Transaction ID', 'Payment ID', 'Invoice Number']);
 
@@ -56,4 +53,10 @@ foreach ($rows as $row) {
     (string)($row['invoice_number'] ?? ''),
   ]);
 }
-exit;
+
+rewind($out);
+
+header('Content-Type: text/csv; charset=utf-8');
+header('Content-Disposition: attachment; filename="' . $filename . '"; filename*=UTF-8\'\'' . rawurlencode($filename));
+
+fpassthru($out);
