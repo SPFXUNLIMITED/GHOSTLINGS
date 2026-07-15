@@ -980,6 +980,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $cust_id_for_credit = (int)$inv_row['customer_id'];
     $inv_total = round((float)$inv_row['subtotal_amount'] + (float)($inv_row['tax_amount'] ?? 0), 2);
+    $positive_payment_min = INVOICE_BALANCE_EPSILON;
 
     // Outstanding balance = invoice total - sum of already applied credits for this invoice
     $already_applied_stmt = $pdo->prepare("SELECT COALESCE(SUM(applied_amount), 0) AS total_applied FROM invoice_credit_applications WHERE quote_id = ?");
@@ -1002,10 +1003,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
            WHERE payment_id IS NOT NULL
            GROUP BY payment_id
          ) used ON used.payment_id = cp.id
-         WHERE cp.id = ? AND cp.customer_id = ? AND cp.amount >= 0.01
+         WHERE cp.id = ? AND cp.customer_id = ? AND cp.amount > ?
          LIMIT 1"
       );
-      $pay_stmt->execute([$apply_payment_id, $cust_id_for_credit]);
+      $pay_stmt->execute([$apply_payment_id, $cust_id_for_credit, $positive_payment_min]);
       $payment_row = $pay_stmt->fetch(PDO::FETCH_ASSOC);
       if ($payment_row) {
         $payment_avail = round((float)$payment_row['amount'] - (float)$payment_row['total_used'], 2);
@@ -1022,9 +1023,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
          WHERE payment_id IS NOT NULL
          GROUP BY payment_id
        ) used ON used.payment_id = cp.id
-       WHERE cp.customer_id = ? AND cp.amount >= 0.01"
+       WHERE cp.customer_id = ? AND cp.amount > ?"
     );
-    $cp_avail_stmt->execute([$cust_id_for_credit]);
+    $cp_avail_stmt->execute([$cust_id_for_credit, $positive_payment_min]);
     $sum_linked_avail = round((float)$cp_avail_stmt->fetchColumn(), 2);
 
     $unlinked_applied_stmt = $pdo->prepare(
@@ -1606,6 +1607,7 @@ render_header($invoice_heading);
     $inv_available_credit = 0.0;
     $inv_payment_options  = []; // for the Apply Credit modal dropdown
     if ($inv_cust_id_for_credit > 0) {
+      $inv_positive_payment_min = INVOICE_BALANCE_EPSILON;
       $inv_cp_stmt = $pdo->prepare(
         "SELECT cp.id, cp.payment_date, cp.amount, cp.payment_method, cp.reference_no,
                 COALESCE(used.total_used, 0) AS total_used
@@ -1616,10 +1618,10 @@ render_header($invoice_heading);
            WHERE payment_id IS NOT NULL
            GROUP BY payment_id
          ) used ON used.payment_id = cp.id
-         WHERE cp.customer_id = ? AND cp.amount >= 0.01
+         WHERE cp.customer_id = ? AND cp.amount > ?
          ORDER BY cp.payment_date DESC, cp.id DESC"
       );
-      $inv_cp_stmt->execute([$inv_cust_id_for_credit]);
+      $inv_cp_stmt->execute([$inv_cust_id_for_credit, $inv_positive_payment_min]);
       $all_payments_for_credit = $inv_cp_stmt->fetchAll(PDO::FETCH_ASSOC);
 
       // Subtract unlinked applications from the aggregate pool
