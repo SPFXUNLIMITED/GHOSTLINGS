@@ -1002,7 +1002,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
            WHERE payment_id IS NOT NULL
            GROUP BY payment_id
          ) used ON used.payment_id = cp.id
-         WHERE cp.id = ? AND cp.customer_id = ?
+         WHERE cp.id = ? AND cp.customer_id = ? AND cp.amount > 0
          LIMIT 1"
       );
       $pay_stmt->execute([$apply_payment_id, $cust_id_for_credit]);
@@ -1022,7 +1022,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
          WHERE payment_id IS NOT NULL
          GROUP BY payment_id
        ) used ON used.payment_id = cp.id
-       WHERE cp.customer_id = ?"
+       WHERE cp.customer_id = ? AND cp.amount > 0"
     );
     $cp_avail_stmt->execute([$cust_id_for_credit]);
     $sum_linked_avail = round((float)$cp_avail_stmt->fetchColumn(), 2);
@@ -1616,7 +1616,7 @@ render_header($invoice_heading);
            WHERE payment_id IS NOT NULL
            GROUP BY payment_id
          ) used ON used.payment_id = cp.id
-         WHERE cp.customer_id = ?
+         WHERE cp.customer_id = ? AND cp.amount > 0
          ORDER BY cp.payment_date DESC, cp.id DESC"
       );
       $inv_cp_stmt->execute([$inv_cust_id_for_credit]);
