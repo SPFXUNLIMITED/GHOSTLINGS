@@ -867,8 +867,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fields[$key] = trim((string)($_POST[$key] ?? ''));
       }
 
-      if ($fields['customer_name'] === '') {
-        $errors[] = 'Customer Name is required.';
+      if ($fields['customer_id'] === '' || (int)$fields['customer_id'] <= 0) {
+        $errors[] = 'You must select a customer from the search results.';
       } elseif (strlen($fields['customer_name']) > 255) {
         $errors[] = 'Customer Name must be 255 characters or fewer.';
       }
@@ -886,10 +886,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
       if ($fields['notes'] !== '' && strlen($fields['notes']) > QUOTE_MAX_NOTES_LENGTH) {
         $errors[] = 'Notes must be ' . QUOTE_MAX_NOTES_LENGTH . ' characters or fewer.';
-      }
-
-      if ($fields['customer_id'] !== '' && (int)$fields['customer_id'] <= 0) {
-        $errors[] = 'Invalid customer selected.';
       }
 
       $customer_id = quote_resolve_customer_id($pdo, $fields);
@@ -1574,6 +1570,8 @@ render_header('Quotes');
             if (cityInput)   cityInput.value   = row.city    || '';
             if (stateInput)  stateInput.value  = row.state   || '';
             if (zipInput)    zipInput.value    = row.zip     || '';
+            const errEl = document.getElementById('customerIdError');
+            if (errEl) errEl.remove();
             hideCustomerSugg();
           });
           customerSugg.appendChild(btn);
@@ -1601,6 +1599,27 @@ render_header('Quotes');
       document.addEventListener('click', (e) => {
         if (!e.target.closest('#customerSuggestions') && e.target !== customerNameInput) hideCustomerSugg();
       });
+
+      // ── Customer ID validation on submit ─────────────────────────────
+      const quoteForm = customerNameInput.closest('form');
+      if (quoteForm) {
+        quoteForm.addEventListener('submit', (e) => {
+          let errEl = document.getElementById('customerIdError');
+          if (!customerIdInput.value) {
+            e.preventDefault();
+            customerNameInput.focus();
+            if (!errEl) {
+              errEl = document.createElement('p');
+              errEl.id = 'customerIdError';
+              errEl.style.cssText = 'color:#991b1b;font-size:0.88em;margin:4px 0 0;';
+              customerSugg.insertAdjacentElement('afterend', errEl);
+            }
+            errEl.textContent = 'You must select a customer from the search results.';
+          } else if (errEl) {
+            errEl.remove();
+          }
+        });
+      }
 
       // ── Shared helpers ────────────────────────────────────────────────
       function parseNum(v) { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; }

@@ -1154,6 +1154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $post_source_quote_id = (int)trim((string)($_POST['source_quote_id'] ?? ''));
   $post_invoice_number  = trim((string)($_POST['invoice_number'] ?? ''));
   $post_invoice_date    = trim((string)($_POST['invoice_date'] ?? ''));
+  $post_customer_id     = (int)trim((string)($_POST['customer_id'] ?? ''));
   $post_customer_name   = trim((string)($_POST['customer_name'] ?? ''));
   $post_company_name    = trim((string)($_POST['company_name'] ?? ''));
   $post_phone_number    = trim((string)($_POST['phone_number'] ?? ''));
@@ -1164,6 +1165,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $post_billing_zip     = trim((string)($_POST['billing_zip'] ?? ''));
   $post_enable_online_payment = !empty($_POST['enable_online_payment']);
   $post_notes           = trim((string)($_POST['notes'] ?? ''));
+
+  if ($post_customer_id <= 0) {
+    $save_error_param = urlencode('You must select a customer from the search results.');
+    if ($post_source_quote_id > 0) {
+      header('Location: invoice_form.php?id=' . $post_source_quote_id . '&save_error=' . $save_error_param);
+    } else {
+      header('Location: invoice_form.php?save_error=' . $save_error_param);
+    }
+    exit;
+  }
 
   // Validate date; fall back to today
   $tz = new DateTimeZone(APP_TZ);
@@ -1222,7 +1233,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       // Any invoice edit invalidates the old Stripe checkout session to prevent Stripe amount mismatches after invoice updates.
       $upd = $pdo->prepare(
         "UPDATE quotes
-            SET customer_name     = ?,
+            SET customer_id       = ?,
+                customer_name     = ?,
                 company_name      = ?,
                 phone_number      = ?,
                 email             = ?,
@@ -1246,6 +1258,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           WHERE id = ?"
       );
       $upd->execute([
+        $post_customer_id,
         $post_customer_name,
         $post_company_name !== '' ? $post_company_name : null,
         $post_phone_number  !== '' ? $post_phone_number  : null,
@@ -1283,11 +1296,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       // Insert a new quote row representing the standalone invoice
       $ins_q = $pdo->prepare(
         "INSERT INTO quotes
-           (customer_name, company_name, phone_number, email, billing_street, billing_city, billing_state, billing_zip, quote_date,
+           (customer_id, customer_name, company_name, phone_number, email, billing_street, billing_city, billing_state, billing_zip, quote_date,
             status, notes, subtotal_amount, tax_rate, tax_amount, enable_online_payment, converted_invoice_no, converted_at, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'converted', ?, ?, ?, ?, ?, '', NOW(), ?)"
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'converted', ?, ?, ?, ?, ?, '', NOW(), ?)"
       );
       $ins_q->execute([
+        $post_customer_id,
         $post_customer_name,
         $post_company_name !== '' ? $post_company_name : null,
         $post_phone_number  !== '' ? $post_phone_number  : null,
@@ -1403,6 +1417,7 @@ $invoice_subtitle = $quote
 $fields = [
   'invoice_number' => $quote ? invoice_number_from_quote($quote, $quote_id) : invoice_default_number(),
   'source_quote_id' => $quote ? (string)$quote_id : '',
+  'customer_id' => (string)($quote['customer_id'] ?? ''),
   'customer_name' => (string)($quote['customer_name'] ?? ''),
   'company_name' => (string)($quote['company_name'] ?? ''),
   'phone_number' => (string)($quote['phone_number'] ?? ''),
@@ -1454,6 +1469,7 @@ $invoice_already_unpaid = isset($_GET['already_unpaid']) && $_GET['already_unpai
 $invoice_credit_applied = isset($_GET['credit_applied']) && $_GET['credit_applied'] === '1';
 $invoice_credit_removed = isset($_GET['credit_removed']) && $_GET['credit_removed'] === '1';
 $invoice_credit_error = isset($_GET['credit_error']) && $_GET['credit_error'] !== '' ? trim((string)$_GET['credit_error']) : '';
+$invoice_save_error = isset($_GET['save_error']) && $_GET['save_error'] !== '' ? trim((string)$_GET['save_error']) : '';
 $invoice_signature_request_ready = isset($_GET['signature_request_ready']) && $_GET['signature_request_ready'] === '1';
 $invoice_sms_sent = isset($_GET['sms_sent']) && $_GET['sms_sent'] === '1';
 $invoice_sms_error = isset($_GET['sms_error']) && $_GET['sms_error'] !== '' ? trim((string)$_GET['sms_error']) : '';
@@ -1556,6 +1572,9 @@ render_header($invoice_heading);
 <?php endif; ?>
 <?php if ($invoice_credit_error !== ''): ?>
   <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b;"><?= h($invoice_credit_error) ?></div>
+<?php endif; ?>
+<?php if ($invoice_save_error !== ''): ?>
+  <div class="alert" style="border-color:#fecaca; background:#fef2f2; color:#991b1b;"><?= h($invoice_save_error) ?></div>
 <?php endif; ?>
 <?php if ($invoice_sms_sent): ?>
   <div class="alert" style="border-color:#bbf7d0; background:#f0fdf4; color:#166534;">Signature request text sent successfully.</div>
@@ -1942,6 +1961,7 @@ render_header($invoice_heading);
       <div style="position:relative;">
         <label for="customer_name">Customer Name</label>
         <input id="customer_name" type="text" name="customer_name" maxlength="255" autocomplete="off" value="<?= h($fields['customer_name']) ?>" />
+        <input id="customer_id" type="hidden" name="customer_id" value="<?= h($fields['customer_id']) ?>" />
         <div id="customerSuggestions" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:40; background:#fff; border:1px solid #d1d5db; border-radius:10px; box-shadow:0 12px 24px rgba(2,6,23,.12); margin-top:6px; max-height:220px; overflow:auto;"></div>
       </div>
       <div>
@@ -2199,6 +2219,7 @@ render_header($invoice_heading);
 
   // ── Customer live search ──────────────────────────────────────────
   const customerNameInput = document.getElementById('customer_name');
+  const customerIdInput   = document.getElementById('customer_id');
   const companyInput      = document.getElementById('company_name');
   const phoneInput        = document.getElementById('phone_number');
   const emailInput        = document.getElementById('email');
@@ -2231,6 +2252,7 @@ render_header($invoice_heading);
         btn.appendChild(meta);
         btn.addEventListener('click', () => {
           customerNameInput.value = row.customer_name || '';
+          if (customerIdInput) customerIdInput.value = row.id || '';
           companyInput.value = rowCompany;
           phoneInput.value   = rowPhone;
           emailInput.value   = rowEmail;
@@ -2238,6 +2260,8 @@ render_header($invoice_heading);
           if (cityInput)   cityInput.value   = row.city    || '';
           if (stateInput)  stateInput.value  = row.state   || '';
           if (zipInput)    zipInput.value    = row.zip     || '';
+          const errEl = document.getElementById('customerIdError');
+          if (errEl) errEl.remove();
           hideCustomerSugg();
         });
         customerSugg.appendChild(btn);
@@ -2245,6 +2269,7 @@ render_header($invoice_heading);
       customerSugg.style.display = 'block';
     }
     customerNameInput.addEventListener('input', () => {
+      if (customerIdInput) customerIdInput.value = '';
       const q = customerNameInput.value.trim();
       if (customerDebounce) clearTimeout(customerDebounce);
       if (q.length < 1) { hideCustomerSugg(); return; }
@@ -2260,6 +2285,27 @@ render_header($invoice_heading);
     document.addEventListener('click', (e) => {
       if (!e.target.closest('#customerSuggestions') && e.target !== customerNameInput) hideCustomerSugg();
     });
+
+    // ── Customer ID validation on submit ─────────────────────────────
+    const invoiceForm = customerNameInput.closest('form');
+    if (invoiceForm) {
+      invoiceForm.addEventListener('submit', (e) => {
+        let errEl = document.getElementById('customerIdError');
+        if (!customerIdInput || !customerIdInput.value) {
+          e.preventDefault();
+          customerNameInput.focus();
+          if (!errEl) {
+            errEl = document.createElement('p');
+            errEl.id = 'customerIdError';
+            errEl.style.cssText = 'color:#991b1b;font-size:0.88em;margin:4px 0 0;';
+            customerSugg.insertAdjacentElement('afterend', errEl);
+          }
+          errEl.textContent = 'You must select a customer from the search results.';
+        } else if (errEl) {
+          errEl.remove();
+        }
+      });
+    }
   }
 
   // ── Shared helpers ────────────────────────────────────────────────
