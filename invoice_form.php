@@ -18,7 +18,7 @@ const INVOICE_MIN_QTY                  = 0.01;
 const STRIPE_AMOUNT_TOLERANCE          = 0.01;
 const STRIPE_API_TIMEOUT_SECONDS       = 20;
 const INVOICE_BALANCE_EPSILON          = 0.005;
-const INVOICE_MIN_POSITIVE_PAYMENT_AMOUNT = INVOICE_BALANCE_EPSILON;
+const INVOICE_PAYMENT_AMOUNT_THRESHOLD = INVOICE_BALANCE_EPSILON;
 const INVOICE_PAYMENT_STATUS_UNPAID    = 'unpaid';
 const INVOICE_PAYMENT_STATUS_PAID      = 'paid';
 
@@ -1006,7 +1006,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
          WHERE cp.id = ? AND cp.customer_id = ? AND cp.amount > ?
          LIMIT 1"
       );
-      $pay_stmt->execute([$apply_payment_id, $cust_id_for_credit, INVOICE_MIN_POSITIVE_PAYMENT_AMOUNT]);
+      $pay_stmt->execute([$apply_payment_id, $cust_id_for_credit, INVOICE_PAYMENT_AMOUNT_THRESHOLD]);
       $payment_row = $pay_stmt->fetch(PDO::FETCH_ASSOC);
       if ($payment_row) {
         $payment_avail = round((float)$payment_row['amount'] - (float)$payment_row['total_used'], 2);
@@ -1025,7 +1025,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
        ) used ON used.payment_id = cp.id
        WHERE cp.customer_id = ? AND cp.amount > ?"
     );
-    $cp_avail_stmt->execute([$cust_id_for_credit, INVOICE_MIN_POSITIVE_PAYMENT_AMOUNT]);
+    $cp_avail_stmt->execute([$cust_id_for_credit, INVOICE_PAYMENT_AMOUNT_THRESHOLD]);
     $sum_linked_avail = round((float)$cp_avail_stmt->fetchColumn(), 2);
 
     $unlinked_applied_stmt = $pdo->prepare(
@@ -1620,7 +1620,7 @@ render_header($invoice_heading);
          WHERE cp.customer_id = ? AND cp.amount > ?
          ORDER BY cp.payment_date DESC, cp.id DESC"
       );
-      $inv_cp_stmt->execute([$inv_cust_id_for_credit, INVOICE_MIN_POSITIVE_PAYMENT_AMOUNT]);
+      $inv_cp_stmt->execute([$inv_cust_id_for_credit, INVOICE_PAYMENT_AMOUNT_THRESHOLD]);
       $all_payments_for_credit = $inv_cp_stmt->fetchAll(PDO::FETCH_ASSOC);
 
       // Subtract unlinked applications from the aggregate pool
