@@ -167,6 +167,56 @@ function app_decrypt_setting_value(?string $encoded): string {
   return $plaintext === false ? '' : (string)$plaintext;
 }
 
+/**
+ * Returns every customer_payments row for a customer, each enriched with:
+ *   total_used       – sum of invoice_credit_applications.applied_amount linked to this payment
+ *   available_balance – amount - total_used (negative for refund records)
+ *
+ * This is the single source of truth for per-payment available balances.
+ * Refunds have a negative available_balance and therefore reduce the aggregate pool.
+ */
+function get_customer_payment_rows(PDO $pdo, int $customer_id): array {
+  if ($customer_id <= 0) return [];
+  $stmt = $pdo->prepare(
+    "SELECT cp.id, cp.payment_date, cp.amount, cp.payment_method, cp.reference_no,
+            COALESCE(used.total_used, 0) AS total_used,
+            (cp.amount - COALESCE(used.total_used, 0)) AS available_balance
+     FROM customer_payments cp
+     LEFT JOIN (
+       SELECT payment_id, SUM(applied_amount) AS total_used
+       FROM invoice_credit_applications
+       WHERE payment_id IS NOT NULL
+       GROUP BY payment_id
+     ) used ON used.payment_id = cp.id
+     WHERE cp.customer_id = ?
+     ORDER BY cp.payment_date DESC, cp.id DESC"
+  );
+  $stmt->execute([$customer_id]);
+  return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Returns the net available credit balance for a customer.
+ * Sums (amount - applied_credits) across ALL payment records, so refunds
+ * (negative payment amounts) automatically reduce the available pool.
+ */
+function get_customer_available_credit(PDO $pdo, int $customer_id): float {
+  if ($customer_id <= 0) return 0.0;
+  $stmt = $pdo->prepare(
+    "SELECT COALESCE(SUM(cp.amount - COALESCE(used.total_used, 0)), 0)
+     FROM customer_payments cp
+     LEFT JOIN (
+       SELECT payment_id, SUM(applied_amount) AS total_used
+       FROM invoice_credit_applications
+       WHERE payment_id IS NOT NULL
+       GROUP BY payment_id
+     ) used ON used.payment_id = cp.id
+     WHERE cp.customer_id = ?"
+  );
+  $stmt->execute([$customer_id]);
+  return max(0.0, round((float)$stmt->fetchColumn(), 2));
+}
+
 // Add playbook column to projects if it does not exist yet
 try {
   $pdo->exec("ALTER TABLE projects ADD COLUMN playbook TINYINT(1) NOT NULL DEFAULT 0");

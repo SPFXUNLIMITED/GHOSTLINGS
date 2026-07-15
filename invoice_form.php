@@ -987,53 +987,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $already_applied = round((float)$already_applied_stmt->fetchColumn(), 2);
     $outstanding_balance = round($inv_total - $already_applied, 2);
 
-    // Validate and load the chosen payment
+    // Validate and load the chosen payment (must belong to this customer and have available balance)
     $apply_payment_id = (int)($_POST['apply_payment_id'] ?? 0);
     $payment_row = null;
     $payment_avail = 0.0;
     if ($apply_payment_id > 0) {
-      $pay_stmt = $pdo->prepare(
-        "SELECT cp.id, cp.customer_id, cp.amount,
-                COALESCE(used.total_used, 0) AS total_used
-         FROM customer_payments cp
-         LEFT JOIN (
-           SELECT payment_id, SUM(applied_amount) AS total_used
-           FROM invoice_credit_applications
-           WHERE payment_id IS NOT NULL
-           GROUP BY payment_id
-         ) used ON used.payment_id = cp.id
-         WHERE cp.id = ? AND cp.customer_id = ? AND cp.amount > 0
-         LIMIT 1"
-      );
-      $pay_stmt->execute([$apply_payment_id, $cust_id_for_credit]);
-      $payment_row = $pay_stmt->fetch(PDO::FETCH_ASSOC);
-      if ($payment_row) {
-        $payment_avail = round((float)$payment_row['amount'] - (float)$payment_row['total_used'], 2);
+      foreach (get_customer_payment_rows($pdo, $cust_id_for_credit) as $cp_row) {
+        if ((int)$cp_row['id'] === $apply_payment_id) {
+          $payment_row = $cp_row;
+          $payment_avail = round((float)$cp_row['available_balance'], 2);
+          break;
+        }
       }
     }
 
-    // Available credit: per-payment remaining balances minus unlinked applied amounts
-    $cp_avail_stmt = $pdo->prepare(
-      "SELECT COALESCE(SUM(cp.amount - COALESCE(used.total_used, 0)), 0) AS sum_avail
-       FROM customer_payments cp
-       LEFT JOIN (
-         SELECT payment_id, SUM(applied_amount) AS total_used
-         FROM invoice_credit_applications
-         WHERE payment_id IS NOT NULL
-         GROUP BY payment_id
-       ) used ON used.payment_id = cp.id
-       WHERE cp.customer_id = ? AND cp.amount > 0"
-    );
-    $cp_avail_stmt->execute([$cust_id_for_credit]);
-    $sum_linked_avail = round((float)$cp_avail_stmt->fetchColumn(), 2);
-
-    $unlinked_applied_stmt = $pdo->prepare(
-      "SELECT COALESCE(SUM(applied_amount), 0) FROM invoice_credit_applications WHERE customer_id = ? AND payment_id IS NULL"
-    );
-    $unlinked_applied_stmt->execute([$cust_id_for_credit]);
-    $unlinked_applied = round((float)$unlinked_applied_stmt->fetchColumn(), 2);
-
-    $available_credit = max(0.0, round($sum_linked_avail - $unlinked_applied, 2));
+    // Available credit: single source of truth from get_customer_available_credit()
+    $available_credit = get_customer_available_credit($pdo, $cust_id_for_credit);
 
     $apply_amount_raw = trim((string)($_POST['apply_amount'] ?? ''));
     $apply_amount = round((float)str_replace(',', '', $apply_amount_raw), 2);
@@ -1618,46 +1587,16 @@ render_header($invoice_heading);
     $inv_outstanding_balance = round($inv_total_for_credit - $inv_total_applied_here, 2);
     if ($inv_outstanding_balance < 0) $inv_outstanding_balance = 0.0;
 
-    // Available credit: sum of per-payment remaining balances for this customer.
-    // This is more precise than total_paid - total_applied because it respects
-    // per-payment caps (payment_id IS NOT NULL rows) while still counting
-    // unlinked applications (payment_id IS NULL) against the aggregate.
+    // Available credit and payment options — single source of truth via db.php helpers.
+    // get_customer_available_credit() sums all payment balances including refunds (negative).
     $inv_available_credit = 0.0;
     $inv_payment_options  = []; // for the Apply Credit modal dropdown
     if ($inv_cust_id_for_credit > 0) {
-      $inv_cp_stmt = $pdo->prepare(
-        "SELECT cp.id, cp.payment_date, cp.amount, cp.payment_method, cp.reference_no,
-                COALESCE(used.total_used, 0) AS total_used
-         FROM customer_payments cp
-         LEFT JOIN (
-           SELECT payment_id, SUM(applied_amount) AS total_used
-           FROM invoice_credit_applications
-           WHERE payment_id IS NOT NULL
-           GROUP BY payment_id
-         ) used ON used.payment_id = cp.id
-         WHERE cp.customer_id = ? AND cp.amount > 0
-         ORDER BY cp.payment_date DESC, cp.id DESC"
-      );
-      $inv_cp_stmt->execute([$inv_cust_id_for_credit]);
-      $all_payments_for_credit = $inv_cp_stmt->fetchAll(PDO::FETCH_ASSOC);
+      $inv_available_credit = get_customer_available_credit($pdo, $inv_cust_id_for_credit);
 
-      // Subtract unlinked applications from the aggregate pool
-      $inv_unlinked_applied_stmt = $pdo->prepare(
-        "SELECT COALESCE(SUM(applied_amount), 0) FROM invoice_credit_applications WHERE customer_id = ? AND payment_id IS NULL"
-      );
-      $inv_unlinked_applied_stmt->execute([$inv_cust_id_for_credit]);
-      $inv_unlinked_applied = round((float)$inv_unlinked_applied_stmt->fetchColumn(), 2);
-
-      $inv_sum_available = 0.0;
-      foreach ($all_payments_for_credit as $cp) {
-        $avail = round((float)$cp['amount'] - (float)$cp['total_used'], 2);
-        if ($avail > 0) $inv_sum_available += $avail;
-      }
-      $inv_available_credit = max(0.0, round($inv_sum_available - $inv_unlinked_applied, 2));
-
-      // Build dropdown options — only payments with remaining balance
-      foreach ($all_payments_for_credit as $cp) {
-        $avail = round((float)$cp['amount'] - (float)$cp['total_used'], 2);
+      // Build dropdown options — only payments with a positive remaining balance
+      foreach (get_customer_payment_rows($pdo, $inv_cust_id_for_credit) as $cp) {
+        $avail = round((float)$cp['available_balance'], 2);
         if ($avail > INVOICE_BALANCE_EPSILON) {
           $inv_payment_options[] = [
             'id'         => (int)$cp['id'],
