@@ -611,7 +611,7 @@ render_header('Customer Payments');
             $balance      = $customer_balances[$cid] ?? null;
             $linked_apps  = $payment_credit_apps[$pid] ?? [];
             $total_applied = round(array_sum(array_column($linked_apps, 'applied_amount')), 2);
-            $remaining_bal = round(max(0.0, $amount - $total_applied), 2);
+            $remaining_bal = round($amount - $total_applied, 2);
             $available_color = $remaining_bal > 0.005 ? '#166534' : '#dc2626';
 
             // Method badge colours
@@ -649,7 +649,7 @@ render_header('Customer Payments');
             <td>
               <strong<?= $method === 'refund' ? ' style="color:#991b1b;"' : '' ?>>$<?= h(cp_format_money($amount)) ?></strong><br>
               <span style="font-size:0.85em; font-weight:600; color:<?= h($available_color) ?>;">
-                $<?= h(number_format($remaining_bal, 2)) ?> available
+                <?= $remaining_bal < 0 ? '-' : '' ?>$<?= h(number_format(abs($remaining_bal), 2)) ?> available
               </span>
             </td>
             <td>
