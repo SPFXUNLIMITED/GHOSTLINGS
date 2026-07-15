@@ -20,6 +20,7 @@ function cp_payment_method_label(string $method): string {
     'cash'        => 'Cash',
     'ach_wire'    => 'ACH / Wire',
     'credit_card' => 'Credit Card',
+    'refund'      => 'Refund',
     default       => 'Other',
   };
 }
@@ -115,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $notes          = trim((string)($_POST['notes'] ?? ''));
 
       $amount = (float)str_replace(',', '', $amount_raw);
-      $valid_methods = ['check', 'cash', 'ach_wire', 'credit_card', 'other'];
+      $valid_methods = ['check', 'cash', 'ach_wire', 'credit_card', 'refund', 'other'];
       if (!in_array($payment_method, $valid_methods, true)) {
         $payment_method = 'other';
       }
@@ -132,8 +133,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($payment_date === '') {
         $errors[] = 'Payment date is required.';
       }
-      if ($amount <= 0) {
-        $errors[] = 'Amount must be greater than zero.';
+      if ($payment_method === 'refund') {
+        if ($amount >= 0) {
+          $errors[] = 'Refund amount must be a negative number (e.g. -50.00).';
+        }
+      } else {
+        if ($amount <= 0) {
+          $errors[] = 'Amount must be greater than zero.';
+        }
       }
       if ($bank_transaction_id > 0) {
         $bank_tx_stmt = $pdo->prepare("SELECT id, linked_payment_id FROM bank_transactions WHERE id = ? LIMIT 1");
@@ -230,6 +237,7 @@ $payment_methods = [
   'cash'        => 'Cash',
   'ach_wire'    => 'ACH / Wire',
   'credit_card' => 'Credit Card',
+  'refund'      => 'Refund',
   'other'       => 'Other',
 ];
 
@@ -612,6 +620,7 @@ render_header('Customer Payments');
               'cash'        => ['#f0fdf4', '#166534'],
               'ach_wire'    => ['#faf5ff', '#7c3aed'],
               'credit_card' => ['#fff7ed', '#c2410c'],
+              'refund'      => ['#fef2f2', '#991b1b'],
               default       => ['#f1f5f9', '#475569'],
             };
 
@@ -622,7 +631,7 @@ render_header('Customer Payments');
               'customer_id'    => $cid,
               'customer_name'  => $cname . ($ccompany !== '' ? ' — ' . $ccompany : ''),
               'payment_date'   => $pdate,
-              'amount'         => number_format(abs((float)$amount), 2, '.', ''),
+              'amount'         => number_format($amount, 2, '.', ''),
               'payment_method' => $method,
               'reference_no'   => $ref_no,
               'notes'          => $pay_notes,
@@ -638,7 +647,7 @@ render_header('Customer Payments');
             </td>
             <td><?= h($pdate !== '' ? fmt_date_mdY($pdate) : '—') ?></td>
             <td>
-              <strong>$<?= h(cp_format_money($amount)) ?></strong><br>
+              <strong<?= $method === 'refund' ? ' style="color:#991b1b;"' : '' ?>>$<?= h(cp_format_money($amount)) ?></strong><br>
               <span style="font-size:0.85em; font-weight:600; color:<?= h($available_color) ?>;">
                 $<?= h(number_format($remaining_bal, 2)) ?> available
               </span>
@@ -818,15 +827,48 @@ render_header('Customer Payments');
   function openModal(isEdit) {
     modal.classList.add('open');
     modal.removeAttribute('aria-hidden');
-    titleEl.textContent = isEdit ? 'Edit Payment' : 'Add Payment';
-    submitBtn.textContent = isEdit ? 'Update Payment' : 'Save Payment';
+    var isRefund = methodSelect.value === 'refund';
+    if (isEdit) {
+      titleEl.textContent = isRefund ? 'Edit Refund' : 'Edit Payment';
+      submitBtn.textContent = isRefund ? 'Update Refund' : 'Update Payment';
+    } else {
+      titleEl.textContent = isRefund ? 'Add Refund' : 'Add Payment';
+      submitBtn.textContent = isRefund ? 'Save Refund' : 'Save Payment';
+    }
     actionIn.value = isEdit ? 'edit_payment' : 'add_payment';
+    updateAmountConstraints();
     // Set server-side today as default date for new payments
     if (!isEdit && dateInput.value === '') {
       dateInput.value = todayYmd;
     }
     customerInput.focus();
   }
+
+  function updateAmountConstraints() {
+    var isRefund = methodSelect.value === 'refund';
+    if (isRefund) {
+      amountInput.setAttribute('min', '-999999999');
+      amountInput.setAttribute('max', '-0.01');
+      amountInput.placeholder = '-0.00';
+    } else {
+      amountInput.setAttribute('min', '0.01');
+      amountInput.removeAttribute('max');
+      amountInput.placeholder = '0.00';
+    }
+  }
+
+  methodSelect.addEventListener('change', function () {
+    updateAmountConstraints();
+    var isRefund = methodSelect.value === 'refund';
+    var isEdit = actionIn.value === 'edit_payment';
+    if (isEdit) {
+      titleEl.textContent = isRefund ? 'Edit Refund' : 'Edit Payment';
+      submitBtn.textContent = isRefund ? 'Update Refund' : 'Update Payment';
+    } else {
+      titleEl.textContent = isRefund ? 'Add Refund' : 'Add Payment';
+      submitBtn.textContent = isRefund ? 'Save Refund' : 'Save Payment';
+    }
+  });
 
   function closeModal() {
     modal.classList.remove('open');
