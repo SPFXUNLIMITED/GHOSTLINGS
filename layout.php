@@ -593,7 +593,6 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
     <?php render_menu_dropdown('Inquiries', [
       ['href' => 'machine_inquiry_form.php', 'file' => 'machine_inquiry_form.php', 'label' => 'Machine Inquiry Form'],
       ['href' => 'machine_inquiry_admin.php', 'file' => 'machine_inquiry_admin.php', 'label' => 'Inquiry Admin'],
-      ['href' => 'sms-opt-in.php', 'file' => 'sms-opt-in.php', 'label' => 'SMS Opt-In'],
     ], $current); ?>
     <?php render_menu_dropdown('Projects', [
       ['href' => 'projects.php', 'files' => ['projects.php', 'project_form.php', 'project_details.php'], 'label' => 'Projects'],
