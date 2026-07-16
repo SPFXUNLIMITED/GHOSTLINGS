@@ -1928,9 +1928,9 @@ render_header('Quotes');
       });
 
       // ── Pre-submit: strip blank rows so backend counts stay consistent ──
-      const quoteForm = laborBody.closest('form');
-      if (quoteForm) {
-        quoteForm.addEventListener('submit', () => {
+      const lineItemsForm = laborBody.closest('form');
+      if (lineItemsForm) {
+        lineItemsForm.addEventListener('submit', () => {
           laborBody.querySelectorAll('tr.labor-row').forEach((row) => {
             if ((row.querySelector('.labor-desc')?.value ?? '').trim() === '') row.remove();
           });
