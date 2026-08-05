@@ -214,44 +214,57 @@ if ($search !== '') {
 
 $query_sql = "
   SELECT
-    c.id,
-    c.first_name,
-    c.last_name,
-    c.company,
-    c.phone,
-    c.email,
-    c.followup_flagged,
-    MAX(COALESCE(sr.completed_at, sr.updated_at)) AS last_service_date,
-    (
-      SELECT MAX(cl.logged_at)
-      FROM contacts_log cl
-      WHERE cl.customer_id = c.id
-    ) AS last_contact_date,
-    (
-      SELECT cl2.contact_type
-      FROM contacts_log cl2
-      WHERE cl2.customer_id = c.id
-      ORDER BY cl2.logged_at DESC
-      LIMIT 1
-    ) AS last_contact_type
-  FROM customers c
-  LEFT JOIN service_requests sr
-    ON sr.customer_id = c.id
-    AND sr.request_status = 'completed'
+    crm.id,
+    crm.first_name,
+    crm.last_name,
+    crm.company,
+    crm.phone,
+    crm.email,
+    crm.followup_flagged,
+    crm.last_service_date,
+    crm.last_contact_date,
+    crm.last_contact_type
+  FROM (
+    SELECT
+      c.id,
+      c.first_name,
+      c.last_name,
+      c.company,
+      c.phone,
+      c.email,
+      c.followup_flagged,
+      MAX(COALESCE(sr.completed_at, sr.updated_at)) AS last_service_date,
+      (
+        SELECT MAX(cl.logged_at)
+        FROM contacts_log cl
+        WHERE cl.customer_id = c.id
+      ) AS last_contact_date,
+      (
+        SELECT cl2.contact_type
+        FROM contacts_log cl2
+        WHERE cl2.customer_id = c.id
+        ORDER BY cl2.logged_at DESC, cl2.id DESC
+        LIMIT 1
+      ) AS last_contact_type
+    FROM customers c
+    LEFT JOIN service_requests sr
+      ON sr.customer_id = c.id
+      AND sr.request_status = 'completed'
+    GROUP BY
+      c.id, c.first_name, c.last_name, c.company, c.phone, c.email, c.followup_flagged
+  ) crm
   WHERE (
-    c.followup_flagged = 1
-    OR EXISTS (
-      SELECT 1 FROM service_requests sr2
-      WHERE sr2.customer_id = c.id AND sr2.request_status = 'completed'
-    )
+    crm.followup_flagged = 1
+    OR crm.last_service_date IS NOT NULL
   )
   $search_sql
-  GROUP BY
-    c.id, c.first_name, c.last_name, c.company, c.phone, c.email, c.followup_flagged
   ORDER BY
-    last_contact_date IS NOT NULL ASC,
-    last_contact_date ASC,
-    last_service_date DESC
+    crm.last_contact_date IS NOT NULL ASC,
+    crm.last_contact_date ASC,
+    crm.last_service_date DESC,
+    crm.last_name ASC,
+    crm.first_name ASC,
+    crm.id ASC
 ";
 
 $stmt = $pdo->prepare($query_sql);
@@ -589,7 +602,34 @@ render_header('CRM');
   </div>
 </div>
 
-<script>
+function bindViewLogBtns() {
+  if (typeof window.openHistoryModal !== 'function') return;
+  document.querySelectorAll('.view-log-btn').forEach(function (btn) {
+    if (btn.dataset.viewLogBound) return;
+    btn.dataset.viewLogBound = '1';
+    btn.addEventListener('click', function () {
+      var history = [];
+      try {
+        history = JSON.parse(btn.dataset.history || '[]');
+      } catch (e) {
+        history = [];
+      }
+      window.openHistoryModal(btn.dataset.customerId, btn.dataset.customerName, history);
+    });
+  });
+}
+
+function bindLogContactBtns() {
+  if (typeof window.openCrmLogContactModal !== 'function') return;
+  document.querySelectorAll('.log-contact-btn').forEach(function (btn) {
+    if (btn.dataset.logContactBound) return;
+    btn.dataset.logContactBound = '1';
+    btn.addEventListener('click', function () {
+      window.openCrmLogContactModal(btn.dataset.customerId, btn.dataset.customerName);
+    });
+  });
+}
+
 (function () {
   var overlay   = document.getElementById('log-contact-overlay');
   var title     = document.getElementById('log-contact-title');
@@ -702,12 +742,8 @@ render_header('CRM');
 
   window.openHistoryModal = openHistoryModal;
   window.openCrmLogContactModal = openModal;
-
-  document.querySelectorAll('.log-contact-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      openModal(btn.dataset.customerId, btn.dataset.customerName);
-    });
-  });
+  bindLogContactBtns();
+  bindViewLogBtns();
 
   cancelBtn.addEventListener('click', closeModal);
   if (historyClose) historyClose.addEventListener('click', closeHistoryModal);
@@ -936,48 +972,6 @@ function toggleFlag(customerId, flagValue, btn) {
   .catch(function () {
     if (btn) { btn.disabled = false; btn.textContent = flagValue ? '+ Add to CRM' : 'Remove Flag'; }
     alert('Network error. Please try again.');
-  });
-}
-
-function bindViewLogBtns() {
-  document.querySelectorAll('.view-log-btn').forEach(function (btn) {
-    if (btn.dataset.bound) return;
-    btn.dataset.bound = '1';
-    btn.addEventListener('click', function () {
-      var history = [];
-      try {
-        history = JSON.parse(btn.dataset.history || '[]');
-      } catch (e) {
-        history = [];
-      }
-      openHistoryModal(btn.dataset.customerId, btn.dataset.customerName, history);
-    });
-  });
-}
-
-function bindLogContactBtns() {
-  document.querySelectorAll('.log-contact-btn').forEach(function (btn) {
-    if (btn.dataset.bound) return;
-    btn.dataset.bound = '1';
-    btn.addEventListener('click', function () {
-      var overlay = document.getElementById('log-contact-overlay');
-      var custInput = document.getElementById('log-customer-id');
-      var title = document.getElementById('log-contact-title');
-      var notesArea = document.getElementById('log-notes');
-      var typeSelect = document.getElementById('log-contact-type');
-      var errBox = document.getElementById('log-contact-error');
-      var submitBtn = document.getElementById('log-submit-btn');
-      if (!overlay || !custInput) return;
-      custInput.value = btn.dataset.customerId;
-      title.textContent = 'Log Contact — ' + btn.dataset.customerName;
-      notesArea.value = '';
-      typeSelect.value = 'call';
-      errBox.style.display = 'none';
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Save Log Entry';
-      overlay.style.display = 'flex';
-      typeSelect.focus();
-    });
   });
 }
 
