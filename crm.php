@@ -209,7 +209,7 @@ function crm_fetch_rows(PDO $pdo, string $search, DateTimeZone $tz): array
         } else {
             $row['days_since_contact'] = null;
         }
-        $row['history'] = [];
+        $row['history'] = crm_fetch_contact_history($pdo, (int) $row['id'], $tz);
     }
     unset($row);
 
