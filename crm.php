@@ -58,7 +58,7 @@ function crm_customer_display_name(array $row): string
 
 function crm_fetch_contact_history(PDO $pdo, int $customerId, DateTimeZone $tz): array
 {
-    $stmt = $pdo->prepare("\n        SELECT\n            cl.id,\n            cl.contact_type,\n            cl.notes,\n            cl.logged_at,\n            COALESCE(u.username, CONCAT_WS(' ', NULLIF(u.first_name, ''), NULLIF(u.last_name, ''))) AS logged_by_name\n        FROM contacts_log cl\n        LEFT JOIN users u ON u.id = cl.logged_by\n        WHERE cl.customer_id = ?\n        ORDER BY cl.logged_at DESC, cl.id DESC\n    ");
+    $stmt = $pdo->prepare("\n        SELECT\n            cl.id,\n            cl.contact_type,\n            cl.notes,\n            cl.logged_at,\n            COALESCE(NULLIF(u.contact_name, ''), u.username) AS logged_by_name\n        FROM contacts_log cl\n        LEFT JOIN users u ON u.id = cl.logged_by\n        WHERE cl.customer_id = ?\n        ORDER BY cl.logged_at DESC, cl.id DESC\n    ");
     $stmt->execute([$customerId]);
 
     $history = [];
@@ -200,7 +200,6 @@ function crm_fetch_rows(PDO $pdo, string $search, DateTimeZone $tz): array
     $stmt->execute();
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $historyMap = crm_map_contact_history($pdo, array_column($rows, 'id'), $tz);
     $today = new DateTime('today', $tz);
     foreach ($rows as &$row) {
         if (!empty($row['last_contact_date'])) {
@@ -210,7 +209,7 @@ function crm_fetch_rows(PDO $pdo, string $search, DateTimeZone $tz): array
         } else {
             $row['days_since_contact'] = null;
         }
-        $row['history'] = $historyMap[(int) $row['id']] ?? [];
+        $row['history'] = [];
     }
     unset($row);
 
