@@ -30,8 +30,8 @@ if (!in_array($filter, ['all', 'today'], true)) {
   $filter = 'all';
 }
 if ($description === '') {
-  header('Location: standalone_tasks.php' . ($filter === 'today' ? '?filter=today' : ''));
-  exit;
+  http_response_code(400);
+  exit('Description is required.');
 }
 if (!in_array($status, ['pending', 'in-progress', 'completed'], true)) {
   $status = 'pending';

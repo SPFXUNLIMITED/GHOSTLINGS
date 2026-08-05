@@ -26,7 +26,9 @@ if (!is_array($ids)) {
   exit('Invalid payload');
 }
 
-$ids = array_values(array_unique(array_map('intval', $ids)));
+$ids = array_values(array_filter(array_map('intval', $ids), static function ($id) {
+  return $id > 0;
+}));
 if (!$ids) {
   http_response_code(400);
   exit('No task ids provided');
@@ -36,9 +38,6 @@ $pdo->beginTransaction();
 try {
   $stmt = $pdo->prepare('UPDATE standalone_tasks SET sort_order = ? WHERE id = ?');
   foreach ($ids as $index => $id) {
-    if ($id <= 0) {
-      continue;
-    }
     $stmt->execute([$index + 1, $id]);
   }
   $pdo->commit();

@@ -307,7 +307,7 @@ render_header('Tasks');
     priorityInput.disabled = isReadonly;
     dueDateInput.disabled = isReadonly;
     submitBtn.hidden = isReadonly;
-    readonlyFields.hidden = false;
+    readonlyFields.hidden = !isReadonly;
   }
 
   function populateFromRow(row) {

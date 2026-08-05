@@ -365,7 +365,10 @@ try {
 }
 
 try {
-  $pdo->exec("UPDATE standalone_tasks SET sort_order = id WHERE sort_order = 0");
+  $needsStandaloneTaskOrderBackfill = (int)$pdo->query("SELECT COUNT(*) FROM standalone_tasks WHERE sort_order = 0")->fetchColumn() > 0;
+  if ($needsStandaloneTaskOrderBackfill) {
+    $pdo->exec("UPDATE standalone_tasks SET sort_order = id WHERE sort_order = 0");
+  }
 } catch (PDOException $e) {
   $missingTableCodes = ['42S02', '42S22'];
   if (!in_array($e->getCode(), $missingTableCodes, true)) {
