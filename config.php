@@ -18,14 +18,14 @@ if (class_exists(\Dotenv\Dotenv::class)) {
 return [
   'version' => '1.0.0',
   'db' => [
-    'host' => '127.0.0.1',
-    'name' => 'spfx_ghostlaser',
-    'user' => 'spfx_ghost',
-    'pass' => '',
-    'charset' => 'utf8mb4',
+		'host' => getenv('DB_HOST') ?: '127.0.0.1', 
+		'name' => getenv('DB_DATABASE') ?: 'spfx_ghostlaser', 
+		'user' => getenv('DB_USERNAME') ?: 'spfx_ghost', 
+		'pass' => getenv('DB_PASSWORD') ?: '', 
+		'charset' => getenv('DB_CHARSET') ?: 'utf8mb4',
   ],
   'recaptcha' => [
-    'site_key'   => '',
-    'secret_key' => '',
+		'site_key' => getenv('RECAPTCHA_SITE_KEY') ?: '', 
+		'secret_key' => getenv('RECAPTCHA_SECRET_KEY') ?: '', 
   ],
 ];
