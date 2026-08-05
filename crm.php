@@ -602,7 +602,34 @@ render_header('CRM');
   </div>
 </div>
 
-<script>
+function bindViewLogBtns() {
+  if (typeof window.openHistoryModal !== 'function') return;
+  document.querySelectorAll('.view-log-btn').forEach(function (btn) {
+    if (btn.dataset.viewLogBound) return;
+    btn.dataset.viewLogBound = '1';
+    btn.addEventListener('click', function () {
+      var history = [];
+      try {
+        history = JSON.parse(btn.dataset.history || '[]');
+      } catch (e) {
+        history = [];
+      }
+      window.openHistoryModal(btn.dataset.customerId, btn.dataset.customerName, history);
+    });
+  });
+}
+
+function bindLogContactBtns() {
+  if (typeof window.openCrmLogContactModal !== 'function') return;
+  document.querySelectorAll('.log-contact-btn').forEach(function (btn) {
+    if (btn.dataset.logContactBound) return;
+    btn.dataset.logContactBound = '1';
+    btn.addEventListener('click', function () {
+      window.openCrmLogContactModal(btn.dataset.customerId, btn.dataset.customerName);
+    });
+  });
+}
+
 (function () {
   var overlay   = document.getElementById('log-contact-overlay');
   var title     = document.getElementById('log-contact-title');
@@ -715,12 +742,8 @@ render_header('CRM');
 
   window.openHistoryModal = openHistoryModal;
   window.openCrmLogContactModal = openModal;
-
-  document.querySelectorAll('.log-contact-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      openModal(btn.dataset.customerId, btn.dataset.customerName);
-    });
-  });
+  bindLogContactBtns();
+  bindViewLogBtns();
 
   cancelBtn.addEventListener('click', closeModal);
   if (historyClose) historyClose.addEventListener('click', closeHistoryModal);
@@ -949,48 +972,6 @@ function toggleFlag(customerId, flagValue, btn) {
   .catch(function () {
     if (btn) { btn.disabled = false; btn.textContent = flagValue ? '+ Add to CRM' : 'Remove Flag'; }
     alert('Network error. Please try again.');
-  });
-}
-
-function bindViewLogBtns() {
-  document.querySelectorAll('.view-log-btn').forEach(function (btn) {
-    if (btn.dataset.bound) return;
-    btn.dataset.bound = '1';
-    btn.addEventListener('click', function () {
-      var history = [];
-      try {
-        history = JSON.parse(btn.dataset.history || '[]');
-      } catch (e) {
-        history = [];
-      }
-      openHistoryModal(btn.dataset.customerId, btn.dataset.customerName, history);
-    });
-  });
-}
-
-function bindLogContactBtns() {
-  document.querySelectorAll('.log-contact-btn').forEach(function (btn) {
-    if (btn.dataset.bound) return;
-    btn.dataset.bound = '1';
-    btn.addEventListener('click', function () {
-      var overlay = document.getElementById('log-contact-overlay');
-      var custInput = document.getElementById('log-customer-id');
-      var title = document.getElementById('log-contact-title');
-      var notesArea = document.getElementById('log-notes');
-      var typeSelect = document.getElementById('log-contact-type');
-      var errBox = document.getElementById('log-contact-error');
-      var submitBtn = document.getElementById('log-submit-btn');
-      if (!overlay || !custInput) return;
-      custInput.value = btn.dataset.customerId;
-      title.textContent = 'Log Contact — ' + btn.dataset.customerName;
-      notesArea.value = '';
-      typeSelect.value = 'call';
-      errBox.style.display = 'none';
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Save Log Entry';
-      overlay.style.display = 'flex';
-      typeSelect.focus();
-    });
   });
 }
 
