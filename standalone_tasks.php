@@ -113,6 +113,8 @@ render_header('Tasks');
             data-due-date="<?= h($due_date) ?>"
             data-created-at="<?= h((string)($task['created_at'] ?? '')) ?>"
             data-updated-at="<?= h((string)($task['updated_at'] ?? '')) ?>"
+            data-created-at-display="<?= h(standalone_tasks_format_datetime($task['created_at'] ?? null)) ?>"
+            data-updated-at-display="<?= h(standalone_tasks_format_datetime($task['updated_at'] ?? null)) ?>"
           >
             <td>
               <button type="button" class="standalone-drag-handle" aria-label="Drag to reorder">↕</button>
@@ -314,8 +316,8 @@ render_header('Tasks');
     statusInput.value = row.dataset.status || 'pending';
     priorityInput.value = row.dataset.priority || 'medium';
     dueDateInput.value = row.dataset.dueDate || '';
-    createdAtValue.textContent = row.dataset.createdAt || '—';
-    updatedAtValue.textContent = row.dataset.updatedAt || '—';
+    createdAtValue.textContent = row.dataset.createdAtDisplay || '—';
+    updatedAtValue.textContent = row.dataset.updatedAtDisplay || '—';
   }
 
   function resetForCreate() {

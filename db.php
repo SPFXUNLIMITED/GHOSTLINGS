@@ -355,6 +355,7 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Migration shim for pre-existing standalone_tasks tables created before sort_order existed.
 try {
   $pdo->exec("ALTER TABLE standalone_tasks ADD COLUMN sort_order INT NOT NULL DEFAULT 0");
 } catch (PDOException $e) {
