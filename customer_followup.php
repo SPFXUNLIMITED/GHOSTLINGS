@@ -59,10 +59,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
   exit;
 }
 
-// ── Fetch customers with ≥1 completed service_request ────────────────────────
-// Last service date = MAX completed_at from service_requests where status = 'completed'
-// Last contact date = MAX logged_at from contacts_log
-$rows = $pdo->query("
+// ── AJAX: toggle followup_flagged ────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'toggle_flag') {
+  header('Content-Type: application/json; charset=UTF-8');
+  header('X-Content-Type-Options: nosniff');
+
+  $csrf = (string)($_POST['csrf_token'] ?? '');
+  if (!hash_equals((string)$_SESSION['followup_log_csrf'], $csrf)) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Security token mismatch.']);
+    exit;
+  }
+
+  $customer_id = (int)($_POST['customer_id'] ?? 0);
+  $flag_value  = (int)($_POST['flag_value']  ?? 1); // 1 = add, 0 = remove
+  $flag_value  = $flag_value ? 1 : 0;
+
+  if ($customer_id <= 0) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Invalid customer.']);
+    exit;
+  }
+
+  $stmt = $pdo->prepare("UPDATE customers SET followup_flagged = ? WHERE id = ?");
+  $stmt->execute([$flag_value, $customer_id]);
+
+  $_SESSION['followup_log_csrf'] = bin2hex(random_bytes(24));
+
+  echo json_encode(['ok' => true, 'new_csrf' => $_SESSION['followup_log_csrf'], 'flagged' => (bool)$flag_value]);
+  exit;
+}
+
+// ── AJAX: live search – return JSON for table rows ───────────────────────────
+$is_live_search = isset($_GET['live_search']) && $_GET['live_search'] === '1';
+
+// ── Build the follow-up customer query ───────────────────────────────────────
+// Includes: customers with ≥1 completed service_request OR manually flagged.
+$search = trim((string)($_GET['q'] ?? ''));
+
+$search_sql   = '';
+$search_binds = [];
+if ($search !== '') {
+  $escaped = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search);
+  $like     = '%' . $escaped . '%';
+  $search_sql   = " AND (c.first_name LIKE :q ESCAPE '!' OR c.last_name LIKE :q ESCAPE '!'
+                         OR CONCAT(c.first_name,' ',c.last_name) LIKE :q ESCAPE '!'
+                         OR c.company LIKE :q ESCAPE '!')";
+  $search_binds = [':q' => $like];
+}
+
+$query_sql = "
   SELECT
     c.id,
     c.first_name,
@@ -70,6 +116,7 @@ $rows = $pdo->query("
     c.company,
     c.phone,
     c.email,
+    c.followup_flagged,
     MAX(COALESCE(sr.completed_at, sr.updated_at)) AS last_service_date,
     (
       SELECT MAX(cl.logged_at)
@@ -84,16 +131,130 @@ $rows = $pdo->query("
       LIMIT 1
     ) AS last_contact_type
   FROM customers c
-  INNER JOIN service_requests sr
+  LEFT JOIN service_requests sr
     ON sr.customer_id = c.id
     AND sr.request_status = 'completed'
+  WHERE (
+    c.followup_flagged = 1
+    OR EXISTS (
+      SELECT 1 FROM service_requests sr2
+      WHERE sr2.customer_id = c.id AND sr2.request_status = 'completed'
+    )
+  )
+  $search_sql
   GROUP BY
-    c.id, c.first_name, c.last_name, c.company, c.phone, c.email
+    c.id, c.first_name, c.last_name, c.company, c.phone, c.email, c.followup_flagged
   ORDER BY
     last_contact_date IS NOT NULL ASC,
     last_contact_date ASC,
     last_service_date DESC
-")->fetchAll(PDO::FETCH_ASSOC);
+";
+
+$stmt = $pdo->prepare($query_sql);
+foreach ($search_binds as $key => $val) {
+  $stmt->bindValue($key, $val, PDO::PARAM_STR);
+}
+$stmt->execute();
+$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Compute days since last contact for each row
+$today = new DateTime('today', new DateTimeZone(APP_TZ));
+foreach ($rows as &$row) {
+  if ($row['last_contact_date'] !== null) {
+    $lc = new DateTime($row['last_contact_date'], new DateTimeZone(APP_TZ));
+    $lc->setTime(0, 0, 0);
+    $row['days_since_contact'] = (int)$today->diff($lc)->days;
+  } else {
+    $row['days_since_contact'] = null;
+  }
+}
+unset($row);
+
+// ── Live search response ──────────────────────────────────────────────────────
+if ($is_live_search) {
+  header('Content-Type: application/json; charset=UTF-8');
+  header('X-Content-Type-Options: nosniff');
+  ob_start();
+  render_followup_table_rows($rows);
+  $rows_html = ob_get_clean();
+  echo json_encode(['tableRowsHtml' => $rows_html]);
+  exit;
+}
+
+// ── Helper: render table rows (used for both full page and live search) ───────
+function render_followup_table_rows(array $rows): void {
+  $today = new DateTime('today', new DateTimeZone(APP_TZ));
+  foreach ($rows as $row):
+    $days = $row['days_since_contact'];
+
+    if ($days === null) {
+      $row_style    = 'background:#fef2f2;';
+      $status_label = 'Never Contacted';
+      $status_color = '#dc2626';
+    } elseif ($days > 365) {
+      $row_style    = 'background:#fef2f2;';
+      $status_label = 'Overdue';
+      $status_color = '#dc2626';
+    } elseif ($days >= 180) {
+      $row_style    = 'background:#fefce8;';
+      $status_label = 'Due Soon';
+      $status_color = '#b45309';
+    } else {
+      $row_style    = 'background:#f0fdf4;';
+      $status_label = 'OK';
+      $status_color = '#166534';
+    }
+
+    $full_name   = trim((string)$row['first_name'] . ' ' . (string)$row['last_name']);
+    $lsd_display = $row['last_service_date'] !== null ? fmt_date_mdY(substr($row['last_service_date'], 0, 10)) : '—';
+    $lcd_display = $row['last_contact_date']  !== null ? fmt_date_mdY(substr($row['last_contact_date'],  0, 10)) : '—';
+    $days_display = $days !== null ? $days : '—';
+    $is_flagged   = !empty($row['followup_flagged']);
+    ?>
+      <tr style="<?= h($row_style) ?>">
+        <td>
+          <a href="customer_details.php?id=<?= (int)$row['id'] ?>">
+            <?= h($full_name !== '' ? $full_name : '(no name)') ?>
+          </a>
+          <?php if ($is_flagged): ?>
+            <span title="Manually added to follow-up" style="color:#b45309; font-size:.8em;">★ flagged</span>
+          <?php endif; ?>
+        </td>
+        <td><?= h($row['company']) ?></td>
+        <td><?= h($row['phone']) ?></td>
+        <td>
+          <?php if (trim((string)$row['email']) !== ''): ?>
+            <a href="mailto:<?= h($row['email']) ?>"><?= h($row['email']) ?></a>
+          <?php else: ?>
+            <span class="muted">—</span>
+          <?php endif; ?>
+        </td>
+        <td><?= h($lsd_display) ?></td>
+        <td><?= h($lcd_display) ?></td>
+        <td><?= h((string)$days_display) ?></td>
+        <td>
+          <strong style="color:<?= h($status_color) ?>;"><?= h($status_label) ?></strong>
+        </td>
+        <td>
+          <button
+            type="button"
+            class="btn log-contact-btn"
+            data-customer-id="<?= (int)$row['id'] ?>"
+            data-customer-name="<?= h($full_name !== '' ? $full_name : (string)$row['company']) ?>"
+          >Log Contact</button>
+          <?php if ($is_flagged): ?>
+            <button
+              type="button"
+              class="btn remove-flag-btn"
+              data-customer-id="<?= (int)$row['id'] ?>"
+              style="margin-top:4px;"
+            >Remove Flag</button>
+          <?php endif; ?>
+        </td>
+      </tr>
+    <?php
+  endforeach;
+}
 
 // Compute days since last contact for each row
 $today = new DateTime('today', new DateTimeZone(APP_TZ));
