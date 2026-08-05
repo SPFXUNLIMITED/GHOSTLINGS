@@ -200,6 +200,7 @@ function crm_fetch_rows(PDO $pdo, string $search, DateTimeZone $tz): array
     $stmt->execute();
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    $historyMap = crm_map_contact_history($pdo, array_column($rows, 'id'), $tz);
     $today = new DateTime('today', $tz);
     foreach ($rows as &$row) {
         if (!empty($row['last_contact_date'])) {
@@ -209,7 +210,7 @@ function crm_fetch_rows(PDO $pdo, string $search, DateTimeZone $tz): array
         } else {
             $row['days_since_contact'] = null;
         }
-        $row['history'] = crm_fetch_contact_history($pdo, (int) $row['id'], $tz);
+        $row['history'] = $historyMap[(int) $row['id']] ?? [];
     }
     unset($row);
 
@@ -443,7 +444,7 @@ render_header('CRM');
 </div>
 
 <div id="log-contact-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000; align-items:center; justify-content:center; padding:16px;">
-    <div style="background:#fff; border-radius:8px; padding:28px 32px; width:100%; max-width:480px; box-shadow:0 8px 32px rgba(0,0,0,.2); position:relative;">
+    <div style="background:#fff; border-radius:8px; padding:28px 32px; width:100%; max-width:480px; box-shadow:0 8px 32px rgba(0,0,0,.2); position:relative;" role="dialog" aria-modal="true" aria-labelledby="log-contact-title">
         <h2 id="log-contact-title" style="margin:0 0 18px;">Log Contact</h2>
         <form id="log-contact-form">
             <input type="hidden" id="log-customer-id" name="customer_id" value="" />
@@ -494,7 +495,7 @@ render_header('CRM');
 </div>
 
 <div id="send-email-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1200; align-items:center; justify-content:center; padding:16px;">
-    <div style="background:#fff; border-radius:8px; padding:28px 32px; width:100%; max-width:620px; box-shadow:0 8px 32px rgba(0,0,0,.2); position:relative;">
+    <div style="background:#fff; border-radius:8px; padding:28px 32px; width:100%; max-width:620px; box-shadow:0 8px 32px rgba(0,0,0,.2); position:relative;" role="dialog" aria-modal="true" aria-labelledby="send-email-title">
         <h2 id="send-email-title" style="margin:0 0 18px;">Send Email</h2>
         <form id="send-email-form">
             <input type="hidden" id="send-email-customer-id" name="customer_id" value="" />
