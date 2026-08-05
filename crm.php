@@ -102,7 +102,6 @@ function crm_send_email(PDO $pdo, int $customerId, string $to, string $subject, 
     try {
         $mailer = new PHPMailer(true);
         $mailer->isSMTP();
-        $mailer->SMTPOptions = ['ssl' => ['verify_peer' => false, 'verify_peer_name' => false, 'allow_self_signed' => true]];
         $mailer->Host = $smtpHost;
         $mailer->Port = $smtpPort;
         $mailer->SMTPAuth = true;
@@ -344,6 +343,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['action'] ?? '') =
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && (string) ($_GET['customer_search'] ?? '') === '1') {
     header('Content-Type: application/json; charset=UTF-8');
+    header('X-Content-Type-Options: nosniff');
     $query = trim((string) ($_GET['q'] ?? ''));
     if ($query === '') {
         echo json_encode(['html' => '']);
@@ -793,7 +793,11 @@ render_header('CRM');
           }
           window.history.replaceState(null, '', url.pathname + (query !== '' ? '?q=' + encodeURIComponent(query) : ''));
         })
-        .catch(function (err) { if (!err || err.name !== 'AbortError') {} });
+        .catch(function (err) {
+          if (err && err.name === 'AbortError') return;
+          crmTableBody.innerHTML = '<tr><td colspan="9" class="muted" style="padding:16px;">Unable to load CRM results.</td></tr>';
+          if (window.console && typeof window.console.error === 'function') window.console.error(err);
+        });
     }
     crmInput.addEventListener('input', function () {
       clearTimeout(timer);
