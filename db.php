@@ -337,6 +337,45 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Create standalone tasks table if it does not exist yet
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS standalone_tasks (
+    id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    description  LONGTEXT NOT NULL,
+    status       ENUM('pending','in-progress','completed') NOT NULL DEFAULT 'pending',
+    priority     ENUM('high','medium','low') NOT NULL DEFAULT 'medium',
+    due_date     DATE NULL,
+    sort_order   INT NOT NULL DEFAULT 0,
+    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_standalone_tasks_status (status),
+    KEY idx_standalone_tasks_due_date (due_date),
+    KEY idx_standalone_tasks_sort_order (sort_order)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// Migration shim for pre-existing standalone_tasks tables created before sort_order existed.
+try {
+  $pdo->exec("ALTER TABLE standalone_tasks ADD COLUMN sort_order INT NOT NULL DEFAULT 0");
+} catch (PDOException $e) {
+  if ($e->getCode() !== '42S21') {
+    throw $e;
+  }
+}
+
+try {
+  $needsStandaloneTaskOrderBackfill = (int)$pdo->query("SELECT COUNT(*) FROM standalone_tasks WHERE sort_order = 0")->fetchColumn() > 0;
+  if ($needsStandaloneTaskOrderBackfill) {
+    $pdo->exec("UPDATE standalone_tasks SET sort_order = id WHERE sort_order = 0");
+  }
+} catch (PDOException $e) {
+  $missingTableCodes = ['42S02', '42S22'];
+  if (!in_array($e->getCode(), $missingTableCodes, true)) {
+    throw $e;
+  }
+}
+
 // Create project_comments table if it does not exist yet
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS project_comments (

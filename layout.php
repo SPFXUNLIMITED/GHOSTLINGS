@@ -600,6 +600,7 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
       ['href' => 'sops.php', 'files' => ['sops.php', 'sop_category_form.php', 'sop_page_form.php', 'sop_pages.php'], 'label' => 'SOP'],
       ['href' => 'playbooks.php', 'files' => ['playbooks.php', 'playbook_form.php', 'playbook_task_form.php', 'playbook_tasks.php'], 'label' => 'Playbooks'],
       ['href' => 'archives.php', 'file' => 'archives.php', 'label' => 'Archives'],
+      ['href' => 'standalone_tasks.php', 'files' => ['standalone_tasks.php', 'standalone_task_save.php', 'standalone_task_delete.php', 'standalone_task_reorder.php'], 'label' => 'Tasks'],
     ], $current); ?>
     <?php render_menu_dropdown('Purchasing', [
       ['href' => 'vendors.php', 'files' => ['vendors.php', 'vendor_form.php', 'vendor_details.php'], 'label' => 'Vendors'],
