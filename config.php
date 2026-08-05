@@ -3,6 +3,8 @@
 
 require_once __DIR__ . '/bootstrap_env.php';
 
+//echo 'Loading .env from: ' . __DIR__ . '/.env'; die();
+
 if (!class_exists(\Dotenv\Dotenv::class)) {
   $autoload = __DIR__ . '/vendor/autoload.php';
   if (is_file($autoload)) {
