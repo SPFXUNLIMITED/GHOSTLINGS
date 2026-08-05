@@ -214,44 +214,57 @@ if ($search !== '') {
 
 $query_sql = "
   SELECT
-    c.id,
-    c.first_name,
-    c.last_name,
-    c.company,
-    c.phone,
-    c.email,
-    c.followup_flagged,
-    MAX(COALESCE(sr.completed_at, sr.updated_at)) AS last_service_date,
-    (
-      SELECT MAX(cl.logged_at)
-      FROM contacts_log cl
-      WHERE cl.customer_id = c.id
-    ) AS last_contact_date,
-    (
-      SELECT cl2.contact_type
-      FROM contacts_log cl2
-      WHERE cl2.customer_id = c.id
-      ORDER BY cl2.logged_at DESC
-      LIMIT 1
-    ) AS last_contact_type
-  FROM customers c
-  LEFT JOIN service_requests sr
-    ON sr.customer_id = c.id
-    AND sr.request_status = 'completed'
+    crm.id,
+    crm.first_name,
+    crm.last_name,
+    crm.company,
+    crm.phone,
+    crm.email,
+    crm.followup_flagged,
+    crm.last_service_date,
+    crm.last_contact_date,
+    crm.last_contact_type
+  FROM (
+    SELECT
+      c.id,
+      c.first_name,
+      c.last_name,
+      c.company,
+      c.phone,
+      c.email,
+      c.followup_flagged,
+      MAX(COALESCE(sr.completed_at, sr.updated_at)) AS last_service_date,
+      (
+        SELECT MAX(cl.logged_at)
+        FROM contacts_log cl
+        WHERE cl.customer_id = c.id
+      ) AS last_contact_date,
+      (
+        SELECT cl2.contact_type
+        FROM contacts_log cl2
+        WHERE cl2.customer_id = c.id
+        ORDER BY cl2.logged_at DESC, cl2.id DESC
+        LIMIT 1
+      ) AS last_contact_type
+    FROM customers c
+    LEFT JOIN service_requests sr
+      ON sr.customer_id = c.id
+      AND sr.request_status = 'completed'
+    GROUP BY
+      c.id, c.first_name, c.last_name, c.company, c.phone, c.email, c.followup_flagged
+  ) crm
   WHERE (
-    c.followup_flagged = 1
-    OR EXISTS (
-      SELECT 1 FROM service_requests sr2
-      WHERE sr2.customer_id = c.id AND sr2.request_status = 'completed'
-    )
+    crm.followup_flagged = 1
+    OR crm.last_service_date IS NOT NULL
   )
   $search_sql
-  GROUP BY
-    c.id, c.first_name, c.last_name, c.company, c.phone, c.email, c.followup_flagged
   ORDER BY
-    last_contact_date IS NOT NULL ASC,
-    last_contact_date ASC,
-    last_service_date DESC
+    crm.last_contact_date IS NOT NULL ASC,
+    crm.last_contact_date ASC,
+    crm.last_service_date DESC,
+    crm.last_name ASC,
+    crm.first_name ASC,
+    crm.id ASC
 ";
 
 $stmt = $pdo->prepare($query_sql);
