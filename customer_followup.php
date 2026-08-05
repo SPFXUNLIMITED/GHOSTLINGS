@@ -70,7 +70,7 @@ $rows = $pdo->query("
     c.company,
     c.phone,
     c.email,
-    MAX(sr.completed_at) AS last_service_date,
+    MAX(COALESCE(sr.completed_at, sr.updated_at)) AS last_service_date,
     (
       SELECT MAX(cl.logged_at)
       FROM contacts_log cl
