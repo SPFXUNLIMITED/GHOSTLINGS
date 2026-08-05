@@ -58,7 +58,7 @@ function crm_customer_display_name(array $row): string
 
 function crm_fetch_contact_history(PDO $pdo, int $customerId, DateTimeZone $tz): array
 {
-    $stmt = $pdo->prepare("\n        SELECT\n            cl.id,\n            cl.contact_type,\n            cl.notes,\n            cl.logged_at,\n            COALESCE(NULLIF(u.contact_name, ''), u.username) AS logged_by_name\n        FROM contacts_log cl\n        LEFT JOIN users u ON u.id = cl.logged_by\n        WHERE cl.customer_id = ?\n        ORDER BY cl.logged_at DESC, cl.id DESC\n    ");
+    $stmt = $pdo->prepare("\n        SELECT\n            cl.id,\n            cl.contact_type,\n            cl.notes,\n            cl.logged_at,\n            cl.logged_by,\n            COALESCE(NULLIF(u.contact_name, ''), u.username) AS logged_by_name\n        FROM contacts_log cl\n        LEFT JOIN users u ON u.id = cl.logged_by\n        WHERE cl.customer_id = ?\n        ORDER BY cl.logged_at DESC, cl.id DESC\n    ");
     $stmt->execute([$customerId]);
 
     $history = [];
@@ -72,6 +72,7 @@ function crm_fetch_contact_history(PDO $pdo, int $customerId, DateTimeZone $tz):
             'date' => $dt ? $dt->format('m/d/Y') : '—',
             'time' => $dt ? $dt->format('g:i A') : '—',
             'notes' => (string) ($entry['notes'] ?? ''),
+            'logged_by' => isset($entry['logged_by']) && $entry['logged_by'] !== null ? (int) $entry['logged_by'] : null,
             'logged_by_name' => trim((string) ($entry['logged_by_name'] ?? '')),
         ];
     }
@@ -310,6 +311,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['action'] ?? '') =
     crm_json_response(['ok' => true, 'new_csrf' => $_SESSION['crm_csrf'], 'history' => crm_fetch_contact_history($pdo, $customerId, $tz)]);
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['action'] ?? '') === 'delete_contact_log') {
+    crm_verify_csrf();
+    $logId = (int) ($_POST['log_id'] ?? 0);
+    if ($logId <= 0) {
+        crm_json_response(['ok' => false, 'error' => 'Invalid log entry.'], 400);
+    }
+    $stmt = $pdo->prepare('SELECT customer_id, logged_by FROM contacts_log WHERE id = ?');
+    $stmt->execute([$logId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        crm_json_response(['ok' => false, 'error' => 'Log entry not found.'], 404);
+    }
+    if ((int) ($row['logged_by'] ?? 0) !== $userId) {
+        crm_json_response(['ok' => false, 'error' => 'You can only delete your own notes.'], 403);
+    }
+    $customerId = (int) $row['customer_id'];
+    $pdo->prepare('DELETE FROM contacts_log WHERE id = ?')->execute([$logId]);
+    $_SESSION['crm_csrf'] = bin2hex(random_bytes(24));
+    crm_json_response(['ok' => true, 'new_csrf' => $_SESSION['crm_csrf'], 'history' => crm_fetch_contact_history($pdo, $customerId, $tz)]);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['action'] ?? '') === 'toggle_flag') {
     crm_verify_csrf();
     $customerId = (int) ($_POST['customer_id'] ?? 0);
@@ -533,6 +555,9 @@ render_header('CRM');
 .crm-history-type{font-weight:700;color:#0f172a;}
 .crm-history-content{white-space:pre-wrap;color:#111827;line-height:1.45;}
 .crm-history-empty{padding:28px 20px;text-align:center;color:#64748b;background:#fff;border:1px dashed #cbd5e1;border-radius:10px;}
+.crm-note-actions{margin-top:10px;display:flex;gap:8px;}
+.crm-delete-note-btn{font-size:.82em;padding:3px 10px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;color:#dc2626;cursor:pointer;}
+.crm-delete-note-btn:hover{background:#fef2f2;border-color:#fca5a5;}
 .crm-compose-form{border-top:1px solid #e5e7eb;padding:16px 24px 20px;background:#fff;}
 .crm-compose-form textarea{width:100%;resize:vertical;min-height:92px;}
 .crm-compose-actions{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:12px;flex-wrap:wrap;}
@@ -541,6 +566,7 @@ render_header('CRM');
 
 <script>
 (function () {
+  var currentUserId = <?= (int) $userId ?>;
   var csrfInput = document.getElementById('crm-csrf');
   var viewLogCsrf = document.getElementById('view-log-csrf');
   var sendEmailCsrf = document.getElementById('send-email-csrf');
@@ -572,8 +598,35 @@ render_header('CRM');
       var icon = entry.type === 'call' ? '📞' : (entry.type === 'email' ? '✉️' : '📝');
       var notes = entry.notes && entry.notes.trim() !== '' ? escapeHtml(entry.notes).replace(/\n/g, '<br>') : '<span class="muted">No details provided.</span>';
       var by = entry.logged_by_name && entry.logged_by_name.trim() !== '' ? '<span>By: ' + escapeHtml(entry.logged_by_name) + '</span>' : '';
-      return '<article class="crm-history-card"><div class="crm-history-meta"><span class="crm-history-type">' + icon + ' ' + escapeHtml(entry.type_label || 'Note') + '</span><span>Date: ' + escapeHtml(entry.date || '—') + '</span><span>Time: ' + escapeHtml(entry.time || '—') + '</span>' + by + '</div><div class="crm-history-content">' + notes + '</div></article>';
+      var deleteBtn = (currentUserId > 0 && entry.logged_by === currentUserId)
+        ? '<button type="button" class="btn crm-delete-note-btn" data-log-id="' + parseInt(entry.id, 10) + '" aria-label="Delete note">🗑 Delete</button>'
+        : '';
+      return '<article class="crm-history-card"><div class="crm-history-meta"><span class="crm-history-type">' + icon + ' ' + escapeHtml(entry.type_label || 'Note') + '</span><span>Date: ' + escapeHtml(entry.date || '—') + '</span><span>Time: ' + escapeHtml(entry.time || '—') + '</span>' + by + '</div><div class="crm-history-content">' + notes + '</div>' + (deleteBtn ? '<div class="crm-note-actions">' + deleteBtn + '</div>' : '') + '</article>';
     }).join('');
+    historyList.querySelectorAll('.crm-delete-note-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (!confirm('Delete this note? This cannot be undone.')) return;
+        var logId = btn.dataset.logId;
+        btn.disabled = true;
+        btn.textContent = 'Deleting…';
+        var formData = new FormData();
+        formData.append('action', 'delete_contact_log');
+        formData.append('log_id', logId);
+        formData.append('csrf_token', viewLogCsrf ? viewLogCsrf.value : (csrfInput ? csrfInput.value : ''));
+        fetch('crm.php', { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: formData })
+          .then(function (resp) { return resp.json(); })
+          .then(function (json) {
+            if (!json || !json.ok) throw new Error(json && json.error ? json.error : 'An error occurred.');
+            updateCsrf(json.new_csrf || '');
+            renderHistory(json.history || []);
+          })
+          .catch(function (err) {
+            btn.disabled = false;
+            btn.textContent = '🗑 Delete';
+            alert(err.message || 'Network error. Please try again.');
+          });
+      });
+    });
   }
 
   function bindLogContactButtons() {
