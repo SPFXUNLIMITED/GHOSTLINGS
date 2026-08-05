@@ -90,6 +90,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
   exit;
 }
 
+// ── AJAX: search all customers (for "Add to CRM") ────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['customer_search']) && $_GET['customer_search'] === '1') {
+  header('Content-Type: application/json; charset=UTF-8');
+  header('X-Content-Type-Options: nosniff');
+
+  $cs_query = trim((string)($_GET['q'] ?? ''));
+  if ($cs_query === '') {
+    echo json_encode(['html' => '']);
+    exit;
+  }
+
+  $cs_escaped = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $cs_query);
+  $cs_like    = '%' . $cs_escaped . '%';
+
+  $cs_stmt = $pdo->prepare("
+    SELECT
+      c.id,
+      c.first_name,
+      c.last_name,
+      c.company,
+      c.phone,
+      c.email,
+      c.followup_flagged
+    FROM customers c
+    WHERE (
+      c.first_name LIKE :q ESCAPE '!'
+      OR c.last_name LIKE :q ESCAPE '!'
+      OR CONCAT(c.first_name,' ',c.last_name) LIKE :q ESCAPE '!'
+      OR c.company LIKE :q ESCAPE '!'
+    )
+    ORDER BY c.last_name, c.first_name, c.company
+    LIMIT 50
+  ");
+  $cs_stmt->bindValue(':q', $cs_like, PDO::PARAM_STR);
+  $cs_stmt->execute();
+  $cs_rows = $cs_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  ob_start();
+  foreach ($cs_rows as $cs_row):
+    $cs_name = trim((string)$cs_row['first_name'] . ' ' . (string)$cs_row['last_name']);
+    $cs_is_flagged = !empty($cs_row['followup_flagged']);
+    // Check if already in CRM via completed service requests
+    $chk = $pdo->prepare("SELECT 1 FROM service_requests WHERE customer_id = ? AND request_status = 'completed' LIMIT 1");
+    $chk->execute([$cs_row['id']]);
+    $has_completed = (bool)$chk->fetchColumn();
+    $already_in_crm = $cs_is_flagged || $has_completed;
+    ?>
+    <tr>
+      <td>
+        <a href="customer_details.php?id=<?= (int)$cs_row['id'] ?>">
+          <?= h($cs_name !== '' ? $cs_name : '(no name)') ?>
+        </a>
+      </td>
+      <td><?= h((string)$cs_row['company']) ?></td>
+      <td><?= h((string)$cs_row['phone']) ?></td>
+      <td><?= h((string)$cs_row['email']) ?></td>
+      <td>
+        <?php if ($already_in_crm): ?>
+          <span style="color:#166534; font-weight:600;">✓ In CRM</span>
+        <?php else: ?>
+          <button
+            type="button"
+            class="btn add-to-crm-btn"
+            data-customer-id="<?= (int)$cs_row['id'] ?>"
+            data-customer-name="<?= h($cs_name !== '' ? $cs_name : (string)$cs_row['company']) ?>"
+          >+ Add to CRM</button>
+        <?php endif; ?>
+      </td>
+    </tr>
+  <?php endforeach;
+  $html = ob_get_clean();
+
+  echo json_encode(['html' => $html]);
+  exit;
+}
+
 // ── AJAX: live search – return JSON for table rows ───────────────────────────
 $is_live_search = isset($_GET['live_search']) && $_GET['live_search'] === '1';
 
@@ -279,9 +355,59 @@ render_header('CRM');
   </div>
 </div>
 
-<div class="card" style="padding:0; overflow-x:auto;">
+<div class="card">
+  <form id="crm-search-form" method="get" action="crm.php" class="row" style="margin-bottom:4px;" role="search">
+    <input
+      id="crm-search-input"
+      type="text"
+      name="q"
+      value="<?= h($search) ?>"
+      placeholder="Filter CRM list by name or company…"
+      aria-label="Filter CRM list by name or company"
+      style="max-width:360px;"
+    />
+    <button type="submit" class="btn">Search</button>
+    <a
+      id="crm-search-clear"
+      class="btn"
+      href="crm.php"
+      <?= $search === '' ? 'style="display:none;"' : '' ?>
+    >Clear</a>
+  </form>
+</div>
+
+<div class="card">
+  <h2 style="margin:0 0 12px; font-size:1.1em;">Add Customer to CRM</h2>
+  <div class="row" style="margin-bottom:8px;">
+    <input
+      id="add-crm-search-input"
+      type="text"
+      placeholder="Search customers by name or company…"
+      aria-label="Search customers to add to CRM"
+      style="max-width:360px;"
+    />
+    <span id="add-crm-searching" style="display:none; color:#6b7280; font-size:.9em;">Searching…</span>
+  </div>
+  <div id="add-crm-results" style="display:none; overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>Company</th>
+          <th>Phone</th>
+          <th>Email</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="add-crm-results-body"></tbody>
+    </table>
+  </div>
+  <p id="add-crm-empty" style="display:none;" class="muted">No customers found.</p>
+</div>
+
+<div id="crm-table-wrap" class="card" style="padding:0; overflow-x:auto;">
   <?php if (!$rows): ?>
-    <p class="muted" style="padding:16px;">No customers with completed service orders found.</p>
+    <p id="crm-no-results" class="muted" style="padding:16px;">No customers with completed service orders found.</p>
   <?php else: ?>
   <table>
     <thead>
@@ -297,66 +423,7 @@ render_header('CRM');
         <th>Actions</th>
       </tr>
     </thead>
-    <tbody>
-    <?php foreach ($rows as $row):
-      $days = $row['days_since_contact'];
-
-      if ($days === null) {
-        // Never contacted — treat as worst case
-        $row_style = 'background:#fef2f2;'; // red
-        $status_label = 'Never Contacted';
-        $status_color = '#dc2626';
-      } elseif ($days > 365) {
-        $row_style = 'background:#fef2f2;'; // red
-        $status_label = 'Overdue';
-        $status_color = '#dc2626';
-      } elseif ($days >= 180) {
-        $row_style = 'background:#fefce8;'; // yellow
-        $status_label = 'Due Soon';
-        $status_color = '#b45309';
-      } else {
-        $row_style = 'background:#f0fdf4;'; // green
-        $status_label = 'OK';
-        $status_color = '#166534';
-      }
-
-      $full_name = trim((string)$row['first_name'] . ' ' . (string)$row['last_name']);
-      $lsd_display = $row['last_service_date'] !== null ? fmt_date_mdY(substr($row['last_service_date'], 0, 10)) : '—';
-      $lcd_display = $row['last_contact_date'] !== null ? fmt_date_mdY(substr($row['last_contact_date'], 0, 10)) : '—';
-      $days_display = $days !== null ? $days : '—';
-    ?>
-      <tr style="<?= h($row_style) ?>">
-        <td>
-          <a href="customer_details.php?id=<?= (int)$row['id'] ?>">
-            <?= h($full_name !== '' ? $full_name : '(no name)') ?>
-          </a>
-        </td>
-        <td><?= h($row['company']) ?></td>
-        <td><?= h($row['phone']) ?></td>
-        <td>
-          <?php if (trim((string)$row['email']) !== ''): ?>
-            <a href="mailto:<?= h($row['email']) ?>"><?= h($row['email']) ?></a>
-          <?php else: ?>
-            <span class="muted">—</span>
-          <?php endif; ?>
-        </td>
-        <td><?= h($lsd_display) ?></td>
-        <td><?= h($lcd_display) ?></td>
-        <td><?= h((string)$days_display) ?></td>
-        <td>
-          <strong style="color:<?= h($status_color) ?>;"><?= h($status_label) ?></strong>
-        </td>
-        <td>
-          <button
-            type="button"
-            class="btn log-contact-btn"
-            data-customer-id="<?= (int)$row['id'] ?>"
-            data-customer-name="<?= h($full_name !== '' ? $full_name : (string)$row['company']) ?>"
-          >Log Contact</button>
-        </td>
-      </tr>
-    <?php endforeach; ?>
-    </tbody>
+    <tbody id="crm-table-body"><?php render_followup_table_rows($rows); ?></tbody>
   </table>
   <?php endif; ?>
 </div>
@@ -484,6 +551,233 @@ render_header('CRM');
     });
   });
 })();
+
+// ── CRM table live search ─────────────────────────────────────────────────────
+(function () {
+  var crmForm      = document.getElementById('crm-search-form');
+  var crmInput     = document.getElementById('crm-search-input');
+  var crmClear     = document.getElementById('crm-search-clear');
+  var crmTableBody = document.getElementById('crm-table-body');
+  var csrfInput    = document.getElementById('log-csrf');
+
+  if (!crmForm || !crmInput) return;
+
+  var DEBOUNCE = 250;
+  var timer = null;
+  var controller = null;
+  var lastQuery = crmInput.value.trim();
+
+  function updateClear() {
+    if (crmClear) crmClear.style.display = crmInput.value.trim() === '' ? 'none' : '';
+  }
+
+  function runSearch() {
+    var q = crmInput.value.trim();
+    updateClear();
+    if (q === lastQuery) return;
+    lastQuery = q;
+
+    if (controller) controller.abort();
+    controller = new AbortController();
+
+    var url = new URL('crm.php', window.location.href);
+    if (q !== '') url.searchParams.set('q', q);
+    url.searchParams.set('live_search', '1');
+
+    fetch(url.toString(), {
+      method: 'GET',
+      credentials: 'same-origin',
+      signal: controller.signal,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(function (resp) { return resp.json(); })
+    .then(function (payload) {
+      if (payload && typeof payload.tableRowsHtml === 'string' && crmTableBody) {
+        crmTableBody.innerHTML = payload.tableRowsHtml;
+        bindLogContactBtns();
+        bindRemoveFlagBtns();
+      }
+      var nextUrl = new URL(window.location.href);
+      if (q === '') { nextUrl.searchParams.delete('q'); } else { nextUrl.searchParams.set('q', q); }
+      window.history.replaceState(null, '', nextUrl.toString());
+    })
+    .catch(function (err) { if (err && err.name === 'AbortError') return; });
+  }
+
+  crmInput.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(runSearch, DEBOUNCE);
+  });
+
+  crmForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    clearTimeout(timer);
+    runSearch();
+  });
+
+  if (crmClear) {
+    crmClear.addEventListener('click', function (e) {
+      e.preventDefault();
+      crmInput.value = '';
+      clearTimeout(timer);
+      runSearch();
+      crmInput.focus();
+    });
+  }
+})();
+
+// ── Toggle flag (add/remove from CRM) + button binding ───────────────────────
+function toggleFlag(customerId, flagValue, btn) {
+  var csrfInput = document.getElementById('log-csrf');
+  if (!csrfInput) return;
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = flagValue ? 'Adding…' : 'Removing…';
+  }
+
+  var data = new FormData();
+  data.append('action', 'toggle_flag');
+  data.append('customer_id', customerId);
+  data.append('flag_value', flagValue);
+  data.append('csrf_token', csrfInput.value);
+
+  fetch('crm.php', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    body: data
+  })
+  .then(function (resp) { return resp.json(); })
+  .then(function (json) {
+    if (json && json.ok) {
+      if (json.new_csrf) csrfInput.value = json.new_csrf;
+      if (flagValue) {
+        // Reload the CRM table to show the newly added customer
+        window.location.reload();
+      } else {
+        // Reload to remove unflagged customer (if it no longer qualifies)
+        window.location.reload();
+      }
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = flagValue ? '+ Add to CRM' : 'Remove Flag'; }
+      alert((json && json.error) ? json.error : 'An error occurred.');
+    }
+  })
+  .catch(function () {
+    if (btn) { btn.disabled = false; btn.textContent = flagValue ? '+ Add to CRM' : 'Remove Flag'; }
+    alert('Network error. Please try again.');
+  });
+}
+
+function bindLogContactBtns() {
+  document.querySelectorAll('.log-contact-btn').forEach(function (btn) {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', function () {
+      var overlay = document.getElementById('log-contact-overlay');
+      var custInput = document.getElementById('log-customer-id');
+      var title = document.getElementById('log-contact-title');
+      var notesArea = document.getElementById('log-notes');
+      var typeSelect = document.getElementById('log-contact-type');
+      var errBox = document.getElementById('log-contact-error');
+      var submitBtn = document.getElementById('log-submit-btn');
+      if (!overlay || !custInput) return;
+      custInput.value = btn.dataset.customerId;
+      title.textContent = 'Log Contact — ' + btn.dataset.customerName;
+      notesArea.value = '';
+      typeSelect.value = 'call';
+      errBox.style.display = 'none';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Save Log Entry';
+      overlay.style.display = 'flex';
+      typeSelect.focus();
+    });
+  });
+}
+
+function bindRemoveFlagBtns() {
+  document.querySelectorAll('.remove-flag-btn').forEach(function (btn) {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', function () {
+      toggleFlag(btn.dataset.customerId, 0, btn);
+    });
+  });
+}
+
+// ── Add to CRM search ─────────────────────────────────────────────────────────
+(function () {
+  var input      = document.getElementById('add-crm-search-input');
+  var resultsDiv = document.getElementById('add-crm-results');
+  var resultsBody= document.getElementById('add-crm-results-body');
+  var emptyMsg   = document.getElementById('add-crm-empty');
+  var searching  = document.getElementById('add-crm-searching');
+
+  if (!input || !resultsDiv || !resultsBody) return;
+
+  var DEBOUNCE = 250;
+  var timer = null;
+  var controller = null;
+  var lastQuery = '';
+
+  function runSearch() {
+    var q = input.value.trim();
+    if (q === lastQuery) return;
+    lastQuery = q;
+
+    if (q === '') {
+      resultsDiv.style.display = 'none';
+      if (emptyMsg) emptyMsg.style.display = 'none';
+      if (searching) searching.style.display = 'none';
+      resultsBody.innerHTML = '';
+      return;
+    }
+
+    if (controller) controller.abort();
+    controller = new AbortController();
+    if (searching) searching.style.display = '';
+
+    var url = new URL('crm.php', window.location.href);
+    url.searchParams.set('customer_search', '1');
+    url.searchParams.set('q', q);
+
+    fetch(url.toString(), {
+      method: 'GET',
+      credentials: 'same-origin',
+      signal: controller.signal,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(function (resp) { return resp.json(); })
+    .then(function (payload) {
+      if (searching) searching.style.display = 'none';
+      if (!payload || typeof payload.html !== 'string') return;
+      resultsBody.innerHTML = payload.html;
+      var hasRows = resultsBody.children.length > 0;
+      resultsDiv.style.display = hasRows ? '' : 'none';
+      if (emptyMsg) emptyMsg.style.display = hasRows ? 'none' : '';
+
+      // Bind "Add to CRM" buttons
+      resultsBody.querySelectorAll('.add-to-crm-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          toggleFlag(btn.dataset.customerId, 1, btn);
+        });
+      });
+    })
+    .catch(function (err) {
+      if (err && err.name === 'AbortError') return;
+      if (searching) searching.style.display = 'none';
+    });
+  }
+
+  input.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(runSearch, DEBOUNCE);
+  });
+})();
+
+// Bind remove-flag buttons on initial page load
+bindRemoveFlagBtns();
 </script>
 
 <?php render_footer(); ?>
