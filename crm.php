@@ -599,7 +599,7 @@ render_header('CRM');
       var notes = entry.notes && entry.notes.trim() !== '' ? escapeHtml(entry.notes).replace(/\n/g, '<br>') : '<span class="muted">No details provided.</span>';
       var by = entry.logged_by_name && entry.logged_by_name.trim() !== '' ? '<span>By: ' + escapeHtml(entry.logged_by_name) + '</span>' : '';
       var deleteBtn = (currentUserId > 0 && entry.logged_by === currentUserId)
-        ? '<button type="button" class="btn crm-delete-note-btn" data-log-id="' + (entry.id | 0) + '" aria-label="Delete note">🗑 Delete</button>'
+        ? '<button type="button" class="btn crm-delete-note-btn" data-log-id="' + parseInt(entry.id, 10) + '" aria-label="Delete note">🗑 Delete</button>'
         : '';
       return '<article class="crm-history-card"><div class="crm-history-meta"><span class="crm-history-type">' + icon + ' ' + escapeHtml(entry.type_label || 'Note') + '</span><span>Date: ' + escapeHtml(entry.date || '—') + '</span><span>Time: ' + escapeHtml(entry.time || '—') + '</span>' + by + '</div><div class="crm-history-content">' + notes + '</div>' + (deleteBtn ? '<div class="crm-note-actions">' + deleteBtn + '</div>' : '') + '</article>';
     }).join('');
