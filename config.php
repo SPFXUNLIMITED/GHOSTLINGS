@@ -1,6 +1,8 @@
 <?php
 // config.php
 
+require_once __DIR__ . '/bootstrap_env.php';
+
 if (!class_exists(\Dotenv\Dotenv::class)) {
   $autoload = __DIR__ . '/vendor/autoload.php';
   if (is_file($autoload)) {
