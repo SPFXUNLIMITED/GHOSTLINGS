@@ -79,6 +79,37 @@ function crm_fetch_contact_history(PDO $pdo, int $customerId, DateTimeZone $tz):
     return $history;
 }
 
+function crm_fetch_contact_history_map(PDO $pdo, array $customerIds, DateTimeZone $tz): array
+{
+    $customerIds = array_values(array_unique(array_map('intval', $customerIds)));
+    $customerIds = array_filter($customerIds, static fn(int $id): bool => $id > 0);
+    if ($customerIds === []) {
+        return [];
+    }
+
+    $placeholders = implode(',', array_fill(0, count($customerIds), '?'));
+    $stmt = $pdo->prepare("\n        SELECT\n            cl.customer_id,\n            cl.id,\n            cl.contact_type,\n            cl.notes,\n            cl.logged_at,\n            u.username AS logged_by_name\n        FROM contacts_log cl\n        LEFT JOIN users u ON u.id = cl.logged_by\n        WHERE cl.customer_id IN ({$placeholders})\n        ORDER BY cl.customer_id ASC, cl.logged_at DESC, cl.id DESC\n    ");
+    $stmt->execute($customerIds);
+
+    $historyMap = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $entry) {
+        $loggedAt = (string) ($entry['logged_at'] ?? '');
+        $dt = $loggedAt !== '' ? new DateTime($loggedAt, $tz) : null;
+        $customerId = (int) ($entry['customer_id'] ?? 0);
+        $historyMap[$customerId][] = [
+            'id' => (int) $entry['id'],
+            'type' => (string) ($entry['contact_type'] ?? 'note'),
+            'type_label' => crm_contact_type_label((string) ($entry['contact_type'] ?? 'note')),
+            'date' => $dt ? $dt->format('m/d/Y') : '—',
+            'time' => $dt ? $dt->format('g:i A') : '—',
+            'notes' => (string) ($entry['notes'] ?? ''),
+            'logged_by_name' => trim((string) ($entry['logged_by_name'] ?? '')),
+        ];
+    }
+
+    return $historyMap;
+}
+
 function crm_send_email(PDO $pdo, int $customerId, string $to, string $subject, string $messageHtml, string $messageText, ?string &$errorMessage): bool
 {
     $smtpHost = trim((string) env_value('SMTP_HOST', ''));
@@ -200,6 +231,7 @@ function crm_fetch_rows(PDO $pdo, string $search, DateTimeZone $tz): array
     $stmt->execute();
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    $historyMap = crm_fetch_contact_history_map($pdo, array_column($rows, 'id'), $tz);
     $today = new DateTime('today', $tz);
     foreach ($rows as &$row) {
         if (!empty($row['last_contact_date'])) {
@@ -209,7 +241,7 @@ function crm_fetch_rows(PDO $pdo, string $search, DateTimeZone $tz): array
         } else {
             $row['days_since_contact'] = null;
         }
-        $row['history'] = crm_fetch_contact_history($pdo, (int) $row['id'], $tz);
+        $row['history'] = $historyMap[(int) $row['id']] ?? [];
     }
     unset($row);
 
