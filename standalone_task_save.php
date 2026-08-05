@@ -4,6 +4,10 @@ require __DIR__ . '/auth.php';
 
 require_login();
 
+if (session_status() !== PHP_SESSION_ACTIVE) {
+  session_start();
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   header('Location: standalone_tasks.php');
   exit;
@@ -11,6 +15,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $id = (int)($_POST['id'] ?? 0);
 $filter = (string)($_POST['filter'] ?? 'all');
+$csrf_token = (string)($_POST['csrf_token'] ?? '');
+if (!hash_equals((string)($_SESSION['standalone_tasks_csrf'] ?? ''), $csrf_token)) {
+  http_response_code(400);
+  exit('Invalid request token.');
+}
 $description = trim((string)($_POST['description'] ?? ''));
 $status = (string)($_POST['status'] ?? 'pending');
 $priority = (string)($_POST['priority'] ?? 'medium');
@@ -38,9 +47,18 @@ if ($id > 0) {
   $stmt = $pdo->prepare('UPDATE standalone_tasks SET description = ?, status = ?, priority = ?, due_date = ? WHERE id = ?');
   $stmt->execute([$description, $status, $priority, $due_value, $id]);
 } else {
-  $sort_order = (int)$pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM standalone_tasks')->fetchColumn();
-  $stmt = $pdo->prepare('INSERT INTO standalone_tasks (description, status, priority, due_date, sort_order) VALUES (?, ?, ?, ?, ?)');
-  $stmt->execute([$description, $status, $priority, $due_value, $sort_order]);
+  $pdo->beginTransaction();
+  try {
+    $sort_order = (int)$pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM standalone_tasks FOR UPDATE')->fetchColumn();
+    $stmt = $pdo->prepare('INSERT INTO standalone_tasks (description, status, priority, due_date, sort_order) VALUES (?, ?, ?, ?, ?)');
+    $stmt->execute([$description, $status, $priority, $due_value, $sort_order]);
+    $pdo->commit();
+  } catch (Throwable $e) {
+    if ($pdo->inTransaction()) {
+      $pdo->rollBack();
+    }
+    throw $e;
+  }
 }
 
 header('Location: standalone_tasks.php' . ($filter === 'today' ? '?filter=today' : ''));

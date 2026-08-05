@@ -4,9 +4,19 @@ require __DIR__ . '/auth.php';
 
 require_login();
 
+if (session_status() !== PHP_SESSION_ACTIVE) {
+  session_start();
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   http_response_code(405);
   exit('Method Not Allowed');
+}
+
+$csrf_token = (string)($_POST['csrf_token'] ?? '');
+if (!hash_equals((string)($_SESSION['standalone_tasks_csrf'] ?? ''), $csrf_token)) {
+  http_response_code(400);
+  exit('Invalid request token');
 }
 
 $ids = $_POST['task_ids'] ?? [];

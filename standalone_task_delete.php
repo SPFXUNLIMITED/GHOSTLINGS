@@ -4,6 +4,10 @@ require __DIR__ . '/auth.php';
 
 require_login();
 
+if (session_status() !== PHP_SESSION_ACTIVE) {
+  session_start();
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   header('Location: standalone_tasks.php');
   exit;
@@ -11,6 +15,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $id = (int)($_POST['id'] ?? 0);
 $filter = (string)($_POST['filter'] ?? 'all');
+$csrf_token = (string)($_POST['csrf_token'] ?? '');
+if (!hash_equals((string)($_SESSION['standalone_tasks_csrf'] ?? ''), $csrf_token)) {
+  http_response_code(400);
+  exit('Invalid request token.');
+}
 if ($id > 0) {
   $stmt = $pdo->prepare('DELETE FROM standalone_tasks WHERE id = ?');
   $stmt->execute([$id]);

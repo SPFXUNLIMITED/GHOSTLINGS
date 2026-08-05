@@ -5,6 +5,14 @@ require __DIR__ . '/auth.php';
 
 require_login();
 
+if (session_status() !== PHP_SESSION_ACTIVE) {
+  session_start();
+}
+if (empty($_SESSION['standalone_tasks_csrf'])) {
+  $_SESSION['standalone_tasks_csrf'] = bin2hex(random_bytes(24));
+}
+$standalone_tasks_csrf = (string)$_SESSION['standalone_tasks_csrf'];
+
 $status_options = [
   'pending' => 'Pending',
   'in-progress' => 'In Progress',
@@ -128,6 +136,7 @@ render_header('Tasks');
                 <form method="post" action="standalone_task_delete.php" class="standalone-task-inline-form" onsubmit="return confirm('Delete this task?');">
                   <input type="hidden" name="id" value="<?= (int)$task['id'] ?>">
                   <input type="hidden" name="filter" value="<?= h($filter) ?>">
+                  <input type="hidden" name="csrf_token" value="<?= h($standalone_tasks_csrf) ?>">
                   <button type="submit" class="btn danger">Delete</button>
                 </form>
               </div>
@@ -150,6 +159,7 @@ render_header('Tasks');
       <div class="standalone-task-modal-body">
         <input type="hidden" name="id" id="standalone-task-id" value="">
         <input type="hidden" name="filter" value="<?= h($filter) ?>">
+        <input type="hidden" name="csrf_token" value="<?= h($standalone_tasks_csrf) ?>">
         <div class="form-grid">
           <div class="full">
             <label for="standalone-task-description-input">Description</label>
@@ -377,6 +387,7 @@ render_header('Tasks');
     var body = new URLSearchParams();
     ids.forEach(function (id) { body.append('task_ids[]', id); });
     body.append('filter', <?= json_encode($filter) ?>);
+    body.append('csrf_token', <?= json_encode($standalone_tasks_csrf) ?>);
 
     fetch('standalone_task_reorder.php', {
       method: 'POST',
