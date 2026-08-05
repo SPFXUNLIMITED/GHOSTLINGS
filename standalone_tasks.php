@@ -3,11 +3,12 @@ require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 
-require_login();
-
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
 }
+
+require_login();
+
 if (empty($_SESSION['standalone_tasks_csrf'])) {
   $_SESSION['standalone_tasks_csrf'] = bin2hex(random_bytes(24));
 }

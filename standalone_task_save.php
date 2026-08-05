@@ -2,11 +2,12 @@
 require __DIR__ . '/db.php';
 require __DIR__ . '/auth.php';
 
-require_login();
-
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
 }
+
+require_login();
+
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   header('Location: standalone_tasks.php');
