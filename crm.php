@@ -313,6 +313,24 @@ function crm_fetch_contact_history(PDO $pdo, int $customer_id): array {
   return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+function crm_history_payload(PDO $pdo, int $customer_id): string {
+  $history = array_map(static function (array $entry): array {
+    $logged_at = (string)($entry['logged_at'] ?? '');
+    $dt = $logged_at !== '' ? new DateTime($logged_at, new DateTimeZone(APP_TZ)) : null;
+    return [
+      'id' => (int)$entry['id'],
+      'contact_type' => (string)$entry['contact_type'],
+      'type_label' => crm_contact_type_label((string)$entry['contact_type']),
+      'notes' => (string)($entry['notes'] ?? ''),
+      'date' => $dt ? $dt->format('m/d/Y') : '—',
+      'time' => $dt ? $dt->format('g:i A') : '—',
+      'logged_by_name' => trim((string)($entry['logged_by_name'] ?? '')),
+    ];
+  }, crm_fetch_contact_history($pdo, $customer_id));
+
+  return json_encode($history, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?: '[]';
+}
+
 // ── Helper: render table rows (used for both full page and live search) ───────
 function render_followup_table_rows(array $rows): void {
   $today = new DateTime('today', new DateTimeZone(APP_TZ));
@@ -379,19 +397,7 @@ function render_followup_table_rows(array $rows): void {
             class="btn view-log-btn"
             data-customer-id="<?= (int)$row['id'] ?>"
             data-customer-name="<?= h($full_name !== '' ? $full_name : (string)$row['company']) ?>"
-            data-history='<?= h(json_encode(array_map(static function (array $entry): array {
-              $logged_at = (string)($entry['logged_at'] ?? '');
-              $dt = $logged_at !== '' ? new DateTime($logged_at, new DateTimeZone(APP_TZ)) : null;
-              return [
-                'id' => (int)$entry['id'],
-                'contact_type' => (string)$entry['contact_type'],
-                'type_label' => crm_contact_type_label((string)$entry['contact_type']),
-                'notes' => (string)($entry['notes'] ?? ''),
-                'date' => $dt ? $dt->format('m/d/Y') : '—',
-                'time' => $dt ? $dt->format('g:i A') : '—',
-                'logged_by_name' => trim((string)($entry['logged_by_name'] ?? '')),
-              ];
-            }, crm_fetch_contact_history($GLOBALS['pdo'], (int)$row['id'])), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?: '[]') ?>'
+            data-history='<?= h(crm_history_payload($GLOBALS['pdo'], (int)$row['id'])) ?>'
             style="margin-top:4px;"
           >View Log</button>
           <?php if ($is_flagged): ?>
@@ -693,6 +699,9 @@ render_header('CRM');
   function closeModal() {
     overlay.style.display = 'none';
   }
+
+  window.openHistoryModal = openHistoryModal;
+  window.openCrmLogContactModal = openModal;
 
   document.querySelectorAll('.log-contact-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
