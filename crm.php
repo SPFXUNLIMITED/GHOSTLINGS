@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
       'type_label' => crm_contact_type_label((string)$entry['contact_type']),
       'date' => $dt ? $dt->format('m/d/Y') : '—',
       'time' => $dt ? $dt->format('g:i A') : '—',
-      'notes' => (string)($entry['notes'] ?? ''),
+      'notes' => crm_obfuscate_email_for_html((string)($entry['notes'] ?? '')),
       'logged_by_name' => trim((string)($entry['logged_by_name'] ?? '')),
     ];
   }
@@ -342,6 +342,15 @@ function crm_history_payload(PDO $pdo, int $customer_id): string {
   }, crm_fetch_contact_history($pdo, $customer_id));
 
   return json_encode($history, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?: '[]';
+}
+
+function crm_obfuscate_email_for_html(string $value): string {
+  $value = trim($value);
+  if ($value === '' || strpos($value, '@') === false) {
+    return $value;
+  }
+
+  return str_replace(['@', '.'], [' at ', ' dot '], $value);
 }
 
 // ── Helper: render table rows (used for both full page and live search) ───────
