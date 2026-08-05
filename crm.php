@@ -269,13 +269,13 @@ foreach ($rows as &$row) {
 }
 unset($row);
 
-render_header('Customer Follow-Up');
+render_header('CRM');
 ?>
 
 <div class="card page-header">
   <div class="page-header-body">
-    <h1>Customer Follow-Up</h1>
-    <p class="muted">Customers with at least one completed service order. Sorted by days since last contact (oldest first).</p>
+    <h1>Customer Relationship Management</h1>
+    <p class="muted">Customers with at least one completed service order or manually flagged for follow-up. Sorted by days since last contact (oldest first).</p>
   </div>
 </div>
 
@@ -448,7 +448,7 @@ render_header('Customer Follow-Up');
 
     var data = new FormData(form);
 
-    fetch('customer_followup.php', {
+    fetch('crm.php', {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'X-Requested-With': 'XMLHttpRequest' },
