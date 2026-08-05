@@ -53,9 +53,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $now,
   ]);
 
+  $history_stmt = $pdo->prepare("
+    SELECT
+      cl.id,
+      cl.contact_type,
+      cl.notes,
+      cl.logged_at,
+      COALESCE(u.username, CONCAT_WS(' ', NULLIF(u.first_name, ''), NULLIF(u.last_name, ''))) AS logged_by_name
+    FROM contacts_log cl
+    LEFT JOIN users u ON u.id = cl.logged_by
+    WHERE cl.customer_id = ?
+    ORDER BY cl.logged_at DESC, cl.id DESC
+  ");
+  $history_stmt->execute([$customer_id]);
+  $history = [];
+  foreach ($history_stmt->fetchAll(PDO::FETCH_ASSOC) as $entry) {
+    $logged_at = (string)($entry['logged_at'] ?? '');
+    $dt = $logged_at !== '' ? new DateTime($logged_at, $tz) : null;
+    $history[] = [
+      'id' => (int)$entry['id'],
+      'type' => (string)$entry['contact_type'],
+      'type_label' => crm_contact_type_label((string)$entry['contact_type']),
+      'date' => $dt ? $dt->format('m/d/Y') : '—',
+      'time' => $dt ? $dt->format('g:i A') : '—',
+      'notes' => (string)($entry['notes'] ?? ''),
+      'logged_by_name' => trim((string)($entry['logged_by_name'] ?? '')),
+    ];
+  }
+
   $_SESSION['followup_log_csrf'] = bin2hex(random_bytes(24));
 
-  echo json_encode(['ok' => true, 'new_csrf' => $_SESSION['followup_log_csrf']]);
+  echo json_encode(['ok' => true, 'new_csrf' => $_SESSION['followup_log_csrf'], 'history' => $history]);
   exit;
 }
 
@@ -257,6 +285,34 @@ if ($is_live_search) {
   exit;
 }
 
+function crm_contact_type_label(string $contact_type): string {
+  switch ($contact_type) {
+    case 'call':
+      return 'Phone Call';
+    case 'email':
+      return 'Email';
+    default:
+      return 'Note';
+  }
+}
+
+function crm_fetch_contact_history(PDO $pdo, int $customer_id): array {
+  $stmt = $pdo->prepare("
+    SELECT
+      cl.id,
+      cl.contact_type,
+      cl.notes,
+      cl.logged_at,
+      COALESCE(u.username, CONCAT_WS(' ', NULLIF(u.first_name, ''), NULLIF(u.last_name, ''))) AS logged_by_name
+    FROM contacts_log cl
+    LEFT JOIN users u ON u.id = cl.logged_by
+    WHERE cl.customer_id = ?
+    ORDER BY cl.logged_at DESC, cl.id DESC
+  ");
+  $stmt->execute([$customer_id]);
+  return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
 // ── Helper: render table rows (used for both full page and live search) ───────
 function render_followup_table_rows(array $rows): void {
   $today = new DateTime('today', new DateTimeZone(APP_TZ));
@@ -318,6 +374,26 @@ function render_followup_table_rows(array $rows): void {
             data-customer-id="<?= (int)$row['id'] ?>"
             data-customer-name="<?= h($full_name !== '' ? $full_name : (string)$row['company']) ?>"
           >Log Contact</button>
+          <button
+            type="button"
+            class="btn view-log-btn"
+            data-customer-id="<?= (int)$row['id'] ?>"
+            data-customer-name="<?= h($full_name !== '' ? $full_name : (string)$row['company']) ?>"
+            data-history='<?= h(json_encode(array_map(static function (array $entry): array {
+              $logged_at = (string)($entry['logged_at'] ?? '');
+              $dt = $logged_at !== '' ? new DateTime($logged_at, new DateTimeZone(APP_TZ)) : null;
+              return [
+                'id' => (int)$entry['id'],
+                'contact_type' => (string)$entry['contact_type'],
+                'type_label' => crm_contact_type_label((string)$entry['contact_type']),
+                'notes' => (string)($entry['notes'] ?? ''),
+                'date' => $dt ? $dt->format('m/d/Y') : '—',
+                'time' => $dt ? $dt->format('g:i A') : '—',
+                'logged_by_name' => trim((string)($entry['logged_by_name'] ?? '')),
+              ];
+            }, crm_fetch_contact_history($GLOBALS['pdo'], (int)$row['id'])), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?: '[]') ?>'
+            style="margin-top:4px;"
+          >View Log</button>
           <?php if ($is_flagged): ?>
             <button
               type="button"
@@ -428,6 +504,26 @@ render_header('CRM');
   <?php endif; ?>
 </div>
 
+<style>
+  .crm-log-history-modal{background:#fff;border-radius:12px;width:min(760px,96vw);max-height:88vh;box-shadow:0 16px 40px rgba(0,0,0,.24);display:flex;flex-direction:column;overflow:hidden;}
+  .crm-log-history-head{padding:20px 24px 16px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:12px;}
+  .crm-log-history-title{margin:0;font-size:1.2em;flex:1;}
+  .crm-log-history-close{border:none;background:#f3f4f6;border-radius:999px;width:34px;height:34px;font-size:22px;cursor:pointer;color:#374151;}
+  .crm-log-history-scroll{padding:20px 24px;overflow-y:auto;flex:1;background:#f8fafc;}
+  .crm-log-history-list{display:flex;flex-direction:column;gap:14px;}
+  .crm-log-history-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;box-shadow:0 1px 2px rgba(15,23,42,.06);}
+  .crm-log-history-meta{display:flex;flex-wrap:wrap;gap:10px 16px;margin-bottom:8px;color:#475569;font-size:.92em;}
+  .crm-log-history-type{font-weight:700;color:#0f172a;}
+  .crm-log-history-content{white-space:pre-wrap;color:#111827;line-height:1.45;}
+  .crm-log-history-empty{padding:28px 20px;text-align:center;color:#64748b;background:#fff;border:1px dashed #cbd5e1;border-radius:10px;}
+  .crm-log-history-compose{border-top:1px solid #e5e7eb;padding:16px 24px 20px;background:#fff;}
+  .crm-log-history-compose textarea{width:100%;resize:vertical;min-height:92px;}
+  .crm-log-history-compose-actions{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:12px;flex-wrap:wrap;}
+  @media (max-width: 640px) {
+    .crm-log-history-head,.crm-log-history-scroll,.crm-log-history-compose{padding-left:16px;padding-right:16px;}
+  }
+</style>
+
 <!-- ── Log Contact Modal ───────────────────────────────────────────────────── -->
 <div id="log-contact-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000; align-items:center; justify-content:center;">
   <div style="background:#fff; border-radius:8px; padding:28px 32px; width:100%; max-width:480px; box-shadow:0 8px 32px rgba(0,0,0,.2); position:relative;">
@@ -461,6 +557,32 @@ render_header('CRM');
   </div>
 </div>
 
+<!-- ── View Log Modal ─────────────────────────────────────────────────────── -->
+<div id="view-log-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1100; align-items:center; justify-content:center; padding:16px;">
+  <div class="crm-log-history-modal" role="dialog" aria-modal="true" aria-labelledby="view-log-title">
+    <div class="crm-log-history-head">
+      <h2 id="view-log-title" class="crm-log-history-title">Conversation Log</h2>
+      <button type="button" class="crm-log-history-close" id="view-log-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="crm-log-history-scroll">
+      <div id="view-log-list" class="crm-log-history-list"></div>
+    </div>
+    <form id="view-log-form" class="crm-log-history-compose">
+      <input type="hidden" id="view-log-customer-id" name="customer_id" value="" />
+      <input type="hidden" name="action" value="log_contact" />
+      <input type="hidden" id="view-log-csrf" name="csrf_token" value="<?= h($_SESSION['followup_log_csrf']) ?>" />
+      <input type="hidden" name="contact_type" value="note" />
+      <label for="view-log-notes" style="display:block; font-weight:600; margin-bottom:6px;">Add Note</label>
+      <textarea id="view-log-notes" name="notes" rows="4" placeholder="Add a new note…"></textarea>
+      <div id="view-log-error" class="alert error" style="display:none; margin-top:12px;"></div>
+      <div class="crm-log-history-compose-actions">
+        <span class="muted" style="font-size:.9em;">New notes stay visible while the history scrolls above.</span>
+        <button type="submit" class="btn primary" id="view-log-submit">Add Note</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 (function () {
   var overlay   = document.getElementById('log-contact-overlay');
@@ -473,6 +595,87 @@ render_header('CRM');
   var cancelBtn = document.getElementById('log-cancel-btn');
   var notesArea = document.getElementById('log-notes');
   var typeSelect= document.getElementById('log-contact-type');
+  var historyOverlay = document.getElementById('view-log-overlay');
+  var historyTitle = document.getElementById('view-log-title');
+  var historyList = document.getElementById('view-log-list');
+  var historyForm = document.getElementById('view-log-form');
+  var historyCustomerInput = document.getElementById('view-log-customer-id');
+  var historyCsrfInput = document.getElementById('view-log-csrf');
+  var historyNotes = document.getElementById('view-log-notes');
+  var historyError = document.getElementById('view-log-error');
+  var historySubmit = document.getElementById('view-log-submit');
+  var historyClose = document.getElementById('view-log-close');
+
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function renderHistory(entries) {
+    if (!historyList) return;
+    if (!entries || !entries.length) {
+      historyList.innerHTML = '<div class="crm-log-history-empty">No past notes yet.</div>';
+      return;
+    }
+
+    historyList.innerHTML = entries.map(function (entry) {
+      var icon = entry.type === 'call' ? '📞' : (entry.type === 'email' ? '✉️' : '📝');
+      var content = entry.notes && entry.notes.trim() !== ''
+        ? escapeHtml(entry.notes).replace(/\n/g, '<br>')
+        : '<span class="muted">No details provided.</span>';
+      var who = entry.logged_by_name && entry.logged_by_name.trim() !== ''
+        ? '<span>By: ' + escapeHtml(entry.logged_by_name) + '</span>'
+        : '';
+      return '' +
+        '<article class="crm-log-history-card">' +
+          '<div class="crm-log-history-meta">' +
+            '<span class="crm-log-history-type">' + icon + ' ' + escapeHtml(entry.type_label || 'Note') + '</span>' +
+            '<span>Date: ' + escapeHtml(entry.date || '—') + '</span>' +
+            '<span>Time: ' + escapeHtml(entry.time || '—') + '</span>' +
+            who +
+          '</div>' +
+          '<div class="crm-log-history-content">' + content + '</div>' +
+        '</article>';
+    }).join('');
+  }
+
+  function normalizeHistory(rawHistory) {
+    return (rawHistory || []).map(function (entry) {
+      var loggedAt = entry.logged_at ? new Date(String(entry.logged_at).replace(' ', 'T')) : null;
+      var hasDate = loggedAt && !isNaN(loggedAt.getTime());
+      return {
+        id: entry.id || '',
+        type: entry.contact_type || entry.type || 'note',
+        type_label: entry.type_label || (entry.contact_type === 'call' ? 'Phone Call' : (entry.contact_type === 'email' ? 'Email' : 'Note')),
+        notes: entry.notes || '',
+        date: entry.date || (hasDate ? String(loggedAt.getMonth() + 1).padStart(2, '0') + '/' + String(loggedAt.getDate()).padStart(2, '0') + '/' + loggedAt.getFullYear() : '—'),
+        time: entry.time || (hasDate ? ((loggedAt.getHours() % 12) || 12) + ':' + String(loggedAt.getMinutes()).padStart(2, '0') + ' ' + (loggedAt.getHours() >= 12 ? 'PM' : 'AM') : '—'),
+        logged_by_name: entry.logged_by_name || entry.logged_by || ''
+      };
+    });
+  }
+
+  function openHistoryModal(customerId, customerName, history) {
+    if (!historyOverlay || !historyCustomerInput || !historyTitle) return;
+    historyCustomerInput.value = customerId;
+    historyTitle.textContent = 'Conversation Log — ' + customerName;
+    historyNotes.value = '';
+    historyError.style.display = 'none';
+    historyError.textContent = '';
+    historySubmit.disabled = false;
+    historySubmit.textContent = 'Add Note';
+    renderHistory(normalizeHistory(history));
+    historyOverlay.style.display = 'flex';
+    historyNotes.focus();
+  }
+
+  function closeHistoryModal() {
+    if (historyOverlay) historyOverlay.style.display = 'none';
+  }
 
   function openModal(customerId, customerName) {
     custInput.value = customerId;
@@ -498,13 +701,21 @@ render_header('CRM');
   });
 
   cancelBtn.addEventListener('click', closeModal);
+  if (historyClose) historyClose.addEventListener('click', closeHistoryModal);
 
   overlay.addEventListener('click', function (e) {
     if (e.target === overlay) closeModal();
   });
 
+  if (historyOverlay) {
+    historyOverlay.addEventListener('click', function (e) {
+      if (e.target === historyOverlay) closeHistoryModal();
+    });
+  }
+
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && overlay.style.display === 'flex') closeModal();
+    if (e.key === 'Escape' && historyOverlay && historyOverlay.style.display === 'flex') closeHistoryModal();
   });
 
   form.addEventListener('submit', function (e) {
@@ -550,6 +761,54 @@ render_header('CRM');
       submitBtn.textContent = 'Save Log Entry';
     });
   });
+
+
+  if (historyForm) {
+    historyForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      historyError.style.display = 'none';
+      historySubmit.disabled = true;
+      historySubmit.textContent = 'Saving…';
+
+      var data = new FormData(historyForm);
+
+      fetch('crm.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: data
+      })
+      .then(function (resp) {
+        return resp.json().then(function (json) {
+          return { ok: resp.ok, json: json };
+        });
+      })
+      .then(function (result) {
+        if (result.json && result.json.ok) {
+          if (result.json.new_csrf) {
+            historyCsrfInput.value = result.json.new_csrf;
+            csrfInput.value = result.json.new_csrf;
+          }
+          renderHistory(normalizeHistory(result.json.history || []));
+          historyNotes.value = '';
+          historySubmit.disabled = false;
+          historySubmit.textContent = 'Add Note';
+        } else {
+          var msg = (result.json && result.json.error) ? result.json.error : 'An error occurred. Please try again.';
+          historyError.textContent = msg;
+          historyError.style.display = '';
+          historySubmit.disabled = false;
+          historySubmit.textContent = 'Add Note';
+        }
+      })
+      .catch(function () {
+        historyError.textContent = 'Network error. Please try again.';
+        historyError.style.display = '';
+        historySubmit.disabled = false;
+        historySubmit.textContent = 'Add Note';
+      });
+    });
+  }
 })();
 
 // ── CRM table live search ─────────────────────────────────────────────────────
@@ -595,6 +854,7 @@ render_header('CRM');
       if (payload && typeof payload.tableRowsHtml === 'string' && crmTableBody) {
         crmTableBody.innerHTML = payload.tableRowsHtml;
         bindLogContactBtns();
+        bindViewLogBtns();
         bindRemoveFlagBtns();
       }
       var nextUrl = new URL(window.location.href);
@@ -667,6 +927,22 @@ function toggleFlag(customerId, flagValue, btn) {
   .catch(function () {
     if (btn) { btn.disabled = false; btn.textContent = flagValue ? '+ Add to CRM' : 'Remove Flag'; }
     alert('Network error. Please try again.');
+  });
+}
+
+function bindViewLogBtns() {
+  document.querySelectorAll('.view-log-btn').forEach(function (btn) {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', function () {
+      var history = [];
+      try {
+        history = JSON.parse(btn.dataset.history || '[]');
+      } catch (e) {
+        history = [];
+      }
+      openHistoryModal(btn.dataset.customerId, btn.dataset.customerName, history);
+    });
   });
 }
 
@@ -781,3 +1057,7 @@ bindRemoveFlagBtns();
 </script>
 
 <?php render_footer(); ?>
+
+bindLogContactBtns();
+bindViewLogBtns();
+bindRemoveFlagBtns();
