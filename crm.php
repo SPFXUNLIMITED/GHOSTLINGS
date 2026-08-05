@@ -81,8 +81,10 @@ function crm_fetch_contact_history(PDO $pdo, int $customerId, DateTimeZone $tz):
 
 function crm_fetch_contact_history_map(PDO $pdo, array $customerIds, DateTimeZone $tz): array
 {
-    $customerIds = array_values(array_unique(array_map('intval', $customerIds)));
-    $customerIds = array_filter($customerIds, static fn(int $id): bool => $id > 0);
+    $customerIds = array_values(array_filter(
+        array_values(array_unique(array_map('intval', $customerIds))),
+        static fn(int $id): bool => $id > 0
+    ));
     if ($customerIds === []) {
         return [];
     }
