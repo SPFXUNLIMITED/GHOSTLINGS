@@ -1,0 +1,1 @@
+ALTER TABLE customers ADD COLUMN followup_flagged TINYINT(1) NOT NULL DEFAULT 0;
