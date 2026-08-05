@@ -2070,6 +2070,25 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Create contacts_log table for tracking calls, emails, and notes per customer
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS contacts_log (
+    id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    customer_id   INT UNSIGNED NOT NULL,
+    contact_type  ENUM('call','email','note') NOT NULL DEFAULT 'note',
+    notes         TEXT NULL,
+    logged_by     INT UNSIGNED NULL,
+    logged_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_cl_customer_id (customer_id),
+    KEY idx_cl_logged_at (logged_at),
+    KEY idx_cl_customer_logged (customer_id, logged_at),
+    CONSTRAINT fk_cl_customer FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE,
+    CONSTRAINT fk_cl_logged_by FOREIGN KEY (logged_by) REFERENCES users (id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 if (!function_exists('log_admin_activity')) {
   function log_admin_activity(PDO $pdo, ?int $user_id, string $action_name, string $details = '', ?string $fallback_user = null): void {
     $safe_user_id = $user_id !== null && $user_id > 0 ? $user_id : null;
