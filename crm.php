@@ -410,7 +410,7 @@ function render_followup_table_rows(array $rows): void {
             class="btn view-log-btn"
             data-customer-id="<?= (int)$row['id'] ?>"
             data-customer-name="<?= h($full_name !== '' ? $full_name : (string)$row['company']) ?>"
-            data-history='<?= h(crm_history_payload($GLOBALS['pdo'], (int)$row['id'])) ?>'
+            data-history='<?= htmlspecialchars(crm_history_payload($GLOBALS['pdo'], (int)$row['id']), ENT_QUOTES, 'UTF-8') ?>'
             style="margin-top:4px;"
           >View Log</button>
           <?php if ($is_flagged): ?>
