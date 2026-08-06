@@ -122,7 +122,7 @@ function crm_send_email(PDO $pdo, int $customerId, string $to, string $subject, 
         }
         $mailer->SMTPOptions = ['ssl' => ['verify_peer' => false, 'verify_peer_name' => false, 'allow_self_signed' => true]];
         $mailer->CharSet = 'UTF-8';
-        $mailer->setFrom($smtpFromEmail, $smtpFromName !== '' ? $smtpFromName : 'Ghostlings');
+        $mailer->setFrom($smtpFromEmail, $smtpFromName !== '' ? $smtpFromName : 'Ghost Laser');
         $mailer->addAddress($to);
         $mailer->Subject = $subject;
         $mailer->isHTML(true);
@@ -249,8 +249,8 @@ function crm_render_rows(array $rows): void
         $lastService = !empty($row['last_service_date']) ? fmt_date_mdY(substr((string) $row['last_service_date'], 0, 10)) : '—';
         $lastContact = !empty($row['last_contact_date']) ? fmt_date_mdY(substr((string) $row['last_contact_date'], 0, 10)) : '—';
         $email = trim((string) ($row['email'] ?? ''));
-        $emailSubject = 'Follow-up from Ghostlings';
-        $emailBody = "Hello {$displayName},\n\nJust following up regarding your recent service order.\n\nBest,\nGhostlings";
+        $emailSubject = 'Follow-up from Ghost Laser';
+        $emailBody = "Hello {$displayName},\n\nJust following up regarding your recent service order.\n\nBest,\nGhost Laser";
         ?>
         <tr style="<?= h($rowStyle) ?>">
             <td>
