@@ -118,8 +118,9 @@ function crm_send_email(PDO $pdo, int $customerId, string $to, string $subject, 
             $mailer->SMTPAutoTLS = false;
         } else {
             $mailer->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-            $mailer->SMTPAutoTLS = true;
+            $mailer->SMTPAutoTLS = false;
         }
+        $mailer->SMTPOptions = ['ssl' => ['verify_peer' => false, 'verify_peer_name' => false, 'allow_self_signed' => true]];
         $mailer->CharSet = 'UTF-8';
         $mailer->setFrom($smtpFromEmail, $smtpFromName !== '' ? $smtpFromName : 'Ghostlings');
         $mailer->addAddress($to);
