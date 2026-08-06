@@ -82,12 +82,17 @@ function crm_fetch_contact_history(PDO $pdo, int $customerId, DateTimeZone $tz):
 
 function crm_send_email(PDO $pdo, int $customerId, string $to, string $subject, string $messageHtml, string $messageText, ?string &$errorMessage): bool
 {
-    $smtpHost = trim((string) env_value('SMTP_HOST', ''));
-    $smtpPort = (int) env_value('SMTP_PORT', '587');
-    $smtpUsername = trim((string) env_value('SMTP_USERNAME', ''));
-    $smtpPassword = (string) env_value('SMTP_PASSWORD', '');
-    $smtpFromEmail = trim((string) env_value('SMTP_FROM_EMAIL', ''));
-    $smtpFromName = trim(str_replace(["\r", "\n"], ' ', (string) env_value('SMTP_FROM_NAME', '')));
+    $readEnv = static function (string $key, string $default = ''): string {
+        $value = getenv($key);
+        return $value === false ? $default : (string) $value;
+    };
+
+    $smtpHost = trim($readEnv('SMTP_HOST'));
+    $smtpPort = (int) $readEnv('SMTP_PORT', '587');
+    $smtpUsername = trim($readEnv('SMTP_USERNAME'));
+    $smtpPassword = $readEnv('SMTP_PASSWORD');
+    $smtpFromEmail = trim($readEnv('SMTP_FROM_EMAIL'));
+    $smtpFromName = trim(str_replace(["\r", "\n"], ' ', $readEnv('SMTP_FROM_NAME')));
 
     $missing = [];
     if ($smtpHost === '') $missing[] = 'SMTP_HOST';
