@@ -526,9 +526,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['action'] ?? '') =
     if (!$tpl) {
         crm_json_response(['ok' => false, 'error' => 'Template not found.'], 404);
     }
-    $tagValues = $customerId > 0 ? crm_resolve_tags_for_customer($pdo, $customerId) : [];
-    $resolvedSubject = $tagValues ? strtr((string) $tpl['subject'], $tagValues) : (string) $tpl['subject'];
-    $resolvedBody    = $tagValues ? strtr((string) $tpl['body'], $tagValues) : (string) $tpl['body'];
+    $tagValues = crm_resolve_tags_for_customer($pdo, $customerId > 0 ? $customerId : 0);
+    $resolvedSubject = strtr((string) $tpl['subject'], $tagValues);
+    $resolvedBody    = strtr((string) $tpl['body'], $tagValues);
     crm_json_response(['ok' => true, 'subject' => $resolvedSubject, 'body' => $resolvedBody]);
 }
 
@@ -1042,22 +1042,28 @@ render_header('CRM');
       : (personalNote !== '' ? personalNote : templateBody);
     document.getElementById('send-email-body').value = combinedBody;
 
+    function restoreFields() {
+      if (personalNote !== '') {
+        document.getElementById('send-email-personal-note').value = personalNote;
+        document.getElementById('send-email-body').value = templateBody;
+      }
+    }
+
     submitBtn.disabled = true;
     submitBtn.textContent = 'Sending…';
     fetch('crm.php', { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: new FormData(event.target) })
       .then(function (resp) { return resp.json(); })
       .then(function (json) {
-        if (!json || !json.ok) throw new Error(json && json.error ? json.error : 'An error occurred.');
+        if (!json || !json.ok) {
+          restoreFields();
+          throw new Error(json && json.error ? json.error : 'An error occurred.');
+        }
         updateCsrf(json.new_csrf || '');
         document.getElementById('send-email-overlay').style.display = 'none';
         window.location.reload();
       })
       .catch(function (err) {
-        // Restore personal note field if send failed
-        if (personalNote !== '') {
-          document.getElementById('send-email-personal-note').value = personalNote;
-          document.getElementById('send-email-body').value = templateBody;
-        }
+        restoreFields();
         errorBox.textContent = err.message || 'Network error. Please try again.';
         errorBox.style.display = '';
         submitBtn.disabled = false;

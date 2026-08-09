@@ -324,15 +324,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($successMessage !== null) {
         $_SESSION['et_csrf'] = bin2hex(random_bytes(24));
-        header('Location: email_templates.php?msg=' . urlencode($successMessage));
+        $_SESSION['et_flash'] = $successMessage;
+        header('Location: email_templates.php');
         exit;
     }
     // Regenerate token after failed POST
     $_SESSION['et_csrf'] = bin2hex(random_bytes(24));
 }
 
-if (isset($_GET['msg'])) {
-    $successMessage = trim((string) $_GET['msg']);
+if (isset($_SESSION['et_flash'])) {
+    $successMessage = (string) $_SESSION['et_flash'];
+    unset($_SESSION['et_flash']);
 }
 
 $tagDefinitions  = getNotificationTagDefinitions();
