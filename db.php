@@ -2070,6 +2070,102 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Create expense_categories table for chart-of-accounts style expense classification
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS expense_categories (
+    id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    code       VARCHAR(64)  NOT NULL,
+    name       VARCHAR(150) NOT NULL,
+    group_type ENUM('cogs','opex') NOT NULL DEFAULT 'opex',
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active  TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uniq_expense_categories_code (code),
+    KEY idx_expense_categories_group_type (group_type),
+    KEY idx_expense_categories_is_active (is_active)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// Seed baseline expense categories for tax filing.
+$pdo->exec("
+  INSERT INTO expense_categories (code, name, group_type, sort_order, is_active)
+  VALUES
+    ('materials', 'Materials', 'cogs', 10, 1),
+    ('gas', 'Gas / Fuel', 'opex', 20, 1),
+    ('utilities', 'Utilities', 'opex', 30, 1),
+    ('rent', 'Rent', 'opex', 40, 1)
+  ON DUPLICATE KEY UPDATE
+    name = VALUES(name),
+    group_type = VALUES(group_type),
+    sort_order = VALUES(sort_order),
+    is_active = VALUES(is_active)
+");
+
+// Create expenses table for import + manual accounting expense records.
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS expenses (
+    id                 INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    expense_date       DATE NOT NULL,
+    amount             DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    category_id        INT UNSIGNED NOT NULL,
+    description        TEXT NOT NULL,
+    vendor_name        VARCHAR(255) NULL,
+    payment_source     VARCHAR(100) NULL,
+    transaction_hash   CHAR(64) NOT NULL,
+    source             VARCHAR(50) NOT NULL DEFAULT 'manual',
+    source_filename    VARCHAR(255) NULL,
+    source_line_number INT UNSIGNED NULL,
+    raw_row_json       LONGTEXT NULL,
+    created_by         INT UNSIGNED NULL,
+    created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uniq_expenses_transaction_hash (transaction_hash),
+    KEY idx_expenses_expense_date (expense_date),
+    KEY idx_expenses_category_id (category_id),
+    KEY idx_expenses_source (source),
+    KEY idx_expenses_created_by (created_by),
+    CONSTRAINT fk_expenses_category FOREIGN KEY (category_id) REFERENCES expense_categories (id) ON DELETE RESTRICT,
+    CONSTRAINT chk_expenses_amount_non_negative CHECK (amount >= 0)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// Create expense_attachments table for receipts/invoices linked to expenses.
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS expense_attachments (
+    id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    expense_id    INT UNSIGNED NOT NULL,
+    original_name VARCHAR(255) NOT NULL,
+    stored_name   VARCHAR(255) NOT NULL,
+    mime_type     VARCHAR(191) NULL,
+    size_bytes    BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_expense_attachments_expense_id (expense_id),
+    CONSTRAINT fk_expense_attachments_expense FOREIGN KEY (expense_id) REFERENCES expenses (id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// Create expense_invoice_links for optional expense allocation to invoices.
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS expense_invoice_links (
+    id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    expense_id       INT UNSIGNED NOT NULL,
+    quote_id         INT UNSIGNED NOT NULL,
+    allocated_amount DECIMAL(12,2) NULL,
+    created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uniq_expense_invoice_pair (expense_id, quote_id),
+    KEY idx_expense_invoice_links_expense_id (expense_id),
+    KEY idx_expense_invoice_links_quote_id (quote_id),
+    CONSTRAINT fk_expense_invoice_links_expense FOREIGN KEY (expense_id) REFERENCES expenses (id) ON DELETE CASCADE,
+    CONSTRAINT fk_expense_invoice_links_quote FOREIGN KEY (quote_id) REFERENCES quotes (id) ON DELETE CASCADE,
+    CONSTRAINT chk_expense_invoice_links_amount_non_negative CHECK (allocated_amount IS NULL OR allocated_amount >= 0)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 // Create contacts_log table for tracking calls, emails, and notes per customer
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS contacts_log (
@@ -2241,6 +2337,73 @@ if (!function_exists('bank_tx_invoice_search_term')) {
       return '';
     }
     return mb_substr($description, 0, 60);
+  }
+}
+
+if (!function_exists('expense_normalize_text')) {
+  function expense_normalize_text(string $value): string {
+    $value = preg_replace('/\s+/u', ' ', trim($value));
+    return mb_strtolower((string)$value);
+  }
+}
+
+if (!function_exists('expense_parse_money')) {
+  function expense_parse_money(?string $raw): ?float {
+    $raw = trim((string)$raw);
+    if ($raw === '') {
+      return null;
+    }
+
+    $negative = false;
+    if (preg_match('/^\(.*\)$/', $raw)) {
+      $negative = true;
+      $raw = substr($raw, 1, -1);
+    }
+
+    $normalized = str_replace(['$', ',', ' '], '', $raw);
+    if ($normalized === '' || !is_numeric($normalized)) {
+      return null;
+    }
+
+    $amount = (float)$normalized;
+    if ($negative) {
+      $amount *= -1;
+    }
+    return $amount;
+  }
+}
+
+if (!function_exists('expense_amount_string')) {
+  function expense_amount_string(float $amount): string {
+    return number_format($amount, 2, '.', '');
+  }
+}
+
+if (!function_exists('expense_hash')) {
+  function expense_hash(string $date_ymd, string $description, float $amount): string {
+    return hash('sha256', $date_ymd . '|' . expense_normalize_text($description) . '|' . expense_amount_string($amount));
+  }
+}
+
+if (!function_exists('expense_category_code_normalize')) {
+  function expense_category_code_normalize(string $category): string {
+    $normalized = expense_normalize_text($category);
+    $normalized = preg_replace('/[^a-z0-9]+/', '_', $normalized);
+    $normalized = trim((string)$normalized, '_');
+    return $normalized !== '' ? $normalized : 'uncategorized';
+  }
+}
+
+if (!function_exists('expense_category_guess_code')) {
+  function expense_category_guess_code(string $raw_category, string $description): string {
+    $haystack = expense_normalize_text($raw_category . ' ' . $description);
+    return match (true) {
+      str_contains($haystack, 'material') => 'materials',
+      str_contains($haystack, 'fuel'), str_contains($haystack, 'gas') => 'gas',
+      str_contains($haystack, 'electric'), str_contains($haystack, 'water'), str_contains($haystack, 'internet'), str_contains($haystack, 'utility') => 'utilities',
+      str_contains($haystack, 'rent'), str_contains($haystack, 'lease') => 'rent',
+      default => expense_category_code_normalize($raw_category),
+    };
   }
 }
 

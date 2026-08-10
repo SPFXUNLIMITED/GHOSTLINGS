@@ -628,6 +628,10 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
       ['type' => 'separator'],
       ['href' => 'bank_import.php', 'files' => ['bank_import.php'], 'label' => 'Import Bank CSV'],
       ['href' => 'transactions.php', 'files' => ['transactions.php'], 'label' => 'Bank Transactions'],
+      ['type' => 'separator'],
+      ['href' => 'expense_import.php', 'files' => ['expense_import.php'], 'label' => 'Import Expenses CSV'],
+      ['href' => 'expenses.php', 'files' => ['expenses.php', 'expense_attachment_file.php'], 'label' => 'Expenses'],
+      ['href' => 'profit_loss.php', 'files' => ['profit_loss.php'], 'label' => 'Profit & Loss'],
     ], $current); ?>
 	
     <?php render_menu_link(['href' => 'standalone_tasks.php', 'files' => ['standalone_tasks.php', 'standalone_task_save.php', 'standalone_task_delete.php', 'standalone_task_reorder.php'], 'label' => 'Tasks'], $current); ?>
