@@ -249,8 +249,6 @@ function crm_render_rows(array $rows): void
         $lastService = !empty($row['last_service_date']) ? fmt_date_mdY(substr((string) $row['last_service_date'], 0, 10)) : '—';
         $lastContact = !empty($row['last_contact_date']) ? fmt_date_mdY(substr((string) $row['last_contact_date'], 0, 10)) : '—';
         $email = trim((string) ($row['email'] ?? ''));
-        $emailSubject = 'Follow-up from Ghost Laser';
-        $emailBody = "Hello {$displayName},\n\nJust following up regarding your recent service order.\n\nBest,\nGhost Laser";
         ?>
         <tr style="<?= h($rowStyle) ?>">
             <td>
@@ -269,8 +267,6 @@ function crm_render_rows(array $rows): void
                         data-customer-id="<?= (int) $row['id'] ?>"
                         data-customer-name="<?= h($displayName) ?>"
                         data-customer-email="<?= h($email) ?>"
-                        data-email-subject="<?= h($emailSubject) ?>"
-                        data-email-body="<?= h($emailBody) ?>"
                     >Send Email</button>
                 <?php else: ?>
                     <span class="muted">—</span>
@@ -369,6 +365,175 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['action'] ?? '') =
     crm_json_response(['ok' => true, 'new_csrf' => $_SESSION['crm_csrf'], 'history' => crm_fetch_contact_history($pdo, $customerId, $tz)]);
 }
 
+// ── Email-template helpers ────────────────────────────────────────────────────
+
+function crm_ensure_email_templates_table(PDO $pdo): void
+{
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS email_templates (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            subject VARCHAR(255) NOT NULL DEFAULT '',
+            body TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+    ");
+}
+
+function crm_get_email_templates(PDO $pdo): array
+{
+    try {
+        return $pdo->query("SELECT id, title, subject, body FROM email_templates ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+/**
+ * Resolve notification merge tags for a specific customer.
+ * Customer-specific tags (client_name, client_address, customer_name) are
+ * loaded from the customers row; all other tags use the global defaults.
+ */
+function crm_resolve_tags_for_customer(PDO $pdo, int $customerId): array
+{
+    // Global defaults (company settings, appointment data, etc.)
+    $tagValues = array_fill_keys(array_keys(crm_notification_tag_definitions()), '');
+
+    // Company settings
+    $defaults = ['company_name' => '', 'company_phone' => '', 'company_website' => ''];
+    try {
+        $row = $pdo->query("SELECT company_name, company_phone, company_website FROM company_settings WHERE id = 1 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+        $cs = $row ?: $defaults;
+    } catch (Throwable $e) {
+        $cs = $defaults;
+    }
+    $tagValues['{company_name}']    = $cs['company_name'];
+    $tagValues['{company_phone}']   = $cs['company_phone'];
+    $tagValues['{company_website}'] = $cs['company_website'];
+
+    // Per-customer fields
+    try {
+        $stmt = $pdo->prepare("SELECT first_name, last_name, address, city, state, zip FROM customers WHERE id = ? LIMIT 1");
+        $stmt->execute([$customerId]);
+        $cust = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) {
+        $cust = [];
+    }
+
+    $fullName = trim(implode(' ', array_filter([
+        trim((string) ($cust['first_name'] ?? '')),
+        trim((string) ($cust['last_name'] ?? '')),
+    ])));
+    $fullAddress = implode(', ', array_filter([
+        trim((string) ($cust['address'] ?? '')),
+        trim((string) ($cust['city'] ?? '')),
+        trim((string) ($cust['state'] ?? '')),
+        trim((string) ($cust['zip'] ?? '')),
+    ]));
+
+    $tagValues['{client_name}']    = $fullName;
+    $tagValues['{client_address}'] = $fullAddress;
+    $tagValues['{customer_name}']  = $fullName;
+
+    // appointment / service tags – use most-recent service request for this customer
+    try {
+        $stmt = $pdo->prepare("
+            SELECT promised_service_date, services AS services_json
+            FROM service_requests
+            WHERE customer_id = ?
+            ORDER BY
+                CASE WHEN promised_service_date IS NULL OR promised_service_date = '' THEN 1 ELSE 0 END,
+                promised_service_date DESC,
+                id DESC
+            LIMIT 1
+        ");
+        $stmt->execute([$customerId]);
+        $sr = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) {
+        $sr = [];
+    }
+
+    $tagValues['{appointment_date}'] = trim((string) ($sr['promised_service_date'] ?? ''));
+    $tagValues['{service_name}']     = '';
+    $servicesJson = trim((string) ($sr['services_json'] ?? ''));
+    if ($servicesJson !== '') {
+        $serviceIds = json_decode($servicesJson, true);
+        if (is_array($serviceIds) && $serviceIds !== []) {
+            try {
+                $placeholders = implode(',', array_fill(0, count($serviceIds), '?'));
+                $svcStmt = $pdo->prepare("SELECT service_name FROM services WHERE id IN ({$placeholders}) ORDER BY service_name ASC");
+                $svcStmt->execute($serviceIds);
+                $tagValues['{service_name}'] = implode(', ', $svcStmt->fetchAll(PDO::FETCH_COLUMN));
+            } catch (Throwable $e) {
+                // services table optional
+            }
+        }
+    }
+
+    // Route stop – most recent overall (not customer-specific in current schema)
+    try {
+        $rs = $pdo->query("SELECT arrival_window_start, arrival_window_end FROM service_route_stops ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC) ?: [];
+        $tagValues['{appointment_time}']     = trim((string) ($rs['arrival_window_start'] ?? ''));
+        $tagValues['{appointment_end_time}'] = trim((string) ($rs['arrival_window_end'] ?? ''));
+    } catch (Throwable $e) {
+        // optional
+    }
+
+    // Recurring service dates – most recent overall
+    try {
+        $rec = $pdo->query("SELECT last_serviced_date, next_due_date FROM recurring_service_customers ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC) ?: [];
+        $tagValues['{last_service_date}'] = trim((string) ($rec['last_serviced_date'] ?? ''));
+        $tagValues['{next_service_date}'] = trim((string) ($rec['next_due_date'] ?? ''));
+    } catch (Throwable $e) {
+        $tagValues['{last_service_date}'] = '';
+        $tagValues['{next_service_date}'] = '';
+    }
+
+    // Admin name from session
+    $tagValues['{admin_name}'] = trim((string) ($_SESSION['admin_username'] ?? ''));
+
+    return $tagValues;
+}
+
+/** Minimal tag definitions list – same keys as getNotificationTagDefinitions(). */
+function crm_notification_tag_definitions(): array
+{
+    return array_fill_keys([
+        '{client_name}', '{client_address}', '{company_name}', '{company_phone}',
+        '{appointment_date}', '{appointment_time}', '{appointment_end_time}',
+        '{service_name}', '{company_website}', '{customer_name}',
+        '{last_service_date}', '{next_service_date}', '{admin_name}',
+    ], []);
+}
+
+// ── get_template AJAX endpoint ─────────────────────────────────────────────────
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['action'] ?? '') === 'get_template') {
+    crm_verify_csrf();
+    $templateId = (int) ($_POST['template_id'] ?? 0);
+    $customerId = (int) ($_POST['customer_id'] ?? 0);
+    if ($templateId <= 0) {
+        crm_json_response(['ok' => false, 'error' => 'Invalid template.'], 400);
+    }
+    try {
+        $stmt = $pdo->prepare("SELECT title, subject, body FROM email_templates WHERE id = ? LIMIT 1");
+        $stmt->execute([$templateId]);
+        $tpl = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $tpl = false;
+    }
+    if (!$tpl) {
+        crm_json_response(['ok' => false, 'error' => 'Template not found.'], 404);
+    }
+    $tagValues = crm_resolve_tags_for_customer($pdo, $customerId > 0 ? $customerId : 0);
+    $resolvedSubject = strtr((string) $tpl['subject'], $tagValues);
+    $resolvedBody    = strtr((string) $tpl['body'], $tagValues);
+    crm_json_response(['ok' => true, 'subject' => $resolvedSubject, 'body' => $resolvedBody]);
+}
+
+// ── customer_search endpoint ───────────────────────────────────────────────────
+
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && (string) ($_GET['customer_search'] ?? '') === '1') {
     header('Content-Type: application/json; charset=UTF-8');
     header('X-Content-Type-Options: nosniff');
@@ -406,6 +571,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && (string) ($_GET['customer_search'] ?
     exit;
 }
 
+crm_ensure_email_templates_table($pdo);
+$emailTemplates = crm_get_email_templates($pdo);
+
 $search = trim((string) ($_GET['q'] ?? ''));
 $rows = crm_fetch_rows($pdo, $search, $tz);
 
@@ -421,6 +589,30 @@ render_header('CRM');
     <div class="page-header-body">
         <h1>Customer Relationship Management</h1>
         <p class="muted">Customers with completed service orders or manual follow-up flags, sorted by days since last contact.</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="row" style="align-items:center; flex-wrap:wrap; gap:12px;">
+        <div style="flex:1; min-width:220px;">
+            <label for="crm-active-template" style="display:block; font-weight:600; margin-bottom:6px;">Active Email Template</label>
+            <?php if ($emailTemplates): ?>
+                <select id="crm-active-template" style="max-width:400px; width:100%;">
+                    <option value="">— None selected —</option>
+                    <?php foreach ($emailTemplates as $tpl): ?>
+                        <option value="<?= (int) $tpl['id'] ?>"><?= h($tpl['title']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="muted" style="margin-top:4px; font-size:.88em;">
+                    Select a template once here; it will pre-fill the email modal whenever you click Send Email on any customer.
+                </p>
+            <?php else: ?>
+                <p class="muted">No templates yet. <a href="email_templates.php">Manage email templates →</a></p>
+            <?php endif; ?>
+        </div>
+        <div>
+            <a href="email_templates.php" class="btn">Manage Templates</a>
+        </div>
     </div>
 </div>
 
@@ -524,6 +716,7 @@ render_header('CRM');
 <div id="send-email-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1200; align-items:center; justify-content:center; padding:16px;">
     <div style="background:#fff; border-radius:8px; padding:28px 32px; width:100%; max-width:620px; box-shadow:0 8px 32px rgba(0,0,0,.2); position:relative;" role="dialog" aria-modal="true" aria-labelledby="send-email-title">
         <h2 id="send-email-title" style="margin:0 0 18px;">Send Email</h2>
+        <div id="send-email-loading" style="display:none; color:#6b7280; margin-bottom:14px; font-size:.92em;">Loading template…</div>
         <form id="send-email-form">
             <input type="hidden" id="send-email-customer-id" name="customer_id" value="" />
             <input type="hidden" name="action" value="send_email" />
@@ -536,8 +729,12 @@ render_header('CRM');
                 <label for="send-email-subject" style="display:block; font-weight:600; margin-bottom:6px;">Subject</label>
                 <input id="send-email-subject" type="text" name="subject" style="width:100%;" required />
             </div>
+            <div style="margin-bottom:14px;">
+                <label for="send-email-personal-note" style="display:block; font-weight:600; margin-bottom:6px;">Personal Note <span class="muted" style="font-weight:400;">(optional — appears at the top of the email)</span></label>
+                <textarea id="send-email-personal-note" rows="3" style="width:100%; resize:vertical;" placeholder="Add a personal message here…"></textarea>
+            </div>
             <div style="margin-bottom:18px;">
-                <label for="send-email-body" style="display:block; font-weight:600; margin-bottom:6px;">Message</label>
+                <label for="send-email-body" style="display:block; font-weight:600; margin-bottom:6px;">Message Body <span id="send-email-template-label" class="muted" style="font-weight:400;"></span></label>
                 <textarea id="send-email-body" name="body" rows="8" style="width:100%; resize:vertical;" required></textarea>
             </div>
             <div id="send-email-error" class="alert error" style="display:none; margin-bottom:14px;"></div>
@@ -672,13 +869,49 @@ render_header('CRM');
       if (btn.dataset.boundEmail) return;
       btn.dataset.boundEmail = '1';
       btn.addEventListener('click', function () {
-        document.getElementById('send-email-customer-id').value = btn.dataset.customerId || '';
-        document.getElementById('send-email-title').textContent = 'Send Email — ' + (btn.dataset.customerName || 'Customer');
-        document.getElementById('send-email-to').value = btn.dataset.customerEmail || '';
-        document.getElementById('send-email-subject').value = btn.dataset.emailSubject || '';
-        document.getElementById('send-email-body').value = btn.dataset.emailBody || '';
+        var customerId = btn.dataset.customerId || '';
+        var customerName = btn.dataset.customerName || 'Customer';
+        var customerEmail = btn.dataset.customerEmail || '';
+
+        document.getElementById('send-email-customer-id').value = customerId;
+        document.getElementById('send-email-title').textContent = 'Send Email — ' + customerName;
+        document.getElementById('send-email-to').value = customerEmail;
+        document.getElementById('send-email-subject').value = '';
+        document.getElementById('send-email-body').value = '';
+        document.getElementById('send-email-personal-note').value = '';
+        document.getElementById('send-email-template-label').textContent = '';
         document.getElementById('send-email-error').style.display = 'none';
         document.getElementById('send-email-overlay').style.display = 'flex';
+
+        var templateSelect = document.getElementById('crm-active-template');
+        var templateId = templateSelect ? templateSelect.value : '';
+        if (!templateId) return;
+
+        var loadingEl = document.getElementById('send-email-loading');
+        if (loadingEl) loadingEl.style.display = '';
+
+        var formData = new FormData();
+        formData.append('action', 'get_template');
+        formData.append('template_id', templateId);
+        formData.append('customer_id', customerId);
+        formData.append('csrf_token', sendEmailCsrf ? sendEmailCsrf.value : (csrfInput ? csrfInput.value : ''));
+        fetch('crm.php', { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: formData })
+          .then(function (resp) { return resp.json(); })
+          .then(function (json) {
+            if (loadingEl) loadingEl.style.display = 'none';
+            if (json && json.ok) {
+              document.getElementById('send-email-subject').value = json.subject || '';
+              document.getElementById('send-email-body').value = json.body || '';
+              var tplLabel = document.getElementById('send-email-template-label');
+              if (tplLabel && templateSelect) {
+                var opt = templateSelect.options[templateSelect.selectedIndex];
+                tplLabel.textContent = opt ? '(template: ' + opt.text + ')' : '';
+              }
+            }
+          })
+          .catch(function () {
+            if (loadingEl) loadingEl.style.display = 'none';
+          });
       });
     });
   }
@@ -800,17 +1033,37 @@ render_header('CRM');
     var errorBox = document.getElementById('send-email-error');
     var submitBtn = document.getElementById('send-email-submit');
     errorBox.style.display = 'none';
+
+    // Combine personal note + template body into the body field before submission
+    var personalNote = (document.getElementById('send-email-personal-note').value || '').trim();
+    var templateBody = (document.getElementById('send-email-body').value || '').trim();
+    var combinedBody = personalNote !== '' && templateBody !== ''
+      ? personalNote + '\n\n' + templateBody
+      : (personalNote !== '' ? personalNote : templateBody);
+    document.getElementById('send-email-body').value = combinedBody;
+
+    function restoreFields() {
+      if (personalNote !== '') {
+        document.getElementById('send-email-personal-note').value = personalNote;
+        document.getElementById('send-email-body').value = templateBody;
+      }
+    }
+
     submitBtn.disabled = true;
     submitBtn.textContent = 'Sending…';
     fetch('crm.php', { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: new FormData(event.target) })
       .then(function (resp) { return resp.json(); })
       .then(function (json) {
-        if (!json || !json.ok) throw new Error(json && json.error ? json.error : 'An error occurred.');
+        if (!json || !json.ok) {
+          restoreFields();
+          throw new Error(json && json.error ? json.error : 'An error occurred.');
+        }
         updateCsrf(json.new_csrf || '');
         document.getElementById('send-email-overlay').style.display = 'none';
         window.location.reload();
       })
       .catch(function (err) {
+        restoreFields();
         errorBox.textContent = err.message || 'Network error. Please try again.';
         errorBox.style.display = '';
         submitBtn.disabled = false;
