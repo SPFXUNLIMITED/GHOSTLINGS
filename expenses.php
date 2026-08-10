@@ -433,9 +433,17 @@ render_header('Expenses');
 .expenses-pill{display:inline-flex;align-items:center;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600;white-space:nowrap;}
 </style>
 
+<div class="card" style="display:flex;align-items:center;gap:12px;padding:10px 16px;margin-bottom:0;">
+  <a class="btn primary" href="expense_import.php">Import</a>
+</div>
+
 <div class="card">
   <div class="table-wrap" style="overflow-x:auto;">
     <table class="table-auto" style="min-width:1320px;">
+      <colgroup>
+        <col />
+        <col style="width:180px;" />
+      </colgroup>
       <thead>
         <tr>
           <th><?= expenses_sort_link('date', 'Date', $sort, $dir) ?></th>
@@ -513,11 +521,6 @@ render_header('Expenses');
               <?php endif; ?>
             </td>
             <td id="expense-<?= $expenseId ?>">
-              <div class="expenses-actions">
-                <a class="btn" href="expense_import.php">Import</a>
-                <a class="btn" href="invoice_tracker.php?q=<?= h(urlencode((string)$expense['description'])) ?>">Find Invoice</a>
-              </div>
-
               <form method="post" enctype="multipart/form-data" class="expenses-inline-form">
                 <input type="hidden" name="csrf_token" value="<?= h($_SESSION['expenses_csrf']) ?>" />
                 <input type="hidden" name="action" value="upload_attachment" />
