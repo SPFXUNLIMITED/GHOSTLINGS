@@ -57,13 +57,18 @@ if ($downloadName === '') {
   $downloadName = 'expense-attachment';
 }
 $mime = trim((string)($row['mime_type'] ?? 'application/octet-stream'));
-if ($mime === '') {
+if ($mime === '' || str_contains($mime, "\n") || str_contains($mime, "\r") || !preg_match('/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/i', $mime)) {
   $mime = 'application/octet-stream';
 }
 $inline = isset($_GET['inline']) && $_GET['inline'] === '1' && expense_attachment_inline_allowed($downloadName, $mime);
+$size = filesize($path);
+if ($size === false) {
+  http_response_code(500);
+  exit('Could not read attachment size');
+}
 
 header('Content-Type: ' . $mime);
-header('Content-Length: ' . (string)filesize($path));
+header('Content-Length: ' . (string)$size);
 header('X-Content-Type-Options: nosniff');
 header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment') . '; filename*=UTF-8\'\'' . rawurlencode($downloadName));
 readfile($path);

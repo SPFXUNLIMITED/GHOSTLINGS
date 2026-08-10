@@ -2397,13 +2397,24 @@ if (!function_exists('expense_category_code_normalize')) {
 if (!function_exists('expense_category_guess_code')) {
   function expense_category_guess_code(string $raw_category, string $description): string {
     $haystack = expense_normalize_text($raw_category . ' ' . $description);
-    return match (true) {
-      str_contains($haystack, 'material') => 'materials',
-      str_contains($haystack, 'fuel'), str_contains($haystack, 'gas') => 'gas',
-      str_contains($haystack, 'electric'), str_contains($haystack, 'water'), str_contains($haystack, 'internet'), str_contains($haystack, 'utility') => 'utilities',
-      str_contains($haystack, 'rent'), str_contains($haystack, 'lease') => 'rent',
-      default => expense_category_code_normalize($raw_category),
-    };
+    if (str_contains($haystack, 'material')) {
+      return 'materials';
+    }
+    if (str_contains($haystack, 'fuel') || str_contains($haystack, 'gas')) {
+      return 'gas';
+    }
+    if (
+      str_contains($haystack, 'electric')
+      || str_contains($haystack, 'water')
+      || str_contains($haystack, 'internet')
+      || str_contains($haystack, 'utility')
+    ) {
+      return 'utilities';
+    }
+    if (str_contains($haystack, 'rent') || str_contains($haystack, 'lease')) {
+      return 'rent';
+    }
+    return expense_category_code_normalize($raw_category);
   }
 }
 

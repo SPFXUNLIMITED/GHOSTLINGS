@@ -5,6 +5,8 @@ require __DIR__ . '/auth.php';
 require_admin_or_moderator();
 
 const EXPENSE_UPLOAD_MAX_BYTES = 20 * 1024 * 1024;
+const EXPENSES_LIST_LIMIT = 300;
+const EXPENSE_ATTACHMENTS_PREVIEW_LIMIT = 4;
 const EXPENSE_UPLOAD_ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'zip'];
 const EXPENSE_UPLOAD_ALLOWED_MIMES = [
   'application/pdf',
@@ -91,7 +93,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   }
                 }
 
-                if ($mime !== null && !in_array($mime, EXPENSE_UPLOAD_ALLOWED_MIMES, true)) {
+                if ($mime === null) {
+                  $errors[] = 'Could not validate attachment content type.';
+                } elseif (!in_array($mime, EXPENSE_UPLOAD_ALLOWED_MIMES, true)) {
                   $errors[] = 'File content type not allowed.';
                 } else {
                   $uploadsDir = __DIR__ . '/uploads';
@@ -167,8 +171,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 
   if (empty($errors) && $success !== '') {
-    $query = $_GET ? ('?' . http_build_query($_GET)) : '';
-    header('Location: expenses.php' . $query . '&saved=1');
+    $query = $_GET ? http_build_query($_GET) : '';
+    $redirect = 'expenses.php?saved=1';
+    if ($query !== '') {
+      $redirect .= '&' . $query;
+    }
+    header('Location: ' . $redirect);
     exit;
   }
 }
@@ -266,7 +274,7 @@ $stmt = $pdo->prepare(
    ) il ON il.expense_id = e.id
    WHERE " . implode(' AND ', $where) . "
    ORDER BY {$sortMap[$sort]} {$dir}, e.id DESC
-   LIMIT 300"
+   LIMIT " . EXPENSES_LIST_LIMIT
 );
 
 foreach ($params as $key => $value) {
@@ -274,6 +282,36 @@ foreach ($params as $key => $value) {
 }
 $stmt->execute();
 $expenses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$limitHit = count($expenses) >= EXPENSES_LIST_LIMIT;
+
+$attachmentsByExpense = [];
+if ($expenses) {
+  $expenseIds = array_map(static fn(array $row): int => (int)($row['id'] ?? 0), $expenses);
+  $expenseIds = array_values(array_filter($expenseIds, static fn(int $id): bool => $id > 0));
+  if ($expenseIds) {
+    $placeholders = implode(',', array_fill(0, count($expenseIds), '?'));
+    $attachmentsStmt = $pdo->prepare(
+      "SELECT id, expense_id, original_name
+       FROM expense_attachments
+       WHERE expense_id IN ($placeholders)
+       ORDER BY created_at DESC, id DESC"
+    );
+    $attachmentsStmt->execute($expenseIds);
+    foreach ($attachmentsStmt->fetchAll(PDO::FETCH_ASSOC) as $attachment) {
+      $expenseId = (int)($attachment['expense_id'] ?? 0);
+      if ($expenseId <= 0) {
+        continue;
+      }
+      if (!isset($attachmentsByExpense[$expenseId])) {
+        $attachmentsByExpense[$expenseId] = [];
+      }
+      if (count($attachmentsByExpense[$expenseId]) >= EXPENSE_ATTACHMENTS_PREVIEW_LIMIT) {
+        continue;
+      }
+      $attachmentsByExpense[$expenseId][] = $attachment;
+    }
+  }
+}
 
 $heroTotal = count($expenses);
 $heroAmount = 0.0;
@@ -298,6 +336,9 @@ render_header('Expenses');
 
 <?php if ($success !== ''): ?>
   <div class="alert" style="border-color:#bbf7d0;background:#f0fdf4;color:#166534;"><?= h($success) ?></div>
+<?php endif; ?>
+<?php if ($limitHit): ?>
+  <div class="alert" style="border-color:#bfdbfe;background:#eff6ff;color:#1e40af;">Showing the first <?= (int)EXPENSES_LIST_LIMIT ?> rows for this filter.</div>
 <?php endif; ?>
 
 <div class="card laser-rfq-hero page-header">
@@ -442,7 +483,7 @@ render_header('Expenses');
             <td>
               <strong><?= (int)$expense['attachment_count'] ?></strong>
               <?php if ((int)$expense['attachment_count'] > 0): ?>
-                <div><a class="btn" href="expenses.php?expense_id=<?= $expenseId ?>#expense-<?= $expenseId ?>">Open</a></div>
+                <div><a class="btn" href="#expense-<?= $expenseId ?>">Open</a></div>
               <?php endif; ?>
             </td>
             <td>
@@ -494,17 +535,7 @@ render_header('Expenses');
                 <button type="submit" class="btn">Link Invoice</button>
               </form>
 
-              <?php
-                $attachStmt = $pdo->prepare(
-                  "SELECT id, original_name
-                   FROM expense_attachments
-                   WHERE expense_id = ?
-                   ORDER BY created_at DESC, id DESC
-                   LIMIT 4"
-                );
-                $attachStmt->execute([$expenseId]);
-                $attachments = $attachStmt->fetchAll(PDO::FETCH_ASSOC);
-              ?>
+              <?php $attachments = $attachmentsByExpense[$expenseId] ?? []; ?>
               <?php if ($attachments): ?>
                 <div class="muted" style="margin-top:6px;font-size:.82em;">Latest receipts:</div>
                 <div style="display:flex;flex-direction:column;gap:4px;margin-top:4px;">

@@ -4,8 +4,6 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_admin_or_moderator();
 
-const EXPENSE_IMPORT_DUPLICATE_SQLSTATE = '23000';
-
 function expense_import_find_col(array $row, array $needles): ?int {
   foreach ($needles as $needle) {
     $needle = strtolower($needle);
@@ -225,7 +223,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ];
               }
             } catch (PDOException $e) {
-              if ($e->getCode() === EXPENSE_IMPORT_DUPLICATE_SQLSTATE) {
+              $isDuplicate = isset($e->errorInfo[1]) && (int)$e->errorInfo[1] === 1062;
+              if ($isDuplicate) {
                 $duplicates++;
                 continue;
               }

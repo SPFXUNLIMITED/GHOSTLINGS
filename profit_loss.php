@@ -254,7 +254,7 @@ render_header('Profit & Loss');
         </tr>
         <tr>
           <th>Less COGS</th>
-          <td><strong>-<?= h(profit_loss_money($cogsTotal)) ?></strong></td>
+          <td><strong><?= ($cogsTotal > 0 ? '-' : '') . h(profit_loss_money($cogsTotal)) ?></strong></td>
         </tr>
         <tr>
           <th>Gross Profit</th>
@@ -262,7 +262,7 @@ render_header('Profit & Loss');
         </tr>
         <tr>
           <th>Less Operating Expenses</th>
-          <td><strong>-<?= h(profit_loss_money($opexTotal)) ?></strong></td>
+          <td><strong><?= ($opexTotal > 0 ? '-' : '') . h(profit_loss_money($opexTotal)) ?></strong></td>
         </tr>
         <tr>
           <th>Net Profit / Loss</th>
@@ -333,8 +333,8 @@ render_header('Profit & Loss');
             <td><?= h((string)$month['label']) ?></td>
             <td><?= h(profit_loss_money((float)$month['revenue'])) ?></td>
             <td><?= h(profit_loss_money((float)$month['tax'])) ?></td>
-            <td>-<?= h(profit_loss_money((float)$month['cogs'])) ?></td>
-            <td>-<?= h(profit_loss_money((float)$month['opex'])) ?></td>
+            <td><?= ((float)$month['cogs'] > 0 ? '-' : '') . h(profit_loss_money((float)$month['cogs'])) ?></td>
+            <td><?= ((float)$month['opex'] > 0 ? '-' : '') . h(profit_loss_money((float)$month['opex'])) ?></td>
             <td><strong><?= h(profit_loss_money((float)$month['net'])) ?></strong></td>
           </tr>
         <?php endforeach; ?>
