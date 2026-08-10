@@ -2110,6 +2110,7 @@ $pdo->exec("
     expense_date       DATE NOT NULL,
     amount             DECIMAL(12,2) NOT NULL DEFAULT 0.00,
     category_id        INT UNSIGNED NOT NULL,
+    group_type         ENUM('cogs','opex') NULL DEFAULT NULL,
     description        TEXT NOT NULL,
     vendor_name        VARCHAR(255) NULL,
     payment_source     VARCHAR(100) NULL,
@@ -2125,11 +2126,23 @@ $pdo->exec("
     UNIQUE KEY uniq_expenses_transaction_hash (transaction_hash),
     KEY idx_expenses_expense_date (expense_date),
     KEY idx_expenses_category_id (category_id),
+    KEY idx_expenses_group_type (group_type),
     KEY idx_expenses_source (source),
     KEY idx_expenses_created_by (created_by),
     CONSTRAINT fk_expenses_category FOREIGN KEY (category_id) REFERENCES expense_categories (id) ON DELETE RESTRICT,
     CONSTRAINT chk_expenses_amount_non_negative CHECK (amount >= 0)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+$_expenses_group_type_col = $pdo->query("SHOW COLUMNS FROM expenses LIKE 'group_type'");
+if ($_expenses_group_type_col === false || $_expenses_group_type_col->fetch(PDO::FETCH_ASSOC) === false) {
+  $pdo->exec("ALTER TABLE expenses ADD COLUMN group_type ENUM('cogs','opex') NULL DEFAULT NULL AFTER category_id");
+}
+$pdo->exec("
+  UPDATE expenses e
+  INNER JOIN expense_categories ec ON ec.id = e.category_id
+  SET e.group_type = ec.group_type
+  WHERE e.group_type IS NULL
 ");
 
 // Create expense_attachments table for receipts/invoices linked to expenses.

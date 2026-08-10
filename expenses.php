@@ -46,7 +46,7 @@ function expenses_is_ajax_request(): bool {
 function expenses_fetch_rows(PDO $pdo, array $whereParts, array $params, string $orderBy, ?int $limit = null): array {
   $stmt = $pdo->prepare(
     "SELECT e.id, e.expense_date, e.description, e.amount, e.vendor_name, e.payment_source, e.source,
-            ec.name AS category_name, ec.code AS category_code, ec.group_type,
+            ec.name AS category_name, ec.code AS category_code, COALESCE(e.group_type, ec.group_type) AS group_type,
             COALESCE(att.attachment_count, 0) AS attachment_count,
             COALESCE(il.invoice_count, 0) AS invoice_count,
             il.invoice_labels
@@ -264,8 +264,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           exit;
         }
 
-        $updateStmt = $pdo->prepare("UPDATE expense_categories SET group_type = ? WHERE id = ?");
-        $updateStmt->execute([$groupType, (int)$expenseRow['category_id']]);
+        $updateStmt = $pdo->prepare("UPDATE expenses SET group_type = ? WHERE id = ?");
+        $updateStmt->execute([$groupType, $expenseId]);
+
+        $_SESSION['expenses_csrf'] = bin2hex(random_bytes(24));
 
         $rows = expenses_fetch_rows($pdo, ['e.id = :expense_id'], [':expense_id' => $expenseId], 'e.id DESC', 1);
         if (!$rows) {
@@ -277,6 +279,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $attachmentsByExpense = expenses_load_attachments_by_expense($pdo, [$expenseId]);
         echo json_encode([
           'ok' => true,
+          'new_csrf' => (string)$_SESSION['expenses_csrf'],
           'rowHtml' => expenses_render_row($rows[0], $attachmentsByExpense[$expenseId] ?? [], (string)$_SESSION['expenses_csrf']),
         ]);
         exit;
@@ -442,7 +445,7 @@ $sortMap = [
   'date' => 'e.expense_date',
   'description' => 'e.description',
   'category' => 'ec.name',
-  'group' => 'ec.group_type',
+  'group' => 'COALESCE(e.group_type, ec.group_type)',
   'amount' => 'e.amount',
   'vendor' => 'e.vendor_name',
 ];
@@ -685,6 +688,12 @@ render_header('Expenses');
         throw new Error((payload && payload.error) || 'Unable to update the group.');
       }
 
+      if (typeof payload.new_csrf === 'string' && payload.new_csrf !== '') {
+        document.querySelectorAll('input[name="csrf_token"]').forEach((input) => {
+          input.value = payload.new_csrf;
+        });
+      }
+
       const template = document.createElement('template');
       template.innerHTML = payload.rowHtml.trim();
       const nextRow = template.content.firstElementChild;
@@ -697,10 +706,14 @@ render_header('Expenses');
       select.value = previousValue;
       alert(error instanceof Error ? error.message : 'Network error. Please try again.');
     } finally {
-      row.classList.remove('expenses-row-saving');
-      if (row.isConnected) {
-        select.disabled = false;
-        delete select.dataset.saving;
+      const activeRow = row.isConnected ? row : tableBody.querySelector(`#expense-row-${expenseId}`);
+      if (activeRow) {
+        activeRow.classList.remove('expenses-row-saving');
+        const activeSelect = activeRow.querySelector('.js-expense-group-select');
+        if (activeSelect) {
+          activeSelect.disabled = false;
+          delete activeSelect.dataset.saving;
+        }
       }
     }
   });
