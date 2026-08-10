@@ -95,6 +95,7 @@ $expenseRows = $expenseStmt->fetchAll(PDO::FETCH_ASSOC);
 
 $cogsTotal = 0.0;
 $opexTotal = 0.0;
+$excludedTotal = 0.0;
 $cogsRows = [];
 $opexRows = [];
 foreach ($expenseRows as $row) {
@@ -102,6 +103,11 @@ foreach ($expenseRows as $row) {
   if (($row['group_type'] ?? '') === 'cogs') {
     $cogsTotal += $amount;
     $cogsRows[] = $row;
+  } elseif (($row['group_type'] ?? '') === 'excluded') {
+    $excludedTotal += $amount;
+  } elseif (($row['group_type'] ?? '') === 'opex') {
+    $opexTotal += $amount;
+    $opexRows[] = $row;
   } else {
     $opexTotal += $amount;
     $opexRows[] = $row;
@@ -147,6 +153,10 @@ if ($months) {
     }
     if (($row['group_type'] ?? '') === 'cogs') {
       $months[$key]['cogs'] = (float)($row['expense_total'] ?? 0);
+    } elseif (($row['group_type'] ?? '') === 'excluded') {
+      continue;
+    } elseif (($row['group_type'] ?? '') === 'opex') {
+      $months[$key]['opex'] = (float)($row['expense_total'] ?? 0);
     } else {
       $months[$key]['opex'] = (float)($row['expense_total'] ?? 0);
     }
@@ -235,6 +245,12 @@ render_header('Profit & Loss');
           <th>Net Profit / Loss</th>
           <td><strong><?= h(profit_loss_money($netProfit)) ?></strong></td>
         </tr>
+        <?php if ($excludedTotal !== 0.0): ?>
+          <tr>
+            <th>Excluded Expenses (not included above)</th>
+            <td><?= h(profit_loss_money($excludedTotal)) ?></td>
+          </tr>
+        <?php endif; ?>
         <tr>
           <th>Sales Tax Collected (informational)</th>
           <td><?= h(profit_loss_money($totalSalesTax)) ?></td>

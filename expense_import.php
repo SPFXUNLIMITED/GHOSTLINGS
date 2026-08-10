@@ -150,14 +150,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 category_id,
                 group_type,
                 description,
-                vendor_name,
                 transaction_hash,
                 source,
                 source_filename,
                 source_line_number,
                 raw_row_json,
                 created_by
-             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
           );
 
           $lineNumber = 1;
@@ -205,6 +204,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $categoryMeta = $getCategoryMeta($categoryCode, $categoryRaw);
             $categoryId = (int)($categoryMeta['id'] ?? 0);
             $groupType = (string)($categoryMeta['group_type'] ?? 'opex');
+            if (!in_array($groupType, ['opex', 'cogs', 'excluded'], true)) {
+              $groupType = 'opex';
+            }
             $hash = expense_hash($dateYmd, $finalDescription, $expenseAmount);
             $rawRowJson = json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
@@ -215,7 +217,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $categoryId,
                 $groupType,
                 $finalDescription,
-                $merchant !== '' ? $merchant : null,
                 $hash,
                 'rocket_money_csv',
                 $originalName !== '' ? $originalName : null,

@@ -45,7 +45,7 @@ function expenses_is_ajax_request(): bool {
 
 function expenses_fetch_rows(PDO $pdo, array $whereParts, array $params, string $orderBy, ?int $limit = null): array {
   $stmt = $pdo->prepare(
-    "SELECT e.id, e.expense_date, e.description, e.amount, e.vendor_name, e.payment_source, e.source,
+    "SELECT e.id, e.expense_date, e.description, e.amount, e.payment_source, e.source,
             ec.name AS category_name, ec.code AS category_code, COALESCE(e.group_type, ec.group_type) AS group_type,
             COALESCE(att.attachment_count, 0) AS attachment_count,
             COALESCE(il.invoice_count, 0) AS invoice_count,
@@ -111,9 +111,13 @@ function expenses_load_attachments_by_expense(PDO $pdo, array $expenseIds): arra
 function expenses_render_row(array $expense, array $attachments, string $csrfToken): string {
   $expenseId = (int)($expense['id'] ?? 0);
   $groupType = (string)($expense['group_type'] ?? 'opex');
-  [$groupBg, $groupFg] = $groupType === 'cogs'
-    ? ['#fee2e2', '#991b1b']
-    : ['#dbeafe', '#1e3a8a'];
+  if ($groupType === 'cogs') {
+    [$groupBg, $groupFg] = ['#fee2e2', '#991b1b'];
+  } elseif ($groupType === 'excluded') {
+    [$groupBg, $groupFg] = ['#f3f4f6', '#374151'];
+  } else {
+    [$groupBg, $groupFg] = ['#dbeafe', '#1e3a8a'];
+  }
   $invoiceRaw = trim((string)($expense['invoice_labels'] ?? ''));
   $invoiceLinks = $invoiceRaw !== '' ? explode('||', $invoiceRaw) : [];
 
@@ -126,13 +130,6 @@ function expenses_render_row(array $expense, array $attachments, string $csrfTok
       <?= h((string)$expense['description']) ?>
       <div class="muted" style="font-size:.82em;">Source: <?= h((string)$expense['source']) ?></div>
     </td>
-    <td>
-      <?php if (trim((string)($expense['vendor_name'] ?? '')) !== ''): ?>
-        <?= h((string)$expense['vendor_name']) ?>
-      <?php else: ?>
-        <span class="muted">—</span>
-      <?php endif; ?>
-    </td>
     <td><?= h((string)$expense['category_name']) ?></td>
     <td>
       <select
@@ -144,6 +141,7 @@ function expenses_render_row(array $expense, array $attachments, string $csrfTok
       >
         <option value="opex" <?= $groupType === 'opex' ? 'selected' : '' ?>>OPEX</option>
         <option value="cogs" <?= $groupType === 'cogs' ? 'selected' : '' ?>>COGS</option>
+        <option value="excluded" <?= $groupType === 'excluded' ? 'selected' : '' ?>>Excluded</option>
       </select>
     </td>
     <td><strong>$<?= h(number_format((float)$expense['amount'], 2)) ?></strong></td>
@@ -249,7 +247,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode(['ok' => false, 'error' => 'Invalid expense selected.']);
         exit;
       }
-      if (!in_array($groupType, ['opex', 'cogs'], true)) {
+      if (!in_array($groupType, ['opex', 'cogs', 'excluded'], true)) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'Invalid group selected.']);
         exit;
@@ -448,7 +446,6 @@ $sortMap = [
   'category' => 'ec.name',
   'group' => 'COALESCE(e.group_type, ec.group_type)',
   'amount' => 'e.amount',
-  'vendor' => 'e.vendor_name',
 ];
 if (!isset($sortMap[$sort])) {
   $sort = 'date';
@@ -459,7 +456,6 @@ $params = [];
 
 if ($search !== '') {
   $where[] = "(e.description LIKE :q ESCAPE '\\\\'
-               OR COALESCE(e.vendor_name, '') LIKE :q ESCAPE '\\\\'
                OR COALESCE(ec.name, '') LIKE :q ESCAPE '\\\\')";
   $params[':q'] = '%' . expenses_escape_like($search) . '%';
 }
@@ -567,7 +563,7 @@ render_header('Expenses');
   <form method="get" class="row" style="align-items:flex-end;">
     <div style="flex:1 1 260px;">
       <label for="exp_q">Search</label>
-      <input id="exp_q" type="text" name="q" value="<?= h($search) ?>" placeholder="Description, vendor, category..." />
+      <input id="exp_q" type="text" name="q" value="<?= h($search) ?>" placeholder="Description, category..." />
     </div>
     <div style="width:220px;">
       <label for="exp_category">Category</label>
@@ -626,7 +622,6 @@ render_header('Expenses');
         <tr>
           <th><?= expenses_sort_link('date', 'Date', $sort, $dir) ?></th>
           <th><?= expenses_sort_link('description', 'Description', $sort, $dir) ?></th>
-          <th><?= expenses_sort_link('vendor', 'Vendor', $sort, $dir) ?></th>
           <th><?= expenses_sort_link('category', 'Category', $sort, $dir) ?></th>
           <th><?= expenses_sort_link('group', 'Group', $sort, $dir) ?></th>
           <th><?= expenses_sort_link('amount', 'Amount', $sort, $dir) ?></th>
@@ -637,7 +632,7 @@ render_header('Expenses');
       </thead>
       <tbody data-expenses-table-body>
         <?php if (!$expenses): ?>
-          <tr><td colspan="9" class="muted">No expenses found for the current filters.</td></tr>
+          <tr><td colspan="8" class="muted">No expenses found for the current filters.</td></tr>
         <?php endif; ?>
         <?php foreach ($expenses as $expense): ?>
           <?= expenses_render_row($expense, $attachmentsByExpense[(int)($expense['id'] ?? 0)] ?? [], (string)$_SESSION['expenses_csrf']) ?>
