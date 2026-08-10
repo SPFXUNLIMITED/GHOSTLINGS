@@ -230,7 +230,7 @@ render_header('Profit & Loss');
           <td><strong><?= h(profit_loss_money($totalRevenue)) ?></strong></td>
         </tr>
         <tr>
-          <th>Less COGS</th>
+          <th>Less COGS (Cost of Goods Sold)</th>
           <td><strong><?= ($cogsTotal > 0 ? '-' : '') . h(profit_loss_money($cogsTotal)) ?></strong></td>
         </tr>
         <tr>
@@ -302,8 +302,8 @@ render_header('Profit & Loss');
           <th>Month</th>
           <th>Revenue</th>
           <th>Sales Tax</th>
-          <th>COGS</th>
-          <th>OpEx</th>
+          <th>COGS (Cost of Goods Sold)</th>
+          <th>OpEx (Operating Expenses)</th>
           <th>Net</th>
         </tr>
       </thead>
