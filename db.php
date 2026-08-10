@@ -2112,7 +2112,6 @@ $pdo->exec("
     category_id        INT UNSIGNED NOT NULL,
     group_type         ENUM('cogs','opex','excluded') NULL DEFAULT NULL,
     description        TEXT NOT NULL,
-    vendor_name        VARCHAR(255) NULL,
     payment_source     VARCHAR(100) NULL,
     transaction_hash   CHAR(64) NOT NULL,
     source             VARCHAR(50) NOT NULL DEFAULT 'manual',
@@ -2155,6 +2154,11 @@ if (stripos((string)($_expense_categories_group_type['Type'] ?? ''), "'excluded'
 
 if (stripos((string)($_expenses_group_type_definition['Type'] ?? ''), "'excluded'") === false) {
   $pdo->exec("ALTER TABLE expenses MODIFY COLUMN group_type ENUM('cogs','opex','excluded') NULL DEFAULT NULL");
+}
+
+$_expenses_vendor_name_col = $pdo->query("SHOW COLUMNS FROM expenses LIKE 'vendor_name'");
+if ($_expenses_vendor_name_col && $_expenses_vendor_name_col->fetch(PDO::FETCH_ASSOC)) {
+  $pdo->exec("ALTER TABLE expenses DROP COLUMN vendor_name");
 }
 
 // Create expense_attachments table for receipts/invoices linked to expenses.
