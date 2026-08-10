@@ -2161,6 +2161,13 @@ if ($_expenses_vendor_name_col && $_expenses_vendor_name_col->fetch(PDO::FETCH_A
   $pdo->exec("ALTER TABLE expenses DROP COLUMN vendor_name");
 }
 
+// Add amazon_order_id column to expenses for tracking matched Amazon orders.
+$_expenses_amazon_order_id_col = $pdo->query("SHOW COLUMNS FROM expenses LIKE 'amazon_order_id'");
+if (!$_expenses_amazon_order_id_col || !$_expenses_amazon_order_id_col->fetch(PDO::FETCH_ASSOC)) {
+  $pdo->exec("ALTER TABLE expenses ADD COLUMN amazon_order_id VARCHAR(50) NULL DEFAULT NULL AFTER source_line_number");
+  $pdo->exec("ALTER TABLE expenses ADD KEY idx_expenses_amazon_order_id (amazon_order_id)");
+}
+
 // Create expense_attachments table for receipts/invoices linked to expenses.
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS expense_attachments (
