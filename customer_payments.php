@@ -29,6 +29,18 @@ function cp_format_money($value): string {
   return number_format((float)$value, 2);
 }
 
+function cp_sort_link(string $column, string $label, string $currentSort, string $currentDir): string {
+  $params = $_GET;
+  $nextDir = ($currentSort === $column && $currentDir === 'asc') ? 'desc' : 'asc';
+  $params['sort'] = $column;
+  $params['dir'] = $nextDir;
+  $arrow = '';
+  if ($currentSort === $column) {
+    $arrow = $currentDir === 'asc' ? ' ↑' : ' ↓';
+  }
+  return '<a href="?' . h(http_build_query($params)) . '">' . h($label . $arrow) . '</a>';
+}
+
 function cp_find_matching_customer(PDO $pdo, string $customer_name): ?array {
   $customer_name = trim($customer_name);
   if ($customer_name === '') {
@@ -231,6 +243,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $search        = trim((string)($_GET['q'] ?? ''));
 $method_filter = trim((string)($_GET['method'] ?? ''));
 $payment_id_filter = (int)($_GET['payment_id'] ?? 0);
+$cp_date_from  = trim((string)($_GET['date_from'] ?? ''));
+$cp_date_to    = trim((string)($_GET['date_to'] ?? ''));
+$cp_min_amount = trim((string)($_GET['min_amount'] ?? ''));
+$cp_max_amount = trim((string)($_GET['max_amount'] ?? ''));
+$cp_sort       = trim((string)($_GET['sort'] ?? 'date'));
+$cp_dir        = strtolower(trim((string)($_GET['dir'] ?? 'desc'))) === 'asc' ? 'asc' : 'desc';
+
+$cp_sort_map = [
+  'date'     => 'cp.payment_date',
+  'customer' => 'customer_name',
+  'amount'   => 'cp.amount',
+  'method'   => 'cp.payment_method',
+];
+if (!isset($cp_sort_map[$cp_sort])) {
+  $cp_sort = 'date';
+}
 
 $payment_methods = [
   'check'       => 'Check',
@@ -296,6 +324,22 @@ if ($payment_id_filter > 0) {
   $where_parts[] = 'cp.id = :payment_id';
   $params[':payment_id'] = $payment_id_filter;
 }
+if ($cp_date_from !== '') {
+  $where_parts[] = 'cp.payment_date >= :date_from';
+  $params[':date_from'] = $cp_date_from;
+}
+if ($cp_date_to !== '') {
+  $where_parts[] = 'cp.payment_date <= :date_to';
+  $params[':date_to'] = $cp_date_to;
+}
+if ($cp_min_amount !== '' && is_numeric($cp_min_amount)) {
+  $where_parts[] = 'cp.amount >= :min_amount';
+  $params[':min_amount'] = number_format((float)$cp_min_amount, 2, '.', '');
+}
+if ($cp_max_amount !== '' && is_numeric($cp_max_amount)) {
+  $where_parts[] = 'cp.amount <= :max_amount';
+  $params[':max_amount'] = number_format((float)$cp_max_amount, 2, '.', '');
+}
 
 $list_stmt = $pdo->prepare(
   "SELECT cp.id, cp.customer_id, cp.payment_date, cp.amount, cp.payment_method,
@@ -309,7 +353,7 @@ $list_stmt = $pdo->prepare(
    JOIN customers c ON c.id = cp.customer_id
    LEFT JOIN bank_transactions bt ON bt.linked_payment_id = cp.id
    WHERE " . implode(' AND ', $where_parts) . "
-   ORDER BY cp.payment_date DESC, cp.id DESC
+   ORDER BY {$cp_sort_map[$cp_sort]} {$cp_dir}, cp.id DESC
    LIMIT 300"
 );
 foreach ($params as $k => $v) {
@@ -479,6 +523,22 @@ render_header('Customer Payments');
         <?php endforeach; ?>
       </select>
     </div>
+    <div style="width:160px;">
+      <label for="cp_date_from">From Date</label>
+      <input id="cp_date_from" type="date" name="date_from" value="<?= h($cp_date_from) ?>" />
+    </div>
+    <div style="width:160px;">
+      <label for="cp_date_to">To Date</label>
+      <input id="cp_date_to" type="date" name="date_to" value="<?= h($cp_date_to) ?>" />
+    </div>
+    <div style="width:140px;">
+      <label for="cp_min_amount">Min Amount</label>
+      <input id="cp_min_amount" type="number" step="0.01" name="min_amount" value="<?= h($cp_min_amount) ?>" placeholder="0.00" />
+    </div>
+    <div style="width:140px;">
+      <label for="cp_max_amount">Max Amount</label>
+      <input id="cp_max_amount" type="number" step="0.01" name="max_amount" value="<?= h($cp_max_amount) ?>" placeholder="0.00" />
+    </div>
     <div class="row">
       <button type="submit" class="btn primary">Filter</button>
       <a class="btn" href="customer_payments.php">Clear</a>
@@ -581,10 +641,10 @@ render_header('Customer Payments');
       <thead>
         <tr>
           <th>#</th>
-          <th>Customer</th>
-          <th>Date</th>
-          <th>Amount</th>
-          <th>Method</th>
+          <th><?= cp_sort_link('customer', 'Customer', $cp_sort, $cp_dir) ?></th>
+          <th><?= cp_sort_link('date', 'Date', $cp_sort, $cp_dir) ?></th>
+          <th><?= cp_sort_link('amount', 'Amount', $cp_sort, $cp_dir) ?></th>
+          <th><?= cp_sort_link('method', 'Method', $cp_sort, $cp_dir) ?></th>
           <th>Reference / Check #</th>
           <th>Outstanding</th>
           <th class="col-actions">Actions</th>
@@ -593,7 +653,7 @@ render_header('Customer Payments');
       <tbody>
         <?php if (!$payments): ?>
           <tr><td colspan="<?= CP_TABLE_COLUMNS ?>" class="muted">No payments found.
-            <?= ($search !== '' || $method_filter !== '') ? '<a href="customer_payments.php">Clear filters</a>' : '' ?>
+            <?= ($search !== '' || $method_filter !== '' || $cp_date_from !== '' || $cp_date_to !== '' || $cp_min_amount !== '' || $cp_max_amount !== '') ? '<a href="customer_payments.php">Clear filters</a>' : '' ?>
           </td></tr>
         <?php endif; ?>
 
