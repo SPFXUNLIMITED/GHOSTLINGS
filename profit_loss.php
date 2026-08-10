@@ -80,15 +80,15 @@ $revenueCount = (int)($revenue['revenue_count'] ?? 0);
 
 $expenseStmt = $pdo->prepare(
   "SELECT
-     ec.group_type,
+    COALESCE(e.group_type, ec.group_type) AS group_type,
      ec.code,
      ec.name,
      COALESCE(SUM(e.amount), 0) AS total_amount
    FROM expenses e
    INNER JOIN expense_categories ec ON ec.id = e.category_id
    WHERE e.expense_date BETWEEN :date_from AND :date_to
-   GROUP BY ec.group_type, ec.code, ec.name
-   ORDER BY ec.group_type ASC, total_amount DESC"
+   GROUP BY COALESCE(e.group_type, ec.group_type), ec.code, ec.name
+   ORDER BY COALESCE(e.group_type, ec.group_type) ASC, total_amount DESC"
 );
 $expenseStmt->execute($params);
 $expenseRows = $expenseStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -131,12 +131,12 @@ if ($months) {
 
   $expenseByMonthStmt = $pdo->prepare(
     "SELECT DATE_FORMAT(e.expense_date, '%Y-%m') AS month_key,
-            ec.group_type,
+           COALESCE(e.group_type, ec.group_type) AS group_type,
             COALESCE(SUM(e.amount), 0) AS expense_total
      FROM expenses e
      INNER JOIN expense_categories ec ON ec.id = e.category_id
      WHERE e.expense_date BETWEEN :date_from AND :date_to
-     GROUP BY month_key, ec.group_type"
+     GROUP BY month_key, COALESCE(e.group_type, ec.group_type)"
   );
   $expenseByMonthStmt->execute($params);
 

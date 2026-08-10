@@ -43,20 +43,23 @@ if (empty($_SESSION['expense_import_csrf'])) {
 $errors = [];
 $summary = null;
 
-$categoryRows = $pdo->query("SELECT id, code, name FROM expense_categories ORDER BY sort_order ASC, name ASC")->fetchAll(PDO::FETCH_ASSOC);
+$categoryRows = $pdo->query("SELECT id, code, name, group_type FROM expense_categories ORDER BY sort_order ASC, name ASC")->fetchAll(PDO::FETCH_ASSOC);
 $categoriesByCode = [];
 foreach ($categoryRows as $catRow) {
-  $categoriesByCode[(string)$catRow['code']] = (int)$catRow['id'];
+  $categoriesByCode[(string)$catRow['code']] = [
+    'id' => (int)$catRow['id'],
+    'group_type' => (string)($catRow['group_type'] ?? 'opex'),
+  ];
 }
 
-$getCategoryId = function (string $categoryCode, string $categoryName) use ($pdo, &$categoriesByCode): int {
+$getCategoryMeta = function (string $categoryCode, string $categoryName) use ($pdo, &$categoriesByCode): array {
   $categoryCode = trim($categoryCode);
   if ($categoryCode === '') {
     $categoryCode = 'uncategorized';
   }
 
   if (isset($categoriesByCode[$categoryCode])) {
-    return (int)$categoriesByCode[$categoryCode];
+    return $categoriesByCode[$categoryCode];
   }
 
   $insert = $pdo->prepare(
@@ -67,15 +70,19 @@ $getCategoryId = function (string $categoryCode, string $categoryName) use ($pdo
   $label = trim($categoryName) !== '' ? trim($categoryName) : ucwords(str_replace('_', ' ', $categoryCode));
   $insert->execute([$categoryCode, mb_substr($label, 0, 150)]);
 
-  $fetch = $pdo->prepare("SELECT id FROM expense_categories WHERE code = ? LIMIT 1");
+  $fetch = $pdo->prepare("SELECT id, group_type FROM expense_categories WHERE code = ? LIMIT 1");
   $fetch->execute([$categoryCode]);
-  $id = (int)($fetch->fetchColumn() ?: 0);
+  $row = $fetch->fetch(PDO::FETCH_ASSOC) ?: [];
+  $id = (int)($row['id'] ?? 0);
   if ($id <= 0) {
     throw new RuntimeException('Unable to resolve expense category ID for code: ' . $categoryCode);
   }
 
-  $categoriesByCode[$categoryCode] = $id;
-  return $id;
+  $categoriesByCode[$categoryCode] = [
+    'id' => $id,
+    'group_type' => (string)($row['group_type'] ?? 'opex'),
+  ];
+  return $categoriesByCode[$categoryCode];
 };
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -141,6 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 expense_date,
                 amount,
                 category_id,
+                group_type,
                 description,
                 vendor_name,
                 transaction_hash,
@@ -149,7 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 source_line_number,
                 raw_row_json,
                 created_by
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
           );
 
           $lineNumber = 1;
@@ -194,7 +202,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $dateYmd = $parsedDate->format('Y-m-d');
             $categoryCode = expense_category_guess_code($categoryRaw, $finalDescription);
-            $categoryId = $getCategoryId($categoryCode, $categoryRaw);
+            $categoryMeta = $getCategoryMeta($categoryCode, $categoryRaw);
+            $categoryId = (int)($categoryMeta['id'] ?? 0);
+            $groupType = (string)($categoryMeta['group_type'] ?? 'opex');
             $hash = expense_hash($dateYmd, $finalDescription, $expenseAmount);
             $rawRowJson = json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
@@ -203,6 +213,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $dateYmd,
                 expense_amount_string($expenseAmount),
                 $categoryId,
+                $groupType,
                 $finalDescription,
                 $merchant !== '' ? $merchant : null,
                 $hash,
