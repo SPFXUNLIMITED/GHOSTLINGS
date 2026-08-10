@@ -2567,6 +2567,38 @@ if (!function_exists('invoice_signature_access_expires_at')) {
   }
 }
 
+if (!function_exists('db_delete_expense')) {
+  /**
+   * Delete an expense and its associated attachment files from disk.
+   * Child rows in expense_attachments and expense_invoice_links are removed
+   * automatically via ON DELETE CASCADE foreign keys.
+   *
+   * @throws Throwable on DB or unexpected filesystem errors
+   */
+  function db_delete_expense(PDO $pdo, int $expenseId): void {
+    // Collect stored filenames before deleting so we can clean up disk files.
+    $attachStmt = $pdo->prepare(
+      "SELECT stored_name FROM expense_attachments WHERE expense_id = ?"
+    );
+    $attachStmt->execute([$expenseId]);
+    $storedNames = $attachStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    $pdo->prepare("DELETE FROM expenses WHERE id = ?")->execute([$expenseId]);
+
+    $uploadsDir = __DIR__ . '/uploads';
+    foreach ($storedNames as $storedName) {
+      $storedName = (string)$storedName;
+      if ($storedName === '') {
+        continue;
+      }
+      $filePath = $uploadsDir . '/' . basename($storedName);
+      if (is_file($filePath)) {
+        @unlink($filePath);
+      }
+    }
+  }
+}
+
 if (!function_exists('invoice_signature_access_is_expired')) {
   // Treat blank or invalid timestamps as expired so inactive links fail closed.
   function invoice_signature_access_is_expired(?string $expires_at): bool {
