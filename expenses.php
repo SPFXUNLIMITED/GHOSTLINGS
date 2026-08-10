@@ -39,6 +39,17 @@ function expenses_sort_link(string $column, string $label, string $currentSort, 
   return '<a href="?' . h(http_build_query($params)) . '">' . h($label . $arrow) . '</a>';
 }
 
+function expenses_source_label(?string $source): string {
+  $source = trim((string)$source);
+  return match ($source) {
+    'amazon_csv' => 'Amazon Import',
+    'rocket_money_csv' => 'Rocket CSV',
+    'manual' => 'Manual',
+    '' => 'Unknown',
+    default => ucwords(str_replace(['_', '-'], ' ', $source)),
+  };
+}
+
 function expenses_is_ajax_request(): bool {
   return strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest';
 }
@@ -131,7 +142,9 @@ function expenses_render_row(array $expense, array $attachments, string $csrfTok
     <td style="word-wrap:break-word;overflow-wrap:break-word;max-width:220px;">
       <strong>#<?= $expenseId ?></strong><br>
       <?= h((string)$expense['description']) ?>
-      <div class="muted" style="font-size:.82em;">Source: <?= h((string)$expense['source']) ?></div>
+      <div style="margin-top:6px;">
+        <span class="expenses-pill" style="background:#f3f4f6;color:#374151;">Source: <?= h(expenses_source_label((string)($expense['source'] ?? ''))) ?></span>
+      </div>
     </td>
     <td><?= h((string)$expense['category_name']) ?></td>
     <td>
@@ -549,6 +562,7 @@ if (($_GET['saved'] ?? '') === '1' && !$errors) {
 
 $search = trim((string)($_GET['q'] ?? ''));
 $categoryFilter = trim((string)($_GET['category_id'] ?? ''));
+$sourceFilter = trim((string)($_GET['source_filter'] ?? ''));
 $dateFrom = trim((string)($_GET['date_from'] ?? ''));
 $dateTo = trim((string)($_GET['date_to'] ?? ''));
 $minAmountRaw = trim((string)($_GET['min_amount'] ?? ''));
@@ -566,6 +580,15 @@ $categoryOptions = $pdo->query(
 $categoryOptionIds = [];
 foreach ($categoryOptions as $cat) {
   $categoryOptionIds[(int)$cat['id']] = true;
+}
+
+$sourceOptions = [
+  '' => 'All sources',
+  'amazon_csv' => 'Amazon Import',
+  '__other__' => 'Other Sources',
+];
+if (!array_key_exists($sourceFilter, $sourceOptions)) {
+  $sourceFilter = '';
 }
 
 $sortMap = [
@@ -592,6 +615,14 @@ $categoryIdInt = (int)$categoryFilter;
 if ($categoryFilter !== '' && isset($categoryOptionIds[$categoryIdInt])) {
   $where[] = 'e.category_id = :category_id';
   $params[':category_id'] = $categoryIdInt;
+}
+
+if ($sourceFilter === 'amazon_csv') {
+  $where[] = 'e.source = :source_exact';
+  $params[':source_exact'] = 'amazon_csv';
+} elseif ($sourceFilter === '__other__') {
+  $where[] = 'e.source <> :source_other';
+  $params[':source_other'] = 'amazon_csv';
 }
 
 if ($dateFrom !== '') {
@@ -703,6 +734,14 @@ render_header('Expenses');
           <option value="<?= $catId ?>" <?= $categoryIdInt === $catId ? 'selected' : '' ?>>
             <?= h((string)$cat['name']) ?> (<?= h(strtoupper((string)$cat['group_type'])) ?>)
           </option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <div style="width:180px;">
+      <label for="exp_source_filter">Source</label>
+      <select id="exp_source_filter" name="source_filter">
+        <?php foreach ($sourceOptions as $sourceValue => $sourceLabel): ?>
+          <option value="<?= h($sourceValue) ?>" <?= $sourceFilter === $sourceValue ? 'selected' : '' ?>><?= h($sourceLabel) ?></option>
         <?php endforeach; ?>
       </select>
     </div>
