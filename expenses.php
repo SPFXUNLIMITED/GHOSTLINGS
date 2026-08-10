@@ -128,7 +128,7 @@ function expenses_render_row(array $expense, array $attachments, string $csrfTok
       <input type="checkbox" class="js-expense-row-check" data-expense-id="<?= $expenseId ?>" aria-label="Select expense #<?= $expenseId ?>" />
     </td>
     <td><?= h(fmt_date_mdY((string)$expense['expense_date'])) ?></td>
-    <td>
+    <td style="word-wrap:break-word;overflow-wrap:break-word;max-width:220px;">
       <strong>#<?= $expenseId ?></strong><br>
       <?= h((string)$expense['description']) ?>
       <div class="muted" style="font-size:.82em;">Source: <?= h((string)$expense['source']) ?></div>
@@ -140,7 +140,7 @@ function expenses_render_row(array $expense, array $attachments, string $csrfTok
         data-expense-id="<?= $expenseId ?>"
         data-group-value="<?= h($groupType) ?>"
         aria-label="Group for expense #<?= $expenseId ?>"
-        style="min-width:110px;background:<?= h($groupBg) ?>;color:<?= h($groupFg) ?>;border-color:<?= h($groupFg) ?>;font-weight:600;"
+        style="min-width:100px;background:<?= h($groupBg) ?>;color:<?= h($groupFg) ?>;border-color:<?= h($groupFg) ?>;font-weight:600;"
       >
         <option value="opex" <?= $groupType === 'opex' ? 'selected' : '' ?>>OPEX</option>
         <option value="cogs" <?= $groupType === 'cogs' ? 'selected' : '' ?>>COGS</option>
@@ -180,7 +180,7 @@ function expenses_render_row(array $expense, array $attachments, string $csrfTok
         </div>
       <?php endif; ?>
     </td>
-    <td id="expense-<?= $expenseId ?>">
+    <td id="expense-<?= $expenseId ?>" style="word-wrap:break-word;overflow-wrap:break-word;min-width:300px;">
       <form method="post" enctype="multipart/form-data" class="expenses-inline-form">
         <input type="hidden" name="csrf_token" value="<?= h($csrfToken) ?>" />
         <input type="hidden" name="action" value="upload_attachment" />
@@ -734,7 +734,7 @@ render_header('Expenses');
 .expenses-inline-form{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;}
 .expenses-inline-form input[type="number"],
 .expenses-inline-form input[type="text"],
-.expenses-inline-form input[type="file"]{max-width:180px;}
+.expenses-inline-form input[type="file"]{max-width:140px;}
 .expenses-pill{display:inline-flex;align-items:center;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600;white-space:nowrap;}
 .expenses-group-select{padding:4px 10px;border-radius:999px;}
 .expenses-row-saving{opacity:.65;}
@@ -754,11 +754,17 @@ render_header('Expenses');
 
 <div class="card">
   <div class="table-wrap" style="overflow-x:auto;">
-    <table class="table-auto" style="min-width:1320px;">
+    <table class="table-auto" style="min-width:1280px;table-layout:fixed;width:100%;">
       <colgroup>
         <col style="width:40px;" />
-        <col />
-        <col style="width:180px;" />
+        <col style="width:100px;" />
+        <col style="width:220px;" />
+        <col style="width:140px;" />
+        <col style="width:130px;" />
+        <col style="width:100px;" />
+        <col style="width:90px;" />
+        <col style="width:160px;" />
+        <col style="width:300px;" />
       </colgroup>
       <thead>
         <tr>
