@@ -232,11 +232,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $errors[] = 'Security token mismatch. Please refresh and try again.';
   } else {
-    if ($action !== 'update_group') {
+    if ($action === 'update_group' && !$isAjaxGroupUpdate) {
+      $errors[] = 'Invalid group update request.';
+    } elseif ($action !== 'update_group') {
       $_SESSION['expenses_csrf'] = bin2hex(random_bytes(24));
     }
-
-    if ($action === 'update_group') {
+    if ($action === 'update_group' && $isAjaxGroupUpdate) {
       header('Content-Type: application/json; charset=UTF-8');
       header('X-Content-Type-Options: nosniff');
 
@@ -654,6 +655,11 @@ render_header('Expenses');
   tableBody.addEventListener('change', async (event) => {
     const select = event.target.closest('.js-expense-group-select');
     if (!select || select.dataset.saving === '1') return;
+    if (tableBody.dataset.groupUpdateInFlight === '1') {
+      select.value = select.dataset.groupValue || select.value;
+      alert('Please wait for the current group update to finish.');
+      return;
+    }
 
     const expenseId = parseInt(select.dataset.expenseId || '0', 10);
     const previousValue = select.dataset.groupValue || '';
@@ -665,6 +671,7 @@ render_header('Expenses');
     if (!row || !csrfInput) return;
 
     select.dataset.saving = '1';
+    tableBody.dataset.groupUpdateInFlight = '1';
     select.disabled = true;
     row.classList.add('expenses-row-saving');
 
@@ -715,6 +722,7 @@ render_header('Expenses');
           delete activeSelect.dataset.saving;
         }
       }
+      delete tableBody.dataset.groupUpdateInFlight;
     }
   });
 })();
