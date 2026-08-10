@@ -658,7 +658,7 @@ render_header('Expenses');
     if (!expenseId || !nextValue || nextValue === previousValue) return;
 
     const row = select.closest('tr');
-    const csrfInput = document.querySelector('input[name="csrf_token"]');
+    const csrfInput = row.querySelector('input[name="csrf_token"]');
     if (!row || !csrfInput) return;
 
     select.dataset.saving = '1';
