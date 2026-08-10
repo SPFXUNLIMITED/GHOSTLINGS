@@ -2135,7 +2135,8 @@ $pdo->exec("
 ");
 
 $_expenses_group_type_col = $pdo->query("SHOW COLUMNS FROM expenses LIKE 'group_type'");
-if ($_expenses_group_type_col === false || $_expenses_group_type_col->fetch(PDO::FETCH_ASSOC) === false) {
+$_expenses_group_type_definition = $_expenses_group_type_col ? ($_expenses_group_type_col->fetch(PDO::FETCH_ASSOC) ?: []) : [];
+if (!$_expenses_group_type_definition) {
   $pdo->exec("ALTER TABLE expenses ADD COLUMN group_type ENUM('cogs','opex','excluded') NULL DEFAULT NULL AFTER category_id");
   $pdo->exec("
     UPDATE expenses e
@@ -2143,10 +2144,18 @@ if ($_expenses_group_type_col === false || $_expenses_group_type_col->fetch(PDO:
     SET e.group_type = ec.group_type
     WHERE e.group_type IS NULL
   ");
+  $_expenses_group_type_definition = ['Type' => "enum('cogs','opex','excluded')"];
 }
 
-$pdo->exec("ALTER TABLE expense_categories MODIFY COLUMN group_type ENUM('cogs','opex','excluded') NOT NULL DEFAULT 'opex'");
-$pdo->exec("ALTER TABLE expenses MODIFY COLUMN group_type ENUM('cogs','opex','excluded') NULL DEFAULT NULL");
+$_expense_categories_group_type_col = $pdo->query("SHOW COLUMNS FROM expense_categories LIKE 'group_type'");
+$_expense_categories_group_type = $_expense_categories_group_type_col ? ($_expense_categories_group_type_col->fetch(PDO::FETCH_ASSOC) ?: []) : [];
+if (stripos((string)($_expense_categories_group_type['Type'] ?? ''), "'excluded'") === false) {
+  $pdo->exec("ALTER TABLE expense_categories MODIFY COLUMN group_type ENUM('cogs','opex','excluded') NOT NULL DEFAULT 'opex'");
+}
+
+if (stripos((string)($_expenses_group_type_definition['Type'] ?? ''), "'excluded'") === false) {
+  $pdo->exec("ALTER TABLE expenses MODIFY COLUMN group_type ENUM('cogs','opex','excluded') NULL DEFAULT NULL");
+}
 
 // Create expense_attachments table for receipts/invoices linked to expenses.
 $pdo->exec("

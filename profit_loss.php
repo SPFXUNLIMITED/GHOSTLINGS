@@ -103,11 +103,14 @@ foreach ($expenseRows as $row) {
   if (($row['group_type'] ?? '') === 'cogs') {
     $cogsTotal += $amount;
     $cogsRows[] = $row;
+  } elseif (($row['group_type'] ?? '') === 'excluded') {
+    $excludedTotal += $amount;
   } elseif (($row['group_type'] ?? '') === 'opex') {
     $opexTotal += $amount;
     $opexRows[] = $row;
   } else {
-    $excludedTotal += $amount;
+    $opexTotal += $amount;
+    $opexRows[] = $row;
   }
 }
 
@@ -150,7 +153,11 @@ if ($months) {
     }
     if (($row['group_type'] ?? '') === 'cogs') {
       $months[$key]['cogs'] = (float)($row['expense_total'] ?? 0);
+    } elseif (($row['group_type'] ?? '') === 'excluded') {
+      continue;
     } elseif (($row['group_type'] ?? '') === 'opex') {
+      $months[$key]['opex'] = (float)($row['expense_total'] ?? 0);
+    } else {
       $months[$key]['opex'] = (float)($row['expense_total'] ?? 0);
     }
   }
@@ -238,10 +245,10 @@ render_header('Profit & Loss');
           <th>Net Profit / Loss</th>
           <td><strong><?= h(profit_loss_money($netProfit)) ?></strong></td>
         </tr>
-        <?php if ($excludedTotal > 0): ?>
+        <?php if ($excludedTotal !== 0.0): ?>
           <tr>
             <th>Excluded Expenses (not included above)</th>
-            <td><?= ($excludedTotal > 0 ? '-' : '') . h(profit_loss_money($excludedTotal)) ?></td>
+            <td><?= h(profit_loss_money($excludedTotal)) ?></td>
           </tr>
         <?php endif; ?>
         <tr>
