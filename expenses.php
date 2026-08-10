@@ -111,9 +111,13 @@ function expenses_load_attachments_by_expense(PDO $pdo, array $expenseIds): arra
 function expenses_render_row(array $expense, array $attachments, string $csrfToken): string {
   $expenseId = (int)($expense['id'] ?? 0);
   $groupType = (string)($expense['group_type'] ?? 'opex');
-  [$groupBg, $groupFg] = $groupType === 'cogs'
-    ? ['#fee2e2', '#991b1b']
-    : ['#dbeafe', '#1e3a8a'];
+  if ($groupType === 'cogs') {
+    [$groupBg, $groupFg] = ['#fee2e2', '#991b1b'];
+  } elseif ($groupType === 'excluded') {
+    [$groupBg, $groupFg] = ['#f3f4f6', '#374151'];
+  } else {
+    [$groupBg, $groupFg] = ['#dbeafe', '#1e3a8a'];
+  }
   $invoiceRaw = trim((string)($expense['invoice_labels'] ?? ''));
   $invoiceLinks = $invoiceRaw !== '' ? explode('||', $invoiceRaw) : [];
 
@@ -144,6 +148,7 @@ function expenses_render_row(array $expense, array $attachments, string $csrfTok
       >
         <option value="opex" <?= $groupType === 'opex' ? 'selected' : '' ?>>OPEX</option>
         <option value="cogs" <?= $groupType === 'cogs' ? 'selected' : '' ?>>COGS</option>
+        <option value="excluded" <?= $groupType === 'excluded' ? 'selected' : '' ?>>Excluded</option>
       </select>
     </td>
     <td><strong>$<?= h(number_format((float)$expense['amount'], 2)) ?></strong></td>
@@ -249,7 +254,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode(['ok' => false, 'error' => 'Invalid expense selected.']);
         exit;
       }
-      if (!in_array($groupType, ['opex', 'cogs'], true)) {
+      if (!in_array($groupType, ['opex', 'cogs', 'excluded'], true)) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'Invalid group selected.']);
         exit;

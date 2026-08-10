@@ -2076,7 +2076,7 @@ $pdo->exec("
     id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
     code       VARCHAR(64)  NOT NULL,
     name       VARCHAR(150) NOT NULL,
-    group_type ENUM('cogs','opex') NOT NULL DEFAULT 'opex',
+    group_type ENUM('cogs','opex','excluded') NOT NULL DEFAULT 'opex',
     sort_order INT NOT NULL DEFAULT 0,
     is_active  TINYINT(1) NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -2110,7 +2110,7 @@ $pdo->exec("
     expense_date       DATE NOT NULL,
     amount             DECIMAL(12,2) NOT NULL DEFAULT 0.00,
     category_id        INT UNSIGNED NOT NULL,
-    group_type         ENUM('cogs','opex') NULL DEFAULT NULL,
+    group_type         ENUM('cogs','opex','excluded') NULL DEFAULT NULL,
     description        TEXT NOT NULL,
     vendor_name        VARCHAR(255) NULL,
     payment_source     VARCHAR(100) NULL,
@@ -2136,7 +2136,7 @@ $pdo->exec("
 
 $_expenses_group_type_col = $pdo->query("SHOW COLUMNS FROM expenses LIKE 'group_type'");
 if ($_expenses_group_type_col === false || $_expenses_group_type_col->fetch(PDO::FETCH_ASSOC) === false) {
-  $pdo->exec("ALTER TABLE expenses ADD COLUMN group_type ENUM('cogs','opex') NULL DEFAULT NULL AFTER category_id");
+  $pdo->exec("ALTER TABLE expenses ADD COLUMN group_type ENUM('cogs','opex','excluded') NULL DEFAULT NULL AFTER category_id");
   $pdo->exec("
     UPDATE expenses e
     INNER JOIN expense_categories ec ON ec.id = e.category_id
@@ -2144,6 +2144,9 @@ if ($_expenses_group_type_col === false || $_expenses_group_type_col->fetch(PDO:
     WHERE e.group_type IS NULL
   ");
 }
+
+$pdo->exec("ALTER TABLE expense_categories MODIFY COLUMN group_type ENUM('cogs','opex','excluded') NOT NULL DEFAULT 'opex'");
+$pdo->exec("ALTER TABLE expenses MODIFY COLUMN group_type ENUM('cogs','opex','excluded') NULL DEFAULT NULL");
 
 // Create expense_attachments table for receipts/invoices linked to expenses.
 $pdo->exec("
