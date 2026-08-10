@@ -160,6 +160,36 @@ if ($months) {
     }
   }
 
+  $taxByMonthStmt = $pdo->prepare(
+    "SELECT DATE_FORMAT(paid_in_range.first_payment_date, '%Y-%m') AS month_key,
+            COALESCE(SUM(q.tax_amount), 0) AS tax_total
+     FROM quotes q
+     INNER JOIN (
+       SELECT ica2.quote_id, MIN(cp2.payment_date) AS first_payment_date
+       FROM invoice_credit_applications ica2
+       INNER JOIN customer_payments cp2 ON cp2.id = ica2.payment_id
+       WHERE cp2.payment_date BETWEEN :date_from AND :date_to
+       GROUP BY ica2.quote_id
+     ) paid_in_range ON paid_in_range.quote_id = q.id
+     INNER JOIN (
+       SELECT quote_id, SUM(applied_amount) AS total_applied
+       FROM invoice_credit_applications
+       GROUP BY quote_id
+     ) ica_sum ON ica_sum.quote_id = q.id
+     WHERE q.tax_amount > 0
+       AND (q.subtotal_amount + q.tax_amount) > 0.01
+       AND ica_sum.total_applied >= (q.subtotal_amount + q.tax_amount - 0.01)
+     GROUP BY month_key"
+  );
+  $taxByMonthStmt->execute($params);
+
+  foreach ($taxByMonthStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    $key = (string)($row['month_key'] ?? '');
+    if ($key !== '' && isset($months[$key])) {
+      $months[$key]['tax'] = (float)($row['tax_total'] ?? 0);
+    }
+  }
+
   $expenseByMonthStmt = $pdo->prepare(
     "SELECT DATE_FORMAT(e.expense_date, '%Y-%m') AS month_key,
            COALESCE(e.group_type, ec.group_type) AS group_type,
