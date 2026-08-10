@@ -86,8 +86,8 @@ $getOrCreateCategory = function (string $code, string $label) use ($pdo, &$categ
   return $meta;
 };
 
-// "excluded" category used for new unmatched Amazon rows
-$excludedMeta = $getOrCreateCategory('excluded', 'Excluded');
+// "cogs" category used for new unmatched Amazon rows
+$excludedMeta = $getOrCreateCategory('cogs', 'COGS');
 
 // ── AJAX: confirm matched/review rows ─────────────────────────────────────
 
@@ -151,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
           $dateYmd,
           expense_amount_string($amount),
           $excludedMeta['id'],
-          'excluded',
+          'cogs',
           $description,
           $orderId !== '' ? $orderId : null,
           $hash,
@@ -396,7 +396,7 @@ render_header('Amazon Import');
       <li class="laser-rfq-hero-pill"><span aria-hidden="true">📦</span> Amazon CSV</li>
       <li class="laser-rfq-hero-pill"><span aria-hidden="true">🔍</span> ±2-day matching</li>
       <li class="laser-rfq-hero-pill"><span aria-hidden="true">🕵️</span> Manual review</li>
-      <li class="laser-rfq-hero-pill"><span aria-hidden="true">🚫</span> Auto-excluded</li>
+      <li class="laser-rfq-hero-pill"><span aria-hidden="true">💰</span> Auto-COGS</li>
     </ul>
   </div>
   <div class="laser-rfq-hero-actions">
