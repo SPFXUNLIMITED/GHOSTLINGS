@@ -38,7 +38,7 @@ function cp_sort_link(string $column, string $label, string $currentSort, string
   if ($currentSort === $column) {
     $arrow = $currentDir === 'asc' ? ' ↑' : ' ↓';
   }
-  return '<a href="?' . h(http_build_query($params)) . '">' . h($label . $arrow) . '</a>';
+  return '<a href="?' . h(http_build_query($params)) . '">' . h($label) . $arrow . '</a>';
 }
 
 function cp_find_matching_customer(PDO $pdo, string $customer_name): ?array {
@@ -245,6 +245,13 @@ $method_filter = trim((string)($_GET['method'] ?? ''));
 $payment_id_filter = (int)($_GET['payment_id'] ?? 0);
 $cp_date_from  = trim((string)($_GET['date_from'] ?? ''));
 $cp_date_to    = trim((string)($_GET['date_to'] ?? ''));
+// Validate date format YYYY-MM-DD to prevent invalid values reaching the query
+if ($cp_date_from !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $cp_date_from)) {
+  $cp_date_from = '';
+}
+if ($cp_date_to !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $cp_date_to)) {
+  $cp_date_to = '';
+}
 $cp_min_amount = trim((string)($_GET['min_amount'] ?? ''));
 $cp_max_amount = trim((string)($_GET['max_amount'] ?? ''));
 $cp_sort       = trim((string)($_GET['sort'] ?? 'date'));
