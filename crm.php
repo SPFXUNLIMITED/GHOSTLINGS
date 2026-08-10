@@ -729,10 +729,6 @@ render_header('CRM');
                 <label for="send-email-subject" style="display:block; font-weight:600; margin-bottom:6px;">Subject</label>
                 <input id="send-email-subject" type="text" name="subject" style="width:100%;" required />
             </div>
-            <div style="margin-bottom:14px;">
-                <label for="send-email-personal-note" style="display:block; font-weight:600; margin-bottom:6px;">Personal Note <span class="muted" style="font-weight:400;">(optional — appears at the top of the email)</span></label>
-                <textarea id="send-email-personal-note" rows="3" style="width:100%; resize:vertical;" placeholder="Add a personal message here…"></textarea>
-            </div>
             <div style="margin-bottom:18px;">
                 <label for="send-email-body" style="display:block; font-weight:600; margin-bottom:6px;">Message Body <span id="send-email-template-label" class="muted" style="font-weight:400;"></span></label>
                 <textarea id="send-email-body" name="body" rows="8" style="width:100%; resize:vertical;" required></textarea>
@@ -878,7 +874,6 @@ render_header('CRM');
         document.getElementById('send-email-to').value = customerEmail;
         document.getElementById('send-email-subject').value = '';
         document.getElementById('send-email-body').value = '';
-        document.getElementById('send-email-personal-note').value = '';
         document.getElementById('send-email-template-label').textContent = '';
         document.getElementById('send-email-error').style.display = 'none';
         document.getElementById('send-email-overlay').style.display = 'flex';
@@ -1034,28 +1029,12 @@ render_header('CRM');
     var submitBtn = document.getElementById('send-email-submit');
     errorBox.style.display = 'none';
 
-    // Combine personal note + template body into the body field before submission
-    var personalNote = (document.getElementById('send-email-personal-note').value || '').trim();
-    var templateBody = (document.getElementById('send-email-body').value || '').trim();
-    var combinedBody = personalNote !== '' && templateBody !== ''
-      ? personalNote + '\n\n' + templateBody
-      : (personalNote !== '' ? personalNote : templateBody);
-    document.getElementById('send-email-body').value = combinedBody;
-
-    function restoreFields() {
-      if (personalNote !== '') {
-        document.getElementById('send-email-personal-note').value = personalNote;
-        document.getElementById('send-email-body').value = templateBody;
-      }
-    }
-
     submitBtn.disabled = true;
     submitBtn.textContent = 'Sending…';
     fetch('crm.php', { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: new FormData(event.target) })
       .then(function (resp) { return resp.json(); })
       .then(function (json) {
         if (!json || !json.ok) {
-          restoreFields();
           throw new Error(json && json.error ? json.error : 'An error occurred.');
         }
         updateCsrf(json.new_csrf || '');
@@ -1063,7 +1042,6 @@ render_header('CRM');
         window.location.reload();
       })
       .catch(function (err) {
-        restoreFields();
         errorBox.textContent = err.message || 'Network error. Please try again.';
         errorBox.style.display = '';
         submitBtn.disabled = false;
