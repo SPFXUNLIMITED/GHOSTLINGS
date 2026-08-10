@@ -6,6 +6,9 @@ require_admin_or_moderator();
 const PROFIT_LOSS_EXPORT_DEFAULT_BASIS = 'accrual';
 
 function pl_export_money(float $value): string {
+  if ($value < 0) {
+    return '-$' . number_format(-$value, 2);
+  }
   return '$' . number_format($value, 2);
 }
 
@@ -147,11 +150,11 @@ if ($months) {
       continue;
     }
     if (($row['group_type'] ?? '') === 'cogs') {
-      $months[$key]['cogs'] = (float)($row['expense_total'] ?? 0);
+      $months[$key]['cogs'] += (float)($row['expense_total'] ?? 0);
     } elseif (($row['group_type'] ?? '') === 'excluded') {
       continue;
     } else {
-      $months[$key]['opex'] = (float)($row['expense_total'] ?? 0);
+      $months[$key]['opex'] += (float)($row['expense_total'] ?? 0);
     }
   }
 
