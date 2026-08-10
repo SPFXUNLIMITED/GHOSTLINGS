@@ -66,7 +66,6 @@ $params = [
 $revenueSql =
   "SELECT
      COALESCE(SUM(cp.amount), 0) AS total_revenue,
-     0 AS total_tax,
      COUNT(*) AS revenue_count
    FROM customer_payments cp
    WHERE cp.payment_date BETWEEN :date_from AND :date_to";
@@ -75,8 +74,33 @@ $revenueStmt = $pdo->prepare($revenueSql);
 $revenueStmt->execute($params);
 $revenue = $revenueStmt->fetch(PDO::FETCH_ASSOC) ?: [];
 $totalRevenue = (float)($revenue['total_revenue'] ?? 0);
-$totalSalesTax = (float)($revenue['total_tax'] ?? 0);
 $revenueCount = (int)($revenue['revenue_count'] ?? 0);
+
+// Sum tax_amount from invoices (quotes) that are fully paid and had a payment
+// recorded within the selected date range.  An invoice is considered paid when
+// total applied credits cover its total due (subtotal + tax) within the $0.01
+// epsilon used by the invoice tracker.
+$taxSql =
+  "SELECT COALESCE(SUM(q.tax_amount), 0) AS total_tax
+   FROM quotes q
+   WHERE q.tax_amount > 0
+     AND (q.subtotal_amount + q.tax_amount) > 0.01
+     AND (
+       SELECT COALESCE(SUM(ica.applied_amount), 0)
+       FROM invoice_credit_applications ica
+       WHERE ica.quote_id = q.id
+     ) >= (q.subtotal_amount + q.tax_amount - 0.01)
+     AND EXISTS (
+       SELECT 1
+       FROM invoice_credit_applications ica2
+       INNER JOIN customer_payments cp2 ON cp2.id = ica2.payment_id
+       WHERE ica2.quote_id = q.id
+         AND cp2.payment_date BETWEEN :date_from AND :date_to
+     )";
+
+$taxStmt = $pdo->prepare($taxSql);
+$taxStmt->execute($params);
+$totalSalesTax = (float)($taxStmt->fetchColumn() ?: 0);
 
 $expenseStmt = $pdo->prepare(
   "SELECT
