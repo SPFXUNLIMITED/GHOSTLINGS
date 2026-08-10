@@ -39,6 +39,178 @@ function expenses_sort_link(string $column, string $label, string $currentSort, 
   return '<a href="?' . h(http_build_query($params)) . '">' . h($label . $arrow) . '</a>';
 }
 
+function expenses_is_ajax_request(): bool {
+  return strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest';
+}
+
+function expenses_fetch_rows(PDO $pdo, array $whereParts, array $params, string $orderBy, ?int $limit = null): array {
+  $stmt = $pdo->prepare(
+    "SELECT e.id, e.expense_date, e.description, e.amount, e.vendor_name, e.payment_source, e.source,
+            ec.name AS category_name, ec.code AS category_code, ec.group_type,
+            COALESCE(att.attachment_count, 0) AS attachment_count,
+            COALESCE(il.invoice_count, 0) AS invoice_count,
+            il.invoice_labels
+     FROM expenses e
+     INNER JOIN expense_categories ec ON ec.id = e.category_id
+     LEFT JOIN (
+       SELECT expense_id, COUNT(*) AS attachment_count
+       FROM expense_attachments
+       GROUP BY expense_id
+     ) att ON att.expense_id = e.id
+     LEFT JOIN (
+       SELECT eil.expense_id,
+              COUNT(*) AS invoice_count,
+              GROUP_CONCAT(CONCAT(eil.id, '::', q.id, '::', COALESCE(NULLIF(q.converted_invoice_no, ''), CONCAT('#', q.id))) ORDER BY q.id SEPARATOR '||') AS invoice_labels
+       FROM expense_invoice_links eil
+       INNER JOIN quotes q ON q.id = eil.quote_id
+       GROUP BY eil.expense_id
+     ) il ON il.expense_id = e.id
+     WHERE " . implode(' AND ', $whereParts) . "
+     ORDER BY {$orderBy}" . ($limit !== null ? ' LIMIT ' . max(1, $limit) : '')
+  );
+
+  foreach ($params as $key => $value) {
+    $stmt->bindValue($key, $value);
+  }
+  $stmt->execute();
+  return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function expenses_load_attachments_by_expense(PDO $pdo, array $expenseIds): array {
+  $attachmentsByExpense = [];
+  $expenseIds = array_values(array_filter(array_map('intval', $expenseIds), static fn(int $id): bool => $id > 0));
+  if (!$expenseIds) {
+    return $attachmentsByExpense;
+  }
+
+  $placeholders = implode(',', array_fill(0, count($expenseIds), '?'));
+  $attachmentsStmt = $pdo->prepare(
+    "SELECT id, expense_id, original_name
+     FROM expense_attachments
+     WHERE expense_id IN ($placeholders)
+     ORDER BY created_at DESC, id DESC"
+  );
+  $attachmentsStmt->execute($expenseIds);
+  foreach ($attachmentsStmt->fetchAll(PDO::FETCH_ASSOC) as $attachment) {
+    $expenseId = (int)($attachment['expense_id'] ?? 0);
+    if ($expenseId <= 0) {
+      continue;
+    }
+    if (!isset($attachmentsByExpense[$expenseId])) {
+      $attachmentsByExpense[$expenseId] = [];
+    }
+    if (count($attachmentsByExpense[$expenseId]) >= EXPENSE_ATTACHMENTS_PREVIEW_LIMIT) {
+      continue;
+    }
+    $attachmentsByExpense[$expenseId][] = $attachment;
+  }
+
+  return $attachmentsByExpense;
+}
+
+function expenses_render_row(array $expense, array $attachments, string $csrfToken): string {
+  $expenseId = (int)($expense['id'] ?? 0);
+  $groupType = (string)($expense['group_type'] ?? 'opex');
+  [$groupBg, $groupFg] = $groupType === 'cogs'
+    ? ['#fee2e2', '#991b1b']
+    : ['#dbeafe', '#1e3a8a'];
+  $invoiceRaw = trim((string)($expense['invoice_labels'] ?? ''));
+  $invoiceLinks = $invoiceRaw !== '' ? explode('||', $invoiceRaw) : [];
+
+  ob_start();
+  ?>
+  <tr id="expense-row-<?= $expenseId ?>" data-expense-id="<?= $expenseId ?>">
+    <td><?= h(fmt_date_mdY((string)$expense['expense_date'])) ?></td>
+    <td>
+      <strong>#<?= $expenseId ?></strong><br>
+      <?= h((string)$expense['description']) ?>
+      <div class="muted" style="font-size:.82em;">Source: <?= h((string)$expense['source']) ?></div>
+    </td>
+    <td>
+      <?php if (trim((string)($expense['vendor_name'] ?? '')) !== ''): ?>
+        <?= h((string)$expense['vendor_name']) ?>
+      <?php else: ?>
+        <span class="muted">—</span>
+      <?php endif; ?>
+    </td>
+    <td><?= h((string)$expense['category_name']) ?></td>
+    <td>
+      <select
+        class="expenses-group-select js-expense-group-select"
+        data-expense-id="<?= $expenseId ?>"
+        data-group-value="<?= h($groupType) ?>"
+        aria-label="Group for expense #<?= $expenseId ?>"
+        style="min-width:110px;background:<?= h($groupBg) ?>;color:<?= h($groupFg) ?>;border-color:<?= h($groupFg) ?>;font-weight:600;"
+      >
+        <option value="opex" <?= $groupType === 'opex' ? 'selected' : '' ?>>OPEX</option>
+        <option value="cogs" <?= $groupType === 'cogs' ? 'selected' : '' ?>>COGS</option>
+      </select>
+    </td>
+    <td><strong>$<?= h(number_format((float)$expense['amount'], 2)) ?></strong></td>
+    <td>
+      <strong><?= (int)$expense['attachment_count'] ?></strong>
+      <?php if ((int)$expense['attachment_count'] > 0): ?>
+        <div><a class="btn" href="#expense-<?= $expenseId ?>">Open</a></div>
+      <?php endif; ?>
+    </td>
+    <td>
+      <strong><?= (int)$expense['invoice_count'] ?></strong>
+      <?php if ($invoiceLinks): ?>
+        <div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">
+          <?php foreach ($invoiceLinks as $invoiceLink): ?>
+            <?php
+              $parts = explode('::', $invoiceLink);
+              $linkId = (int)($parts[0] ?? 0);
+              $quoteId = (int)($parts[1] ?? 0);
+              $label = (string)($parts[2] ?? ('#' . $quoteId));
+            ?>
+            <?php if ($quoteId > 0): ?>
+              <div class="expenses-actions">
+                <a class="btn" href="quotes.php?view=id&id=<?= $quoteId ?>"><?= h($label) ?></a>
+                <form method="post" style="margin:0;">
+                  <input type="hidden" name="csrf_token" value="<?= h($csrfToken) ?>" />
+                  <input type="hidden" name="action" value="unlink_invoice" />
+                  <input type="hidden" name="link_id" value="<?= $linkId ?>" />
+                  <button type="submit" class="btn">Unlink</button>
+                </form>
+              </div>
+            <?php endif; ?>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </td>
+    <td id="expense-<?= $expenseId ?>">
+      <form method="post" enctype="multipart/form-data" class="expenses-inline-form">
+        <input type="hidden" name="csrf_token" value="<?= h($csrfToken) ?>" />
+        <input type="hidden" name="action" value="upload_attachment" />
+        <input type="hidden" name="expense_id" value="<?= $expenseId ?>" />
+        <input type="file" name="attachment" required />
+        <button type="submit" class="btn">Upload Receipt</button>
+      </form>
+
+      <form method="post" class="expenses-inline-form">
+        <input type="hidden" name="csrf_token" value="<?= h($csrfToken) ?>" />
+        <input type="hidden" name="action" value="link_invoice" />
+        <input type="hidden" name="expense_id" value="<?= $expenseId ?>" />
+        <input type="number" name="quote_id" min="1" step="1" placeholder="Invoice ID" required />
+        <input type="number" name="allocated_amount" min="0" step="0.01" placeholder="Allocated $ (optional)" />
+        <button type="submit" class="btn">Link Invoice</button>
+      </form>
+
+      <?php if ($attachments): ?>
+        <div class="muted" style="margin-top:6px;font-size:.82em;">Latest receipts:</div>
+        <div style="display:flex;flex-direction:column;gap:4px;margin-top:4px;">
+          <?php foreach ($attachments as $attachment): ?>
+            <a class="btn" href="expense_attachment_file.php?id=<?= (int)$attachment['id'] ?>" target="_blank" rel="noopener noreferrer"><?= h((string)$attachment['original_name']) ?></a>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </td>
+  </tr>
+  <?php
+  return trim((string)ob_get_clean());
+}
+
 if (empty($_SESSION['expenses_csrf'])) {
   $_SESSION['expenses_csrf'] = bin2hex(random_bytes(24));
 }
@@ -47,14 +219,74 @@ $errors = [];
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  $action = trim((string)($_POST['action'] ?? ''));
+  $isAjaxGroupUpdate = $action === 'update_group' && expenses_is_ajax_request();
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
   if (empty($_SESSION['expenses_csrf']) || !hash_equals((string)$_SESSION['expenses_csrf'], $submitted_csrf)) {
+    if ($isAjaxGroupUpdate) {
+      header('Content-Type: application/json; charset=UTF-8');
+      header('X-Content-Type-Options: nosniff');
+      http_response_code(403);
+      echo json_encode(['ok' => false, 'error' => 'Security token mismatch. Please refresh and try again.']);
+      exit;
+    }
     $errors[] = 'Security token mismatch. Please refresh and try again.';
   } else {
-    $_SESSION['expenses_csrf'] = bin2hex(random_bytes(24));
-    $action = trim((string)($_POST['action'] ?? ''));
+    if ($action !== 'update_group') {
+      $_SESSION['expenses_csrf'] = bin2hex(random_bytes(24));
+    }
 
-    if ($action === 'upload_attachment') {
+    if ($action === 'update_group') {
+      header('Content-Type: application/json; charset=UTF-8');
+      header('X-Content-Type-Options: nosniff');
+
+      $expenseId = (int)($_POST['expense_id'] ?? 0);
+      $groupType = strtolower(trim((string)($_POST['group_type'] ?? '')));
+
+      if ($expenseId <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Invalid expense selected.']);
+        exit;
+      }
+      if (!in_array($groupType, ['opex', 'cogs'], true)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Invalid group selected.']);
+        exit;
+      }
+
+      try {
+        $expenseStmt = $pdo->prepare("SELECT id, category_id FROM expenses WHERE id = ? LIMIT 1");
+        $expenseStmt->execute([$expenseId]);
+        $expenseRow = $expenseStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$expenseRow) {
+          http_response_code(404);
+          echo json_encode(['ok' => false, 'error' => 'Expense not found.']);
+          exit;
+        }
+
+        $updateStmt = $pdo->prepare("UPDATE expense_categories SET group_type = ? WHERE id = ?");
+        $updateStmt->execute([$groupType, (int)$expenseRow['category_id']]);
+
+        $rows = expenses_fetch_rows($pdo, ['e.id = :expense_id'], [':expense_id' => $expenseId], 'e.id DESC', 1);
+        if (!$rows) {
+          http_response_code(404);
+          echo json_encode(['ok' => false, 'error' => 'Expense not found.']);
+          exit;
+        }
+
+        $attachmentsByExpense = expenses_load_attachments_by_expense($pdo, [$expenseId]);
+        echo json_encode([
+          'ok' => true,
+          'rowHtml' => expenses_render_row($rows[0], $attachmentsByExpense[$expenseId] ?? [], (string)$_SESSION['expenses_csrf']),
+        ]);
+        exit;
+      } catch (Throwable $e) {
+        error_log('Expense group update failed for expense ' . $expenseId . ': ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Unable to update the group right now.']);
+        exit;
+      }
+    } elseif ($action === 'upload_attachment') {
       $expenseId = (int)($_POST['expense_id'] ?? 0);
       if ($expenseId <= 0) {
         $errors[] = 'Invalid expense selected for attachment upload.';
@@ -251,67 +483,11 @@ if ($maxAmountRaw !== '' && is_numeric($maxAmountRaw)) {
   $params[':max_amount'] = expense_amount_string((float)$maxAmountRaw);
 }
 
-$stmt = $pdo->prepare(
-  "SELECT e.id, e.expense_date, e.description, e.amount, e.vendor_name, e.payment_source, e.source,
-          ec.name AS category_name, ec.code AS category_code, ec.group_type,
-          COALESCE(att.attachment_count, 0) AS attachment_count,
-          COALESCE(il.invoice_count, 0) AS invoice_count,
-          il.invoice_labels
-   FROM expenses e
-   INNER JOIN expense_categories ec ON ec.id = e.category_id
-   LEFT JOIN (
-     SELECT expense_id, COUNT(*) AS attachment_count
-     FROM expense_attachments
-     GROUP BY expense_id
-   ) att ON att.expense_id = e.id
-   LEFT JOIN (
-     SELECT eil.expense_id,
-            COUNT(*) AS invoice_count,
-            GROUP_CONCAT(CONCAT(eil.id, '::', q.id, '::', COALESCE(NULLIF(q.converted_invoice_no, ''), CONCAT('#', q.id))) ORDER BY q.id SEPARATOR '||') AS invoice_labels
-     FROM expense_invoice_links eil
-     INNER JOIN quotes q ON q.id = eil.quote_id
-     GROUP BY eil.expense_id
-   ) il ON il.expense_id = e.id
-   WHERE " . implode(' AND ', $where) . "
-   ORDER BY {$sortMap[$sort]} {$dir}, e.id DESC
-   LIMIT " . EXPENSES_LIST_LIMIT
-);
-
-foreach ($params as $key => $value) {
-  $stmt->bindValue($key, $value);
-}
-$stmt->execute();
-$expenses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$expenses = expenses_fetch_rows($pdo, $where, $params, "{$sortMap[$sort]} {$dir}, e.id DESC", EXPENSES_LIST_LIMIT);
 $limitHit = count($expenses) >= EXPENSES_LIST_LIMIT;
 
-$attachmentsByExpense = [];
-if ($expenses) {
-  $expenseIds = array_map(static fn(array $row): int => (int)($row['id'] ?? 0), $expenses);
-  $expenseIds = array_values(array_filter($expenseIds, static fn(int $id): bool => $id > 0));
-  if ($expenseIds) {
-    $placeholders = implode(',', array_fill(0, count($expenseIds), '?'));
-    $attachmentsStmt = $pdo->prepare(
-      "SELECT id, expense_id, original_name
-       FROM expense_attachments
-       WHERE expense_id IN ($placeholders)
-       ORDER BY created_at DESC, id DESC"
-    );
-    $attachmentsStmt->execute($expenseIds);
-    foreach ($attachmentsStmt->fetchAll(PDO::FETCH_ASSOC) as $attachment) {
-      $expenseId = (int)($attachment['expense_id'] ?? 0);
-      if ($expenseId <= 0) {
-        continue;
-      }
-      if (!isset($attachmentsByExpense[$expenseId])) {
-        $attachmentsByExpense[$expenseId] = [];
-      }
-      if (count($attachmentsByExpense[$expenseId]) >= EXPENSE_ATTACHMENTS_PREVIEW_LIMIT) {
-        continue;
-      }
-      $attachmentsByExpense[$expenseId][] = $attachment;
-    }
-  }
-}
+$expenseIds = array_map(static fn(array $row): int => (int)($row['id'] ?? 0), $expenses);
+$attachmentsByExpense = expenses_load_attachments_by_expense($pdo, $expenseIds);
 
 $heroTotal = count($expenses);
 $heroAmount = 0.0;
@@ -431,6 +607,8 @@ render_header('Expenses');
 .expenses-inline-form input[type="text"],
 .expenses-inline-form input[type="file"]{max-width:180px;}
 .expenses-pill{display:inline-flex;align-items:center;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600;white-space:nowrap;}
+.expenses-group-select{padding:4px 10px;border-radius:999px;}
+.expenses-row-saving{opacity:.65;}
 </style>
 
 <div class="card">
@@ -453,102 +631,80 @@ render_header('Expenses');
           <th>Actions</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody data-expenses-table-body>
         <?php if (!$expenses): ?>
           <tr><td colspan="9" class="muted">No expenses found for the current filters.</td></tr>
         <?php endif; ?>
         <?php foreach ($expenses as $expense): ?>
-          <?php
-            $expenseId = (int)$expense['id'];
-            $groupType = (string)($expense['group_type'] ?? 'opex');
-            [$groupBg, $groupFg, $groupLabel] = $groupType === 'cogs'
-              ? ['#fee2e2', '#991b1b', 'COGS']
-              : ['#dbeafe', '#1e3a8a', 'OpEx'];
-            $invoiceRaw = trim((string)($expense['invoice_labels'] ?? ''));
-            $invoiceLinks = $invoiceRaw !== '' ? explode('||', $invoiceRaw) : [];
-          ?>
-          <tr>
-            <td><?= h(fmt_date_mdY((string)$expense['expense_date'])) ?></td>
-            <td>
-              <strong>#<?= $expenseId ?></strong><br>
-              <?= h((string)$expense['description']) ?>
-              <div class="muted" style="font-size:.82em;">Source: <?= h((string)$expense['source']) ?></div>
-            </td>
-            <td>
-              <?php if (trim((string)($expense['vendor_name'] ?? '')) !== ''): ?>
-                <?= h((string)$expense['vendor_name']) ?>
-              <?php else: ?>
-                <span class="muted">—</span>
-              <?php endif; ?>
-            </td>
-            <td><?= h((string)$expense['category_name']) ?></td>
-            <td><span class="expenses-pill" style="background:<?= h($groupBg) ?>;color:<?= h($groupFg) ?>;"><?= h($groupLabel) ?></span></td>
-            <td><strong>$<?= h(number_format((float)$expense['amount'], 2)) ?></strong></td>
-            <td>
-              <strong><?= (int)$expense['attachment_count'] ?></strong>
-              <?php if ((int)$expense['attachment_count'] > 0): ?>
-                <div><a class="btn" href="#expense-<?= $expenseId ?>">Open</a></div>
-              <?php endif; ?>
-            </td>
-            <td>
-              <strong><?= (int)$expense['invoice_count'] ?></strong>
-              <?php if ($invoiceLinks): ?>
-                <div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">
-                  <?php foreach ($invoiceLinks as $invoiceLink): ?>
-                    <?php
-                      $parts = explode('::', $invoiceLink);
-                      $linkId = (int)($parts[0] ?? 0);
-                      $quoteId = (int)($parts[1] ?? 0);
-                      $label = (string)($parts[2] ?? ('#' . $quoteId));
-                    ?>
-                    <?php if ($quoteId > 0): ?>
-                      <div class="expenses-actions">
-                        <a class="btn" href="quotes.php?view=id&id=<?= $quoteId ?>"><?= h($label) ?></a>
-                        <form method="post" style="margin:0;">
-                          <input type="hidden" name="csrf_token" value="<?= h($_SESSION['expenses_csrf']) ?>" />
-                          <input type="hidden" name="action" value="unlink_invoice" />
-                          <input type="hidden" name="link_id" value="<?= $linkId ?>" />
-                          <button type="submit" class="btn">Unlink</button>
-                        </form>
-                      </div>
-                    <?php endif; ?>
-                  <?php endforeach; ?>
-                </div>
-              <?php endif; ?>
-            </td>
-            <td id="expense-<?= $expenseId ?>">
-              <form method="post" enctype="multipart/form-data" class="expenses-inline-form">
-                <input type="hidden" name="csrf_token" value="<?= h($_SESSION['expenses_csrf']) ?>" />
-                <input type="hidden" name="action" value="upload_attachment" />
-                <input type="hidden" name="expense_id" value="<?= $expenseId ?>" />
-                <input type="file" name="attachment" required />
-                <button type="submit" class="btn">Upload Receipt</button>
-              </form>
-
-              <form method="post" class="expenses-inline-form">
-                <input type="hidden" name="csrf_token" value="<?= h($_SESSION['expenses_csrf']) ?>" />
-                <input type="hidden" name="action" value="link_invoice" />
-                <input type="hidden" name="expense_id" value="<?= $expenseId ?>" />
-                <input type="number" name="quote_id" min="1" step="1" placeholder="Invoice ID" required />
-                <input type="number" name="allocated_amount" min="0" step="0.01" placeholder="Allocated $ (optional)" />
-                <button type="submit" class="btn">Link Invoice</button>
-              </form>
-
-              <?php $attachments = $attachmentsByExpense[$expenseId] ?? []; ?>
-              <?php if ($attachments): ?>
-                <div class="muted" style="margin-top:6px;font-size:.82em;">Latest receipts:</div>
-                <div style="display:flex;flex-direction:column;gap:4px;margin-top:4px;">
-                  <?php foreach ($attachments as $attachment): ?>
-                    <a class="btn" href="expense_attachment_file.php?id=<?= (int)$attachment['id'] ?>" target="_blank" rel="noopener noreferrer"><?= h((string)$attachment['original_name']) ?></a>
-                  <?php endforeach; ?>
-                </div>
-              <?php endif; ?>
-            </td>
-          </tr>
+          <?= expenses_render_row($expense, $attachmentsByExpense[(int)($expense['id'] ?? 0)] ?? [], (string)$_SESSION['expenses_csrf']) ?>
         <?php endforeach; ?>
       </tbody>
     </table>
   </div>
 </div>
+
+<script>
+(() => {
+  const tableBody = document.querySelector('[data-expenses-table-body]');
+  if (!tableBody) return;
+
+  tableBody.addEventListener('change', async (event) => {
+    const select = event.target.closest('.js-expense-group-select');
+    if (!select || select.dataset.saving === '1') return;
+
+    const expenseId = parseInt(select.dataset.expenseId || '0', 10);
+    const previousValue = select.dataset.groupValue || '';
+    const nextValue = select.value;
+    if (!expenseId || !nextValue || nextValue === previousValue) return;
+
+    const row = select.closest('tr');
+    const csrfInput = document.querySelector('input[name="csrf_token"]');
+    if (!row || !csrfInput) return;
+
+    select.dataset.saving = '1';
+    select.disabled = true;
+    row.classList.add('expenses-row-saving');
+
+    try {
+      const body = new URLSearchParams({
+        action: 'update_group',
+        csrf_token: csrfInput.value,
+        expense_id: String(expenseId),
+        group_type: nextValue
+      });
+
+      const response = await fetch('expenses.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload || !payload.ok || typeof payload.rowHtml !== 'string') {
+        throw new Error((payload && payload.error) || 'Unable to update the group.');
+      }
+
+      const template = document.createElement('template');
+      template.innerHTML = payload.rowHtml.trim();
+      const nextRow = template.content.firstElementChild;
+      if (!nextRow) {
+        throw new Error('Unable to refresh the expense row.');
+      }
+
+      row.replaceWith(nextRow);
+    } catch (error) {
+      select.value = previousValue;
+      alert(error instanceof Error ? error.message : 'Network error. Please try again.');
+    } finally {
+      row.classList.remove('expenses-row-saving');
+      if (row.isConnected) {
+        select.disabled = false;
+        delete select.dataset.saving;
+      }
+    }
+  });
+})();
+</script>
 
 <?php render_footer(); ?>
