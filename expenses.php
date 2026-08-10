@@ -124,8 +124,11 @@ function expenses_render_row(array $expense, array $attachments, string $csrfTok
   ob_start();
   ?>
   <tr id="expense-row-<?= $expenseId ?>" data-expense-id="<?= $expenseId ?>">
+    <td style="width:36px;text-align:center;">
+      <input type="checkbox" class="js-expense-row-check" data-expense-id="<?= $expenseId ?>" aria-label="Select expense #<?= $expenseId ?>" />
+    </td>
     <td><?= h(fmt_date_mdY((string)$expense['expense_date'])) ?></td>
-    <td>
+    <td style="word-wrap:break-word;overflow-wrap:break-word;max-width:220px;">
       <strong>#<?= $expenseId ?></strong><br>
       <?= h((string)$expense['description']) ?>
       <div class="muted" style="font-size:.82em;">Source: <?= h((string)$expense['source']) ?></div>
@@ -137,7 +140,7 @@ function expenses_render_row(array $expense, array $attachments, string $csrfTok
         data-expense-id="<?= $expenseId ?>"
         data-group-value="<?= h($groupType) ?>"
         aria-label="Group for expense #<?= $expenseId ?>"
-        style="min-width:110px;background:<?= h($groupBg) ?>;color:<?= h($groupFg) ?>;border-color:<?= h($groupFg) ?>;font-weight:600;"
+        style="min-width:100px;background:<?= h($groupBg) ?>;color:<?= h($groupFg) ?>;border-color:<?= h($groupFg) ?>;font-weight:600;"
       >
         <option value="opex" <?= $groupType === 'opex' ? 'selected' : '' ?>>OPEX</option>
         <option value="cogs" <?= $groupType === 'cogs' ? 'selected' : '' ?>>COGS</option>
@@ -177,7 +180,7 @@ function expenses_render_row(array $expense, array $attachments, string $csrfTok
         </div>
       <?php endif; ?>
     </td>
-    <td id="expense-<?= $expenseId ?>">
+    <td id="expense-<?= $expenseId ?>" style="word-wrap:break-word;overflow-wrap:break-word;min-width:300px;">
       <form method="post" enctype="multipart/form-data" class="expenses-inline-form">
         <input type="hidden" name="csrf_token" value="<?= h($csrfToken) ?>" />
         <input type="hidden" name="action" value="upload_attachment" />
@@ -229,9 +232,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = trim((string)($_POST['action'] ?? ''));
   $isAjaxGroupUpdate = $action === 'update_group' && expenses_is_ajax_request();
   $isAjaxDelete = $action === 'delete_expense' && expenses_is_ajax_request();
+  $isAjaxBatchExclude = $action === 'batch_exclude' && expenses_is_ajax_request();
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
   if (empty($_SESSION['expenses_csrf']) || !hash_equals((string)$_SESSION['expenses_csrf'], $submitted_csrf)) {
-    if ($isAjaxGroupUpdate || $isAjaxDelete) {
+    if ($isAjaxGroupUpdate || $isAjaxDelete || $isAjaxBatchExclude) {
       header('Content-Type: application/json; charset=UTF-8');
       header('X-Content-Type-Options: nosniff');
       http_response_code(403);
@@ -244,7 +248,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $errors[] = 'Invalid group update request.';
     } elseif ($action === 'delete_expense' && !$isAjaxDelete) {
       $errors[] = 'Invalid delete request.';
-    } elseif ($action !== 'update_group' && $action !== 'delete_expense') {
+    } elseif ($action === 'batch_exclude' && !$isAjaxBatchExclude) {
+      $errors[] = 'Invalid batch exclude request.';
+    } elseif (!in_array($action, ['update_group', 'delete_expense', 'batch_exclude'], true)) {
       $_SESSION['expenses_csrf'] = bin2hex(random_bytes(24));
     }
     if ($action === 'update_group' && $isAjaxGroupUpdate) {
@@ -444,6 +450,83 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         error_log('Expense delete failed for expense ' . $expenseId . ': ' . $e->getMessage());
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => 'Unable to delete the expense right now.']);
+        exit;
+      }
+    } elseif ($action === 'batch_exclude' && $isAjaxBatchExclude) {
+      header('Content-Type: application/json; charset=UTF-8');
+      header('X-Content-Type-Options: nosniff');
+
+      $rawIds = $_POST['expense_ids'] ?? '';
+      $idList = [];
+      foreach (explode(',', (string)$rawIds) as $raw) {
+        $id = (int)trim($raw);
+        if ($id > 0) {
+          $idList[] = $id;
+        }
+      }
+      $idList = array_values(array_unique($idList));
+
+      if (!$idList) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'No expenses selected.']);
+        exit;
+      }
+      if (count($idList) > 500) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Too many expenses selected at once (max 500).']);
+        exit;
+      }
+
+      try {
+        $placeholders = implode(',', array_fill(0, count($idList), '?'));
+        $existsStmt = $pdo->prepare("SELECT id FROM expenses WHERE id IN ($placeholders)");
+        $existsStmt->execute($idList);
+        $foundIds = array_column($existsStmt->fetchAll(PDO::FETCH_ASSOC), 'id');
+        $foundIds = array_map('intval', $foundIds);
+
+        if (!$foundIds) {
+          http_response_code(404);
+          echo json_encode(['ok' => false, 'error' => 'None of the selected expenses were found.']);
+          exit;
+        }
+
+        $updatePlaceholders = implode(',', array_fill(0, count($foundIds), '?'));
+        $pdo->prepare("UPDATE expenses SET group_type = 'excluded' WHERE id IN ($updatePlaceholders)")
+            ->execute($foundIds);
+
+        $_SESSION['expenses_csrf'] = bin2hex(random_bytes(24));
+
+        $attachmentsByExpense = expenses_load_attachments_by_expense($pdo, $foundIds);
+        $fetchNamedParts = [];
+        $fetchParams = [];
+        foreach (array_values($foundIds) as $i => $id) {
+          $fetchNamedParts[] = ':bid' . $i;
+          $fetchParams[':bid' . $i] = $id;
+        }
+        $updatedRows = expenses_fetch_rows(
+          $pdo,
+          ['e.id IN (' . implode(',', $fetchNamedParts) . ')'],
+          $fetchParams,
+          'e.id DESC'
+        );
+
+        $rowsHtml = [];
+        foreach ($updatedRows as $row) {
+          $rid = (int)($row['id'] ?? 0);
+          $rowsHtml[(string)$rid] = expenses_render_row($row, $attachmentsByExpense[$rid] ?? [], (string)$_SESSION['expenses_csrf']);
+        }
+
+        echo json_encode([
+          'ok' => true,
+          'updated_count' => count($foundIds),
+          'new_csrf' => (string)$_SESSION['expenses_csrf'],
+          'rows' => $rowsHtml,
+        ]);
+        exit;
+      } catch (Throwable $e) {
+        error_log('Expense batch exclude failed: ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Unable to update expenses right now.']);
         exit;
       }
     }
@@ -651,11 +734,23 @@ render_header('Expenses');
 .expenses-inline-form{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;}
 .expenses-inline-form input[type="number"],
 .expenses-inline-form input[type="text"],
-.expenses-inline-form input[type="file"]{max-width:180px;}
+.expenses-inline-form input[type="file"]{max-width:140px;}
 .expenses-pill{display:inline-flex;align-items:center;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600;white-space:nowrap;}
 .expenses-group-select{padding:4px 10px;border-radius:999px;}
 .expenses-row-saving{opacity:.65;}
+.expenses-batch-bar{display:none;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;border-radius:6px;background:#eff6ff;border:1px solid #bfdbfe;margin-bottom:10px;}
+.expenses-batch-bar.is-active{display:flex;}
+#js-expense-select-all{cursor:pointer;}
+.js-expense-row-check{cursor:pointer;}
 </style>
+
+<div class="expenses-batch-bar" id="js-expenses-batch-bar" aria-live="polite">
+  <input type="hidden" id="js-expenses-batch-csrf" value="<?= h((string)$_SESSION['expenses_csrf']) ?>" />
+  <span id="js-expenses-batch-count" style="font-weight:600;color:#1e40af;"></span>
+  <button type="button" class="btn" id="js-expenses-batch-exclude" style="background:#1e40af;color:#fff;border-color:#1e40af;">Mark Selected as Excluded</button>
+  <button type="button" class="btn" id="js-expenses-batch-deselect">Deselect All</button>
+  <span id="js-expenses-batch-result" style="font-size:.9em;color:#166534;font-weight:600;"></span>
+</div>
 
 <div class="card">
   <div class="table-wrap" style="overflow-x:auto;">
@@ -672,6 +767,9 @@ render_header('Expenses');
       </colgroup>
       <thead>
         <tr>
+          <th style="width:40px;text-align:center;">
+            <input type="checkbox" id="js-expense-select-all" aria-label="Select all expenses" />
+          </th>
           <th><?= expenses_sort_link('date', 'Date', $sort, $dir) ?></th>
           <th><?= expenses_sort_link('description', 'Description', $sort, $dir) ?></th>
           <th><?= expenses_sort_link('category', 'Category', $sort, $dir) ?></th>
@@ -684,7 +782,7 @@ render_header('Expenses');
       </thead>
       <tbody data-expenses-table-body>
         <?php if (!$expenses): ?>
-          <tr><td colspan="8" class="muted">No expenses found for the current filters.</td></tr>
+          <tr><td colspan="9" class="muted">No expenses found for the current filters.</td></tr>
         <?php endif; ?>
         <?php foreach ($expenses as $expense): ?>
           <?= expenses_render_row($expense, $attachmentsByExpense[(int)($expense['id'] ?? 0)] ?? [], (string)$_SESSION['expenses_csrf']) ?>
@@ -699,7 +797,49 @@ render_header('Expenses');
   const tableBody = document.querySelector('[data-expenses-table-body]');
   if (!tableBody) return;
 
+  // ── Batch selection helpers ──────────────────────────────────────────────
+  const batchBar      = document.getElementById('js-expenses-batch-bar');
+  const batchCount    = document.getElementById('js-expenses-batch-count');
+  const batchExclude  = document.getElementById('js-expenses-batch-exclude');
+  const batchDeselect = document.getElementById('js-expenses-batch-deselect');
+  const batchResult   = document.getElementById('js-expenses-batch-result');
+  const selectAllChk  = document.getElementById('js-expense-select-all');
+
+  function getCheckedIds() {
+    return Array.from(tableBody.querySelectorAll('.js-expense-row-check:checked'))
+      .map((cb) => parseInt(cb.dataset.expenseId || '0', 10))
+      .filter((id) => id > 0);
+  }
+
+  function updateBatchBar() {
+    const ids = getCheckedIds();
+    const total = tableBody.querySelectorAll('.js-expense-row-check').length;
+    const checked = ids.length;
+    if (batchBar)    { batchBar.classList.toggle('is-active', checked > 0); }
+    if (batchCount)  { batchCount.textContent = checked > 0 ? `${checked} row${checked === 1 ? '' : 's'} selected` : ''; }
+    if (batchResult) { batchResult.textContent = ''; }
+    if (selectAllChk) {
+      selectAllChk.checked = checked > 0 && checked === total;
+      selectAllChk.indeterminate = checked > 0 && checked < total;
+    }
+  }
+
+  function refreshCsrfTokens(newToken) {
+    if (typeof newToken === 'string' && newToken !== '') {
+      document.querySelectorAll('input[name="csrf_token"]').forEach((input) => {
+        input.value = newToken;
+      });
+    }
+  }
+
   tableBody.addEventListener('change', async (event) => {
+    // Row checkbox toggle
+    if (event.target.classList.contains('js-expense-row-check')) {
+      updateBatchBar();
+      return;
+    }
+
+    // Group select change
     const select = event.target.closest('.js-expense-group-select');
     if (!select || select.dataset.saving === '1') return;
     if (tableBody.dataset.groupUpdateInFlight === '1') {
@@ -742,11 +882,7 @@ render_header('Expenses');
         throw new Error((payload && payload.error) || 'Unable to update the group.');
       }
 
-      if (typeof payload.new_csrf === 'string' && payload.new_csrf !== '') {
-        document.querySelectorAll('input[name="csrf_token"]').forEach((input) => {
-          input.value = payload.new_csrf;
-        });
-      }
+      refreshCsrfTokens(payload.new_csrf);
 
       const template = document.createElement('template');
       template.innerHTML = payload.rowHtml.trim();
@@ -772,6 +908,112 @@ render_header('Expenses');
       delete tableBody.dataset.groupUpdateInFlight;
     }
   });
+
+  // ── Select-all checkbox ─────────────────────────────────────────────────
+  if (selectAllChk) {
+    selectAllChk.addEventListener('change', () => {
+      tableBody.querySelectorAll('.js-expense-row-check').forEach((cb) => {
+        cb.checked = selectAllChk.checked;
+      });
+      updateBatchBar();
+    });
+  }
+
+  // ── Deselect all ────────────────────────────────────────────────────────
+  if (batchDeselect) {
+    batchDeselect.addEventListener('click', () => {
+      tableBody.querySelectorAll('.js-expense-row-check').forEach((cb) => { cb.checked = false; });
+      if (selectAllChk) { selectAllChk.checked = false; selectAllChk.indeterminate = false; }
+      updateBatchBar();
+    });
+  }
+
+  // ── Batch Exclude ────────────────────────────────────────────────────────
+  if (batchExclude) {
+    batchExclude.addEventListener('click', async () => {
+      if (batchExclude.dataset.busy === '1') return;
+
+      const ids = getCheckedIds();
+      if (!ids.length) {
+        alert('No expenses are selected.');
+        return;
+      }
+
+      if (!confirm(`Mark ${ids.length} selected expense${ids.length === 1 ? '' : 's'} as "Excluded"? This will overwrite their current group type.`)) return;
+
+      // Find a CSRF token from any row
+      const anyRow = tableBody.querySelector('tr[data-expense-id]');
+      const csrfInput = anyRow && anyRow.querySelector('input[name="csrf_token"]');
+      if (!csrfInput) {
+        alert('Unable to locate security token. Please refresh the page.');
+        return;
+      }
+
+      batchExclude.dataset.busy = '1';
+      batchExclude.disabled = true;
+      if (batchDeselect) batchDeselect.disabled = true;
+      if (batchResult) batchResult.textContent = '';
+
+      // Dim selected rows
+      ids.forEach((id) => {
+        const r = tableBody.querySelector(`#expense-row-${id}`);
+        if (r) r.classList.add('expenses-row-saving');
+      });
+
+      try {
+        const body = new URLSearchParams({
+          action: 'batch_exclude',
+          csrf_token: csrfInput.value,
+          expense_ids: ids.join(',')
+        });
+
+        const response = await fetch('expenses.php', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          body
+        });
+        const payload = await response.json();
+
+        if (!response.ok || !payload || !payload.ok) {
+          throw new Error((payload && payload.error) || 'Unable to update the expenses.');
+        }
+
+        refreshCsrfTokens(payload.new_csrf);
+
+        // Replace updated rows
+        const rows = payload.rows || {};
+        Object.entries(rows).forEach(([idStr, html]) => {
+          const oldRow = tableBody.querySelector(`#expense-row-${idStr}`);
+          if (!oldRow || typeof html !== 'string') return;
+          const tmpl = document.createElement('template');
+          tmpl.innerHTML = html.trim();
+          const newRow = tmpl.content.firstElementChild;
+          if (newRow) oldRow.replaceWith(newRow);
+        });
+
+        // Update select-all state after rows are replaced
+        if (selectAllChk) { selectAllChk.checked = false; selectAllChk.indeterminate = false; }
+
+        const updatedCount = typeof payload.updated_count === 'number' ? payload.updated_count : ids.length;
+        if (batchResult) {
+          batchResult.textContent = `✓ ${updatedCount} expense${updatedCount === 1 ? '' : 's'} marked as Excluded.`;
+        }
+        updateBatchBar();
+      } catch (error) {
+        // Un-dim rows on failure
+        ids.forEach((id) => {
+          const r = tableBody.querySelector(`#expense-row-${id}`);
+          if (r) r.classList.remove('expenses-row-saving');
+        });
+        alert(error instanceof Error ? error.message : 'Network error. Please try again.');
+      } finally {
+        batchExclude.disabled = false;
+        delete batchExclude.dataset.busy;
+        if (batchDeselect) batchDeselect.disabled = false;
+      }
+    });
+  }
 
   tableBody.addEventListener('click', async (event) => {
     const btn = event.target.closest('.js-expense-delete-btn');
@@ -809,13 +1051,10 @@ render_header('Expenses');
         throw new Error((payload && payload.error) || 'Unable to delete the expense.');
       }
 
-      if (typeof payload.new_csrf === 'string' && payload.new_csrf !== '') {
-        document.querySelectorAll('input[name="csrf_token"]').forEach((input) => {
-          input.value = payload.new_csrf;
-        });
-      }
+      refreshCsrfTokens(payload.new_csrf);
 
       row.remove();
+      updateBatchBar();
     } catch (error) {
       btn.disabled = false;
       delete btn.dataset.deleting;
