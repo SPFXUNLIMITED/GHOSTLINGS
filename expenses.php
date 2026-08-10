@@ -754,17 +754,16 @@ render_header('Expenses');
 
 <div class="card">
   <div class="table-wrap" style="overflow-x:auto;">
-    <table class="table-auto" style="min-width:1280px;table-layout:fixed;width:100%;">
+    <table class="table-auto" style="min-width:900px;">
       <colgroup>
-        <col style="width:40px;" />
-        <col style="width:100px;" />
-        <col style="width:220px;" />
-        <col style="width:140px;" />
-        <col style="width:130px;" />
-        <col style="width:100px;" />
-        <col style="width:90px;" />
-        <col style="width:160px;" />
-        <col style="width:300px;" />
+        <col style="width:105px;" /><!-- Date -->
+        <col /><!-- Description (flexible) -->
+        <col style="width:130px;" /><!-- Category -->
+        <col style="width:130px;" /><!-- Group -->
+        <col style="width:100px;" /><!-- Amount -->
+        <col style="width:110px;" /><!-- Attachments -->
+        <col style="width:130px;" /><!-- Linked Invoices -->
+        <col style="width:110px;" /><!-- Actions -->
       </colgroup>
       <thead>
         <tr>
