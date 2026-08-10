@@ -2576,14 +2576,23 @@ if (!function_exists('db_delete_expense')) {
    * @throws Throwable on DB or unexpected filesystem errors
    */
   function db_delete_expense(PDO $pdo, int $expenseId): void {
-    // Collect stored filenames before deleting so we can clean up disk files.
-    $attachStmt = $pdo->prepare(
-      "SELECT stored_name FROM expense_attachments WHERE expense_id = ?"
-    );
-    $attachStmt->execute([$expenseId]);
-    $storedNames = $attachStmt->fetchAll(PDO::FETCH_COLUMN);
+    $pdo->beginTransaction();
+    try {
+      // Collect stored filenames inside the transaction so the list is
+      // consistent with what the DELETE will remove via CASCADE.
+      $attachStmt = $pdo->prepare(
+        "SELECT stored_name FROM expense_attachments WHERE expense_id = ? FOR UPDATE"
+      );
+      $attachStmt->execute([$expenseId]);
+      $storedNames = $attachStmt->fetchAll(PDO::FETCH_COLUMN);
 
-    $pdo->prepare("DELETE FROM expenses WHERE id = ?")->execute([$expenseId]);
+      $pdo->prepare("DELETE FROM expenses WHERE id = ?")->execute([$expenseId]);
+
+      $pdo->commit();
+    } catch (Throwable $e) {
+      $pdo->rollBack();
+      throw $e;
+    }
 
     $uploadsDir = __DIR__ . '/uploads';
     foreach ($storedNames as $storedName) {
@@ -2592,8 +2601,8 @@ if (!function_exists('db_delete_expense')) {
         continue;
       }
       $filePath = $uploadsDir . '/' . basename($storedName);
-      if (is_file($filePath)) {
-        @unlink($filePath);
+      if (is_file($filePath) && !unlink($filePath)) {
+        error_log('db_delete_expense: failed to delete attachment file ' . $filePath . ' for expense ' . $expenseId);
       }
     }
   }
