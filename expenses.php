@@ -555,6 +555,7 @@ render_header('Expenses');
   </div>
   <div class="laser-rfq-hero-actions">
     <a class="btn primary" href="expense_import.php">Import Rocket CSV</a>
+    <a class="btn" href="expense_amazon_import.php">Amazon Import</a>
     <a class="btn" href="profit_loss.php">Profit &amp; Loss</a>
   </div>
 </div>

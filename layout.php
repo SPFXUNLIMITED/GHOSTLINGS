@@ -630,6 +630,7 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
       ['href' => 'transactions.php', 'files' => ['transactions.php'], 'label' => 'Bank Transactions'],
       ['type' => 'separator'],
       ['href' => 'expense_import.php', 'files' => ['expense_import.php'], 'label' => 'Import Expenses CSV'],
+      ['href' => 'expense_amazon_import.php', 'files' => ['expense_amazon_import.php'], 'label' => 'Amazon Import'],
       ['href' => 'expenses.php', 'files' => ['expenses.php', 'expense_attachment_file.php'], 'label' => 'Expenses'],
       ['href' => 'profit_loss.php', 'files' => ['profit_loss.php'], 'label' => 'Profit & Loss'],
     ], $current); ?>
