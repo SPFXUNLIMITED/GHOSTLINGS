@@ -83,13 +83,14 @@ $revenueCount = (int)($revenue['revenue_count'] ?? 0);
 $taxSql =
   "SELECT COALESCE(SUM(q.tax_amount), 0) AS total_tax
    FROM quotes q
+   INNER JOIN (
+     SELECT quote_id, SUM(applied_amount) AS total_applied
+     FROM invoice_credit_applications
+     GROUP BY quote_id
+   ) ica_sum ON ica_sum.quote_id = q.id
    WHERE q.tax_amount > 0
      AND (q.subtotal_amount + q.tax_amount) > 0.01
-     AND (
-       SELECT COALESCE(SUM(ica.applied_amount), 0)
-       FROM invoice_credit_applications ica
-       WHERE ica.quote_id = q.id
-     ) >= (q.subtotal_amount + q.tax_amount - 0.01)
+     AND ica_sum.total_applied >= (q.subtotal_amount + q.tax_amount - 0.01)
      AND EXISTS (
        SELECT 1
        FROM invoice_credit_applications ica2
