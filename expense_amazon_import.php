@@ -300,11 +300,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action'])) {
               'description'  => $description,
               'order_id'     => $orderId,
               'raw_json'     => json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+              'hash'         => expense_hash($dateYmd, $description, $amount),
             ];
           }
 
           fclose($handle);
           $handle = null;
+
+          // ── duplicate detection: check amazon_order_id and transaction_hash ─
+          $dupOrderIds = [];
+          $dupHashes   = [];
+
+          if ($parsedItems !== []) {
+            $allHashes   = array_column($parsedItems, 'hash');
+            $allOrderIds = array_filter(array_column($parsedItems, 'order_id'), fn($v) => $v !== '');
+
+            $dupConditions = [];
+            $dupParams     = [];
+
+            if ($allHashes !== []) {
+              $hPlaceholders    = implode(',', array_fill(0, count($allHashes), '?'));
+              $dupConditions[]  = "transaction_hash IN ($hPlaceholders)";
+              $dupParams        = array_merge($dupParams, $allHashes);
+            }
+            if ($allOrderIds !== []) {
+              $oPlaceholders    = implode(',', array_fill(0, count($allOrderIds), '?'));
+              $dupConditions[]  = "amazon_order_id IN ($oPlaceholders)";
+              $dupParams        = array_merge($dupParams, array_values($allOrderIds));
+            }
+
+            if ($dupConditions !== []) {
+              $dupStmt = $pdo->prepare(
+                "SELECT amazon_order_id, transaction_hash FROM expenses
+                 WHERE " . implode(' OR ', $dupConditions)
+              );
+              $dupStmt->execute($dupParams);
+              foreach ($dupStmt->fetchAll(PDO::FETCH_ASSOC) as $dupRow) {
+                if ($dupRow['amazon_order_id'] !== null && $dupRow['amazon_order_id'] !== '') {
+                  $dupOrderIds[$dupRow['amazon_order_id']] = true;
+                }
+                if ($dupRow['transaction_hash'] !== null && $dupRow['transaction_hash'] !== '') {
+                  $dupHashes[$dupRow['transaction_hash']] = true;
+                }
+              }
+            }
+          }
 
           // ── load expenses scoped to CSV date range ± DATE_WINDOW days ─────
           $DATE_WINDOW = 2;
@@ -325,11 +365,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action'])) {
           }
 
           // ── second pass: match each parsed item ───────────────────────────
-          $autoMatched = [];
-          $reviewRows  = [];
-          $createdRows = [];
+          $autoMatched   = [];
+          $reviewRows    = [];
+          $createdRows   = [];
+          $duplicateRows = [];
 
           foreach ($parsedItems as $item) {
+            // ── duplicate check (highest priority) ────────────────────────
+            $isOrderDup = $item['order_id'] !== '' && isset($dupOrderIds[$item['order_id']]);
+            $isHashDup  = isset($dupHashes[$item['hash']]);
+            if ($isOrderDup || $isHashDup) {
+              $item['dup_reason'] = $isOrderDup ? 'order_id' : 'hash';
+              $duplicateRows[]    = $item;
+              continue;
+            }
+
             $candidates = [];
             for ($d = -$DATE_WINDOW; $d <= $DATE_WINDOW; $d++) {
               $checkDate = (new DateTime($item['expense_date']))->modify("{$d} days")->format('Y-m-d');
@@ -356,11 +406,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action'])) {
           }
 
           $summary = [
-            'file_name'     => $originalName,
-            'auto_matched'  => $autoMatched,
-            'review_rows'   => $reviewRows,
-            'created_rows'  => $createdRows,
-            'invalid_count' => $invalidCount,
+            'file_name'      => $originalName,
+            'auto_matched'   => $autoMatched,
+            'review_rows'    => $reviewRows,
+            'created_rows'   => $createdRows,
+            'duplicate_rows' => $duplicateRows,
+            'invalid_count'  => $invalidCount,
           ];
         }
 
@@ -430,10 +481,11 @@ render_header('Amazon Import');
 <?php if ($summary): ?>
 
 <?php
-  $totalRows   = count($summary['auto_matched']) + count($summary['review_rows']) + count($summary['created_rows']);
+  $totalRows   = count($summary['auto_matched']) + count($summary['review_rows']) + count($summary['created_rows']) + count($summary['duplicate_rows']);
   $reviewCount = count($summary['review_rows']);
   $autoCount   = count($summary['auto_matched']);
   $newCount    = count($summary['created_rows']);
+  $dupCount    = count($summary['duplicate_rows']);
 ?>
 
 <div class="alert" style="border-color:#bfdbfe;background:#eff6ff;color:#1e40af;">
@@ -442,6 +494,7 @@ render_header('Amazon Import');
   <strong><?= $autoCount ?></strong> auto-matched &nbsp;·&nbsp;
   <strong><?= $reviewCount ?></strong> need review &nbsp;·&nbsp;
   <strong><?= $newCount ?></strong> new (will be Excluded) &nbsp;·&nbsp;
+  <?php if ($dupCount > 0): ?><strong style="color:#92400e;"><?= $dupCount ?></strong> already imported (duplicates) &nbsp;·&nbsp; <?php endif; ?>
   <strong><?= (int)$summary['invalid_count'] ?></strong> skipped (invalid).
 </div>
 
@@ -532,6 +585,39 @@ render_header('Amazon Import');
   </div>
   <?php endif; ?>
 
+  <?php if ($dupCount > 0): ?>
+  <div class="card" style="border-color:#fde68a;">
+    <h2 style="margin-top:0;">⚠️ Already Imported — Duplicates (<?= $dupCount ?>)</h2>
+    <p class="muted" style="margin-top:0;">These items already exist in the database (matched by Order ID or content hash). They are <strong>skipped by default</strong>. Check the box only if you need to force-create an additional entry.</p>
+    <div class="table-wrap" style="overflow-x:auto;">
+      <table class="table-auto" style="min-width:700px;">
+        <thead>
+          <tr>
+            <th style="width:36px;" title="Force create">Force</th>
+            <th>Date</th>
+            <th>Product</th>
+            <th>Amount</th>
+            <th>Order ID</th>
+            <th>Detected via</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($summary['duplicate_rows'] as $idx => $row): ?>
+          <tr style="opacity:0.7;">
+            <td><input type="checkbox" class="dup-decision" data-idx="<?= $idx ?>" /></td>
+            <td><?= h(fmt_date_mdY($row['expense_date'])) ?></td>
+            <td><?= h($row['description']) ?></td>
+            <td><strong>$<?= h(number_format($row['amount'], 2)) ?></strong></td>
+            <td class="muted"><?= h($row['order_id']) ?></td>
+            <td class="muted"><?= $row['dup_reason'] === 'order_id' ? 'Order ID' : 'Content hash' ?></td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <?php endif; ?>
+
   <?php if ($newCount > 0): ?>
   <div class="card">
     <h2 style="margin-top:0;">🆕 New Entries — Excluded (<?= $newCount ?>)</h2>
@@ -578,6 +664,7 @@ render_header('Amazon Import');
   var autoRows    = <?= json_encode($summary['auto_matched'],  JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES) ?>;
   var reviewRows  = <?= json_encode($summary['review_rows'],   JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES) ?>;
   var newRows     = <?= json_encode($summary['created_rows'],  JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES) ?>;
+  var dupRows     = <?= json_encode($summary['duplicate_rows'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES) ?>;
 
   document.getElementById('confirm-btn').addEventListener('click', function () {
     var allRows      = [];
@@ -614,6 +701,14 @@ render_header('Amazon Import');
     document.querySelectorAll('.new-decision').forEach(function (cb) {
       var idx = parseInt(cb.dataset.idx, 10);
       var row = Object.assign({}, newRows[idx]);
+      allRows.push(row);
+      allDecisions.push(cb.checked ? 'create' : 'skip');
+    });
+
+    // ── duplicate rows (skipped by default; force-create if checked) ──────
+    document.querySelectorAll('.dup-decision').forEach(function (cb) {
+      var idx = parseInt(cb.dataset.idx, 10);
+      var row = Object.assign({}, dupRows[idx]);
       allRows.push(row);
       allDecisions.push(cb.checked ? 'create' : 'skip');
     });
