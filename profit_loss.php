@@ -79,28 +79,38 @@ $revenueCount = (int)($revenue['revenue_count'] ?? 0);
 // Sum tax_amount from invoices (quotes) that are fully paid and had a payment
 // recorded within the selected date range.  An invoice is considered paid when
 // total applied credits cover its total due (subtotal + tax) within the $0.01
-// epsilon used by the invoice tracker.
+// epsilon used by the invoice tracker, OR when the invoice has been manually
+// marked as paid (payment_status = 'paid' or paid_at is set) with paid_at
+// falling within the selected date range.
 $taxSql =
   "SELECT COALESCE(SUM(q.tax_amount), 0) AS total_tax
    FROM quotes q
-   INNER JOIN (
+   LEFT JOIN (
      SELECT quote_id, SUM(applied_amount) AS total_applied
      FROM invoice_credit_applications
      GROUP BY quote_id
    ) ica_sum ON ica_sum.quote_id = q.id
    WHERE q.tax_amount > 0
      AND (q.subtotal_amount + q.tax_amount) > 0.01
-     AND ica_sum.total_applied >= (q.subtotal_amount + q.tax_amount - 0.01)
-     AND EXISTS (
-       SELECT 1
-       FROM invoice_credit_applications ica2
-       INNER JOIN customer_payments cp2 ON cp2.id = ica2.payment_id
-       WHERE ica2.quote_id = q.id
-         AND cp2.payment_date BETWEEN :date_from AND :date_to
+     AND (
+       (
+         ica_sum.total_applied >= (q.subtotal_amount + q.tax_amount - 0.01)
+         AND EXISTS (
+           SELECT 1
+           FROM invoice_credit_applications ica2
+           INNER JOIN customer_payments cp2 ON cp2.id = ica2.payment_id
+           WHERE ica2.quote_id = q.id
+             AND cp2.payment_date BETWEEN :date_from AND :date_to
+         )
+       )
+       OR (
+         (q.payment_status = 'paid' OR q.paid_at IS NOT NULL)
+         AND q.paid_at BETWEEN :date_from2 AND :date_to2
+       )
      )";
 
 $taxStmt = $pdo->prepare($taxSql);
-$taxStmt->execute($params);
+$taxStmt->execute(array_merge($params, [':date_from2' => $dateFrom, ':date_to2' => $dateTo]));
 $totalSalesTax = (float)($taxStmt->fetchColumn() ?: 0);
 
 $expenseStmt = $pdo->prepare(
@@ -161,27 +171,41 @@ if ($months) {
   }
 
   $taxByMonthStmt = $pdo->prepare(
-    "SELECT DATE_FORMAT(paid_in_range.first_payment_date, '%Y-%m') AS month_key,
-            COALESCE(SUM(q.tax_amount), 0) AS tax_total
-     FROM quotes q
-     INNER JOIN (
-       SELECT ica2.quote_id, MIN(cp2.payment_date) AS first_payment_date
-       FROM invoice_credit_applications ica2
+    "SELECT DATE_FORMAT(effective_date, '%Y-%m') AS month_key,
+            COALESCE(SUM(tax_amount), 0) AS tax_total
+     FROM (
+       SELECT q.id, q.tax_amount, MIN(cp2.payment_date) AS effective_date
+       FROM quotes q
+       INNER JOIN invoice_credit_applications ica2 ON ica2.quote_id = q.id
        INNER JOIN customer_payments cp2 ON cp2.id = ica2.payment_id
-       WHERE cp2.payment_date BETWEEN :date_from AND :date_to
-       GROUP BY ica2.quote_id
-     ) paid_in_range ON paid_in_range.quote_id = q.id
-     INNER JOIN (
-       SELECT quote_id, SUM(applied_amount) AS total_applied
-       FROM invoice_credit_applications
-       GROUP BY quote_id
-     ) ica_sum ON ica_sum.quote_id = q.id
-     WHERE q.tax_amount > 0
-       AND (q.subtotal_amount + q.tax_amount) > 0.01
-       AND ica_sum.total_applied >= (q.subtotal_amount + q.tax_amount - 0.01)
+       INNER JOIN (
+         SELECT quote_id, SUM(applied_amount) AS total_applied
+         FROM invoice_credit_applications
+         GROUP BY quote_id
+       ) ica_sum ON ica_sum.quote_id = q.id
+       WHERE q.tax_amount > 0
+         AND (q.subtotal_amount + q.tax_amount) > 0.01
+         AND ica_sum.total_applied >= (q.subtotal_amount + q.tax_amount - 0.01)
+         AND cp2.payment_date BETWEEN :date_from AND :date_to
+       GROUP BY q.id, q.tax_amount
+       UNION
+       SELECT q.id, q.tax_amount, q.paid_at AS effective_date
+       FROM quotes q
+       LEFT JOIN (
+         SELECT quote_id, SUM(applied_amount) AS total_applied
+         FROM invoice_credit_applications
+         GROUP BY quote_id
+       ) ica_sum ON ica_sum.quote_id = q.id
+       WHERE q.tax_amount > 0
+         AND (q.subtotal_amount + q.tax_amount) > 0.01
+         AND (q.payment_status = 'paid' OR q.paid_at IS NOT NULL)
+         AND q.paid_at BETWEEN :date_from2 AND :date_to2
+         AND (ica_sum.total_applied IS NULL
+              OR ica_sum.total_applied < (q.subtotal_amount + q.tax_amount - 0.01))
+     ) combined
      GROUP BY month_key"
   );
-  $taxByMonthStmt->execute($params);
+  $taxByMonthStmt->execute(array_merge($params, [':date_from2' => $dateFrom, ':date_to2' => $dateTo]));
 
   foreach ($taxByMonthStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
     $key = (string)($row['month_key'] ?? '');
