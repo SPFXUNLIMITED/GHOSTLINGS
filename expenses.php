@@ -433,10 +433,6 @@ render_header('Expenses');
 .expenses-pill{display:inline-flex;align-items:center;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600;white-space:nowrap;}
 </style>
 
-<div class="card" style="display:flex;align-items:center;gap:12px;padding:10px 16px;margin-bottom:0;">
-  <a class="btn primary" href="expense_import.php">Import</a>
-</div>
-
 <div class="card">
   <div class="table-wrap" style="overflow-x:auto;">
     <table class="table-auto" style="min-width:1320px;">
