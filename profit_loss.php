@@ -240,7 +240,7 @@ render_header('Profit & Loss');
           <td><strong><?= h(profit_loss_money($grossProfit)) ?></strong></td>
         </tr>
         <tr>
-          <th>Less Operating Expenses</th>
+          <th>Less OpEx (Operating Expenses)</th>
           <td><strong><?= ($opexTotal > 0 ? '-' : '') . h(profit_loss_money($opexTotal)) ?></strong></td>
         </tr>
         <tr>
