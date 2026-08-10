@@ -188,11 +188,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action'])) {
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
-  if (empty($_SESSION['expense_import_csrf']) && empty($_SESSION['amazon_import_csrf'])) {
+  if (empty($_SESSION['amazon_import_csrf'])) {
     $errors[] = 'Security token missing.';
-  } elseif (
-    !hash_equals((string)$_SESSION['amazon_import_csrf'], $submitted_csrf)
-  ) {
+  } elseif (!hash_equals((string)$_SESSION['amazon_import_csrf'], $submitted_csrf)) {
     $errors[] = 'Security token mismatch. Please refresh and try again.';
   } elseif (empty($_FILES['csv_file']) || !is_array($_FILES['csv_file'])) {
     $errors[] = 'Please choose a CSV file to import.';
@@ -245,27 +243,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action'])) {
         if (!$foundHeader) {
           $errors[] = 'The CSV must include Order Date, Product/Title, and Item Total columns.';
         } else {
-          // ── load existing expenses for matching ────────────────────────────
-          // Fetch all expenses within a reasonable window (no outer range filter;
-          // we'll match per-row in PHP using a ±2-day window).
-          $existingStmt = $pdo->query(
-            "SELECT id, expense_date, amount FROM expenses ORDER BY expense_date ASC"
-          );
-          $existingExpenses = $existingStmt->fetchAll(PDO::FETCH_ASSOC);
-
-          // Index by date string → array of rows for faster lookup
-          $expenseByDate = [];
-          foreach ($existingExpenses as $exp) {
-            $expenseByDate[$exp['expense_date']][] = $exp;
-          }
-
-          $autoMatched  = [];  // confident single matches
-          $reviewRows   = [];  // ambiguous (multiple candidates) or close
-          $createdRows  = [];  // no match found → will create as Excluded
+          // ── first pass: parse all valid CSV rows into memory ──────────────
+          $parsedItems  = [];
           $invalidCount = 0;
           $lineNumber   = 1;
-
-          $DATE_WINDOW = 2; // days
+          $minDate      = null;
+          $maxDate      = null;
 
           while (($row = fgetcsv($handle)) !== false) {
             $lineNumber++;
@@ -280,7 +263,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action'])) {
             $totalRaw    = trim((string)($row[$itemTotalIndex]  ?? ''));
             $orderId     = $orderIdIndex !== null ? trim((string)($row[$orderIdIndex] ?? '')) : '';
 
-            // Skip blank rows
             if ($dateRaw === '' && $product === '' && $totalRaw === '') {
               continue;
             }
@@ -293,66 +275,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action'])) {
               continue;
             }
 
-            $amount  = abs($parsedTotal);
+            $amount = abs($parsedTotal);
             if ($amount <= 0) {
               $invalidCount++;
               continue;
             }
 
             $dateYmd = $parsedDate->format('Y-m-d');
+            if ($minDate === null || $dateYmd < $minDate) {
+              $minDate = $dateYmd;
+            }
+            if ($maxDate === null || $dateYmd > $maxDate) {
+              $maxDate = $dateYmd;
+            }
 
-            // Build description from product + qty
             $qty = (int)$qtyRaw;
-            if ($qty > 1) {
-              $description = $product . ' (×' . $qty . ')';
-            } else {
-              $description = $product;
-            }
+            $description = ($qty > 1) ? ($product . ' (×' . $qty . ')') : $product;
 
-            $rawJson = json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-
-            // ── match against existing expenses (±2-day window, same amount) ─
-            $candidates = [];
-            $dt = clone $parsedDate;
-            for ($d = -$DATE_WINDOW; $d <= $DATE_WINDOW; $d++) {
-              $checkDate = (clone $parsedDate)->modify("{$d} days")->format('Y-m-d');
-              if (!isset($expenseByDate[$checkDate])) {
-                continue;
-              }
-              foreach ($expenseByDate[$checkDate] as $exp) {
-                if (abs((float)$exp['amount'] - $amount) < 0.005) {
-                  $candidates[] = $exp;
-                }
-              }
-            }
-
-            $rowData = [
+            $parsedItems[] = [
               'line_number'  => $lineNumber,
               'filename'     => $originalName,
               'expense_date' => $dateYmd,
               'amount'       => $amount,
               'description'  => $description,
               'order_id'     => $orderId,
-              'raw_json'     => $rawJson,
+              'raw_json'     => json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             ];
-
-            if (count($candidates) === 1) {
-              // Confident match – queue for auto-confirm (user still sees summary)
-              $rowData['expense_id'] = (int)$candidates[0]['id'];
-              $rowData['match_date'] = (string)$candidates[0]['expense_date'];
-              $autoMatched[] = $rowData;
-            } elseif (count($candidates) > 1) {
-              // Ambiguous – show to user for manual review
-              $rowData['candidates'] = $candidates;
-              $reviewRows[] = $rowData;
-            } else {
-              // No match – will create as Excluded
-              $createdRows[] = $rowData;
-            }
           }
 
           fclose($handle);
           $handle = null;
+
+          // ── load expenses scoped to CSV date range ± DATE_WINDOW days ─────
+          $DATE_WINDOW = 2;
+          $expenseByDate = [];
+
+          if ($parsedItems !== []) {
+            $windowFrom = (new DateTime($minDate))->modify("-{$DATE_WINDOW} days")->format('Y-m-d');
+            $windowTo   = (new DateTime($maxDate))->modify("+{$DATE_WINDOW} days")->format('Y-m-d');
+            $existingStmt = $pdo->prepare(
+              "SELECT id, expense_date, amount FROM expenses
+               WHERE expense_date BETWEEN ? AND ?
+               ORDER BY expense_date ASC"
+            );
+            $existingStmt->execute([$windowFrom, $windowTo]);
+            foreach ($existingStmt->fetchAll(PDO::FETCH_ASSOC) as $exp) {
+              $expenseByDate[$exp['expense_date']][] = $exp;
+            }
+          }
+
+          // ── second pass: match each parsed item ───────────────────────────
+          $autoMatched = [];
+          $reviewRows  = [];
+          $createdRows = [];
+
+          foreach ($parsedItems as $item) {
+            $candidates = [];
+            for ($d = -$DATE_WINDOW; $d <= $DATE_WINDOW; $d++) {
+              $checkDate = (new DateTime($item['expense_date']))->modify("{$d} days")->format('Y-m-d');
+              if (!isset($expenseByDate[$checkDate])) {
+                continue;
+              }
+              foreach ($expenseByDate[$checkDate] as $exp) {
+                if (abs((float)$exp['amount'] - $item['amount']) < 0.005) {
+                  $candidates[] = $exp;
+                }
+              }
+            }
+
+            if (count($candidates) === 1) {
+              $item['expense_id'] = (int)$candidates[0]['id'];
+              $item['match_date'] = (string)$candidates[0]['expense_date'];
+              $autoMatched[] = $item;
+            } elseif (count($candidates) > 1) {
+              $item['candidates'] = $candidates;
+              $reviewRows[] = $item;
+            } else {
+              $createdRows[] = $item;
+            }
+          }
 
           $summary = [
             'file_name'     => $originalName,
