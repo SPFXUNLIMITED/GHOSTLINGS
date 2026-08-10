@@ -225,7 +225,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action'])) {
           $p   = amazon_find_col($headerRow, ['title', 'product name', 'product', 'item']);
           $q   = amazon_find_col($headerRow, ['quantity', 'qty']);
           $up  = amazon_find_col($headerRow, ['unit price', 'price per unit']);
-          $tot = amazon_find_col($headerRow, ['item total', 'item subtotal', 'subtotal', 'total']);
+          $tot = amazon_find_col($headerRow, ['order net total', 'item total', 'item subtotal', 'subtotal', 'total']);
           $oid = amazon_find_col($headerRow, ['order id', 'order #', 'orderid']);
 
           if ($d !== null && $p !== null && $tot !== null) {
