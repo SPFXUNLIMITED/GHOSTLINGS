@@ -193,6 +193,8 @@ render_header('Profit & Loss');
   <div class="laser-rfq-hero-actions">
     <a class="btn" href="invoice_tracker.php">Invoice Tracker</a>
     <a class="btn" href="expenses.php?<?= h(http_build_query(['date_from' => $dateFrom, 'date_to' => $dateTo])) ?>">View Expenses</a>
+    <a class="btn" href="profit_loss_export.php?<?= h(http_build_query(['format' => 'csv', 'basis' => $basis, 'date_from' => $dateFrom, 'date_to' => $dateTo])) ?>">Export CSV</a>
+    <a class="btn" href="profit_loss_export.php?<?= h(http_build_query(['format' => 'pdf', 'basis' => $basis, 'date_from' => $dateFrom, 'date_to' => $dateTo])) ?>" target="_blank">Export PDF</a>
   </div>
 </div>
 
