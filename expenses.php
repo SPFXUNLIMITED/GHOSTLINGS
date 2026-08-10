@@ -621,7 +621,7 @@ if ($sourceFilter === 'amazon_csv') {
   $where[] = 'e.source = :source_exact';
   $params[':source_exact'] = 'amazon_csv';
 } elseif ($sourceFilter === '__other__') {
-  $where[] = 'e.source <> :source_other';
+  $where[] = '(e.source <> :source_other OR e.source IS NULL)';
   $params[':source_other'] = 'amazon_csv';
 }
 
