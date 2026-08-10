@@ -203,6 +203,15 @@ function expenses_render_row(array $expense, array $attachments, string $csrfTok
           <?php endforeach; ?>
         </div>
       <?php endif; ?>
+
+      <div style="margin-top:10px;">
+        <button
+          type="button"
+          class="btn js-expense-delete-btn"
+          data-expense-id="<?= $expenseId ?>"
+          style="color:#b91c1c;border-color:#b91c1c;"
+        >Delete</button>
+      </div>
     </td>
   </tr>
   <?php
@@ -219,9 +228,10 @@ $success = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = trim((string)($_POST['action'] ?? ''));
   $isAjaxGroupUpdate = $action === 'update_group' && expenses_is_ajax_request();
+  $isAjaxDelete = $action === 'delete_expense' && expenses_is_ajax_request();
   $submitted_csrf = (string)($_POST['csrf_token'] ?? '');
   if (empty($_SESSION['expenses_csrf']) || !hash_equals((string)$_SESSION['expenses_csrf'], $submitted_csrf)) {
-    if ($isAjaxGroupUpdate) {
+    if ($isAjaxGroupUpdate || $isAjaxDelete) {
       header('Content-Type: application/json; charset=UTF-8');
       header('X-Content-Type-Options: nosniff');
       http_response_code(403);
@@ -232,7 +242,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   } else {
     if ($action === 'update_group' && !$isAjaxGroupUpdate) {
       $errors[] = 'Invalid group update request.';
-    } elseif ($action !== 'update_group') {
+    } elseif ($action === 'delete_expense' && !$isAjaxDelete) {
+      $errors[] = 'Invalid delete request.';
+    } elseif ($action !== 'update_group' && $action !== 'delete_expense') {
       $_SESSION['expenses_csrf'] = bin2hex(random_bytes(24));
     }
     if ($action === 'update_group' && $isAjaxGroupUpdate) {
@@ -400,6 +412,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       } else {
         $pdo->prepare("DELETE FROM expense_invoice_links WHERE id = ?")->execute([$linkId]);
         $success = 'Invoice link removed.';
+      }
+    } elseif ($action === 'delete_expense' && $isAjaxDelete) {
+      header('Content-Type: application/json; charset=UTF-8');
+      header('X-Content-Type-Options: nosniff');
+
+      $expenseId = (int)($_POST['expense_id'] ?? 0);
+
+      if ($expenseId <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Invalid expense selected.']);
+        exit;
+      }
+
+      try {
+        $expenseCheck = $pdo->prepare("SELECT id FROM expenses WHERE id = ? LIMIT 1");
+        $expenseCheck->execute([$expenseId]);
+        if (!$expenseCheck->fetch()) {
+          http_response_code(404);
+          echo json_encode(['ok' => false, 'error' => 'Expense not found.']);
+          exit;
+        }
+
+        db_delete_expense($pdo, $expenseId);
+
+        $_SESSION['expenses_csrf'] = bin2hex(random_bytes(24));
+
+        echo json_encode(['ok' => true, 'new_csrf' => (string)$_SESSION['expenses_csrf']]);
+        exit;
+      } catch (Throwable $e) {
+        error_log('Expense delete failed for expense ' . $expenseId . ': ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Unable to delete the expense right now.']);
+        exit;
       }
     }
   }
@@ -719,6 +764,57 @@ render_header('Expenses');
         }
       }
       delete tableBody.dataset.groupUpdateInFlight;
+    }
+  });
+
+  tableBody.addEventListener('click', async (event) => {
+    const btn = event.target.closest('.js-expense-delete-btn');
+    if (!btn || btn.dataset.deleting === '1') return;
+
+    const expenseId = parseInt(btn.dataset.expenseId || '0', 10);
+    if (!expenseId) return;
+
+    const row = btn.closest('tr');
+    const csrfInput = row && row.querySelector('input[name="csrf_token"]');
+    if (!row || !csrfInput) return;
+
+    if (!confirm(`Delete expense #${expenseId}? This action cannot be undone.`)) return;
+
+    btn.dataset.deleting = '1';
+    btn.disabled = true;
+    row.classList.add('expenses-row-saving');
+
+    try {
+      const body = new URLSearchParams({
+        action: 'delete_expense',
+        csrf_token: csrfInput.value,
+        expense_id: String(expenseId)
+      });
+
+      const response = await fetch('expenses.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload || !payload.ok) {
+        throw new Error((payload && payload.error) || 'Unable to delete the expense.');
+      }
+
+      if (typeof payload.new_csrf === 'string' && payload.new_csrf !== '') {
+        document.querySelectorAll('input[name="csrf_token"]').forEach((input) => {
+          input.value = payload.new_csrf;
+        });
+      }
+
+      row.remove();
+    } catch (error) {
+      btn.disabled = false;
+      delete btn.dataset.deleting;
+      row.classList.remove('expenses-row-saving');
+      alert(error instanceof Error ? error.message : 'Network error. Please try again.');
     }
   });
 })();
