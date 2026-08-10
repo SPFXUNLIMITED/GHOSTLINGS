@@ -69,7 +69,16 @@ function invoice_payment_badge_config(string $status): array {
   };
 }
 
-function invoice_payment_status_key(float $invoice_total_due, float $invoice_paid_amount, float $epsilon = INVOICE_TRACKER_PAYMENT_EPSILON): string {
+function invoice_payment_status_key(
+  float $invoice_total_due,
+  float $invoice_paid_amount,
+  string $quote_payment_status = '',
+  ?string $quote_paid_at = null,
+  float $epsilon = INVOICE_TRACKER_PAYMENT_EPSILON
+): string {
+  if ($quote_payment_status === 'paid' || ($quote_paid_at !== null && trim($quote_paid_at) !== '')) {
+    return 'paid';
+  }
   if ($invoice_total_due > $epsilon && $invoice_paid_amount >= ($invoice_total_due - $epsilon)) {
     return 'paid';
   }
@@ -189,7 +198,7 @@ if ($status_filter !== '' && isset($invoice_statuses[$status_filter])) {
 }
 
 $stmt = $pdo->prepare(
-  "SELECT id, customer_name, company_name, quote_date, subtotal_amount, tax_amount, status, approval_status, converted_invoice_no,
+  "SELECT id, customer_name, company_name, quote_date, subtotal_amount, tax_amount, status, approval_status, payment_status, paid_at, converted_invoice_no,
           enable_online_payment, invoice_emailed, created_at
    FROM quotes
    WHERE " . implode(' AND ', $where_parts) . "
@@ -446,7 +455,9 @@ render_header('Invoice Tracker');
               error_log('invoice_tracker.php detected negative applied payment total for quote #' . $inv_id . ': ' . $invoice_paid_amount);
               $invoice_paid_amount = 0.0;
             }
-            $payment_status = invoice_payment_status_key($invoice_total_due, $invoice_paid_amount);
+            $quote_payment_status = trim((string)($invoice['payment_status'] ?? ''));
+            $quote_paid_at = $invoice['paid_at'] ?? null;
+            $payment_status = invoice_payment_status_key($invoice_total_due, $invoice_paid_amount, $quote_payment_status, $quote_paid_at);
             [$payment_label, $payment_bg, $payment_color, $payment_border] = invoice_payment_badge_config($payment_status);
             $applied_tooltip = 'This payment has been applied to an invoice and cannot be modified';
           ?>
