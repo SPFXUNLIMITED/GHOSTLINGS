@@ -5,7 +5,6 @@ require __DIR__ . '/auth.php';
 require_admin_or_moderator();
 
 const PROFIT_LOSS_DEFAULT_BASIS = 'accrual';
-const PROFIT_LOSS_INVOICE_CONDITION = "(q.status = 'converted' OR (q.converted_invoice_no IS NOT NULL AND q.converted_invoice_no <> ''))";
 
 function profit_loss_money(float $value): string {
   return '$' . number_format($value, 2);
@@ -64,24 +63,13 @@ $params = [
   ':date_to' => $dateTo,
 ];
 
-if ($basis === 'cash') {
-  $revenueSql =
-    "SELECT
-       COALESCE(SUM(cp.amount), 0) AS total_revenue,
-       0 AS total_tax,
-       COUNT(*) AS revenue_count
-     FROM customer_payments cp
-     WHERE cp.payment_date BETWEEN :date_from AND :date_to";
-} else {
-  $revenueSql =
-    "SELECT
-       COALESCE(SUM(q.subtotal_amount), 0) AS total_revenue,
-       COALESCE(SUM(q.tax_amount), 0) AS total_tax,
-       COUNT(*) AS revenue_count
-     FROM quotes q
-     WHERE " . PROFIT_LOSS_INVOICE_CONDITION . "
-       AND DATE(COALESCE(q.converted_at, q.quote_date, q.created_at)) BETWEEN :date_from AND :date_to";
-}
+$revenueSql =
+  "SELECT
+     COALESCE(SUM(cp.amount), 0) AS total_revenue,
+     0 AS total_tax,
+     COUNT(*) AS revenue_count
+   FROM customer_payments cp
+   WHERE cp.payment_date BETWEEN :date_from AND :date_to";
 
 $revenueStmt = $pdo->prepare($revenueSql);
 $revenueStmt->execute($params);
@@ -125,40 +113,19 @@ $netProfit = $grossProfit - $opexTotal;
 
 $months = profit_loss_month_keys($dateFrom, $dateTo);
 if ($months) {
-  if ($basis === 'cash') {
-    $revenueByMonthStmt = $pdo->prepare(
-      "SELECT DATE_FORMAT(cp.payment_date, '%Y-%m') AS month_key,
-              COALESCE(SUM(cp.amount), 0) AS revenue_total
-       FROM customer_payments cp
-       WHERE cp.payment_date BETWEEN :date_from AND :date_to
-       GROUP BY month_key"
-    );
-    $revenueByMonthStmt->execute($params);
+  $revenueByMonthStmt = $pdo->prepare(
+    "SELECT DATE_FORMAT(cp.payment_date, '%Y-%m') AS month_key,
+            COALESCE(SUM(cp.amount), 0) AS revenue_total
+     FROM customer_payments cp
+     WHERE cp.payment_date BETWEEN :date_from AND :date_to
+     GROUP BY month_key"
+  );
+  $revenueByMonthStmt->execute($params);
 
-    foreach ($revenueByMonthStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-      $key = (string)($row['month_key'] ?? '');
-      if ($key !== '' && isset($months[$key])) {
-        $months[$key]['revenue'] = (float)($row['revenue_total'] ?? 0);
-      }
-    }
-  } else {
-    $revenueByMonthStmt = $pdo->prepare(
-      "SELECT DATE_FORMAT(COALESCE(q.converted_at, q.quote_date, q.created_at), '%Y-%m') AS month_key,
-              COALESCE(SUM(q.subtotal_amount), 0) AS revenue_total,
-              COALESCE(SUM(q.tax_amount), 0) AS tax_total
-       FROM quotes q
-       WHERE " . PROFIT_LOSS_INVOICE_CONDITION . "
-         AND DATE(COALESCE(q.converted_at, q.quote_date, q.created_at)) BETWEEN :date_from AND :date_to
-       GROUP BY month_key"
-    );
-    $revenueByMonthStmt->execute($params);
-
-    foreach ($revenueByMonthStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-      $key = (string)($row['month_key'] ?? '');
-      if ($key !== '' && isset($months[$key])) {
-        $months[$key]['revenue'] = (float)($row['revenue_total'] ?? 0);
-        $months[$key]['tax'] = (float)($row['tax_total'] ?? 0);
-      }
+  foreach ($revenueByMonthStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    $key = (string)($row['month_key'] ?? '');
+    if ($key !== '' && isset($months[$key])) {
+      $months[$key]['revenue'] = (float)($row['revenue_total'] ?? 0);
     }
   }
 
@@ -204,10 +171,10 @@ render_header('Profit & Loss');
     <span class="laser-rfq-hero-tag">Accounting Report</span>
     <h1>Profit &amp; Loss</h1>
     <p class="muted">
-      Basis: <strong><?= h(strtoupper($basis)) ?></strong>. Default is accrual for tax prep. Sales tax is tracked separately and excluded from operating revenue totals.
+      Revenue is sourced from actual payments received. Sales tax is tracked separately and excluded from operating revenue totals.
     </p>
     <ul class="laser-rfq-hero-pills" aria-label="P&amp;L highlights">
-      <li class="laser-rfq-hero-pill"><span aria-hidden="true">💰</span> Revenue from invoices</li>
+      <li class="laser-rfq-hero-pill"><span aria-hidden="true">💰</span> Revenue from payments</li>
       <li class="laser-rfq-hero-pill"><span aria-hidden="true">🧾</span> Expenses by category</li>
       <li class="laser-rfq-hero-pill"><span aria-hidden="true">🏭</span> COGS vs OpEx</li>
       <li class="laser-rfq-hero-pill"><span aria-hidden="true">📈</span> Monthly rollup</li>
