@@ -2,8 +2,7 @@
 require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
-require_admin_or_moderator();
-require_once __DIR__ . '/project/customer_interaction_module.php';
+require_once __DIR__ . '/customer_interaction_module.php';
 
 customerInteractionEnsureSchema($pdo);
 

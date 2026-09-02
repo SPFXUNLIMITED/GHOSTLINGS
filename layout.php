@@ -497,6 +497,8 @@ function render_header(string $title): void {
     <link rel="apple-touch-icon" href="<?= asset('ghost-logo2-32x32.png') ?>">
 
   <link rel="stylesheet" href="<?= asset('styles.css') ?>" />
+  <link rel="stylesheet" href="<?= asset('customer-interaction.css') ?>" />
+  
 </head>
 <body>
   <div class="container">
