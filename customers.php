@@ -2,7 +2,11 @@
 require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
+require_once __DIR__ . '/customer_interaction_module.php';
 require_admin_or_moderator();
+
+customerInteractionEnsureSchema($pdo);
+$customerInteractionCsrf = customerInteractionCsrfToken();
 
 const HUBSPOT_SYNC_PAGE_LIMIT = 50;
 const HUBSPOT_SYNC_PAGE_SIZE = 100;
@@ -292,6 +296,7 @@ function render_customers_table_rows(array $customers, string $search, int $cust
       <td class="muted"><?= h(format_customer_last_updated($row['last_updated'] ?? null)) ?></td>
       <td class="actions">
         <a class="btn" href="customer_details.php?id=<?= (int)$row['id'] ?>">View</a>
+        <button type="button" class="btn" onclick="openCustomerDetailsModal(<?= (int)$row['id'] ?>)" style="background:#0e7490; color:#fff; border:none;">Notes</button>
         <a class="btn" href="customer_form.php?id=<?= (int)$row['id'] ?>">Edit</a>
         <?php if ((int)($row['has_associations'] ?? 0) === 1): ?>
           <span title="This customer cannot be deleted because they have associated RFQs or orders.">
@@ -733,4 +738,6 @@ render_header('Customers');
 })();
 </script>
 
-<?php render_footer(); ?>
+<?php
+customerInteractionRenderModal();
+render_footer();
