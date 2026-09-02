@@ -362,8 +362,9 @@ function render_menu_link(array $item, string $current): void {
   if (array_key_exists('visible', $item) && empty($item['visible'])) {
     return;
   }
+  $target = $item['target'] ?? null;
   ?>
-  <a class="menu-link <?= is_menu_item_active($item, $current) ? 'active' : '' ?>" href="<?= h($item['href']) ?>"><?= h($item['label']) ?></a>
+  <a class="menu-link <?= is_menu_item_active($item, $current) ? 'active' : '' ?>" href="<?= h($item['href']) ?>"<?= $target ? ' target="' . h($target) . '" rel="noopener noreferrer"' : '' ?>><?= h($item['label']) ?></a>
   <?php
 }
 
@@ -579,9 +580,11 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
     <?php if ($is_regular_user): ?>
     <?php render_menu_link(['href' => 'user_page.php', 'file' => 'user_page.php', 'label' => 'My Profile'], $current); ?>
     <?php render_menu_link(['href' => 'machine_inquiry_form.php', 'file' => 'machine_inquiry_form.php', 'label' => 'Machine Inquiry Form'], $current); ?>
+    <?php render_menu_link(['href' => 'https://ghostlaser.com/webmail', 'label' => 'Webmail', 'target' => '_blank'], $current); ?>
     <?php elseif ($show_mod_menu): ?>
     <?php render_menu_link(['href' => 'index.php', 'file' => 'index.php', 'label' => 'Home'], $current); ?>
     <?php render_menu_link(['href' => 'user_page.php', 'file' => 'user_page.php', 'label' => 'My Profile'], $current); ?>
+    <?php render_menu_link(['href' => 'https://ghostlaser.com/webmail', 'label' => 'Webmail', 'target' => '_blank'], $current); ?>
 
 	<?php render_menu_dropdown('Messages', [
 	  ['href' => 'messages.php', 'file' => 'messages.php', 'label' => 'Messages'],
