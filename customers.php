@@ -2,6 +2,7 @@
 require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
+require_once __DIR__ . '/customer_interaction_module.reference';
 require_admin_or_moderator();
 
 const HUBSPOT_SYNC_PAGE_LIMIT = 50;
@@ -636,6 +637,8 @@ render_header('Customers');
 <div id="customers-pagination">
   <?php render_customers_pagination($total_pages, $page, $customers_per_page, $search); ?>
 </div>
+
+<?php customerInteractionRenderModal(); ?>
 
 <script>
 (() => {
