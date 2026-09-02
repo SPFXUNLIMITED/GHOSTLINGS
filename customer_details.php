@@ -2,7 +2,11 @@
 require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
+require_once __DIR__ . '/customer_interaction_module.php';
 require_admin_or_moderator();
+
+customerInteractionEnsureSchema($pdo);
+$customerInteractionCsrf = customerInteractionCsrfToken();
 
 $id = (int)($_GET['id'] ?? 0);
 if ($id <= 0) {
@@ -31,6 +35,7 @@ render_header('Customer Details');
     <div class="actions">
       <a class="btn" href="customers.php">Back to Customers</a>
       <a class="btn" href="customer_form.php?id=<?= (int)$customer['id'] ?>">Edit</a>
+      <button type="button" class="btn" onclick="openCustomerDetailsModal(<?= (int)$customer['id'] ?>)" style="background:#0e7490; color:#fff; border:none;">Interactions</button>
     </div>
   </div>
 </div>
@@ -106,4 +111,6 @@ render_header('Customer Details');
   </table>
 </div>
 
-<?php render_footer(); ?>
+<?php
+customerInteractionRenderModal();
+render_footer();
