@@ -1,3 +1,8 @@
 .env
 .env.local
 .env.*.local
+
+# Reference copies of files that live in the frontend repo.
+# Kept on disk for Claude/reference only — never committed, so the two repos
+# cannot fight over the same file on deploy.
+/reference/
