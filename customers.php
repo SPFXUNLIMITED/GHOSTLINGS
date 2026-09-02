@@ -291,8 +291,7 @@ function render_customers_table_rows(array $customers, string $search, int $cust
       </td>
       <td class="muted"><?= h(format_customer_last_updated($row['last_updated'] ?? null)) ?></td>
       <td class="actions">
-        <a class="btn" href="customer_details.php?id=<?= (int)$row['id'] ?>">View</a>
-        <a class="btn" href="customer_form.php?id=<?= (int)$row['id'] ?>">Edit</a>
+        <button type="button" class="btn" onclick="openCustomerDetailsModal(<?= (int)$row['id'] ?>)">Edit</button>
         <?php if ((int)($row['has_associations'] ?? 0) === 1): ?>
           <span title="This customer cannot be deleted because they have associated RFQs or orders.">
             <button type="button" class="btn danger" disabled>Delete</button>
