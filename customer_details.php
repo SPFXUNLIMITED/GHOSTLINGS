@@ -3,6 +3,9 @@ require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_admin_or_moderator();
+require_once __DIR__ . '/project/customer_interaction_module.php';
+
+customerInteractionEnsureSchema($pdo);
 
 $id = (int)($_GET['id'] ?? 0);
 if ($id <= 0) {
@@ -30,6 +33,7 @@ render_header('Customer Details');
     <h1 style="margin:0;">Customer Details</h1>
     <div class="actions">
       <a class="btn" href="customers.php">Back to Customers</a>
+      <button type="button" class="btn" onclick="openCustomerDetailsModal(<?= (int)$customer['id'] ?>)">Notes</button>
       <a class="btn" href="customer_form.php?id=<?= (int)$customer['id'] ?>">Edit</a>
     </div>
   </div>
@@ -105,5 +109,7 @@ render_header('Customer Details');
     </tbody>
   </table>
 </div>
+
+<?php customerInteractionRenderModal(); ?>
 
 <?php render_footer(); ?>
