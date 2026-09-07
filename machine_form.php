@@ -46,6 +46,7 @@ $fields = [
   'tertiary_photo'   => '',
   // Content
   'description'      => '',
+  'price'            => '',
   // Toggles
   'is_active'        => '1',
   'is_visible'       => '1',
@@ -149,6 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $fields['name']        = trim((string)($_POST['name'] ?? ''));
     $fields['model']       = trim((string)($_POST['model'] ?? ''));
     $fields['description'] = trim((string)($_POST['description'] ?? ''));
+    $fields['price']       = trim((string)($_POST['price'] ?? ''));
     $fields['is_active']   = isset($_POST['is_active'])  ? '1' : '0';
     $fields['is_visible']  = isset($_POST['is_visible'])  ? '1' : '0';
     $fields['is_catalog']  = isset($_POST['is_catalog'])  ? '1' : '0';
@@ -261,6 +263,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($crate_weight_kg_db !== null && $crate_weight_kg_db < 0) {
       $errors[] = 'Crate Weight must be a positive number.';
     }
+    $price_db = null;
+    if ($fields['price'] !== '') {
+      if (!is_numeric($fields['price'])) {
+        $errors[] = 'Price must be a number.';
+      } else {
+        $price_db = round((float)$fields['price'], 2);
+        if ($price_db < 0) {
+          $errors[] = 'Price must be a positive number.';
+        }
+      }
+    }
 
     // ── Photo uploads ────────────────────────────────────────────────────────
     $new_primary   = $processPhotoUpload('primary_photo_upload',   'Primary photo',   'machine_primary');
@@ -288,6 +301,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $primary_final, $secondary_final, $tertiary_final,
         // Content & toggles
         $fields['description'] !== '' ? $fields['description'] : null,
+        $price_db,
         (int)$fields['is_active'],
         (int)$fields['is_visible'],
         (int)$fields['is_catalog'],
@@ -302,7 +316,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             crate_length = ?, crate_width = ?, crate_length_mm = ?, crate_width_mm = ?,
             crate_height = ?, crate_height_mm = ?, crate_weight_kg = ?,
             primary_photo = ?, secondary_photo = ?, tertiary_photo = ?,
-            description = ?, is_active = ?, is_visible = ?, is_catalog = ?
+            description = ?, price = ?, is_active = ?, is_visible = ?, is_catalog = ?
           WHERE id = ?
         ")->execute([...$common_params, $id]);
         $success = 'Machine updated.';
@@ -315,8 +329,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              crate_length, crate_width, crate_length_mm, crate_width_mm,
              crate_height, crate_height_mm, crate_weight_kg,
              primary_photo, secondary_photo, tertiary_photo,
-             description, is_active, is_visible, is_catalog)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             description, price, is_active, is_visible, is_catalog)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ")->execute($common_params);
         $id      = (int)$pdo->lastInsertId();
         $is_edit = true;
@@ -815,6 +829,16 @@ render_header($page_title);
         <label>Description</label>
         <textarea name="description" rows="4"
                   placeholder="e.g. High-powered CO₂ laser cutter for large-format sheet work…"><?= h($fields['description']) ?></textarea>
+      </div>
+
+      <!-- ── Price ────────────────────────────────────────────────────────── -->
+      <div>
+        <label for="price">Price (USD)</label>
+        <input type="number" id="price" name="price" min="0" step="0.01"
+               value="<?= h($fields['price']) ?>" placeholder="0.00" />
+        <div class="muted" style="margin-top:6px; font-size:0.82rem;">
+          Amount charged at checkout. Stripe receives this value from our app — nothing is stored in Stripe.
+        </div>
       </div>
 
       <!-- ── Toggles ──────────────────────────────────────────────────────── -->
