@@ -14,11 +14,14 @@ if (empty($_SESSION['machine_delete_csrf'])) {
 
 // Ordered by cutting area descending (largest first); fall back to machine dims; NULLs last
 $stmt = $pdo->query("
-  SELECT * FROM machines
+  SELECT m.*,
+         ii.image_stored_name AS inventory_image_stored_name
+  FROM machines m
+  LEFT JOIN inventory_items ii ON ii.id = m.inventory_item_id
   ORDER BY
-    CASE WHEN cut_width_mm IS NULL OR cut_length_mm IS NULL THEN 1 ELSE 0 END ASC,
-    (COALESCE(cut_width_mm, 0) * COALESCE(cut_length_mm, 0)) DESC,
-    name ASC
+    CASE WHEN m.cut_width_mm IS NULL OR m.cut_length_mm IS NULL THEN 1 ELSE 0 END ASC,
+    (COALESCE(m.cut_width_mm, 0) * COALESCE(m.cut_length_mm, 0)) DESC,
+    m.name ASC
 ");
 $machines = $stmt->fetchAll();
 
@@ -216,6 +219,13 @@ render_header('Machines');
     $primary_url   = ($m['primary_photo']   !== null && $m['primary_photo']   !== '') ? 'uploads/' . rawurlencode($m['primary_photo'])   : '';
     $secondary_url = ($m['secondary_photo'] !== null && $m['secondary_photo'] !== '') ? 'uploads/' . rawurlencode($m['secondary_photo']) : '';
     $tertiary_url  = (isset($m['tertiary_photo']) && $m['tertiary_photo']  !== null && $m['tertiary_photo']  !== '') ? 'uploads/' . rawurlencode($m['tertiary_photo'])  : '';
+
+    // Fall back to the linked inventory item's image when the machine has no
+    // photo of its own (the machine's own photo always wins as the override).
+    $inv_img = $m['inventory_image_stored_name'] ?? null;
+    if ($primary_url === '' && $inv_img !== null && $inv_img !== '') {
+      $primary_url = 'uploads/inventory/' . rawurlencode($inv_img);
+    }
 
     // ── Cutting area ──────────────────────────────────────────────────────────
     $has_cut = (!empty($m['cut_width_mm']) || !empty($m['cut_length_mm']));
