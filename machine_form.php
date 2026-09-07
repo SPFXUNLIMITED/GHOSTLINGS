@@ -47,6 +47,7 @@ $fields = [
   // Content
   'description'      => '',
   'price'            => '',
+  'inventory_item_id'=> '',
   // Toggles
   'is_active'        => '1',
   'is_visible'       => '1',
@@ -151,6 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $fields['model']       = trim((string)($_POST['model'] ?? ''));
     $fields['description'] = trim((string)($_POST['description'] ?? ''));
     $fields['price']       = trim((string)($_POST['price'] ?? ''));
+    $fields['inventory_item_id'] = trim((string)($_POST['inventory_item_id'] ?? ''));
     $fields['is_active']   = isset($_POST['is_active'])  ? '1' : '0';
     $fields['is_visible']  = isset($_POST['is_visible'])  ? '1' : '0';
     $fields['is_catalog']  = isset($_POST['is_catalog'])  ? '1' : '0';
@@ -275,6 +277,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
     }
 
+    $inventory_item_id_db = null;
+    if ($fields['inventory_item_id'] !== '' && (int)$fields['inventory_item_id'] > 0) {
+      $inventory_item_id_db = (int)$fields['inventory_item_id'];
+    }
+
     // ── Photo uploads ────────────────────────────────────────────────────────
     $new_primary   = $processPhotoUpload('primary_photo_upload',   'Primary photo',   'machine_primary');
     $new_secondary = $processPhotoUpload('secondary_photo_upload', 'Secondary photo', 'machine_secondary');
@@ -302,6 +309,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Content & toggles
         $fields['description'] !== '' ? $fields['description'] : null,
         $price_db,
+        $inventory_item_id_db,
         (int)$fields['is_active'],
         (int)$fields['is_visible'],
         (int)$fields['is_catalog'],
@@ -316,7 +324,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             crate_length = ?, crate_width = ?, crate_length_mm = ?, crate_width_mm = ?,
             crate_height = ?, crate_height_mm = ?, crate_weight_kg = ?,
             primary_photo = ?, secondary_photo = ?, tertiary_photo = ?,
-            description = ?, price = ?, is_active = ?, is_visible = ?, is_catalog = ?
+            description = ?, price = ?, inventory_item_id = ?, is_active = ?, is_visible = ?, is_catalog = ?
           WHERE id = ?
         ")->execute([...$common_params, $id]);
         $success = 'Machine updated.';
@@ -329,8 +337,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              crate_length, crate_width, crate_length_mm, crate_width_mm,
              crate_height, crate_height_mm, crate_weight_kg,
              primary_photo, secondary_photo, tertiary_photo,
-             description, price, is_active, is_visible, is_catalog)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             description, price, inventory_item_id, is_active, is_visible, is_catalog)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ")->execute($common_params);
         $id      = (int)$pdo->lastInsertId();
         $is_edit = true;
@@ -341,6 +349,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       exit;
     }
   }
+}
+
+// Inventory items for the "Linked Inventory Item" dropdown
+try {
+  $inventory_options = $pdo->query("
+    SELECT id, item_name
+    FROM inventory_items
+    ORDER BY item_name ASC
+  ")->fetchAll();
+} catch (PDOException $e) {
+  $inventory_options = [];
 }
 
 $page_title = $is_edit ? 'Edit Machine' : 'Add Machine';
@@ -838,6 +857,23 @@ render_header($page_title);
                value="<?= h($fields['price']) ?>" placeholder="0.00" />
         <div class="muted" style="margin-top:6px; font-size:0.82rem;">
           Amount charged at checkout. Stripe receives this value from our app — nothing is stored in Stripe.
+        </div>
+      </div>
+
+      <!-- ── Linked Inventory Item ────────────────────────────────────────── -->
+      <div>
+        <label for="inventory_item_id">Linked Inventory Item</label>
+        <select id="inventory_item_id" name="inventory_item_id">
+          <option value="">None</option>
+          <?php foreach ($inventory_options as $inv): ?>
+            <option value="<?= (int)$inv['id'] ?>"
+                    <?= (string)$fields['inventory_item_id'] === (string)$inv['id'] ? 'selected' : '' ?>>
+              <?= h((string)$inv['item_name']) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+        <div class="muted" style="margin-top:6px; font-size:0.82rem;">
+          Optional. Links this catalog entry to a stock record for quantity tracking.
         </div>
       </div>
 

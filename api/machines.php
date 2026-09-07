@@ -117,6 +117,8 @@ foreach ($rows as $m) {
         'description'             => ($m['description'] ?? '') !== '' ? (string)$m['description'] : null,
         'price'                   => ($m['price'] ?? '') !== '' ? round((float)$m['price'], 2) : null,
         'currency'                => null,
+        'inventory_item_id'       => isset($m['inventory_item_id']) && $m['inventory_item_id'] !== null
+                                        ? (int)$m['inventory_item_id'] : null,
         'cutting_area_metric'     => machines_api_pair(
                                         machines_api_fmt_mm($m['cut_length_mm'] ?? null),
                                         machines_api_fmt_mm($m['cut_width_mm'] ?? null)
