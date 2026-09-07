@@ -111,11 +111,11 @@ foreach ($rows as $m) {
     $out[] = [
         'id'                      => (int)$m['id'],
         'name'                    => (string)$m['name'],
-        // No brand/price/currency columns exist on `machines` yet.
+        // No brand/currency columns exist on `machines` yet.
         'brand'                   => null,
         'model'                   => ($m['model'] ?? '') !== '' ? (string)$m['model'] : null,
         'description'             => ($m['description'] ?? '') !== '' ? (string)$m['description'] : null,
-        'price'                   => null,
+        'price'                   => ($m['price'] ?? '') !== '' ? round((float)$m['price'], 2) : null,
         'currency'                => null,
         'cutting_area_metric'     => machines_api_pair(
                                         machines_api_fmt_mm($m['cut_length_mm'] ?? null),
