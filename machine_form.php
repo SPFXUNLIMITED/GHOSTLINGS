@@ -354,7 +354,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Inventory items for the "Linked Inventory Item" dropdown
 try {
   $inventory_options = $pdo->query("
-    SELECT id, item_name
+    SELECT id, item_name, retail_price
     FROM inventory_items
     ORDER BY item_name ASC
   ")->fetchAll();
@@ -868,6 +868,7 @@ render_header($page_title);
           <?php foreach ($inventory_options as $inv): ?>
             <option value="<?= (int)$inv['id'] ?>"
                     data-item-name="<?= h((string)$inv['item_name']) ?>"
+                    data-item-price="<?= $inv['retail_price'] === null ? '' : h(number_format((float)$inv['retail_price'], 2, '.', '')) ?>"
                     <?= (string)$fields['inventory_item_id'] === (string)$inv['id'] ? 'selected' : '' ?>>
               <?= h((string)$inv['item_name']) ?>
             </option>
@@ -962,10 +963,11 @@ function previewPhoto(input, previewId) {
   }
 }
 
-// ── Auto-fill machine name from linked inventory item ───────────────────────
+// ── Auto-fill machine name & price from linked inventory item ───────────────
 (function () {
-  var sel  = document.getElementById('inventory_item_id');
-  var name = document.getElementById('name');
+  var sel   = document.getElementById('inventory_item_id');
+  var name  = document.getElementById('name');
+  var price = document.getElementById('price');
   if (!sel || !name) return;
 
   function selectedItemName() {
@@ -973,16 +975,31 @@ function previewPhoto(input, previewId) {
     return (opt && opt.getAttribute('data-item-name')) || '';
   }
 
+  function selectedItemPrice() {
+    var opt = sel.options[sel.selectedIndex];
+    return (opt && opt.getAttribute('data-item-price')) || '';
+  }
+
   // Seed with the current selection so a saved name matching it stays editable
   // but is still treated as auto-filled; anything else counts as user-typed.
   var lastAutoFill = name.value.trim() === selectedItemName() ? name.value : null;
 
+  // Same seeding rule for the price field.
+  var lastAutoFillPrice = (price && price.value.trim() !== '' &&
+                           price.value.trim() === selectedItemPrice()) ? price.value : null;
+
   sel.addEventListener('change', function () {
     var itemName = selectedItemName();
-    if (!itemName) return;
-    if (name.value.trim() !== '' && name.value !== lastAutoFill) return; // user typed it
-    name.value   = itemName;
-    lastAutoFill = itemName;
+    if (itemName && (name.value.trim() === '' || name.value === lastAutoFill)) {
+      name.value   = itemName;
+      lastAutoFill = itemName;
+    }
+
+    var itemPrice = selectedItemPrice();
+    if (price && itemPrice && (price.value.trim() === '' || price.value === lastAutoFillPrice)) {
+      price.value       = itemPrice;
+      lastAutoFillPrice = itemPrice;
+    }
   });
 })();
 </script>
