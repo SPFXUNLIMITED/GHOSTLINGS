@@ -66,11 +66,19 @@ function machines_api_photo_url(string $base, ?string $file): ?string {
     return $base . '/uploads/' . rawurlencode($file);
 }
 
+/** Absolute URL for an inventory item's stored image filename. */
+function machines_api_inventory_photo_url(string $base, ?string $file): ?string {
+    if ($file === null || $file === '') return null;
+    return $base . '/uploads/inventory/' . rawurlencode($file);
+}
+
 try {
     $stmt = $pdo->query("
-        SELECT * FROM machines
-        WHERE is_active = 1 AND is_visible = 1 AND is_catalog = 1
-        ORDER BY name ASC
+        SELECT m.*, ii.image_stored_name AS inventory_image_stored_name
+        FROM machines m
+        LEFT JOIN inventory_items ii ON ii.id = m.inventory_item_id
+        WHERE m.is_active = 1 AND m.is_visible = 1 AND m.is_catalog = 1
+        ORDER BY m.name ASC
     ");
     $rows = $stmt->fetchAll();
 } catch (\Throwable $e) {
@@ -107,6 +115,18 @@ foreach ($rows as $m) {
         machines_api_photo_url($base_url, $m['secondary_photo'] ?? null),
         machines_api_photo_url($base_url, $m['tertiary_photo']  ?? null),
     ], static fn($u) => $u !== null));
+
+    // Fall back to the linked inventory item's image when the machine has no
+    // photo of its own (the machine's own photos always win as the override).
+    if (!$photos) {
+        $inventory_photo = machines_api_inventory_photo_url(
+            $base_url,
+            $m['inventory_image_stored_name'] ?? null
+        );
+        if ($inventory_photo !== null) {
+            $photos = [$inventory_photo];
+        }
+    }
 
     $out[] = [
         'id'                      => (int)$m['id'],
