@@ -479,7 +479,7 @@ render_header($page_title);
 
       <div>
         <label>Machine Name <span style="color:var(--d);">*</span></label>
-        <input type="text" name="name" maxlength="255" required
+        <input type="text" id="name" name="name" maxlength="255" required
                value="<?= h($fields['name']) ?>"
                placeholder="e.g. Fiber Laser Cutter" />
       </div>
@@ -867,6 +867,7 @@ render_header($page_title);
           <option value="">None</option>
           <?php foreach ($inventory_options as $inv): ?>
             <option value="<?= (int)$inv['id'] ?>"
+                    data-item-name="<?= h((string)$inv['item_name']) ?>"
                     <?= (string)$fields['inventory_item_id'] === (string)$inv['id'] ? 'selected' : '' ?>>
               <?= h((string)$inv['item_name']) ?>
             </option>
@@ -960,6 +961,30 @@ function previewPhoto(input, previewId) {
     reader.readAsDataURL(input.files[0]);
   }
 }
+
+// ── Auto-fill machine name from linked inventory item ───────────────────────
+(function () {
+  var sel  = document.getElementById('inventory_item_id');
+  var name = document.getElementById('name');
+  if (!sel || !name) return;
+
+  function selectedItemName() {
+    var opt = sel.options[sel.selectedIndex];
+    return (opt && opt.getAttribute('data-item-name')) || '';
+  }
+
+  // Seed with the current selection so a saved name matching it stays editable
+  // but is still treated as auto-filled; anything else counts as user-typed.
+  var lastAutoFill = name.value.trim() === selectedItemName() ? name.value : null;
+
+  sel.addEventListener('change', function () {
+    var itemName = selectedItemName();
+    if (!itemName) return;
+    if (name.value.trim() !== '' && name.value !== lastAutoFill) return; // user typed it
+    name.value   = itemName;
+    lastAutoFill = itemName;
+  });
+})();
 </script>
 
 <?php render_footer(); ?>
