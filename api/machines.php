@@ -74,7 +74,9 @@ function machines_api_inventory_photo_url(string $base, ?string $file): ?string 
 
 try {
     $stmt = $pdo->query("
-        SELECT m.*, ii.image_stored_name AS inventory_image_stored_name
+        SELECT m.*,
+               ii.image_stored_name AS inventory_image_stored_name,
+               ii.current_stock      AS inventory_quantity
         FROM machines m
         LEFT JOIN inventory_items ii ON ii.id = m.inventory_item_id
         WHERE m.is_active = 1 AND m.is_visible = 1 AND m.is_catalog = 1
@@ -139,6 +141,8 @@ foreach ($rows as $m) {
         'currency'                => null,
         'inventory_item_id'       => isset($m['inventory_item_id']) && $m['inventory_item_id'] !== null
                                         ? (int)$m['inventory_item_id'] : null,
+        'quantity'                => isset($m['inventory_quantity']) && $m['inventory_quantity'] !== null
+                                        ? (int)$m['inventory_quantity'] : null,
         'cutting_area_metric'     => machines_api_pair(
                                         machines_api_fmt_mm($m['cut_length_mm'] ?? null),
                                         machines_api_fmt_mm($m['cut_width_mm'] ?? null)
