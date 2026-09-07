@@ -2477,6 +2477,7 @@ foreach ([
   "ALTER TABLE machines ADD COLUMN crate_height_mm DECIMAL(10,2) NULL",
   "ALTER TABLE machines ADD COLUMN crate_weight_kg DECIMAL(10,2) NULL",
   // Extras
+  "ALTER TABLE machines ADD COLUMN price           DECIMAL(10,2) NULL AFTER description",
   "ALTER TABLE machines ADD COLUMN tertiary_photo  VARCHAR(255)  NULL",
   "ALTER TABLE machines ADD COLUMN is_visible      TINYINT(1)    NOT NULL DEFAULT 1",
   "ALTER TABLE machines ADD COLUMN is_catalog      TINYINT(1)    NOT NULL DEFAULT 1",
