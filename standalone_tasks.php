@@ -3,6 +3,7 @@ require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
 require_once __DIR__ . '/includes/completed_tasks_toggle.php';
+require_once __DIR__ . '/includes/new_task_banner.php';
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
@@ -71,6 +72,7 @@ function standalone_tasks_truncate(string $value, int $limit = 100): string {
 }
 
 render_header('Tasks');
+render_new_task_banner();
 ?>
 <div class="card standalone-tasks-page">
   <div class="row standalone-tasks-toolbar" style="justify-content:space-between; align-items:center; gap:16px;">

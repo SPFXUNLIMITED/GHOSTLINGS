@@ -3,6 +3,7 @@ require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
 
 require __DIR__ . '/auth.php';
+require_once __DIR__ . '/includes/new_task_banner.php';
 require_login();
 
 $project_id = (int)($_GET['project_id'] ?? $_POST['project_id'] ?? 0);
@@ -73,6 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['add_comment']) && !i
     } else {
       $stmt = $pdo->prepare("INSERT INTO tasks (project_id, title, details, status, due_date, priority, assigned_to) VALUES (?, ?, ?, ?, ?, ?, ?)");
       $stmt->execute([$new_project_id, $title, $details ?: null, $status, $due, $priority, $assigned_to]);
+      flash_new_task_banner($title);
     }
     header("Location: tasks.php?project_id={$new_project_id}");
     exit;

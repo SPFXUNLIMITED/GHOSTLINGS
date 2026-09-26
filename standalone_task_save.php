@@ -1,6 +1,7 @@
 <?php
 require __DIR__ . '/db.php';
 require __DIR__ . '/auth.php';
+require_once __DIR__ . '/includes/new_task_banner.php';
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
@@ -54,6 +55,7 @@ if ($id > 0) {
     $stmt = $pdo->prepare('INSERT INTO standalone_tasks (description, status, priority, due_date, sort_order) VALUES (?, ?, ?, ?, ?)');
     $stmt->execute([$description, $status, $priority, $due_value, $sort_order]);
     $pdo->commit();
+    flash_new_task_banner($description);
   } catch (Throwable $e) {
     if ($pdo->inTransaction()) {
       $pdo->rollBack();

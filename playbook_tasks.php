@@ -4,6 +4,7 @@ require __DIR__ . '/layout.php';
 
 require __DIR__ . '/auth.php';
 require_once __DIR__ . '/includes/completed_tasks_toggle.php';
+require_once __DIR__ . '/includes/new_task_banner.php';
 require_login();
 
 $project_id = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
@@ -36,6 +37,7 @@ foreach ($tasks as $task_row) {
 }
 
 render_header('Playbook Tasks');
+render_new_task_banner();
 ?>
 <div class="card">
   <div class="row" style="justify-content:space-between; align-items:center;">
