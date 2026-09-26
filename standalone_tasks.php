@@ -2,6 +2,7 @@
 require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
 require __DIR__ . '/auth.php';
+require_once __DIR__ . '/includes/completed_tasks_toggle.php';
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
@@ -40,6 +41,12 @@ if ($filter === 'today') {
   $stmt = $pdo->query("SELECT * FROM standalone_tasks ORDER BY sort_order ASC, id ASC");
 }
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$completed_task_count = 0;
+foreach ($tasks as $task_row) {
+  if ((string)($task_row['status'] ?? '') === 'completed') {
+    $completed_task_count++;
+  }
+}
 
 function standalone_tasks_format_datetime(?string $value): string {
   if (!$value) {
@@ -74,6 +81,7 @@ render_header('Tasks');
     <div class="actions standalone-tasks-actions">
       <a class="btn <?= $filter === 'all' ? 'primary' : '' ?>" href="standalone_tasks.php">All</a>
       <a class="btn <?= $filter === 'today' ? 'primary' : '' ?>" href="standalone_tasks.php?filter=today">Today</a>
+      <?php render_completed_tasks_toggle('standalone-task-list', $completed_task_count); ?>
       <button type="button" class="btn primary" id="standalone-task-add-btn">Add Task</button>
     </div>
   </div>
@@ -102,10 +110,11 @@ render_header('Tasks');
             $description = (string)($task['description'] ?? '');
             $plain_description = trim(preg_replace('/\s+/', ' ', strip_tags($description)) ?? '');
             $due_date = (string)($task['due_date'] ?? '');
-            $is_overdue = $due_date !== '' && $due_date < $today && (string)($task['status'] ?? '') !== 'completed';
+            $is_completed = (string)($task['status'] ?? '') === 'completed';
+            $is_overdue = $due_date !== '' && $due_date < $today && !$is_completed;
           ?>
           <tr
-            class="standalone-task-row<?= $is_overdue ? ' is-overdue' : '' ?>"
+            class="standalone-task-row<?= $is_overdue ? ' is-overdue' : '' ?><?= $is_completed ? ' completed-task-row' : '' ?>"
             data-task-id="<?= (int)$task['id'] ?>"
             data-description="<?= h($description) ?>"
             data-status="<?= h((string)$task['status']) ?>"

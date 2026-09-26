@@ -3,6 +3,7 @@ require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
 
 require __DIR__ . '/auth.php';
+require_once __DIR__ . '/includes/completed_tasks_toggle.php';
 require_login();
 
 $project_id = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
@@ -41,6 +42,12 @@ if (is_admin()) {
   $stmt->execute([$project_id, $uid, $uid]);
 }
 $tasks = $stmt->fetchAll();
+$completed_task_count = 0;
+foreach ($tasks as $task_row) {
+  if ((string)($task_row['status'] ?? '') === 'done') {
+    $completed_task_count++;
+  }
+}
 
 render_header('Tasks');
 ?>
@@ -52,6 +59,7 @@ render_header('Tasks');
     </div>
     <div class="actions">
       <a class="btn" href="projects.php">Back to Projects</a>
+      <?php render_completed_tasks_toggle('project-task-list', $completed_task_count); ?>
       <a class="btn primary" href="task_form.php?project_id=<?= (int)$project_id ?>">+ New Task</a>
     </div>
   </div>
@@ -70,13 +78,13 @@ render_header('Tasks');
 		<th>Actions</th>
       </tr>
     </thead>
-    <tbody>
+    <tbody id="project-task-list">
       <?php if (!$tasks): ?>
         <tr><td colspan="7" class="muted">No tasks yet.</td></tr>
       <?php endif; ?>
 
       <?php foreach ($tasks as $t): ?>
-        <tr>
+        <tr<?= (string)($t['status'] ?? '') === 'done' ? ' class="completed-task-row"' : '' ?>>
           <td>
             <strong><?= h($t['title']) ?></strong><br>
             <?php $count = (int)($t['upload_count'] ?? 0); ?>
