@@ -3,6 +3,8 @@ require __DIR__ . '/db.php';
 require __DIR__ . '/layout.php';
 
 require __DIR__ . '/auth.php';
+require_once __DIR__ . '/includes/completed_tasks_toggle.php';
+require_once __DIR__ . '/includes/new_task_banner.php';
 require_login();
 
 $project_id = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
@@ -27,8 +29,15 @@ $stmt = $pdo->prepare("
 $stmt->execute([$project_id]);
 $tasks = $stmt->fetchAll();
 $table_column_count = 7;
+$completed_task_count = 0;
+foreach ($tasks as $task_row) {
+  if ((string)($task_row['status'] ?? '') === 'done') {
+    $completed_task_count++;
+  }
+}
 
 render_header('Playbook Tasks');
+render_new_task_banner();
 ?>
 <div class="card">
   <div class="row" style="justify-content:space-between; align-items:center;">
@@ -38,6 +47,7 @@ render_header('Playbook Tasks');
     </div>
     <div class="actions">
       <a class="btn" href="playbooks.php">Back to Playbooks</a>
+      <?php render_completed_tasks_toggle('playbook-task-list', $completed_task_count); ?>
       <a class="btn primary" href="playbook_task_form.php?project_id=<?= (int)$project_id ?>">+ New Task</a>
     </div>
   </div>
@@ -58,13 +68,14 @@ render_header('Playbook Tasks');
         <th style="width:160px;">Actions</th>
       </tr>
     </thead>
-    <tbody>
+    <tbody id="playbook-task-list">
       <?php if (!$tasks): ?>
         <tr><td colspan="<?= (int)$table_column_count ?>" class="muted">No tasks yet.</td></tr>
       <?php endif; ?>
 
       <?php foreach ($tasks as $t): ?>
-        <tr data-title="<?= h(strtolower($t['title'])) ?>"
+        <tr class="<?= (string)($t['status'] ?? '') === 'done' ? 'completed-task-row' : '' ?>"
+            data-title="<?= h(strtolower($t['title'])) ?>"
             data-created-at="<?= h($t['created_at'] ?? '') ?>">
           <td>
             <strong><?= h($t['title']) ?></strong><br>

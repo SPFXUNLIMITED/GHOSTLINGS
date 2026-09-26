@@ -26,6 +26,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 }
 
 require __DIR__ . '/db.php';
+require_once __DIR__ . '/includes/new_task_banner.php';
 
 $expected_key = (string)(getenv('STANDALONE_TASK_API_KEY') ?: '');
 if ($expected_key === '') {
@@ -77,6 +78,8 @@ try {
   error_log('standalone_task_api.php: ' . $e->getMessage());
   standalone_task_api_fail(500, 'Unable to create the task.');
 }
+
+new_task_banner_cookie($description);
 
 http_response_code(201);
 echo json_encode(['id' => $id]);
