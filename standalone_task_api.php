@@ -79,7 +79,7 @@ try {
   standalone_task_api_fail(500, 'Unable to create the task.');
 }
 
-new_task_banner_cookie($description);
+record_last_new_task_id($pdo, $id);
 
 http_response_code(201);
 echo json_encode(['id' => $id]);
