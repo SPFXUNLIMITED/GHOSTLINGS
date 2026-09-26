@@ -14,6 +14,8 @@ $options = [
 ];
 
 $pdo = new PDO($dsn, $db['user'], $db['pass'], $options);
+// MySQL session timezone defaults to UTC on most hosts; CURRENT_TIMESTAMP would otherwise store UTC while PHP reads those values as Pacific.
+$pdo->exec("SET time_zone = '-07:00';");
 const APP_ENCRYPTED_MIN_PAYLOAD_BYTES = 29; // 12-byte IV + 16-byte tag + minimum 1-byte ciphertext
 
 function app_ensure_integration_settings_table(PDO $pdo): void {
