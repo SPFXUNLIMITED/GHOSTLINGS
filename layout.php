@@ -497,8 +497,8 @@ function render_header(string $title): void {
     <link rel="shortcut icon" type="image/png" href="<?= asset('ghost-logo2-32x32.png') ?>">
     <link rel="apple-touch-icon" href="<?= asset('ghost-logo2-32x32.png') ?>">
 
-  <link rel="stylesheet" href="<?= asset('styles.css') ?>" />
-  <link rel="stylesheet" href="<?= asset('customer-interaction.css') ?>" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="customer-interaction.css" />
   
 </head>
 <body>
@@ -580,11 +580,11 @@ $is_regular_user = $is_logged_in && (($_SESSION['role'] ?? '') === 'user');
     <?php if ($is_regular_user): ?>
     <?php render_menu_link(['href' => 'user_page.php', 'file' => 'user_page.php', 'label' => 'My Profile'], $current); ?>
     <?php render_menu_link(['href' => 'machine_inquiry_form.php', 'file' => 'machine_inquiry_form.php', 'label' => 'Machine Inquiry Form'], $current); ?>
-    <?php render_menu_link(['href' => 'https://ghostlaser.com/webmail', 'label' => 'Webmail', 'target' => '_blank'], $current); ?>
+    <?php render_menu_link(['href' => 'https://gator4220.hostgator.com:2096/cpsess1906822260/webmail/', 'label' => 'Webmail', 'target' => '_blank'], $current); ?>
     <?php elseif ($show_mod_menu): ?>
     <?php render_menu_link(['href' => 'index.php', 'file' => 'index.php', 'label' => 'Home'], $current); ?>
     <?php render_menu_link(['href' => 'user_page.php', 'file' => 'user_page.php', 'label' => 'My Profile'], $current); ?>
-    <?php render_menu_link(['href' => 'https://ghostlaser.com/webmail', 'label' => 'Webmail', 'target' => '_blank'], $current); ?>
+    <?php render_menu_link(['href' => 'https://gator4220.hostgator.com:2096/cpsess1906822260/webmail/', 'label' => 'Webmail', 'target' => '_blank'], $current); ?>
 
 	<?php render_menu_dropdown('Messages', [
 	  ['href' => 'messages.php', 'file' => 'messages.php', 'label' => 'Messages'],
@@ -940,7 +940,7 @@ function render_footer(): void {
   </nav>
 <?php endif; ?>
 
-  <script src="<?= asset('sort.js') ?>"></script>
+  <script src="sort.js"></script>
 
 <?php if ($is_logged_in): ?>
   <script>

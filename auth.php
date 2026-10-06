@@ -6,7 +6,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 
 function require_login(): void {
   if (empty($_SESSION['user_id'])) {
-    $next = $_SERVER['REQUEST_URI'] ?? 'index.php';
+    $next = 'index.php';
     header('Location: login.php?next=' . urlencode($next));
     exit;
   }

@@ -27,6 +27,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // ── Load DB ───────────────────────────────────────────────────────────────────
 require __DIR__ . '/../db.php';
 
+function log_api($msg) {
+    file_put_contents(__DIR__ . '/api_debug.log', date('Y-m-d H:i:s') . ' ' . $msg . "\n", FILE_APPEND);
+}
+
+
 // ── Rate limit: max 10 submissions per IP per hour (reuses form_rate_limit) ───
 $_api_ip = (function (): string {
     foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'] as $k) {

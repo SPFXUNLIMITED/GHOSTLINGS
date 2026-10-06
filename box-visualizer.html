@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>20ft Container Visualizer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/OrbitControls.js"></script>
+  <style>
+    body { margin: 0; overflow: hidden; background: #0a0a0a; }
+    #ui {
+      position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.85);
+      color: white; padding: 15px; border-radius: 10px; font-family: Arial, sans-serif; width: 380px;
+    }
+    input { width: 65px; padding: 6px; margin: 3px 0; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <h3>20ft Shipping Container Visualizer</h3>
+    <strong>Container (cm):</strong><br>
+    Length: <input type="number" id="cl" value="589" onchange="update()"> 
+    Width:  <input type="number" id="cw" value="235" onchange="update()">
+    Height: <input type="number" id="ch" value="239" onchange="update()"><br><br>
+
+    <strong>Box (cm):</strong><br>
+    Length: <input type="number" id="bl" value="120" onchange="update()"> 
+    Width:  <input type="number" id="bw" value="80" onchange="update()">
+    Height: <input type="number" id="bh" value="80" onchange="update()">
+  </div>
+
+  <script>
+    let scene, camera, renderer, controls;
+    let containerMesh, boxMesh;
+
+    function init() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0a0a0a);
+
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 1, 2000);
+      
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+
+      scene.add(new THREE.AmbientLight(0xaaaaaa));
+      const light = new THREE.DirectionalLight(0xffffff, 1);
+      light.position.set(400, 400, 400);
+      scene.add(light);
+
+      scene.add(new THREE.GridHelper(800, 40));
+
+      camera.position.set(700, 500, 800);
+      controls.update();
+
+      updateScene();
+      animate();
+    }
+
+function updateScene() {
+  if (containerMesh) scene.remove(containerMesh);
+  if (boxMesh) scene.remove(boxMesh);
+
+  const cl = +document.getElementById('cl').value || 589;
+  const cw = +document.getElementById('cw').value || 235;
+  const ch = +document.getElementById('ch').value || 239;
+
+  const bl = +document.getElementById('bl').value || 120;
+  const bw = +document.getElementById('bw').value || 80;
+  const bh = +document.getElementById('bh').value || 80;
+
+  // Container - semi-transparent with visible edges
+  const cGeo = new THREE.BoxGeometry(cl, ch, cw);
+  const cMat = new THREE.MeshPhongMaterial({ 
+    color: 0x3388ff, 
+    transparent: true, 
+    opacity: 0.12,
+    side: THREE.DoubleSide
+  });
+  containerMesh = new THREE.Mesh(cGeo, cMat);
+  containerMesh.position.y = ch / 2;
+  scene.add(containerMesh);
+
+  // Add visible edges to the container (this is the important part)
+  const edges = new THREE.EdgesGeometry(cGeo);
+  const lineMat = new THREE.LineBasicMaterial({ color: 0x66aaff, linewidth: 2 });
+  const wireframe = new THREE.LineSegments(edges, lineMat);
+  wireframe.position.y = ch / 2;
+  scene.add(wireframe);
+
+  // Small box
+  const bMat = new THREE.MeshPhongMaterial({ color: 0xff4444 });
+  boxMesh = new THREE.Mesh(new THREE.BoxGeometry(bl, bh, bw), bMat);
+  boxMesh.position.set(0, bh/2, 0);
+  scene.add(boxMesh);
+}
+
+    function update() { updateScene(); }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    init();
+  </script>
+</body>
+</html>

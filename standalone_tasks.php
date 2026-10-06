@@ -71,14 +71,9 @@ function standalone_tasks_truncate(string $value, int $limit = 100): string {
   return strlen($normalized) > $limit ? substr($normalized, 0, $limit) . '…' : $normalized;
 }
 
-$last_new_task_id = get_last_new_task_id($pdo);
-
 render_header('Tasks');
+render_new_task_banner();
 ?>
-<div class="new-task-banner" id="new-task-banner" role="status" aria-live="polite" title="Click to dismiss" hidden>
-  <span class="new-task-banner-dot" aria-hidden="true"></span>
-  <span class="new-task-banner-text"></span>
-</div>
 <div class="card standalone-tasks-page">
   <div class="row standalone-tasks-toolbar" style="justify-content:space-between; align-items:center; gap:16px;">
     <div>
@@ -220,23 +215,6 @@ render_header('Tasks');
 </div>
 
 <style>
-.new-task-banner {
-  position:fixed; top:16px; left:50%; transform:translateX(-50%);
-  z-index:9600; display:flex; align-items:center; gap:10px;
-  max-width:min(620px, calc(100vw - 32px));
-  padding:10px 18px; border-radius:999px;
-  background:#dcfce7; color:#166534; border:1px solid #86efac;
-  box-shadow:0 10px 30px rgba(15,23,42,.18);
-  font-size:14px; font-weight:600; cursor:pointer;
-  opacity:1; transition:opacity .45s ease;
-}
-.new-task-banner[hidden] { display:none; }
-.new-task-banner.is-hidden { opacity:0; pointer-events:none; }
-.new-task-banner-dot { width:8px; height:8px; border-radius:999px; background:#16a34a; flex:none; }
-.new-task-banner-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-@media (prefers-reduced-motion: reduce) {
-  .new-task-banner { transition:none; }
-}
 .standalone-tasks-toolbar .btn.primary { box-shadow:none; }
 .standalone-tasks-card { overflow:hidden; }
 .standalone-tasks-table-wrap { overflow-x:auto; }
@@ -303,67 +281,6 @@ render_header('Tasks');
 <script>
 (function () {
   'use strict';
-
-  // Poll for tasks created by anyone (web form or JSON API) and announce them
-  // to every viewer of this list.
-  var POLL_INTERVAL_MS = 4000;
-  var banner = document.getElementById('new-task-banner');
-  var bannerText = banner ? banner.querySelector('.new-task-banner-text') : null;
-  var lastSeenId = <?= (int)$last_new_task_id ?>;
-  var hideTimer = null;
-  var polling = false;
-
-  function hideBanner() {
-    if (!banner || banner.hidden) return;
-    if (hideTimer) {
-      window.clearTimeout(hideTimer);
-      hideTimer = null;
-    }
-    banner.classList.add('is-hidden');
-    window.setTimeout(function () {
-      banner.hidden = true;
-      banner.classList.remove('is-hidden');
-    }, 500);
-  }
-
-  function showBanner(description) {
-    if (!banner || !bannerText) return;
-    bannerText.textContent = 'New task: ' + (description || 'untitled');
-    banner.classList.remove('is-hidden');
-    banner.hidden = false;
-    if (hideTimer) window.clearTimeout(hideTimer);
-    hideTimer = window.setTimeout(hideBanner, 5000);
-  }
-
-  function pollLatestTask() {
-    if (polling || document.hidden) return;
-    polling = true;
-
-    fetch('standalone_task_latest.php', { credentials: 'same-origin', cache: 'no-store' })
-      .then(function (response) { return response.ok ? response.json() : null; })
-      .then(function (data) {
-        if (!data) return null;
-        var latestId = parseInt(data.last_new_task_id, 10) || 0;
-        if (latestId <= lastSeenId) return null;
-        lastSeenId = latestId;
-        return fetch('standalone_task_latest.php?task_id=' + encodeURIComponent(latestId), {
-          credentials: 'same-origin',
-          cache: 'no-store'
-        }).then(function (response) { return response.ok ? response.json() : null; });
-      })
-      .then(function (details) {
-        if (details && details.task) {
-          showBanner(details.task.description);
-        }
-      })
-      .catch(function () { /* transient network errors are ignored */ })
-      .then(function () { polling = false; });
-  }
-
-  if (banner && window.fetch) {
-    banner.addEventListener('click', hideBanner);
-    window.setInterval(pollLatestTask, POLL_INTERVAL_MS);
-  }
 
   var modal = document.getElementById('standalone-task-modal');
   var backdrop = document.getElementById('standalone-task-modal-backdrop');

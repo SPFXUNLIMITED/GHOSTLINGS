@@ -54,9 +54,8 @@ if ($id > 0) {
     $sort_order = (int)$pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM standalone_tasks FOR UPDATE')->fetchColumn();
     $stmt = $pdo->prepare('INSERT INTO standalone_tasks (description, status, priority, due_date, sort_order) VALUES (?, ?, ?, ?, ?)');
     $stmt->execute([$description, $status, $priority, $due_value, $sort_order]);
-    $new_task_id = (int)$pdo->lastInsertId();
     $pdo->commit();
-    record_last_new_task_id($pdo, $new_task_id);
+    flash_new_task_banner($description);
   } catch (Throwable $e) {
     if ($pdo->inTransaction()) {
       $pdo->rollBack();

@@ -29,26 +29,37 @@ $vendors = $stmt->fetchAll();
 render_header('Vendors');
 ?>
 
+
 <style>
-  .vendor-hero {
-    background-image: url('map.jpeg');
-    background-size: cover;
-    background-position: center;
-    border-radius: 10px;
-    padding: 72px 40px;
-    margin-bottom: 18px;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-  }
-  .vendor-hero::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(to bottom, rgba(10,18,32,0.62) 0%, rgba(10,18,32,0.72) 100%);
-    border-radius: inherit;
-    pointer-events: none;
-  }
+	.vendor-hero {
+		background-image: url('map.jpg');
+		background-size: cover;
+		background-position: center;
+height: 400px;
+padding: 0 40px;
+		margin-bottom: 18px;
+		text-align: left;
+		position: relative;
+		border-radius: 10px;
+	}
+
+	.vendor-hero h1, .vendor-hero p {
+		position: relative;
+		z-index: 2;
+		color: white;
+		text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.99);
+	}
+
+	.vendor-hero::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: rgba(0, 0, 0, 0.15);
+		border-radius: 10px;
+	}
   .vendor-hero-content {
     position: relative;
     z-index: 1;
@@ -72,8 +83,8 @@ render_header('Vendors');
 
 <div class="vendor-hero">
   <div class="vendor-hero-content">
-    <h2 class="vendor-hero-title">Our Vendor Network</h2>
-    <p class="vendor-hero-route">Qingdao &#8596; Shenzhen &nbsp;&bull;&nbsp; &#8776;&nbsp;1,180 miles</p>
+    <h2 class="vendor-hero-title">Shenzhen &#8596; Qingdao&nbsp;&bull;&nbsp; &#8776;&nbsp;1,180 miles</h2>
+    <p class="vendor-hero-route"></p>
   </div>
 </div>
 

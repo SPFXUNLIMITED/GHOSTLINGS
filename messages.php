@@ -19,53 +19,20 @@ function message_body_to_reply_text(string $html): string {
 }
 
 $current_user_id = (int)$_SESSION['user_id'];
-$current_username = (string)($_SESSION['username'] ?? '');
-$is_admin_user = !empty($_SESSION['is_admin']);
-$is_patty_user = strcasecmp($current_username, 'Patty') === 0;
-$requested_user = trim((string)($_GET['with'] ?? ''));
 
-$conversation_candidates = [];
-if ($is_admin_user) {
-  $conversation_candidates[] = 'Patty';
-} elseif ($is_patty_user) {
-  $conversation_candidates[] = 'Zeke';
-}
-
-if ($conversation_candidates) {
-  $selected_username = $conversation_candidates[0];
-  if ($requested_user !== '') {
-    foreach ($conversation_candidates as $candidate) {
-      if (strcasecmp($requested_user, $candidate) === 0) {
-        $selected_username = $candidate;
-        break;
-      }
-    }
-  }
-  $other_user_stmt = $pdo->prepare("SELECT id, username FROM users WHERE username = ? LIMIT 1");
-  $other_user_stmt->execute([$selected_username]);
-  $other_user = $other_user_stmt->fetch();
-} else {
-  $other_user_stmt = $pdo->prepare("
-    SELECT id, username
-    FROM users
-    WHERE id != ?
-      AND role != 'system'
-    ORDER BY id
-    LIMIT 1
-  ");
-  $other_user_stmt->execute([$current_user_id]);
-  $other_user = $other_user_stmt->fetch();
-}
+// Find the other user (the only other user in the system)
+$other_user_stmt = $pdo->prepare("SELECT id, username FROM users WHERE id != ? ORDER BY id LIMIT 1");
+$other_user_stmt->execute([$current_user_id]);
+$other_user = $other_user_stmt->fetch();
 
 if (!$other_user) {
   render_header('Messages');
-  echo '<div class="card"><p class="muted">No conversation user is available.</p></div>';
+  echo '<div class="card"><p class="muted">No other users found.</p></div>';
   render_footer();
   exit;
 }
 
 $other_user_id = (int)$other_user['id'];
-$conversation_url = 'messages.php?with=' . rawurlencode((string)$other_user['username']);
 
 // CSRF
 if (empty($_SESSION['messages_csrf'])) {
@@ -96,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $errors[] = 'Message not found or you do not have permission to delete it.';
         } else {
           $_SESSION['messages_csrf'] = bin2hex(random_bytes(24));
-          header('Location: ' . $conversation_url . '&deleted=1');
+          header('Location: messages.php?deleted=1');
           exit;
         }
       }
@@ -112,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
         $ins->execute([$current_user_id, $other_user_id, $body]);
         $_SESSION['messages_csrf'] = bin2hex(random_bytes(24));
-        header('Location: ' . $conversation_url . '&sent=1');
+        header('Location: messages.php?sent=1');
         exit;
       }
     }
@@ -190,7 +157,7 @@ render_header('Messages');
   <?php else: ?>
     <?php if ($has_more): ?>
       <div style="padding:12px 16px; border-bottom:1px solid #e5e7eb; text-align:center;">
-        <a href="<?= h($conversation_url) ?>&show=<?= h($show + MESSAGES_PER_PAGE) ?>" class="btn" style="font-size:13px; padding:6px 14px;">Load more</a>
+        <a href="messages.php?show=<?= h($show + MESSAGES_PER_PAGE) ?>" class="btn" style="font-size:13px; padding:6px 14px;">Load more</a>
       </div>
     <?php endif; ?>
     <div style="max-height:520px; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px;" id="msg-scroll">

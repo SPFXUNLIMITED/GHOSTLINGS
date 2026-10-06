@@ -1,0 +1,256 @@
+[18-Jun-2026 04:56:55 America/Los_Angeles] DEBUG: enable_online_payment = 1 | is_paid = false | invoice #25
+[18-Jun-2026 10:31:38 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1359 Trigger already exists in /home3/spfx/public_html/website_a844b2f2/project/db.php:819
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/db.php(819): PDO->exec('\n    CREATE TRI...')
+#1 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(2): require('/home3/spfx/pub...')
+#2 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 819
+[18-Jun-2026 10:49:08 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1359 Trigger already exists in /home3/spfx/public_html/website_a844b2f2/project/db.php:819
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/db.php(819): PDO->exec('\n    CREATE TRI...')
+#1 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(2): require('/home3/spfx/pub...')
+#2 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 819
+[18-Jun-2026 16:02:39 America/Los_Angeles] DEBUG: enable_online_payment = 0 | is_paid = false | invoice #16
+[19-Jun-2026 13:27:49 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 712
+[19-Jun-2026 14:02:28 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 712
+[19-Jun-2026 14:02:36 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 712
+[19-Jun-2026 14:02:39 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 712
+[19-Jun-2026 14:08:37 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 712
+[20-Jun-2026 12:58:08 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 712
+[20-Jun-2026 16:41:54 America/Chicago] PHP Parse error:  syntax error, unexpected integer "0", expecting "]" in /home3/spfx/public_html/website_a844b2f2/project/debug-geocode.php on line 34
+[20-Jun-2026 16:41:56 America/Chicago] PHP Parse error:  syntax error, unexpected integer "0", expecting "]" in /home3/spfx/public_html/website_a844b2f2/project/debug-geocode.php on line 34
+[20-Jun-2026 16:42:30 America/Chicago] PHP Parse error:  Unclosed '{' on line 31 in /home3/spfx/public_html/website_a844b2f2/project/debug-geocode.php on line 32
+[20-Jun-2026 16:42:32 America/Chicago] PHP Parse error:  Unclosed '{' on line 31 in /home3/spfx/public_html/website_a844b2f2/project/debug-geocode.php on line 32
+[20-Jun-2026 16:43:25 America/Chicago] PHP Warning:  Array to string conversion in /home3/spfx/public_html/website_a844b2f2/project/debug-geocode.php on line 29
+[20-Jun-2026 16:43:25 America/Chicago] PHP Warning:  Array to string conversion in /home3/spfx/public_html/website_a844b2f2/project/debug-geocode.php on line 34
+[20-Jun-2026 16:45:17 America/Chicago] PHP Warning:  Array to string conversion in /home3/spfx/public_html/website_a844b2f2/project/debug-geocode.php on line 29
+[20-Jun-2026 16:45:17 America/Chicago] PHP Warning:  Array to string conversion in /home3/spfx/public_html/website_a844b2f2/project/debug-geocode.php on line 34
+[20-Jun-2026 16:45:17 America/Chicago] PHP Warning:  Undefined array key "error_message" in /home3/spfx/public_html/website_a844b2f2/project/debug-geocode.php on line 36
+[20-Jun-2026 16:45:21 America/Chicago] PHP Warning:  Array to string conversion in /home3/spfx/public_html/website_a844b2f2/project/debug-geocode.php on line 29
+[20-Jun-2026 16:45:21 America/Chicago] PHP Warning:  Array to string conversion in /home3/spfx/public_html/website_a844b2f2/project/debug-geocode.php on line 34
+[20-Jun-2026 16:45:24 America/Chicago] PHP Warning:  Array to string conversion in /home3/spfx/public_html/website_a844b2f2/project/debug-geocode.php on line 29
+[20-Jun-2026 16:45:24 America/Chicago] PHP Warning:  Array to string conversion in /home3/spfx/public_html/website_a844b2f2/project/debug-geocode.php on line 34
+[20-Jun-2026 16:45:24 America/Chicago] PHP Warning:  Undefined array key "error_message" in /home3/spfx/public_html/website_a844b2f2/project/debug-geocode.php on line 36
+[20-Jun-2026 16:46:07 America/Chicago] PHP Warning:  Array to string conversion in /home3/spfx/public_html/website_a844b2f2/project/debug-geocode.php on line 24
+[22-Jun-2026 04:36:21 America/Chicago] PHP Warning:  require_once(/home3/spfx/public_html/website_a844b2f2/project/templates/header.php): Failed to open stream: No such file or directory in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 62
+[22-Jun-2026 04:36:21 America/Chicago] PHP Fatal error:  Uncaught Error: Failed opening required '/home3/spfx/public_html/website_a844b2f2/project/templates/header.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home3/spfx/public_html/website_a844b2f2/project/index.php:62
+Stack trace:
+#0 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 62
+[22-Jun-2026 12:26:25 America/Chicago] PHP Warning:  require_once(/home3/spfx/public_html/website_a844b2f2/project/templates/header.php): Failed to open stream: No such file or directory in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 62
+[22-Jun-2026 12:26:25 America/Chicago] PHP Fatal error:  Uncaught Error: Failed opening required '/home3/spfx/public_html/website_a844b2f2/project/templates/header.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home3/spfx/public_html/website_a844b2f2/project/index.php:62
+Stack trace:
+#0 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 62
+[22-Jun-2026 12:26:29 America/Chicago] PHP Warning:  require_once(/home3/spfx/public_html/website_a844b2f2/project/templates/header.php): Failed to open stream: No such file or directory in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 62
+[22-Jun-2026 12:26:29 America/Chicago] PHP Fatal error:  Uncaught Error: Failed opening required '/home3/spfx/public_html/website_a844b2f2/project/templates/header.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home3/spfx/public_html/website_a844b2f2/project/index.php:62
+Stack trace:
+#0 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 62
+[22-Jun-2026 12:26:36 America/Chicago] PHP Warning:  require_once(/home3/spfx/public_html/website_a844b2f2/project/templates/header.php): Failed to open stream: No such file or directory in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 62
+[22-Jun-2026 12:26:36 America/Chicago] PHP Fatal error:  Uncaught Error: Failed opening required '/home3/spfx/public_html/website_a844b2f2/project/templates/header.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home3/spfx/public_html/website_a844b2f2/project/index.php:62
+Stack trace:
+#0 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 62
+[22-Jun-2026 10:27:14 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 712
+[22-Jun-2026 12:27:16 America/Chicago] PHP Warning:  require_once(/home3/spfx/public_html/website_a844b2f2/project/templates/header.php): Failed to open stream: No such file or directory in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 62
+[22-Jun-2026 12:27:16 America/Chicago] PHP Fatal error:  Uncaught Error: Failed opening required '/home3/spfx/public_html/website_a844b2f2/project/templates/header.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home3/spfx/public_html/website_a844b2f2/project/index.php:62
+Stack trace:
+#0 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 62
+[22-Jun-2026 12:27:18 America/Chicago] PHP Warning:  require_once(/home3/spfx/public_html/website_a844b2f2/project/templates/header.php): Failed to open stream: No such file or directory in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 62
+[22-Jun-2026 12:27:18 America/Chicago] PHP Fatal error:  Uncaught Error: Failed opening required '/home3/spfx/public_html/website_a844b2f2/project/templates/header.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home3/spfx/public_html/website_a844b2f2/project/index.php:62
+Stack trace:
+#0 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 62
+[22-Jun-2026 12:27:26 America/Chicago] PHP Warning:  require_once(/home3/spfx/public_html/website_a844b2f2/project/templates/header.php): Failed to open stream: No such file or directory in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 62
+[22-Jun-2026 12:27:26 America/Chicago] PHP Fatal error:  Uncaught Error: Failed opening required '/home3/spfx/public_html/website_a844b2f2/project/templates/header.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home3/spfx/public_html/website_a844b2f2/project/index.php:62
+Stack trace:
+#0 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 62
+[22-Jun-2026 12:27:27 America/Chicago] PHP Warning:  require_once(/home3/spfx/public_html/website_a844b2f2/project/templates/header.php): Failed to open stream: No such file or directory in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 62
+[22-Jun-2026 12:27:27 America/Chicago] PHP Fatal error:  Uncaught Error: Failed opening required '/home3/spfx/public_html/website_a844b2f2/project/templates/header.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home3/spfx/public_html/website_a844b2f2/project/index.php:62
+Stack trace:
+#0 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 62
+[22-Jun-2026 12:27:29 America/Chicago] PHP Warning:  require_once(/home3/spfx/public_html/website_a844b2f2/project/templates/header.php): Failed to open stream: No such file or directory in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 62
+[22-Jun-2026 12:27:29 America/Chicago] PHP Fatal error:  Uncaught Error: Failed opening required '/home3/spfx/public_html/website_a844b2f2/project/templates/header.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home3/spfx/public_html/website_a844b2f2/project/index.php:62
+Stack trace:
+#0 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/index.php on line 62
+[23-Jun-2026 08:19:15 America/Los_Angeles] PHP Warning:  Trying to access array offset on int in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 7
+[23-Jun-2026 08:19:15 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:15 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:15 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:15 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:15 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:15 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2019] Unknown character set in /home3/spfx/public_html/website_a844b2f2/project/db.php:16
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/db.php(16): PDO->__construct('mysql:host=;dbn...', NULL, Object(SensitiveParameterValue), Array)
+#1 /home3/spfx/public_html/website_a844b2f2/project/idle_clockout.php(2): require('/home3/spfx/pub...')
+#2 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:16 America/Los_Angeles] PHP Warning:  Trying to access array offset on int in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 7
+[23-Jun-2026 08:19:16 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:16 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:16 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:16 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:16 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:16 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2019] Unknown character set in /home3/spfx/public_html/website_a844b2f2/project/db.php:16
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/db.php(16): PDO->__construct('mysql:host=;dbn...', NULL, Object(SensitiveParameterValue), Array)
+#1 /home3/spfx/public_html/website_a844b2f2/project/idle_clockout.php(2): require('/home3/spfx/pub...')
+#2 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:16 America/Los_Angeles] PHP Warning:  Trying to access array offset on int in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 7
+[23-Jun-2026 08:19:16 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:16 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:16 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:16 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:16 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:16 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2019] Unknown character set in /home3/spfx/public_html/website_a844b2f2/project/db.php:16
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/db.php(16): PDO->__construct('mysql:host=;dbn...', NULL, Object(SensitiveParameterValue), Array)
+#1 /home3/spfx/public_html/website_a844b2f2/project/login.php(2): require('/home3/spfx/pub...')
+#2 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:23 America/Los_Angeles] PHP Warning:  Trying to access array offset on int in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 7
+[23-Jun-2026 08:19:23 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:23 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:23 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:23 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:23 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:23 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2019] Unknown character set in /home3/spfx/public_html/website_a844b2f2/project/db.php:16
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/db.php(16): PDO->__construct('mysql:host=;dbn...', NULL, Object(SensitiveParameterValue), Array)
+#1 /home3/spfx/public_html/website_a844b2f2/project/tasks.php(2): require('/home3/spfx/pub...')
+#2 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:23 America/Los_Angeles] PHP Warning:  Trying to access array offset on int in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 7
+[23-Jun-2026 08:19:23 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:23 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:23 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:23 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:23 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:23 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2019] Unknown character set in /home3/spfx/public_html/website_a844b2f2/project/db.php:16
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/db.php(16): PDO->__construct('mysql:host=;dbn...', NULL, Object(SensitiveParameterValue), Array)
+#1 /home3/spfx/public_html/website_a844b2f2/project/tasks.php(2): require('/home3/spfx/pub...')
+#2 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:27 America/Los_Angeles] PHP Warning:  Trying to access array offset on int in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 7
+[23-Jun-2026 08:19:27 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:27 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:27 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:27 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:27 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:27 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2019] Unknown character set in /home3/spfx/public_html/website_a844b2f2/project/db.php:16
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/db.php(16): PDO->__construct('mysql:host=;dbn...', NULL, Object(SensitiveParameterValue), Array)
+#1 /home3/spfx/public_html/website_a844b2f2/project/idle_clockout.php(2): require('/home3/spfx/pub...')
+#2 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:27 America/Los_Angeles] PHP Warning:  Trying to access array offset on int in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 7
+[23-Jun-2026 08:19:27 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:27 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:27 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:19:27 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:27 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:19:27 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2019] Unknown character set in /home3/spfx/public_html/website_a844b2f2/project/db.php:16
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/db.php(16): PDO->__construct('mysql:host=;dbn...', NULL, Object(SensitiveParameterValue), Array)
+#1 /home3/spfx/public_html/website_a844b2f2/project/login.php(2): require('/home3/spfx/pub...')
+#2 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:24:14 America/Los_Angeles] PHP Warning:  Trying to access array offset on int in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 7
+[23-Jun-2026 08:24:14 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:24:14 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:24:14 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 9
+[23-Jun-2026 08:24:14 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:24:14 America/Los_Angeles] PHP Warning:  Trying to access array offset on null in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 08:24:14 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2019] Unknown character set in /home3/spfx/public_html/website_a844b2f2/project/db.php:16
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/db.php(16): PDO->__construct('mysql:host=;dbn...', NULL, Object(SensitiveParameterValue), Array)
+#1 /home3/spfx/public_html/website_a844b2f2/project/tasks.php(2): require('/home3/spfx/pub...')
+#2 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 16
+[23-Jun-2026 15:45:25 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1359 Trigger already exists in /home3/spfx/public_html/website_a844b2f2/project/db.php:819
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/db.php(819): PDO->exec('\n    CREATE TRI...')
+#1 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(2): require('/home3/spfx/pub...')
+#2 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 819
+[23-Jun-2026 15:48:19 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1359 Trigger already exists in /home3/spfx/public_html/website_a844b2f2/project/db.php:819
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/db.php(819): PDO->exec('\n    CREATE TRI...')
+#1 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(2): require('/home3/spfx/pub...')
+#2 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 819
+[23-Jun-2026 15:55:11 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1359 Trigger already exists in /home3/spfx/public_html/website_a844b2f2/project/db.php:819
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/db.php(819): PDO->exec('\n    CREATE TRI...')
+#1 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(2): require('/home3/spfx/pub...')
+#2 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 819
+[23-Jun-2026 22:09:29 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1359 Trigger already exists in /home3/spfx/public_html/website_a844b2f2/project/db.php:819
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/db.php(819): PDO->exec('\n    CREATE TRI...')
+#1 /home3/spfx/public_html/website_a844b2f2/project/quotes.php(2): require('/home3/spfx/pub...')
+#2 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/db.php on line 819
+[24-Jun-2026 08:04:26 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 712
+[24-Jun-2026 15:35:09 America/Los_Angeles] DEBUG: enable_online_payment = 0 | is_paid = false | invoice #30
+[25-Jun-2026 11:16:10 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 712
+[25-Jun-2026 11:27:14 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 712
+[25-Jun-2026 11:30:47 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 712
+[25-Jun-2026 11:31:34 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 712
+[25-Jun-2026 11:32:09 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 712
+[25-Jun-2026 11:32:30 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 712
+[25-Jun-2026 11:45:25 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 712
+[25-Jun-2026 11:45:54 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 712
+[25-Jun-2026 13:32:35 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 712
+[26-Jun-2026 02:34:22 America/Los_Angeles] PHP Warning:  Undefined variable $can_manage_stage in /home3/spfx/public_html/website_a844b2f2/project/order_form.php on line 712
+[26-Jun-2026 14:04:31 America/Los_Angeles] PHP Warning:  Undefined array key "crate_cost" in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php on line 1749
+[26-Jun-2026 14:05:33 America/Los_Angeles] PHP Warning:  Undefined array key "crate_cost" in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php on line 1749
+[26-Jun-2026 14:06:20 America/Los_Angeles] PHP Warning:  Undefined array key "crate_cost" in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php on line 1749
+[26-Jun-2026 14:06:35 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'crate_cost' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php:1095
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php(1095): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php on line 1095
+[26-Jun-2026 14:07:03 America/Los_Angeles] PHP Warning:  Undefined array key "crate_cost" in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php on line 1749
+[26-Jun-2026 14:07:22 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'crate_cost' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php:1095
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php(1095): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php on line 1095
+[26-Jun-2026 14:07:48 America/Los_Angeles] PHP Warning:  Undefined array key "crate_cost" in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php on line 1749
+[26-Jun-2026 14:08:08 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'crate_cost' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php:1095
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php(1095): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php on line 1095
+[26-Jun-2026 14:09:33 America/Los_Angeles] PHP Warning:  Undefined array key "crate_cost" in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php on line 1749
+[26-Jun-2026 14:11:56 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'crate_cost' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php:1095
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php(1095): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php on line 1095
+[26-Jun-2026 14:13:00 America/Los_Angeles] PHP Warning:  Undefined array key "crate_cost" in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php on line 1749
+[26-Jun-2026 14:14:57 America/Los_Angeles] PHP Warning:  Undefined array key "crate_cost" in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php on line 1749
+[26-Jun-2026 14:15:56 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'crate_cost' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php:1095
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php(1095): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php on line 1095
+[26-Jun-2026 14:16:01 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'crate_cost' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php:1095
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php(1095): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php on line 1095
+[26-Jun-2026 14:16:13 America/Los_Angeles] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'crate_cost' in 'field list' in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php:1095
+Stack trace:
+#0 /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php(1095): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /home3/spfx/public_html/website_a844b2f2/project/sourcing_rfq_tracker.php on line 1095

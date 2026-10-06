@@ -1,19 +1,22 @@
 <?php
 
 /**
- * Shared helpers for task notifications.
+ * Shared helper for task lists: after a task is created, a banner is shown at
+ * the top of the task list announcing the new task. The banner fades away
+ * after a few seconds or when clicked, and plays a short chime unless the
+ * visitor prefers reduced motion.
  *
- * Standalone tasks are announced to *every* viewer of the task list: each
- * insert (web form or JSON API) records the new task id in the app_state
- * table via record_last_new_task_id(), and standalone_tasks.php polls
- * standalone_task_latest.php for changes.
- *
- * The other task lists (tasks.php, playbook_tasks.php) still use the session
- * flash helpers below for their own creates.
+ * Manual creates use the session flash (flash_new_task_banner()). The
+ * stateless JSON API cannot use the session, so it sets the short-lived
+ * NEW_TASK_BANNER_COOKIE instead (new_task_banner_cookie()); the list page
+ * consumes and clears it on the next load.
  */
 
-if (!defined('LAST_NEW_TASK_STATE_KEY')) {
-    define('LAST_NEW_TASK_STATE_KEY', 'last_new_task_id');
+if (!defined('NEW_TASK_BANNER_COOKIE')) {
+    define('NEW_TASK_BANNER_COOKIE', 'new_task_banner');
+}
+if (!defined('NEW_TASK_BANNER_COOKIE_MAX_AGE')) {
+    define('NEW_TASK_BANNER_COOKIE_MAX_AGE', 300);
 }
 
 if (!function_exists('new_task_banner_sanitize_title')) {
@@ -37,64 +40,27 @@ if (!function_exists('flash_new_task_banner')) {
     }
 }
 
-if (!function_exists('app_ensure_state_table')) {
-    function app_ensure_state_table(PDO $pdo): void
-    {
-        static $ready = false;
-        if ($ready) {
-            return;
-        }
-
-        $pdo->exec(
-            'CREATE TABLE IF NOT EXISTS app_state ('
-            . ' state_key VARCHAR(64) NOT NULL,'
-            . ' state_val VARCHAR(255) NULL,'
-            . ' updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,'
-            . ' PRIMARY KEY (state_key)'
-            . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
-        );
-
-        $ready = true;
-    }
-}
-
-if (!function_exists('record_last_new_task_id')) {
+if (!function_exists('new_task_banner_cookie')) {
     /**
-     * Remember the id of the task that was just created so that every task
-     * list viewer can be notified about it, not only the creator.
+     * Set the short-lived banner cookie. Used by stateless contexts such as the
+     * JSON API, where no session is available. Readable by JavaScript so the
+     * list page can clear it after the banner has been shown.
      */
-    function record_last_new_task_id(PDO $pdo, int $task_id): void
+    function new_task_banner_cookie(string $title = ''): bool
     {
-        if ($task_id <= 0) {
-            return;
+        if (headers_sent()) {
+            return false;
         }
+        $secure = (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off')
+            || (int)($_SERVER['SERVER_PORT'] ?? 0) === 443;
 
-        try {
-            app_ensure_state_table($pdo);
-            $stmt = $pdo->prepare(
-                'INSERT INTO app_state (state_key, state_val) VALUES (?, ?)'
-                . ' ON DUPLICATE KEY UPDATE state_val = VALUES(state_val)'
-            );
-            $stmt->execute([LAST_NEW_TASK_STATE_KEY, (string)$task_id]);
-        } catch (Throwable $e) {
-            // The notification is a nicety; never fail the create because of it.
-            error_log('record_last_new_task_id: ' . $e->getMessage());
-        }
-    }
-}
-
-if (!function_exists('get_last_new_task_id')) {
-    function get_last_new_task_id(PDO $pdo): int
-    {
-        try {
-            app_ensure_state_table($pdo);
-            $stmt = $pdo->prepare('SELECT state_val FROM app_state WHERE state_key = ?');
-            $stmt->execute([LAST_NEW_TASK_STATE_KEY]);
-            return (int)$stmt->fetchColumn();
-        } catch (Throwable $e) {
-            error_log('get_last_new_task_id: ' . $e->getMessage());
-            return 0;
-        }
+        return setcookie(NEW_TASK_BANNER_COOKIE, new_task_banner_sanitize_title($title), [
+            'expires' => time() + NEW_TASK_BANNER_COOKIE_MAX_AGE,
+            'path' => '/',
+            'secure' => $secure,
+            'httponly' => false,
+            'samesite' => 'Lax',
+        ]);
     }
 }
 
@@ -105,16 +71,37 @@ if (!function_exists('render_new_task_banner')) {
             session_start();
         }
 
-        if (!array_key_exists('new_task_banner', $_SESSION)) {
+        $title = null;
+        $from_cookie = false;
+
+        if (array_key_exists('new_task_banner', $_SESSION)) {
+            $title = new_task_banner_sanitize_title((string)$_SESSION['new_task_banner']);
+            unset($_SESSION['new_task_banner']);
+        } elseif (array_key_exists(NEW_TASK_BANNER_COOKIE, $_COOKIE)) {
+            $title = new_task_banner_sanitize_title((string)$_COOKIE[NEW_TASK_BANNER_COOKIE]);
+            $from_cookie = true;
+        }
+
+        if ($title === null) {
             return;
         }
 
-        $title = new_task_banner_sanitize_title((string)$_SESSION['new_task_banner']);
-        unset($_SESSION['new_task_banner']);
+        if ($from_cookie) {
+            unset($_COOKIE[NEW_TASK_BANNER_COOKIE]);
+            if (!headers_sent()) {
+                setcookie(NEW_TASK_BANNER_COOKIE, '', [
+                    'expires' => time() - 3600,
+                    'path' => '/',
+                    'httponly' => false,
+                    'samesite' => 'Lax',
+                ]);
+            }
+        }
 
         $message = $title === '' ? 'New task added' : 'New task added: ' . $title;
         ?>
-        <div class="new-task-banner" id="new-task-banner" role="status" aria-live="polite" title="Click to dismiss">
+        <div class="new-task-banner" id="new-task-banner" role="status" aria-live="polite" title="Click to dismiss"
+             data-clear-cookie="<?= $from_cookie ? '1' : '0' ?>">
           <span class="new-task-banner-dot" aria-hidden="true"></span>
           <span class="new-task-banner-text"><?= htmlspecialchars($message, ENT_QUOTES, 'UTF-8') ?></span>
         </div>
@@ -143,7 +130,12 @@ if (!function_exists('render_new_task_banner')) {
           var banner = document.getElementById('new-task-banner');
           if (!banner) return;
 
+          var cookieName = <?= json_encode(NEW_TASK_BANNER_COOKIE) ?>;
           var removeTimer = null;
+
+          if (banner.dataset.clearCookie === '1') {
+            document.cookie = cookieName + '=; Max-Age=0; path=/; SameSite=Lax';
+          }
 
           function prefersReducedMotion() {
             return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
